@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 
 export interface UserDoc {
@@ -110,22 +113,93 @@ export interface TemporaryDonationDoc {
   createdAt: Date;
 }
 
-const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/streamneon';
+/**
+ * Safely extract MONGODB_URI directly from process.env with fallback
+ */
+export function getMongoUri(): string {
+  return process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/streamneon';
+}
+
+/**
+ * Extract target database name from MONGODB_DB, MONGODB_DATABASE,
+ * or directly from the MONGODB_URI path.
+ */
+export function getMongoDbName(): string {
+  if (process.env.MONGODB_DB) return process.env.MONGODB_DB;
+  if (process.env.MONGODB_DATABASE) return process.env.MONGODB_DATABASE;
+
+  const uri = getMongoUri();
+  try {
+    const parsed = new URL(uri.replace(/^mongodb(\+srv)?:\/\//i, 'http://'));
+    const pathname = parsed.pathname.replace(/^\//, '').trim();
+    if (pathname) {
+      const db = pathname.split('/')[0].split('?')[0];
+      if (db) return db;
+    }
+  } catch {
+    const match = uri.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?/\s]+)/i);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return 'streamneon';
+}
+
+function maskMongoUri(uri: string): string {
+  try {
+    return uri.replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@');
+  } catch {
+    return uri;
+  }
+}
 
 const globalWithMongo = globalThis as typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>;
+  _cachedMongoUri?: string;
 };
 
-if (!globalWithMongo._mongoClientPromise) {
-  const client = new MongoClient(uri);
-  globalWithMongo._mongoClientPromise = client.connect();
+/**
+ * Returns a connected MongoClient promise, lazily reading current process.env.MONGODB_URI.
+ */
+export function getMongoClient(): Promise<MongoClient> {
+  const currentUri = getMongoUri();
+
+  if (!globalWithMongo._mongoClientPromise || globalWithMongo._cachedMongoUri !== currentUri) {
+    globalWithMongo._cachedMongoUri = currentUri;
+    const client = new MongoClient(currentUri);
+    
+    globalWithMongo._mongoClientPromise = client.connect().then((c) => {
+      const dbName = getMongoDbName();
+      console.log(`⚡ [MongoDB] Connected successfully to ${maskMongoUri(currentUri)} | Active Database: "${dbName}"`);
+      return c;
+    }).catch((err) => {
+      console.error(`❌ [MongoDB] Connection failed to ${maskMongoUri(currentUri)}:`, err?.message || err);
+      globalWithMongo._mongoClientPromise = undefined;
+      throw err;
+    });
+  }
+
+  return globalWithMongo._mongoClientPromise;
 }
 
-export const clientPromise: Promise<MongoClient> = globalWithMongo._mongoClientPromise;
+export const clientPromise: Promise<MongoClient> = {
+  then(onfulfilled, onrejected) {
+    return getMongoClient().then(onfulfilled, onrejected);
+  },
+  catch(onrejected) {
+    return getMongoClient().catch(onrejected);
+  },
+  finally(onfinally) {
+    return getMongoClient().finally(onfinally);
+  },
+  [Symbol.toStringTag]: 'Promise'
+} as Promise<MongoClient>;
 
 export async function getMongoDb(): Promise<Db> {
-  const client = await clientPromise;
-  return client.db('streamneon');
+  const client = await getMongoClient();
+  const dbName = getMongoDbName();
+  return client.db(dbName);
 }
 
 export async function getUsersCollection(): Promise<Collection<UserDoc>> {
@@ -175,6 +249,8 @@ export async function initMongo() {
     await db.collection('media').createIndex({ userId: 1, createdAt: -1 });
     await db.collection('overlays').createIndex({ overlayToken: 1 }, { unique: true });
     await db.collection('overlays').createIndex({ userId: 1, createdAt: -1 });
+    await db.collection('temporary_donations').createIndex({ id: 1 }, { unique: true });
+    await db.collection('temporary_donations').createIndex({ streamerId: 1, createdAt: -1 });
 
     // Seed default user if not exists
     const usersCol = await getUsersCollection();
@@ -233,7 +309,7 @@ export async function initMongo() {
       console.log('⚡ [MongoDB] Default gateway_settings initialized');
     }
 
-    console.log('⚡ [MongoDB] Collections and indexes verified successfully');
+    console.log(`⚡ [MongoDB] Collections and indexes verified successfully on database: "${db.databaseName}"`);
   } catch (err) {
     console.error('❌ [MongoDB] Error during initialization:', err);
   }
