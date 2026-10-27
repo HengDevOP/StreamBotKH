@@ -1,8 +1,7 @@
 import crypto from 'crypto';
 import axios from 'axios';
 import { ENV } from '../config/env';
-import { db } from '../database/db';
-import { broadcastAlertToOverlay, broadcastDonationToDashboard } from './socketService';
+import { db } from '../database/db';import { broadcastAlertToOverlay, broadcastDonationToDashboard } from './socketService';
 import { sendTelegramDonationAlert } from './telegramService';
 
 export interface PayWayCheckoutParams {
@@ -108,12 +107,19 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
 }
 
 /**
- * Checks transaction status with ABA PayWay API
+ * Checks transaction status with ABA PayWay API.
+ * Uses the Pro streamer's own merchant credentials stored in the DB.
+ * Returns null if no credentials are configured.
  */
 export async function checkPayWayTransaction(tranId: string, streamerId: string) {
   const paymentSettings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(streamerId) as any;
-  const merchantId = paymentSettings?.aba_merchant_id || ENV.ABA_PAYWAY_MERCHANT_ID;
-  const apiKey = paymentSettings?.aba_api_key || ENV.ABA_PAYWAY_API_KEY;
+  const merchantId = paymentSettings?.aba_merchant_id;
+  const apiKey = paymentSettings?.aba_api_key;
+
+  if (!merchantId || !apiKey) {
+    console.warn(`[PayWay] No merchant credentials configured for streamer ${streamerId}. Skipping check.`);
+    return null;
+  }
 
   const reqTime = Math.floor(Date.now() / 1000).toString();
   // Hash for check-transaction: req_time + merchant_id + tran_id
