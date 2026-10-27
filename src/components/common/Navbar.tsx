@@ -173,11 +173,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
     <header className="sticky top-0 z-50 w-full bg-[#070A12]/95 backdrop-blur-md border-b border-white/[0.08]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-18">
-          {/* Left: Logo + Title ("streambotkh.com") + Nav Menu */}
-          <div className="flex items-center gap-6 lg:gap-8">
+          {/* Left: Mobile Menu Toggle + Logo + Title ("streambotkh.com") + Nav Menu */}
+          <div className="flex items-center gap-3 sm:gap-6 lg:gap-8">
+            {/* Mobile menu toggle on the left side */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+
             {/* Logo on the left & Title "streambotkh.com" */}
             <Link
-              href="/"
+              to="/"
               onClick={(e) => {
                 if (onNavigate) {
                   e.preventDefault();
@@ -204,7 +213,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             <nav className="hidden md:flex items-center gap-1 pl-4 border-l border-slate-800">
               {/* 1. Home Route (/) */}
               <Link
-                href="/"
+                to="/"
                 onClick={(e) => {
                   if (onNavigate) {
                     e.preventDefault();
@@ -302,7 +311,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
               {/* 3. Pricing Route (/pricing) */}
               <Link
-                href="/pricing"
+                to="/pricing"
                 onClick={(e) => {
                   if (onNavigate) {
                     e.preventDefault();
@@ -331,7 +340,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
               {/* 5. Discord Route (/discord) */}
               <Link
-                href="/discord"
+                to="/discord"
                 onClick={(e) => {
                   if (onNavigate) {
                     e.preventDefault();
@@ -351,7 +360,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
               {/* Streamer Dashboard Link when authenticated */}
               {user && (
                 <Link
-                  href="/dashboard"
+                  to="/dashboard"
                   onClick={(e) => {
                     if (onNavigate) {
                       e.preventDefault();
@@ -371,13 +380,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             </nav>
           </div>
 
-          {/* Right Section: Sign in with Google / Profile (Online section removed) */}
+          {/* Right Section: Sign in with Google / Profile */}
           <div className="flex items-center gap-3">
             {/* User authenticated or Sign In with Google */}
             {user ? (
               <div className="flex items-center gap-2">
                 <Link
-                  href="/dashboard"
+                  to="/dashboard"
                   onClick={(e) => {
                     if (onNavigate) {
                       e.preventDefault();
@@ -412,7 +421,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             ) : (
               <div className="flex items-center gap-2">
                 <Link
-                  href="/login"
+                  to="/login"
                   onClick={(e) => {
                     if (onNavigate) {
                       e.preventDefault();
@@ -427,14 +436,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 </Link>
               </div>
             )}
-
-            {/* Mobile menu toggle */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
-            >
-              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
           </div>
         </div>
       </div>

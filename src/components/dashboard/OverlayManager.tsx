@@ -300,7 +300,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
                   {/* Actions Bar */}
                   <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between gap-2">
                     <Link
-                      href={`/dashboard?overlay=${item._id}`}
+                      to={`/dashboard?overlay=${item._id}`}
                       className="px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-colors"
                       title="Manage resolution, media and settings"
                     >

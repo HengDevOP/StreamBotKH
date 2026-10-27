@@ -330,7 +330,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
       <header className="h-14 border-b border-slate-800/80 bg-[#090D18] px-4 flex items-center justify-between flex-shrink-0 z-20">
         <div className="flex items-center gap-3">
           <Link
-            href="/dashboard?tab=overlay"
+            to="/dashboard?tab=overlay"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-slate-300 hover:text-white transition-colors"
           >
             <ArrowLeft size={14} />
