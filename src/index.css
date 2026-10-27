@@ -1,0 +1,230 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    color: #F8FAFC;
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: 0.02em;
+  }
+}
+
+/* Ensure OBS browser overlay sources remain 100% transparent */
+html:has(.obs-overlay),
+body:has(.obs-overlay) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Subtle Dark Grid */
+.cyber-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+.cyber-grid-dense {
+  background-size: 20px 20px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* Radiant Ambient Glow Orbs without blurry drop-shadows */
+.ambient-glow-cyan {
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.12) 0%, rgba(0, 240, 255, 0) 70%);
+}
+
+.ambient-glow-pink {
+  background: radial-gradient(circle, rgba(255, 0, 122, 0.1) 0%, rgba(255, 0, 122, 0) 70%);
+}
+
+.ambient-glow-purple {
+  background: radial-gradient(circle, rgba(138, 43, 226, 0.1) 0%, rgba(138, 43, 226, 0) 70%);
+}
+
+/* Clean Cards without fuzzy drop-shadows */
+.cyber-card {
+  background: #0B0F19;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cyber-card:hover {
+  border-color: rgba(0, 240, 255, 0.4);
+}
+
+/* Audio Equalizer Bar Animation */
+@keyframes eqBar {
+  0%, 100% { height: 4px; }
+  50% { height: 24px; }
+}
+
+.eq-bar-1 { animation: eqBar 0.8s ease-in-out infinite; }
+.eq-bar-2 { animation: eqBar 0.6s ease-in-out infinite 0.15s; }
+.eq-bar-3 { animation: eqBar 1.1s ease-in-out infinite 0.3s; }
+.eq-bar-4 { animation: eqBar 0.7s ease-in-out infinite 0.2s; }
+.eq-bar-5 { animation: eqBar 0.9s ease-in-out infinite 0.4s; }
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 4s ease-in-out 2s infinite;
+}
+
+/* Continuous Horizontal Marquee */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 35s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Shimmer animated gradient text */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    #00F0FF 0%,
+    #38BDF8 25%,
+    #EC4899 50%,
+    #A855F7 75%,
+    #00F0FF 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: shimmer 8s linear infinite;
+}
+
+/* Clean Radar Scanline */
+@keyframes radarScan {
+  0% { top: 0%; opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { top: 100%; opacity: 0.8; }
+}
+
+.radar-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00F0FF, transparent);
+  animation: radarScan 2s linear infinite;
+}
+
+/* Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #070A12;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Smooth Fade In and Out for Donation Alerts */
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-alert-fade {
+  animation: fadeInOut 8s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Toast Pop & Slide Animations (Device top pop, Desktop top-right slide left) */
+@keyframes cancelToastPopTop {
+  0% {
+    opacity: 0;
+    transform: translateY(-36px) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(4px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cancelToastSlidePopLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(120%) scale(0.92);
+  }
+  65% {
+    opacity: 1;
+    transform: translateX(-10px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-cancel-toast {
+  animation: cancelToastPopTop 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (min-width: 768px) {
+  .animate-cancel-toast {
+    animation: cancelToastSlidePopLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
