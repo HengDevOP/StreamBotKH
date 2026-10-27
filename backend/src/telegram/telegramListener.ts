@@ -243,40 +243,7 @@ export class TelegramGroupListener {
         const seenIds = new Set<string>();
         const candidates: any[] = [];
 
-        // A. SQLite temporary_donations
-        try {
-          const tempCandidates = db.prepare(`
-            SELECT * FROM temporary_donations
-            WHERE created_at > datetime('now', '-10 minutes')
-            ORDER BY created_at DESC
-            LIMIT 30
-          `).all() as any[];
-          for (const c of tempCandidates) {
-            if (c && c.id && !seenIds.has(c.id)) {
-              seenIds.add(c.id);
-              candidates.push(c);
-            }
-          }
-        } catch (e) {}
-
-        // B. SQLite pending donations
-        try {
-          const pendingCandidates = db.prepare(`
-            SELECT * FROM donations
-            WHERE status = 'PENDING'
-              AND created_at > datetime('now', '-10 minutes')
-            ORDER BY created_at DESC
-            LIMIT 30
-          `).all() as any[];
-          for (const c of pendingCandidates) {
-            if (c && c.id && !seenIds.has(c.id)) {
-              seenIds.add(c.id);
-              candidates.push(c);
-            }
-          }
-        } catch (e) {}
-
-        // C. MongoDB temporary_donations
+        // A. MongoDB temporary_donations
         try {
           const tempCol = await getTemporaryDonationsCollection();
           const mongoRecent = await tempCol
@@ -309,6 +276,23 @@ export class TelegramGroupListener {
           }
         } catch (e) {}
 
+        // B. SQLite pending donations (for original video & alert metadata)
+        try {
+          const pendingCandidates = db.prepare(`
+            SELECT * FROM donations
+            WHERE status = 'PENDING'
+              AND created_at > datetime('now', '-10 minutes')
+            ORDER BY created_at DESC
+            LIMIT 30
+          `).all() as any[];
+          for (const c of pendingCandidates) {
+            if (c && c.id && !seenIds.has(c.id)) {
+              seenIds.add(c.id);
+              candidates.push(c);
+            }
+          }
+        } catch (e) {}
+
         matchedTemp = findMatchingTemporaryDonation(candidates, {
           donorName: parsed.donorName,
           payerName: parsed.payerName || parsed.donorName,
@@ -319,10 +303,7 @@ export class TelegramGroupListener {
         });
 
         if (matchedTemp) {
-          console.log(`🎯 [Group Listener Matched] Found active donation session ${matchedTemp.id} (Bank Name: "${matchedTemp.banking_name}", Donor: "${matchedTemp.donor_name}").`);
-          try {
-            db.prepare('DELETE FROM temporary_donations WHERE id = ?').run(matchedTemp.id);
-          } catch (e) {}
+          console.log(`🎯 [Group Listener Matched] Found active donation session ${matchedTemp.id} in MongoDB (Bank Name: "${matchedTemp.banking_name}", Donor: "${matchedTemp.donor_name}").`);
           try {
             const col = await getTemporaryDonationsCollection();
             await col.deleteMany({
@@ -335,7 +316,7 @@ export class TelegramGroupListener {
           } catch (e) {}
         }
       } catch (matchErr) {
-        console.warn('[Temporary Listener] Error checking temporary donations in SQLite:', matchErr);
+        console.warn('[Temporary Listener] Error checking temporary donations in MongoDB:', matchErr);
       }
 
       // Preserve active session ID so modal receives PAID status

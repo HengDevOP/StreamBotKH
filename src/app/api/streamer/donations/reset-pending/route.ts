@@ -38,26 +38,23 @@ export async function POST(_req: NextRequest) {
       WHERE status = 'PENDING'
     `).run();
 
-    // 2. Wipe temporary donations queue
-    const deleteResult = db.prepare(`
-      DELETE FROM temporary_donations
-    `).run();
-
-    // 3. Clear MongoDB temporary queue
+    // 2. Clear MongoDB temporary queue
+    let mongoCleared = 0;
     try {
       const col = await getTemporaryDonationsCollection();
-      await col.deleteMany({});
+      const res = await col.deleteMany({});
+      mongoCleared = res.deletedCount || 0;
     } catch (e) {
       // safe fallback
     }
 
-    const totalCleared = (updateResult.changes || 0) + (deleteResult.changes || 0);
-    console.log(`🧹 [Dashboard Reset] Streamer reset all pending sessions. Cleared: ${updateResult.changes} donations, ${deleteResult.changes} temporary records.`);
+    const totalCleared = (updateResult.changes || 0) + mongoCleared;
+    console.log(`🧹 [Dashboard Reset] Streamer reset all pending sessions. Cleared: ${updateResult.changes} donations, ${mongoCleared} MongoDB temporary records.`);
 
     return NextResponse.json({
       success: true,
       clearedDonations: updateResult.changes || 0,
-      clearedTemporary: deleteResult.changes || 0,
+      clearedTemporary: mongoCleared,
       message: `Successfully reset ${updateResult.changes || 0} pending session(s). Unwanted alerts prevented.`
     });
   } catch (err: any) {

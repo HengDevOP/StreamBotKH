@@ -9,9 +9,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'donationId is required' }, { status: 400 });
     }
 
-    // 1. Delete from SQLite temporary_donations
+    // 1. Mark pending donation as CANCELLED
     try {
-      db.prepare('DELETE FROM temporary_donations WHERE id = ?').run(donationId);
       db.prepare("UPDATE donations SET status = 'CANCELLED' WHERE id = ? AND status = 'PENDING'").run(donationId);
     } catch (e) {
       console.warn('[Cleanup] SQLite error:', e);
@@ -20,7 +19,9 @@ export async function POST(req: NextRequest) {
     // 2. Delete from MongoDB temporary_donations
     try {
       const col = await getTemporaryDonationsCollection();
-      await col.deleteOne({ id: donationId });
+      await col.deleteMany({
+        $or: [{ id: donationId }, { donationId }]
+      });
     } catch (e) {
       console.warn('[Cleanup] Mongo error:', e);
     }

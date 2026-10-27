@@ -73,31 +73,7 @@ export async function POST(req: NextRequest) {
       cleanVideoEndTime
     );
 
-    // 2. Store in temporary listener database queue (SQLite)
-    try {
-      db.prepare(`
-        INSERT INTO temporary_donations (
-          id, streamer_id, donor_name, donor_message, amount, currency,
-          banking_name, video_url, video_title, video_start_time, video_end_time
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        donationId,
-        streamerId,
-        donorName.slice(0, 50),
-        (donorMessage || '').slice(0, 250),
-        numAmount,
-        validCurrency,
-        cleanBankingName,
-        cleanVideoUrl,
-        cleanVideoTitle,
-        cleanVideoStartTime,
-        cleanVideoEndTime
-      );
-    } catch (tempErr) {
-      console.warn('[Donation] Could not insert temporary SQLite record:', tempErr);
-    }
-
-    // 3. Store in temporary listener collection in MongoDB
+    // 2. Store in temporary listener collection in MongoDB (100% MongoDB queue)
     try {
       const tempCol = await getTemporaryDonationsCollection();
       await tempCol.insertOne({

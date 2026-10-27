@@ -58,24 +58,9 @@ try {
   db.exec('ALTER TABLE donations ADD COLUMN video_end_time INTEGER DEFAULT 0');
 } catch (e) {}
 
-// Temporary donations table for listener queue
+// Clean any legacy temporary_donations table from SQLite (now 100% in MongoDB)
 try {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS temporary_donations (
-      id TEXT PRIMARY KEY,
-      streamer_id TEXT NOT NULL,
-      donor_name TEXT NOT NULL,
-      donor_message TEXT,
-      amount REAL NOT NULL,
-      currency TEXT NOT NULL,
-      banking_name TEXT,
-      video_url TEXT,
-      video_title TEXT,
-      video_start_time INTEGER DEFAULT 0,
-      video_end_time INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  db.exec('DROP TABLE IF EXISTS temporary_donations');
 } catch (e) {}
 
 // Telegram Monitored Groups table: GramJS listens ONLY from these target groups
@@ -348,24 +333,26 @@ export function cleanupExpiredPendingDonations(): { expiredDonations: number; cl
         AND created_at <= datetime('now', '-5 minutes')
     `).run().changes;
 
-    const clearedTemporary = db.prepare(`
-      DELETE FROM temporary_donations
-      WHERE created_at <= datetime('now', '-5 minutes')
-    `).run().changes;
+    let clearedTemporary = 0;
 
-    if (expiredDonations > 0 || clearedTemporary > 0) {
-      console.log(`🧹 [Cache Timer] Auto-cleared ${expiredDonations} expired pending donations and ${clearedTemporary} temporary records (>5 mins).`);
-    }
-
-    // Also auto-clean expired records from MongoDB temporary_donations
+    // Auto-clean expired records from MongoDB temporary_donations
     try {
       const { getTemporaryDonationsCollection } = require('./mongo');
       getTemporaryDonationsCollection().then((col: any) => {
         col.deleteMany({
           createdAt: { $lt: new Date(Date.now() - 5 * 60 * 1000) }
+        }).then((res: any) => {
+          if (res?.deletedCount) {
+            clearedTemporary = res.deletedCount;
+            console.log(`🧹 [MongoDB Cache] Cleared ${clearedTemporary} expired temporary donation sessions (>5 mins).`);
+          }
         }).catch(() => {});
       }).catch(() => {});
     } catch (e) {}
+
+    if (expiredDonations > 0) {
+      console.log(`🧹 [Cache Timer] Auto-cleared ${expiredDonations} expired pending donations (>5 mins).`);
+    }
 
     return { expiredDonations, clearedTemporary };
   } catch (e) {
