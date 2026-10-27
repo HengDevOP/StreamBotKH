@@ -1,9 +1,0 @@
-{
-  "/dashboard/page": "app/dashboard/page.js",
-  "/page": "app/page.js",
-  "/api/streamer/dashboard/route": "app/api/streamer/dashboard/route.js",
-  "/api/streamer/payments/route": "app/api/streamer/payments/route.js",
-  "/api/media/route": "app/api/media/route.js",
-  "/api/streamer/alerts/route": "app/api/streamer/alerts/route.js",
-  "/pricing/page": "app/pricing/page.js"
-}
