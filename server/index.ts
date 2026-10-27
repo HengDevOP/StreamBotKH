@@ -50,20 +50,26 @@ function createRouteHandler(handler: Function) {
       let body: any = undefined;
       if (req.method !== 'GET' && req.method !== 'HEAD') {
         const contentType = req.headers['content-type'] || '';
-        if (contentType.includes('application/json')) {
-          body = JSON.stringify(req.body);
+        if (contentType.includes('multipart/form-data')) {
+          body = req;
+        } else if (contentType.includes('application/json')) {
+          body = JSON.stringify(req.body ?? {});
+          headers.delete('content-length');
         } else if (contentType.includes('application/x-www-form-urlencoded')) {
-          body = new URLSearchParams(req.body).toString();
-        } else {
-          body = JSON.stringify(req.body);
+          body = new URLSearchParams(req.body ?? {}).toString();
+          headers.delete('content-length');
+        } else if (req.body !== undefined) {
+          body = typeof req.body === 'string' || Buffer.isBuffer(req.body) ? req.body : JSON.stringify(req.body);
+          headers.delete('content-length');
         }
       }
 
       const nextReq = new NextRequest(url, {
         method: req.method,
         headers,
-        body: body || undefined
-      });
+        body: body || undefined,
+        ...(body === req ? { duplex: 'half' } : {})
+      } as any);
 
       const nextRes = await handler(nextReq, { params: req.params });
 

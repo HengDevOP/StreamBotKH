@@ -1,12 +1,13 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrowserRouter, Routes, Route, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { ModalProvider } from './context/ModalContext';
 import { Navbar } from './components/common/Navbar';
 
 // Page Views
 import { HomePage } from './views/HomePage';
-import { DashboardPage } from './views/DashboardPage';
+import { DashboardPage, DashboardTab } from './views/DashboardPage';
 import { OverlayPage } from './views/OverlayPage';
 import { DonatePage } from './views/DonatePage';
 import { LoginPage } from './views/LoginPage';
@@ -19,6 +20,48 @@ import { StreamSoundboardOverlay } from './components/overlay/StreamSoundboardOv
 import { StreamGoalOverlay } from './components/overlay/StreamGoalOverlay';
 import { StreamLeaderboardOverlay } from './components/overlay/StreamLeaderboardOverlay';
 import { StreamTimerOverlay } from './components/overlay/StreamTimerOverlay';
+
+// Wrapper for Dashboard Page reading query parameters (?tab=...&id=...)
+function DashboardRouteWrapper() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  let rawTab = searchParams.get('tab') || '';
+  let id = searchParams.get('id') || '';
+
+  if (rawTab.includes('?id=')) {
+    const parts = rawTab.split('?id=');
+    rawTab = parts[0];
+    id = parts[1];
+  } else if (rawTab.includes('&id=')) {
+    const parts = rawTab.split('&id=');
+    rawTab = parts[0];
+    id = parts[1];
+  }
+
+  if (!rawTab && id) {
+    rawTab = 'donation';
+  }
+
+  let tab: DashboardTab = (rawTab as DashboardTab) || 'overview';
+  if (rawTab === 'alerts' || rawTab === 'donations') {
+    tab = 'donation';
+  }
+
+  const handleNav = (page: string, params?: any) => {
+    if (page === 'home') navigate('/');
+    else if (page === 'donate') navigate(`/@${params?.username || 'neonstreamer'}`);
+    else navigate(`/${page}`);
+  };
+
+  return (
+    <DashboardPage
+      onNavigate={handleNav}
+      initialTab={tab}
+      initialSelectedId={id || undefined}
+    />
+  );
+}
 
 // Wrapper for Donate Page reading route param :username
 function DonateRouteWrapper() {
@@ -78,6 +121,9 @@ function SoundboardOverlayRouteWrapper() {
 // Wrapper for Goal Widget Overlay
 function GoalOverlayRouteWrapper() {
   const { token } = useParams<{ token?: string }>();
+  const [searchParams] = useSearchParams();
+  const goalId = searchParams.get('goalId') || undefined;
+
   return (
     <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0">
       <style>{`
@@ -87,7 +133,7 @@ function GoalOverlayRouteWrapper() {
           background-image: none !important;
         }
       `}</style>
-      <StreamGoalOverlay token={token || ''} />
+      <StreamGoalOverlay token={token || ''} goalId={goalId} />
     </div>
   );
 }
@@ -198,7 +244,8 @@ function AppRoutes() {
         <Route path="/pricing" element={<PricingPage onNavigate={handleNav} />} />
         <Route path="/resources" element={<ResourcesPage onNavigate={handleNav} />} />
         <Route path="/discord" element={<DiscordPage onNavigate={handleNav} />} />
-        <Route path="/dashboard" element={<DashboardPage onNavigate={handleNav} />} />
+        <Route path="/dashboard" element={<DashboardRouteWrapper />} />
+        <Route path="/dashboard/*" element={<DashboardRouteWrapper />} />
         <Route path="/login" element={<LoginPage onSuccess={() => navigate('/dashboard')} />} />
 
         {/* Donation Pages */}
@@ -228,9 +275,11 @@ export function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <ModalProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </ModalProvider>
       </SocketProvider>
     </AuthProvider>
   );
