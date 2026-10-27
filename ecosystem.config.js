@@ -3,11 +3,11 @@ module.exports = {
     {
       name: 'streambotkh-web',
       script: 'node_modules/.bin/tsx',
-      args: 'server.ts',
+      args: 'server/index.ts',
       cwd: './',
       env: {
         NODE_ENV: 'production',
-        PORT: 5173
+        PORT: 3000
       },
       instances: 1,
       autorestart: true,

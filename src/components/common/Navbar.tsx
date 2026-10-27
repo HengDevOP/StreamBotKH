@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bot,
   ExternalLink,
@@ -128,8 +127,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileResourcesOpen, setMobileResourcesOpen] = useState(false);
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pathname = usePathname();
-  const router = useRouter();
+  const location = useLocation();
+  const pathname = location.pathname;
+  const navigate = useNavigate();
 
   const active = (path: string, key: string) => {
     if (currentPage) return currentPage === key;
@@ -142,7 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
     if (onNavigate) {
       onNavigate(key, params);
     } else {
-      router.push(path);
+      navigate(path);
     }
     setMobileMenuOpen(false);
     setDropdownOpen(false);

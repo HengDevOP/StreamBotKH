@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import {
   Tv,
   X,
@@ -79,7 +79,7 @@ export const CreateOverlayModal: React.FC<CreateOverlayModalProps> = ({
   initialName,
   initialMediaUrl
 }) => {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [name, setName] = useState<string>(initialName || 'Alert Box Overlay');
   const [width, setWidth] = useState<number>(1080);
   const [height, setHeight] = useState<number>(720);
@@ -144,7 +144,7 @@ export const CreateOverlayModal: React.FC<CreateOverlayModalProps> = ({
 
       onClose();
       // Redirect the user to the dedicated overlay management studio
-      router.push(`/dashboard?overlay=${created._id}`);
+      navigate(`/dashboard?overlay=${created._id}`);
     } catch (err: any) {
       setError(err.message || 'Could not create overlay. Please try again.');
       setCreating(false);

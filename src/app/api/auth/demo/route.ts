@@ -27,10 +27,11 @@ async function handleDemoLogin(req: NextRequest) {
 
     let streamer = db.prepare('SELECT * FROM streamers WHERE username = ?').get(requestedUsername) as any;
 
-    // If not found, ensure database is initialized and retry with neonstreamer
+    // If not found, ensure database is initialized and retry with neonstreamer or first streamer
     if (!streamer) {
       initDatabase();
-      streamer = db.prepare('SELECT * FROM streamers WHERE username = ?').get('neonstreamer') as any;
+      streamer = (db.prepare('SELECT * FROM streamers WHERE username IN (?, ?)').get(requestedUsername, 'neon') as any) ||
+                 (db.prepare('SELECT * FROM streamers LIMIT 1').get() as any);
     }
 
     if (!streamer) {

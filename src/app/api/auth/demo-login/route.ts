@@ -29,7 +29,8 @@ async function handleDemoLogin(req: NextRequest) {
 
     if (!streamer) {
       initDatabase();
-      streamer = db.prepare('SELECT * FROM streamers WHERE username = ?').get('neonstreamer') as any;
+      streamer = (db.prepare('SELECT * FROM streamers WHERE username IN (?, ?)').get(requestedUsername, 'neon') as any) ||
+                 (db.prepare('SELECT * FROM streamers LIMIT 1').get() as any);
     }
 
     if (!streamer) {

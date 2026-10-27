@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
-import { usePathname } from 'next/navigation';
+import { useLocation } from 'react-router-dom';
 import { Navbar } from './Navbar';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
   const isOverlay = pathname?.startsWith('/overlay');
   const isDashboard = pathname?.startsWith('/dashboard');
 

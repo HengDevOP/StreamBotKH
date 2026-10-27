@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Tv,
   ArrowLeft,
@@ -69,7 +68,7 @@ export interface OverlayData {
 type StudioTab = 'appearance' | 'audio' | 'text' | 'canvas' | 'obs';
 
 export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { socket } = useSocket();
   const { showConfirm, showAlert } = useModal();
   const { playSound } = useAudio();
@@ -195,7 +194,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
               message: 'The requested overlay could not be found.',
               type: 'danger'
             });
-            router.push('/dashboard?tab=overlay');
+            navigate('/dashboard?tab=overlay');
           }
 
           if (resMedia.ok && dataMedia.success) {
@@ -303,7 +302,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
         try {
           const res = await fetch(`/api/overlays/${overlay._id}`, { method: 'DELETE' });
           if (res.ok) {
-            router.push('/dashboard?tab=overlay');
+            navigate('/dashboard?tab=overlay');
           }
         } catch (e) {}
       }

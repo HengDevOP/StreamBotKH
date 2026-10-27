@@ -6,7 +6,7 @@
 
 ## 🌟 Highlights
 
-- **⚡ Full-Stack Next.js Architecture**: Next.js 14 App Router, TypeScript, Tailwind CSS, Lucide icons, Canvas Confetti.
+- **⚡ Pure React TSX + Express Architecture**: Blazing-fast Vite React 18 SPA with React Router, Express backend, TypeScript, Tailwind CSS, Lucide icons, Canvas Confetti.
 - **🇰🇭 Cambodian Payment Integration**: Dynamic EMVCo Tag-Length-Value (TLV) KHQR generator with CRC16 CCITT checksum for 40+ Cambodian banks (ABA Mobile, ACLEDA, Canadia, Wing, etc.).
 - **🎬 Zero-Latency OBS Browser Source Overlay (`/overlay/:token`)**: Transparent overlay designed for OBS Studio, Streamlabs, and vMix with Web Audio SFX + TTS.
 - **🎧 Interactive Stream Assets (Free & Pro)**:
@@ -140,7 +140,7 @@ MONGODB_URI=mongodb://127.0.0.1:27017/streamneon
 
 ---
 
-### Step 7: Build the Next.js Production App
+### Step 7: Build the React TSX Production Frontend
 
 ```bash
 npm run build
@@ -197,7 +197,7 @@ server {
     client_max_body_size 50M;
 
     location / {
-        proxy_pass http://127.0.0.1:5173;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         
         # WebSocket support (Socket.io live alerts)
