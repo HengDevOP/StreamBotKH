@@ -1,95 +1,280 @@
-# ⚡ streambotkh.com (Next.js Full-Stack)
+# ⚡ StreamBotKH (streambotkh.com)
 
-> **Next-Generation Unified Next.js Livestream Donation Alerts & Dashboard with ABA PayWay, Bakong KHQR, OBS Browser Overlay, and Telegram Bot Notifications.**
+> **Next-Generation Unified Next.js Livestream Donation Alerts & Creator Dashboard with ABA PayWay, Bakong KHQR, OBS Browser Overlay, Soundboard, YouTube Media Share, and GramJS Telegram Group Listener.**
 
 ---
 
 ## 🌟 Highlights
 
-- **⚡ Unified Full-Stack Next.js Architecture**:
-  - **Framework**: Next.js 14 App Router, TypeScript, Tailwind CSS, Lucide icons, Canvas Confetti.
-  - **Backend & Real-Time**: Integrated Next.js API Route Handlers, Custom Server (`server.ts`) with Socket.IO real-time event rooms, and high-performance SQLite (`better-sqlite3`).
-- **🇰🇭 Cambodian Payment Integration (ABA PayWay & Bakong KHQR)**:
-  - Dynamic EMVCo Tag-Length-Value (TLV) KHQR generator with CRC16 CCITT checksum.
-  - Support for **Banking Name input** with quick chips for ABA Bank, ACLEDA, Canadia, Wing, Bakong, Sathapana, etc.
-  - Instant Simulation / Sandbox Mode to test live alerts without real bank transactions.
-- **🎬 Zero-Latency OBS Browser Source Overlay (`/overlay/:token`)**:
-  - Transparent overlay designed for OBS Studio, Streamlabs, and vMix.
-  - Animated Cyber card with glowing borders, GIF mascot reaction, particle confetti, and sender bank badge.
-  - Web Audio synthesizer sound effects + Text-to-Speech (TTS) reading donor name & message.
-  - Queued alert dispatcher ensuring rapid donations never step over each other.
-- **📊 Streamer Command Deck (`/dashboard`)**:
-  - Real-time earnings summary in both **USD ($)** and **Khmer Riel (៛)**.
-  - Left sidebar navigation with plan fees: Free (10% fee), Pro $1.99/mo (0% fee), Studio $4.99/mo (0% fee).
-  - Live Alert Box Studio: customize glow color, duration, sound effect, layout, and trigger instant test alerts.
-  - Payment Gateways, Telegram Bot pairing, and OBS Browser Source configuration.
-- **🌐 Dedicated Routes**:
-  - `/` - Landing Page
-  - `/@:username` or `/[username]` - Dedicated streamer donation portal with banking name input
-  - `/donate/:username` - Alternative donation portal route
-  - `/resources` - Documentation & setup guides
-  - `/pricing` - Pricing plans (Free Starter, Pro Streamer, Studio)
-  - `/discord` - Community hub
-  - `/dashboard` - Streamer command deck
-  - `/login` - Google OAuth & 1-Click Demo login
-  - `/overlay/:token` - OBS transparent overlay
+- **⚡ Full-Stack Next.js Architecture**: Next.js 14 App Router, TypeScript, Tailwind CSS, Lucide icons, Canvas Confetti.
+- **🇰🇭 Cambodian Payment Integration**: Dynamic EMVCo Tag-Length-Value (TLV) KHQR generator with CRC16 CCITT checksum for 40+ Cambodian banks (ABA Mobile, ACLEDA, Canadia, Wing, etc.).
+- **🎬 Zero-Latency OBS Browser Source Overlay (`/overlay/:token`)**: Transparent overlay designed for OBS Studio, Streamlabs, and vMix with Web Audio SFX + TTS.
+- **🎧 Interactive Stream Assets (Free & Pro)**:
+  - **Video Alerts (YouTube Media Share)**: Queued video playback with audio ducking and custom start/end timestamps.
+  - **Spinning Wheels**: Interactive giveaway wheel widget for live chat engagement.
+  - **Stream Soundboard**: PC keyboard hotkey SFX engine with instant broadcast to OBS.
+  - **Donor Leaderboard**: 20 unique neon/cyber styles for top supporters.
+  - **Subathon Timer & Goals**: Auto top-ups and live progress tracking.
+- **💎 2-Plan Creator Pricing**:
+  - **Free Plan ($0/mo)**: 10% platform fee, 20MB storage, includes all 8 stream overlay widgets.
+  - **Pro Plan ($4.99/mo)**: 0% fee, 10GB storage, exclusive Payment Gateway (ABA PayWay direct settlement) & GramJS Telegram group auto-listener.
+- **🍃 Pure MongoDB Temporary Queue**: All temporary donation listener sessions are managed directly in MongoDB with zero SQLite file locks.
 
 ---
 
-## 📁 Project Directory Structure
+## 🚀 Complete Ubuntu VPS Deployment Guide (Node.js & HTTPS SSL)
 
-```text
-StreamService/
-├── src/
-│   ├── app/                               # Next.js App Router
-│   │   ├── layout.tsx                     # Root Layout with Auth & Socket providers
-│   │   ├── page.tsx                       # Home Page (/)
-│   │   ├── pricing/page.tsx               # Pricing Page (/pricing)
-│   │   ├── resources/page.tsx             # Resources Page (/resources)
-│   │   ├── discord/page.tsx               # Discord Page (/discord)
-│   │   ├── dashboard/page.tsx             # Streamer Dashboard (/dashboard)
-│   │   ├── login/page.tsx                 # Login Page (/login)
-│   │   ├── [username]/page.tsx            # Streamer Donation Page (/@username)
-│   │   ├── donate/[username]/page.tsx     # Streamer Donation Page (/donate/:username)
-│   │   ├── overlay/[token]/page.tsx       # OBS Browser Source (/overlay/:token)
-│   │   └── api/                           # Next.js Server Route Handlers
-│   │       ├── auth/                      # Google login & demo login
-│   │       ├── donations/                 # KHQR creation, status, and recent feeds
-│   │       ├── payway/                    # PayWay webhook & instant simulator
-│   │       └── streamer/                  # Stats, alert studio, and payment settings
-│   ├── components/
-│   │   ├── common/                        # Navbar, AppShell, Button, Card, Modal
-│   │   ├── donate/                        # DonorForm, BakongKHQRModal, DonationSuccess
-│   │   ├── dashboard/                     # Command deck tabs & stats
-│   │   └── overlay/                       # OBS screen alert components
-│   ├── views/                             # View components (HomePage, DashboardPage, etc.)
-│   ├── context/                           # AuthContext, SocketContext
-│   ├── hooks/                             # useAlertQueue, useAudio, useSpeechTTS
-│   ├── server/                            # Server-side database, services & auth
-│   │   ├── database/                      # better-sqlite3 connection & schema
-│   │   ├── services/                      # Bakong KHQR, PayWay, Telegram, Socket.IO
-│   │   ├── config/                        # Environment configuration
-│   │   └── auth.ts                        # JWT authentication helper
-│   ├── services/                          # Client API service fetchers
-│   └── types/                             # Shared TypeScript types
-├── server.ts                              # Custom Next.js + Socket.IO Server
-├── next.config.mjs                        # Next.js Configuration
-├── tailwind.config.ts                     # Tailwind CSS Configuration
-└── package.json                           # Unified full-stack dependencies
-```
+This step-by-step guide walks you through setting up and running **StreamBotKH** on a fresh **Ubuntu VPS (20.04 / 22.04 / 24.04 LTS)** with Node.js, MongoDB, PM2 process manager, Nginx reverse proxy, and free Let's Encrypt HTTPS SSL.
 
 ---
 
-## 🚀 Getting Started
+### Step 1: Connect to your VPS & Update Packages
 
-### 1. Start the Dev Server
+Open your local terminal and SSH into your server:
 ```bash
-npm run dev
+ssh root@YOUR_SERVER_IP
 ```
-Open **`http://localhost:3000`** in your browser.
 
-### 2. Build for Production
+Update your package index and upgrade installed packages:
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl git ufw build-essential
+```
+
+---
+
+### Step 2: Install Node.js (v20+ / v22+ / Current LTS)
+
+Using the official NodeSource installer:
+```bash
+# Download and install NodeSource setup script
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+
+# Install Node.js and npm
+sudo apt install -y nodejs
+
+# Verify installation
+node -v
+npm -v
+```
+
+---
+
+### Step 3: Install and Start MongoDB Community Edition
+
+```bash
+# Install gnupg and curl if not present
+sudo apt install -y gnupg curl
+
+# Import the MongoDB public GPG key
+curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
+   sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg \
+   --dearmor
+
+# Add the MongoDB repository
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | \
+   sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+
+# Update package lists and install MongoDB
+sudo apt update
+sudo apt install -y mongodb-org
+
+# Start and enable MongoDB service
+sudo systemctl start mongod
+sudo systemctl enable mongod
+
+# Verify MongoDB is active and running
+sudo systemctl status mongod --no-pager
+```
+
+---
+
+### Step 4: Install PM2 Globally
+
+```bash
+sudo npm install -g pm2
+```
+
+---
+
+### Step 5: Clone StreamBotKH Repository
+
+```bash
+# Navigate to web root directory
+cd /var/www
+
+# Clone repository
+git clone https://github.com/HengDevOP/StreamBotKH.git
+cd StreamBotKH
+
+# Install dependencies
+npm install
+```
+
+---
+
+### Step 6: Configure Environment Variables (`.env`)
+
+Create your production `.env` file:
+```bash
+cp .env.example .env
+nano .env
+```
+
+Configure your values:
+```env
+PORT=5173
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
+JWT_SECRET=your_long_random_jwt_secret_key_here
+
+# Telegram Integration (MTProto GramJS & Bot)
+TELEGRAM_API_ID=32427800
+TELEGRAM_API_HASH=8f8e70605256a4e08a81bd5e45481ceb
+TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
+TELEGRAM_BOT_USERNAME=YourBotUsername
+
+# MongoDB Database Connection
+MONGODB_URI=mongodb://127.0.0.1:27017/streamneon
+```
+*(Save and exit in nano: press `CTRL + O`, then `ENTER`, then `CTRL + X`)*
+
+---
+
+### Step 7: Build the Next.js Production App
+
 ```bash
 npm run build
-npm start
 ```
+
+---
+
+### Step 8: Start Services with PM2
+
+Start both the Web Server and the Telegram listener daemon via the included `ecosystem.config.js`:
+
+```bash
+pm2 start ecosystem.config.js
+```
+
+Verify running processes:
+```bash
+pm2 status
+```
+
+Configure PM2 to restart automatically on system reboots:
+```bash
+pm2 save
+pm2 startup
+# (Run the command generated by 'pm2 startup' if prompted)
+```
+
+Useful PM2 commands:
+- View live logs: `pm2 logs`
+- View web logs only: `pm2 logs streambotkh-web`
+- View Telegram listener logs: `pm2 logs streambotkh-telegram`
+- Restart all services: `pm2 restart ecosystem.config.js`
+
+---
+
+### Step 9: Install Nginx & Configure Reverse Proxy
+
+Install Nginx:
+```bash
+sudo apt install -y nginx
+```
+
+Create a new Nginx server block configuration:
+```bash
+sudo nano /etc/nginx/sites-available/streambotkh
+```
+
+Paste the following configuration (replace `yourdomain.com` with your actual domain):
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:5173;
+        proxy_http_version 1.1;
+        
+        # WebSocket support (Socket.io live alerts)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Enable the configuration and reload Nginx:
+```bash
+sudo ln -s /etc/nginx/sites-available/streambotkh /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+---
+
+### Step 10: Secure with Free HTTPS SSL (Certbot Let's Encrypt)
+
+Install Certbot and the Nginx plugin:
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+```
+
+Obtain and install SSL certificate:
+```bash
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+```
+- Enter your email address.
+- Agree to terms.
+- Certbot will automatically verify your domain, configure SSL encryption, and set up automatic 301 redirects from HTTP to HTTPS!
+
+Test auto-renewal:
+```bash
+sudo certbot renew --dry-run
+```
+
+---
+
+### Step 11: Configure Firewall (UFW)
+
+Allow SSH, HTTP, and HTTPS traffic:
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 'Nginx Full'
+sudo ufw enable
+sudo ufw status
+```
+
+---
+
+## 🔄 Updating / Deploying Code Changes in the Future
+
+Whenever you push new code to GitHub, update your live VPS with:
+
+```bash
+cd /var/www/StreamBotKH
+git pull origin main
+npm install
+npm run build
+pm2 reload ecosystem.config.js
+```
+
+---
+
+## 🛠 Tech Stack
+
+- **Frontend & App Engine**: Next.js 14, React 18, Tailwind CSS, Lucide Icons, Canvas Confetti
+- **Real-Time Communication**: Socket.IO, Web Speech API (TTS)
+- **Databases**: MongoDB (Temporary listener queue, media library), SQLite (Streamer accounts & widget settings)
+- **Telegram Client**: Telegram MTProto (GramJS) & Telegram Bot API
+- **Deployment**: Nginx, PM2, Certbot (Let's Encrypt SSL), Ubuntu Linux
