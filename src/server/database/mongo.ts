@@ -1,4 +1,5 @@
 import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
+import { ENV } from '../config/env';
 
 export interface UserDoc {
   _id?: ObjectId;
@@ -110,7 +111,7 @@ export interface TemporaryDonationDoc {
   createdAt: Date;
 }
 
-const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/streamneon';
+const uri = ENV.MONGODB_URI;
 
 const globalWithMongo = globalThis as typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>;
