@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/server/database/db';
+import { getTemporaryDonationsCollection } from '@/server/database/mongo';
 
 export async function GET(
   _req: NextRequest,
@@ -28,6 +29,9 @@ export async function GET(
       if (isOlderThan5Min) {
         db.prepare("UPDATE donations SET status = 'EXPIRED' WHERE id = ?").run(id);
         db.prepare("DELETE FROM temporary_donations WHERE id = ?").run(id);
+        getTemporaryDonationsCollection()
+          .then((col) => col.deleteMany({ $or: [{ id }, { donationId: id }] }))
+          .catch(() => {});
         donation.status = 'EXPIRED';
       }
     }

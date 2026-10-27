@@ -1,10 +1,12 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import http from 'http';
 import next from 'next';
 import { parse } from 'url';
 import { initDatabase, cleanupExpiredPendingDonations } from './src/server/database/db';
 import { initMongo } from './src/server/database/mongo';
 import { initSocketServer } from './src/server/services/socketService';
-import { ENV } from './src/server/config/env';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';

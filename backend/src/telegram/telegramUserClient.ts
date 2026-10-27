@@ -504,30 +504,74 @@ class TelegramUserClientManager {
           try {
             cleanupExpiredPendingDonations();
 
-            // Collect active candidates within 10 minutes window
-            const tempCandidates = db.prepare(`
-              SELECT * FROM temporary_donations
-              ORDER BY created_at DESC
-              LIMIT 30
-            `).all() as any[];
-
-            const pendingCandidates = db.prepare(`
-              SELECT * FROM donations
-              WHERE status = 'PENDING'
-                AND created_at > datetime('now', '-10 minutes')
-              ORDER BY created_at DESC
-              LIMIT 30
-            `).all() as any[];
-
-            // Deduplicate candidates by ID (prioritizing temporary_donations metadata)
+            // Collect active candidates within 10 minutes window across SQLite & MongoDB
             const seenIds = new Set<string>();
             const candidates: any[] = [];
-            for (const c of [...tempCandidates, ...pendingCandidates]) {
-              if (c && c.id && !seenIds.has(c.id)) {
-                seenIds.add(c.id);
-                candidates.push(c);
+
+            // A. SQLite temporary_donations
+            try {
+              const tempCandidates = db.prepare(`
+                SELECT * FROM temporary_donations
+                ORDER BY created_at DESC
+                LIMIT 30
+              `).all() as any[];
+              for (const c of tempCandidates) {
+                if (c && c.id && !seenIds.has(c.id)) {
+                  seenIds.add(c.id);
+                  candidates.push(c);
+                }
               }
-            }
+            } catch (e) {}
+
+            // B. SQLite pending donations
+            try {
+              const pendingCandidates = db.prepare(`
+                SELECT * FROM donations
+                WHERE status = 'PENDING'
+                  AND created_at > datetime('now', '-10 minutes')
+                ORDER BY created_at DESC
+                LIMIT 30
+              `).all() as any[];
+              for (const c of pendingCandidates) {
+                if (c && c.id && !seenIds.has(c.id)) {
+                  seenIds.add(c.id);
+                  candidates.push(c);
+                }
+              }
+            } catch (e) {}
+
+            // C. MongoDB temporary_donations collection
+            try {
+              const tempCol = await getTemporaryDonationsCollection();
+              const mongoRecent = await tempCol
+                .find({
+                  createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
+                })
+                .sort({ createdAt: -1 })
+                .limit(30)
+                .toArray();
+
+              for (const doc of mongoRecent) {
+                const docId = doc.id || (doc as any).donationId || String(doc._id);
+                if (docId && !seenIds.has(docId)) {
+                  seenIds.add(docId);
+                  candidates.push({
+                    id: docId,
+                    streamer_id: doc.streamerId,
+                    donor_name: doc.donorName,
+                    donor_message: doc.donorMessage,
+                    amount: doc.amount,
+                    currency: doc.currency,
+                    banking_name: doc.bankingName,
+                    video_url: doc.videoUrl,
+                    video_title: doc.videoTitle,
+                    video_start_time: doc.videoStartTime,
+                    video_end_time: doc.videoEndTime,
+                    created_at: doc.createdAt
+                  });
+                }
+              }
+            } catch (e) {}
 
             matchedTemp = findMatchingTemporaryDonation(candidates, {
               donorName: parsed.donorName,
@@ -540,10 +584,15 @@ class TelegramUserClientManager {
 
             if (matchedTemp) {
               console.log(`🎯 [GramJS Listener Matched] Found active donation session ${matchedTemp.id} (Bank Name: "${matchedTemp.banking_name}", Donor: "${matchedTemp.donor_name}").`);
-              db.prepare('DELETE FROM temporary_donations WHERE id = ?').run(matchedTemp.id);
-              getTemporaryDonationsCollection()
-                .then((col) => col.deleteOne({ id: matchedTemp.id }))
-                .catch(() => {});
+              try {
+                db.prepare('DELETE FROM temporary_donations WHERE id = ?').run(matchedTemp.id);
+              } catch (e) {}
+              try {
+                const col = await getTemporaryDonationsCollection();
+                await col.deleteMany({
+                  $or: [{ id: matchedTemp.id }, { donationId: matchedTemp.id }]
+                });
+              } catch (e) {}
 
               // Also load full pending record from donations table to preserve all original video & donor data
               try {
@@ -551,7 +600,7 @@ class TelegramUserClientManager {
               } catch (e) {}
             }
           } catch (matchErr) {
-            console.warn('[Temporary Listener] Error checking temporary donations in SQLite:', matchErr);
+            console.warn('[Temporary Listener] Error checking temporary donations in SQLite and MongoDB:', matchErr);
           }
 
           // Preserve the original active session ID so the modal poller receives PAID status

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { ENV } from '../config/env';
 import { db } from '../database/db';
 import { broadcastAlertToOverlay } from './socketService';
 
@@ -15,13 +14,14 @@ export interface TelegramDonationNotification {
 }
 
 export async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTML' | 'Markdown' = 'HTML') {
-  if (!ENV.TELEGRAM_BOT_TOKEN) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
     console.log(`[Telegram] [MOCK BOT] Would send to Chat ID ${chatId}:\n${text}`);
     return;
   }
 
   try {
-    const url = `https://api.telegram.org/bot${ENV.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
     await axios.post(url, {
       chat_id: chatId,
       text,

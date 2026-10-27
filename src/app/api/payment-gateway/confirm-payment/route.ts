@@ -42,13 +42,62 @@ export async function POST(req: NextRequest) {
     const numericAmount = Math.max(0.01, parseFloat(String(amount)) || 1.0);
 
     // 1. Check temporary_donations listener queue for matching bank name (First/Last name, any case)
+    // Checks across both SQLite and MongoDB temporary databases
     let matchedTemp: any = null;
     try {
-      const candidates = db.prepare(`
-        SELECT * FROM temporary_donations
-        WHERE streamer_id = ?
-        ORDER BY created_at DESC
-      `).all(streamer.id) as any[];
+      const seenIds = new Set<string>();
+      const candidates: any[] = [];
+
+      // A. Gather candidates from SQLite temporary_donations
+      try {
+        const sqliteRows = db.prepare(`
+          SELECT * FROM temporary_donations
+          WHERE streamer_id = ?
+          ORDER BY created_at DESC
+        `).all(streamer.id) as any[];
+        for (const row of sqliteRows) {
+          if (row?.id && !seenIds.has(row.id)) {
+            seenIds.add(row.id);
+            candidates.push(row);
+          }
+        }
+      } catch (err) {}
+
+      // B. Gather candidates from MongoDB temporary_donations
+      try {
+        const tempCol = await getTemporaryDonationsCollection();
+        const mongoDocs = await tempCol
+          .find({
+            $or: [
+              { streamerId: streamer.id },
+              { streamerId: 'demo-streamer-id-1001' }
+            ]
+          })
+          .sort({ createdAt: -1 })
+          .limit(30)
+          .toArray();
+
+        for (const doc of mongoDocs) {
+          const docId = doc.id || (doc as any).donationId || String(doc._id);
+          if (docId && !seenIds.has(docId)) {
+            seenIds.add(docId);
+            candidates.push({
+              id: docId,
+              streamer_id: doc.streamerId,
+              donor_name: doc.donorName,
+              donor_message: doc.donorMessage,
+              amount: doc.amount,
+              currency: doc.currency,
+              banking_name: doc.bankingName,
+              video_url: doc.videoUrl,
+              video_title: doc.videoTitle,
+              video_start_time: doc.videoStartTime,
+              video_end_time: doc.videoEndTime,
+              created_at: doc.createdAt
+            });
+          }
+        }
+      } catch (err) {}
 
       matchedTemp = findMatchingTemporaryDonation(candidates, {
         donorName: donorName.trim(),
@@ -59,13 +108,51 @@ export async function POST(req: NextRequest) {
       });
 
       if (!matchedTemp) {
-        const allRecent = db.prepare(`
-          SELECT * FROM temporary_donations
-          ORDER BY created_at DESC
-          LIMIT 25
-        `).all() as any[];
+        const recentCandidates: any[] = [];
+        try {
+          const allRecentSqlite = db.prepare(`
+            SELECT * FROM temporary_donations
+            ORDER BY created_at DESC
+            LIMIT 30
+          `).all() as any[];
+          for (const row of allRecentSqlite) {
+            if (row?.id && !seenIds.has(row.id)) {
+              seenIds.add(row.id);
+              recentCandidates.push(row);
+            }
+          }
+        } catch (err) {}
 
-        matchedTemp = findMatchingTemporaryDonation(allRecent, {
+        try {
+          const tempCol = await getTemporaryDonationsCollection();
+          const allRecentMongo = await tempCol
+            .find({})
+            .sort({ createdAt: -1 })
+            .limit(30)
+            .toArray();
+          for (const doc of allRecentMongo) {
+            const docId = doc.id || (doc as any).donationId || String(doc._id);
+            if (docId && !seenIds.has(docId)) {
+              seenIds.add(docId);
+              recentCandidates.push({
+                id: docId,
+                streamer_id: doc.streamerId,
+                donor_name: doc.donorName,
+                donor_message: doc.donorMessage,
+                amount: doc.amount,
+                currency: doc.currency,
+                banking_name: doc.bankingName,
+                video_url: doc.videoUrl,
+                video_title: doc.videoTitle,
+                video_start_time: doc.videoStartTime,
+                video_end_time: doc.videoEndTime,
+                created_at: doc.createdAt
+              });
+            }
+          }
+        } catch (err) {}
+
+        matchedTemp = findMatchingTemporaryDonation(recentCandidates, {
           donorName: donorName.trim(),
           bankingName,
           rawText: `${bankingName} ${donorName}`,
@@ -76,13 +163,18 @@ export async function POST(req: NextRequest) {
 
       if (matchedTemp) {
         console.log(`🎯 [Gateway Matched] Found active temporary donation session ${matchedTemp.id} (Bank Name: "${matchedTemp.banking_name}", Donor: "${matchedTemp.donor_name}").`);
-        db.prepare('DELETE FROM temporary_donations WHERE id = ?').run(matchedTemp.id);
-        getTemporaryDonationsCollection()
-          .then((col) => col.deleteOne({ id: matchedTemp.id }))
-          .catch(() => {});
+        try {
+          db.prepare('DELETE FROM temporary_donations WHERE id = ?').run(matchedTemp.id);
+        } catch (e) {}
+        try {
+          const col = await getTemporaryDonationsCollection();
+          await col.deleteMany({
+            $or: [{ id: matchedTemp.id }, { donationId: matchedTemp.id }]
+          });
+        } catch (e) {}
       }
     } catch (matchErr) {
-      console.warn('[Temporary Listener] Error checking temporary donations in SQLite:', matchErr);
+      console.warn('[Temporary Listener] Error checking temporary donations in SQLite and MongoDB:', matchErr);
     }
 
     // Preserve active session ID so frontend modal poller immediately sees PAID

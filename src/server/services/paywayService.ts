@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import axios from 'axios';
-import { ENV } from '../config/env';
 import { db } from '../database/db';import { broadcastAlertToOverlay, broadcastDonationToDashboard } from './socketService';
 import { sendTelegramDonationAlert } from './telegramService';
 
@@ -127,8 +126,9 @@ export async function checkPayWayTransaction(tranId: string, streamerId: string)
   const hash = generatePayWayHash(hashString, apiKey);
 
   try {
+    const checkTranUrl = process.env.ABA_PAYWAY_CHECK_TRAN_URL || 'https://checkout.payway.com.kh/api/payment-gateway/v1/payments/check-transaction';
     const response = await axios.post(
-      ENV.ABA_PAYWAY_CHECK_TRAN_URL,
+      checkTranUrl,
       {
         req_time: reqTime,
         merchant_id: merchantId,

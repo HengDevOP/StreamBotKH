@@ -357,6 +357,16 @@ export function cleanupExpiredPendingDonations(): { expiredDonations: number; cl
       console.log(`🧹 [Cache Timer] Auto-cleared ${expiredDonations} expired pending donations and ${clearedTemporary} temporary records (>5 mins).`);
     }
 
+    // Also auto-clean expired records from MongoDB temporary_donations
+    try {
+      const { getTemporaryDonationsCollection } = require('./mongo');
+      getTemporaryDonationsCollection().then((col: any) => {
+        col.deleteMany({
+          createdAt: { $lt: new Date(Date.now() - 5 * 60 * 1000) }
+        }).catch(() => {});
+      }).catch(() => {});
+    } catch (e) {}
+
     return { expiredDonations, clearedTemporary };
   } catch (e) {
     console.warn('[Cache Timer] Error in cleanupExpiredPendingDonations:', e);

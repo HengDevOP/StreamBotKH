@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/server/database/db';
-import { ENV } from '@/server/config/env';
 
 function generateToken(user: { id: string; username: string; email: string }) {
   return jwt.sign(
     { id: user.id, username: user.username, email: user.email },
-    ENV.JWT_SECRET,
+    process.env.JWT_SECRET || 'streamneon_super_secret_jwt_key_2026',
     { expiresIn: '30d' }
   );
 }
