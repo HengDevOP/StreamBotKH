@@ -147,12 +147,28 @@ setInterval(() => {
   cleanupExpiredPendingDonations();
 }, 30 * 1000);
 
-// 5. Production Static Frontend (serve dist/ from Vite build)
-const distDir = path.resolve(process.cwd(), 'dist');
-if (fs.existsSync(distDir)) {
-  app.use(express.static(distDir));
+// Health check endpoint
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+});
 
-  // SPA fallback for all non-API routes (catch-all middleware)
+// 5. Production Static Frontend (serve dist/ from Vite build)
+const candidateDirs = [
+  path.resolve(__dirname, '../dist'),
+  path.resolve(process.cwd(), 'dist'),
+  path.resolve('/var/www/StreamBotKH/dist')
+];
+const distDir = candidateDirs.find((d) => fs.existsSync(d) && fs.existsSync(path.join(d, 'index.html')));
+
+if (distDir) {
+  console.log(`⚡ [StreamBotKH Web] Found compiled React SPA at: ${distDir}`);
+  app.use(express.static(distDir, { maxAge: '1h', index: 'index.html' }));
+
+  // SPA fallback for all non-API routes
   app.use((req, res, next) => {
     if (
       req.method !== 'GET' ||
@@ -165,6 +181,29 @@ if (fs.existsSync(distDir)) {
     }
     res.sendFile(path.join(distDir, 'index.html'));
   });
+} else {
+  console.warn('⚠️ [StreamBotKH Web] dist/index.html not found! Run "npm run build" to build React frontend.');
+  app.get('/', (_req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <title>StreamBotKH Core API</title>
+        </head>
+        <body style="background:#070A12;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;padding:60px 20px;text-align:center;">
+          <h1 style="color:#00F0FF;margin-bottom:8px;">⚡ StreamBotKH Server Active</h1>
+          <p style="color:#94a3b8;font-size:16px;">Core API & Socket.IO are running successfully on port ${process.env.PORT || '3000'}.</p>
+          <div style="margin:30px auto;max-width:500px;background:#0d1322;border:1px solid #1e293b;border-radius:12px;padding:20px;text-align:left;">
+            <p style="color:#f59e0b;font-weight:bold;margin-top:0;">Notice: Frontend assets not built yet</p>
+            <p style="color:#cbd5e1;font-size:14px;">To serve the full React web dashboard, run this in your server terminal:</p>
+            <pre style="background:#05070d;padding:12px;border-radius:8px;color:#38bdf8;font-size:14px;overflow-x:auto;">npm run build</pre>
+          </div>
+          <p><a href="/api/overlays" style="color:#00F0FF;text-decoration:none;font-weight:600;">Test API Endpoint &rarr; /api/overlays</a></p>
+        </body>
+      </html>
+    `);
+  });
 }
 
 // Global Error Handler
@@ -175,19 +214,16 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   }
 });
 
-// Port configuration
-// In production or when running stand-alone: PORT from env or 5173
-// In dev: Backend runs on 5001, Vite runs on 3000
-const isProd = process.env.NODE_ENV === 'production';
-const PORT = parseInt(process.env.API_PORT || (isProd ? (process.env.PORT || '3000') : '5001'), 10);
+// Port configuration: Always prioritize process.env.PORT
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0'; // Bound to all interfaces for universal reachability
 
 server.listen(PORT, HOST, () => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`⚡ [StreamBotKH Core API] Running on http://${HOST}:${PORT}`);
   console.log(`⚡ [StreamBotKH OBS Socket.IO] ws://${HOST}:${PORT}/socket.io`);
-  if (isProd && fs.existsSync(distDir)) {
-    console.log(`⚡ [StreamBotKH Web] Production React SPA served from /dist`);
+  if (distDir) {
+    console.log(`⚡ [StreamBotKH Web] Production React SPA served from ${distDir}`);
   } else {
     console.log(`⚡ [StreamBotKH Web] Development Vite frontend active at http://localhost:3000`);
   }

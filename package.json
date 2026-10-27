@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "streambotkh.com - Livestream Donation Alerts & ABA Bakong KHQR Engine (Vite + React TSX + Express)",
   "scripts": {
-    "dev": "concurrently --names \"API,VITE\" --prefix-colors \"magenta,cyan\" \"tsx server/index.ts\" \"vite --host 0.0.0.0 --port 3000\"",
+    "dev": "concurrently --names \"API,VITE\" --prefix-colors \"magenta,cyan\" \"PORT=5001 tsx server/index.ts\" \"vite --host 0.0.0.0 --port 3000\"",
     "build": "vite build",
     "start": "NODE_ENV=production PORT=3000 tsx server/index.ts",
     "backend": "tsx backend/src/index.ts",
