@@ -489,7 +489,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'media' as DashboardTab,
           label: 'Media Library',
           icon: ImageIcon,
-          badge: 'PNG/GIF'
+          badge: null
         }
       ]
     },
@@ -500,7 +500,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'donation' as DashboardTab,
           label: 'Donations Alerts',
           icon: Bell,
-          badge: 'OBS'
+          badge: null
         },
         {
           id: 'leaderboard' as DashboardTab,
@@ -518,13 +518,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'timer' as DashboardTab,
           label: 'Timer',
           icon: Timer,
-          badge: 'Countdown'
+          badge: null
         },
         {
           id: 'soundboard' as DashboardTab,
           label: 'Soundboard',
           icon: Volume2,
-          badge: 'HOTKEY'
+          badge: null
         },
         {
           id: 'video-alerts' as DashboardTab,
@@ -547,14 +547,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'payments' as DashboardTab,
           label: 'Payment Gateway',
           icon: CreditCard,
-          badge: currentPlan === 'free' ? 'PRO' : 'Active',
+          badge: null,
           isLocked: currentPlan === 'free'
         },
         {
           id: 'telegram' as DashboardTab,
           label: 'Telegram Bot',
           icon: Bot,
-          badge: currentPlan === 'free' ? 'PRO' : 'Active',
+          badge: null,
           isLocked: currentPlan === 'free'
         }
       ]
