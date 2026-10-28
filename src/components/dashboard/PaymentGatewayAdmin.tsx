@@ -147,7 +147,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // STEP 3 STATE: Target Telegram Groups & Group Link Listener
   // ================================================================
   const [targetGroups, setTargetGroups] = useState<TargetGroup[]>([]);
-  const [availableDialogs, setAvailableDialogs] = useState<AvailableDialog[]>(PRESET_GROUPS);
+  const [availableDialogs, setAvailableDialogs] = useState<AvailableDialog[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [addingGroup, setAddingGroup] = useState(false);
   const [connectingGroupId, setConnectingGroupId] = useState<string | null>(null);
@@ -204,11 +204,16 @@ export const PaymentGatewayAdmin: React.FC = () => {
           setCodeRequested(true);
           if (data.pendingPhone) setUserPhone(data.pendingPhone);
           if (data.pendingHash) setPhoneCodeHash(data.pendingHash);
+        } else {
+          setTargetGroups([]);
+          setAvailableDialogs([]);
         }
+        return data;
       }
     } catch (e) {
       console.error('Error fetching user client status:', e);
     }
+    return null;
   };
 
   const fetchTargetGroups = async () => {
@@ -217,9 +222,21 @@ export const PaymentGatewayAdmin: React.FC = () => {
       const res = await fetch('/api/telegram/groups');
       if (res.ok) {
         const data = await res.json();
-        setTargetGroups(data.groups || []);
+        const serverGroups = data.groups || [];
         const apiDialogs: AvailableDialog[] = data.availableDialogs || [];
-        // Merge with preset list so all groups are always present in the card directory
+
+        // If backend returned no groups and no dialogs, verify connection status
+        if (serverGroups.length === 0 && apiDialogs.length === 0) {
+          const statusRes = await fetch('/api/telegram/user/status').catch(() => null);
+          const statusData = statusRes?.ok ? await statusRes.json() : null;
+          if (statusData && !statusData.isConnected) {
+            setTargetGroups([]);
+            setAvailableDialogs([]);
+            return;
+          }
+        }
+
+        setTargetGroups(serverGroups);
         const combined = [...apiDialogs];
         for (const p of PRESET_GROUPS) {
           if (!combined.some((c) => c.id === p.id)) {
@@ -228,11 +245,13 @@ export const PaymentGatewayAdmin: React.FC = () => {
         }
         setAvailableDialogs(combined);
       } else {
-        setAvailableDialogs(PRESET_GROUPS);
+        setTargetGroups([]);
+        setAvailableDialogs([]);
       }
     } catch (e) {
       console.error('Error fetching target groups:', e);
-      setAvailableDialogs(PRESET_GROUPS);
+      setTargetGroups([]);
+      setAvailableDialogs([]);
     } finally {
       setLoadingGroups(false);
     }
@@ -240,14 +259,28 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
   useEffect(() => {
     fetchGatewayConfig();
-    fetchUserClientStatus();
-    fetchTargetGroups();
+    fetchUserClientStatus().then((status) => {
+      if (status?.isConnected) {
+        fetchTargetGroups();
+      } else {
+        setTargetGroups([]);
+        setAvailableDialogs([]);
+      }
+    });
   }, []);
+
+  // Sync groups state whenever GramJS connection state changes
+  useEffect(() => {
+    if (!userClientStatus.isConnected) {
+      setTargetGroups([]);
+      setAvailableDialogs([]);
+    }
+  }, [userClientStatus.isConnected]);
 
   // Step completion flags
   const isStep1Done = Boolean(userClientStatus.isConnected);
   const isStep2Done = Boolean(gatewayConfig?.khqrImageUrl);
-  const isStep3Done = Boolean(targetGroups.length > 0);
+  const isStep3Done = Boolean(userClientStatus.isConnected && targetGroups.length > 0);
 
   const completedStepsCount = (isStep1Done ? 1 : 0) + (isStep2Done ? 1 : 0) + (isStep3Done ? 1 : 0);
 
@@ -345,7 +378,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const handleDisconnectUserClient = () => {
     showConfirm({
       title: 'Disconnect Telegram Account?',
-      message: 'Are you sure you want to disconnect this Telegram account? GramJS will stop listening to incoming bank transfers until reconnected.',
+      message: 'Are you sure you want to disconnect this Telegram account? GramJS will stop listening to incoming bank transfers and all active group listeners will be cleared until reconnected.',
       type: 'danger',
       confirmText: 'Disconnect',
       onConfirm: async () => {
@@ -357,10 +390,14 @@ export const PaymentGatewayAdmin: React.FC = () => {
             setCodeRequested(false);
             setPhoneCodeHash('');
             setVerificationCode('');
+            setUserClientStatus({ isConnected: false, monitoredChats: [] });
+            setTargetGroups([]);
+            setAvailableDialogs([]);
             await fetchUserClientStatus();
+            await fetchTargetGroups();
             showAlert({
               title: 'Account Disconnected',
-              message: 'Your Telegram session has been disconnected.',
+              message: 'Your Telegram session has been disconnected and monitored groups have been cleared.',
               type: 'info'
             });
           }
@@ -1428,7 +1465,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
-                <Users size={22} className={targetGroups.length > 0 ? 'text-cyan-400' : 'text-slate-400'} />
+                <Users size={22} className={isStep3Done ? 'text-cyan-400' : 'text-slate-400'} />
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 font-['Chakra_Petch']">
@@ -1437,6 +1474,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                       {targetGroups.length} GROUPS ACTIVE
+                    </span>
+                  ) : !userClientStatus.isConnected ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-950/60 text-red-400 border border-red-500/30 font-mono">
+                      DISCONNECTED
                     </span>
                   ) : (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono">
@@ -1450,15 +1491,17 @@ export const PaymentGatewayAdmin: React.FC = () => {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={fetchTargetGroups}
-              disabled={loadingGroups}
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5"
-            >
-              <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
-              <span>Refresh Groups</span>
-            </button>
+            {userClientStatus.isConnected && (
+              <button
+                type="button"
+                onClick={fetchTargetGroups}
+                disabled={loadingGroups}
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5"
+              >
+                <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
+                <span>Refresh Groups</span>
+              </button>
+            )}
           </div>
 
           {step3Msg && (
@@ -1483,20 +1526,35 @@ export const PaymentGatewayAdmin: React.FC = () => {
             </div>
           )}
 
-          {!userClientStatus.isConnected && (
-            <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-300">
-              <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <strong className="block font-semibold">Telegram Phone Account Not Connected Yet</strong>
-                <span>
-                  Please complete <button type="button" onClick={() => setActiveStep(1)} className="underline font-bold hover:text-white">Step 1: Connect</button> first. GramJS requires the active session to listen to group messages.
-                </span>
+          {!userClientStatus.isConnected ? (
+            <div className="py-12 px-6 text-center space-y-5 rounded-2xl bg-[#090D18] border border-amber-500/30">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
+                <AlertCircle size={32} />
+              </div>
+              <div className="max-w-md mx-auto space-y-2">
+                <h4 className="text-lg font-bold text-white font-['Chakra_Petch']">
+                  GramJS Client Disconnected
+                </h4>
+                <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                  Telegram bank notification groups cannot be loaded or monitored while GramJS is disconnected. Please connect your Telegram account in Step 1 first.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => setActiveStep(1)}
+                  className="font-bold shadow-lg shadow-cyan-400/20"
+                >
+                  <ArrowRight size={14} className="mr-2" />
+                  Go to Step 1: Connect GramJS
+                </Button>
               </div>
             </div>
-          )}
-
-          {/* Quick Connect Form via Telegram Link */}
-          <form onSubmit={handleConnectGroup} className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-4 shadow-xl">
+          ) : (
+            <>
+              {/* Quick Connect Form via Telegram Link */}
+              <form onSubmit={handleConnectGroup} className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-4 shadow-xl">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
               <LinkIcon size={16} className="text-cyan-400" />
               <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
@@ -1815,6 +1873,8 @@ export const PaymentGatewayAdmin: React.FC = () => {
               );
             })()}
           </div>
+        </>
+      )}
 
           {/* Stepper Navigation Buttons */}
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between">

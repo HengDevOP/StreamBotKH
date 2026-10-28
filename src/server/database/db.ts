@@ -470,3 +470,11 @@ export function deleteMonitoredGroup(id: string, streamerId: string) {
   return db.prepare('DELETE FROM telegram_monitored_groups WHERE id = ? AND streamer_id = ?').run(id, streamerId);
 }
 
+export function clearMonitoredGroups(streamerId: string) {
+  try {
+    return db.prepare('DELETE FROM telegram_monitored_groups WHERE streamer_id = ?').run(streamerId);
+  } catch (e) {
+    return null;
+  }
+}
+

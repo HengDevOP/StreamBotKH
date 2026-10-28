@@ -916,6 +916,11 @@ class TelegramUserClientManager {
       `).run(streamerId);
     } catch (e) {}
 
+    // When disconnected from GramJS, also clear all monitored groups for this streamer
+    try {
+      db.prepare('DELETE FROM telegram_monitored_groups WHERE streamer_id = ?').run(streamerId);
+    } catch (e) {}
+
     return {
       success: true,
       message: 'Telegram account disconnected.'

@@ -393,6 +393,9 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
             setCodeRequested(false);
             setPhoneCodeHash('');
             setVerificationCode('');
+            setUserClientStatus({ isConnected: false, monitoredChats: [] });
+            setTargetGroups([]);
+            setAvailableDialogs([]);
             await fetchAllStatus();
             showAlert({
               title: 'Account Disconnected',

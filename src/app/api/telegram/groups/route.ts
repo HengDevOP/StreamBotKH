@@ -8,6 +8,15 @@ export async function GET(req: NextRequest) {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
 
+    const status = telegramUserManager.getStatus(streamerId);
+    if (!status.isConnected) {
+      return NextResponse.json({
+        success: true,
+        groups: [],
+        availableDialogs: []
+      });
+    }
+
     const groups = getMonitoredGroups(streamerId);
     let availableDialogs: any[] = [];
     try {
@@ -34,6 +43,14 @@ export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
+
+    const status = telegramUserManager.getStatus(streamerId);
+    if (!status.isConnected) {
+      return NextResponse.json(
+        { error: 'GramJS is not connected. Please connect your Telegram account in Step 1 first.' },
+        { status: 400 }
+      );
+    }
 
     const body = await req.json().catch(() => ({}));
     let { chatId, title, username, groupLink } = body;
