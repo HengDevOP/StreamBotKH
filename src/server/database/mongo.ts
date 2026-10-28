@@ -224,6 +224,8 @@ export async function getMongoDb(): Promise<Db> {
   return client.db(dbName);
 }
 
+export const connectMongo = getMongoDb;
+
 export async function getUsersCollection(): Promise<Collection<UserDoc>> {
   const db = await getMongoDb();
   return db.collection<UserDoc>('users');

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { db, isAdminEmail } from '@/server/database/db';
-import { connectMongo } from '@/server/database/mongo';
+import { getMongoDb } from '@/server/database/mongo';
 
 function checkAdmin(req: NextRequest) {
   const authUser = getAuthenticatedUser(req);
@@ -176,7 +176,7 @@ export async function PUT(req: NextRequest) {
     const formatted = formatPromotionRow(updatedRow);
 
     // Non-blocking sync to MongoDB Atlas
-    connectMongo()
+    getMongoDb()
       .then((mongoDb) =>
         mongoDb.collection('platform_promotions').updateOne(
           { id: 'pro_plan_promo' },
