@@ -38,6 +38,7 @@ import {
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useModal } from '../../context/ModalContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface GatewayConfig {
   _id: string;
@@ -94,6 +95,8 @@ const PRESET_GROUPS: AvailableDialog[] = [
 
 export const PaymentGatewayAdmin: React.FC = () => {
   const { showConfirm, showAlert } = useModal();
+  const { user } = useAuth();
+  const currentStreamerUsername = user?.username || 'neonstreamer';
 
   // Active Wizard Step: 1 = Connect (GramJS), 2 = Provide Master KHQR, 3 = Connect Group Listener
   const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
@@ -165,7 +168,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // ================================================================
   // SIMULATOR STATE: Test Scan Payment & Real-Time Alert
   // ================================================================
-  const [testStreamer, setTestStreamer] = useState('neonstreamer');
+  const [testStreamer, setTestStreamer] = useState(user?.username || 'neonstreamer');
   const [testDonor, setTestDonor] = useState('SOKHA CHHIM');
   const [testAmount, setTestAmount] = useState('5.00');
   const [testCurrency, setTestCurrency] = useState<'USD' | 'KHR'>('USD');
@@ -174,13 +177,31 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [triggeringPayment, setTriggeringPayment] = useState(false);
   const [paymentResult, setPaymentResult] = useState<any>(null);
 
+  useEffect(() => {
+    if (user?.username) {
+      setTestStreamer(user.username);
+    }
+  }, [user?.username]);
+
+  // ----------------------------------------------------------------
+  // Authenticated Fetch Helper (Per Client Account Session)
+  // ----------------------------------------------------------------
+  const authFetch = (url: string, init: RequestInit = {}) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
+    const headers = new Headers(init.headers || {});
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    return fetch(url, { ...init, headers });
+  };
+
   // ----------------------------------------------------------------
   // Initial Data Fetching
   // ----------------------------------------------------------------
   const fetchGatewayConfig = async () => {
     try {
       setLoadingConfig(true);
-      const res = await fetch('/api/payment-gateway/config');
+      const res = await authFetch('/api/payment-gateway/config');
       const data = await res.json();
       if (res.ok && data.success) {
         setGatewayConfig(data.config);
@@ -194,7 +215,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
   const fetchUserClientStatus = async () => {
     try {
-      const res = await fetch('/api/telegram/user/status');
+      const res = await authFetch('/api/telegram/user/status');
       if (res.ok) {
         const data = await res.json();
         setUserClientStatus(data);
@@ -219,7 +240,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const fetchTargetGroups = async () => {
     try {
       setLoadingGroups(true);
-      const res = await fetch('/api/telegram/groups');
+      const res = await authFetch('/api/telegram/groups');
       if (res.ok) {
         const data = await res.json();
         const serverGroups = data.groups || [];
@@ -227,7 +248,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
         // If backend returned no groups and no dialogs, verify connection status
         if (serverGroups.length === 0 && apiDialogs.length === 0) {
-          const statusRes = await fetch('/api/telegram/user/status').catch(() => null);
+          const statusRes = await authFetch('/api/telegram/user/status').catch(() => null);
           const statusData = statusRes?.ok ? await statusRes.json() : null;
           if (statusData && !statusData.isConnected) {
             setTargetGroups([]);
@@ -300,7 +321,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
     setSendingCode(true);
     try {
-      const res = await fetch('/api/telegram/user/send-code', {
+      const res = await authFetch('/api/telegram/user/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -341,7 +362,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
     setVerifyingCode(true);
     try {
-      const res = await fetch('/api/telegram/user/verify-code', {
+      const res = await authFetch('/api/telegram/user/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -383,7 +404,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
       confirmText: 'Disconnect',
       onConfirm: async () => {
         try {
-          const res = await fetch('/api/telegram/user/disconnect', { method: 'POST' });
+          const res = await authFetch('/api/telegram/user/disconnect', { method: 'POST' });
           const data = await res.json();
           if (data.success) {
             setStep1Msg({ type: 'success', text: 'Telegram account disconnected.' });
@@ -445,7 +466,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/payment-gateway/upload-khqr', {
+      const res = await authFetch('/api/payment-gateway/upload-khqr', {
         method: 'POST',
         body: formData
       });
@@ -484,7 +505,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
       confirmText: 'Remove Image',
       onConfirm: async () => {
         try {
-          const res = await fetch('/api/payment-gateway/upload-khqr', { method: 'DELETE' });
+          const res = await authFetch('/api/payment-gateway/upload-khqr', { method: 'DELETE' });
           const data = await res.json();
           if (res.ok && data.success) {
             setStep2Msg({ type: 'success', text: data.message });
@@ -522,7 +543,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
     setAddingGroup(true);
     try {
-      const res = await fetch('/api/telegram/groups', {
+      const res = await authFetch('/api/telegram/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -556,7 +577,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
       confirmText: 'Remove Group',
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/telegram/groups?id=${encodeURIComponent(group.id)}`, {
+          const res = await authFetch(`/api/telegram/groups?id=${encodeURIComponent(group.id)}`, {
             method: 'DELETE'
           });
           const data = await res.json();
@@ -588,7 +609,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
     setConnectingGroupId(dialog.id);
     setStep3Msg(null);
     try {
-      const res = await fetch('/api/telegram/groups', {
+      const res = await authFetch('/api/telegram/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -627,7 +648,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
     setPaymentResult(null);
 
     try {
-      const res = await fetch('/api/payment-gateway/confirm-payment', {
+      const res = await authFetch('/api/payment-gateway/confirm-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1339,20 +1360,20 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   <div className="space-y-1">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      ACTIVE ON ALL STREAMER DONATION PAGES
+                      ACTIVE ON YOUR DONATION PAGE (@{currentStreamerUsername})
                     </div>
                     <div className="text-sm font-bold text-white">
                       {gatewayConfig.khqrFilename || 'master-khqr.png'}
                     </div>
                     <div className="text-xs font-mono text-slate-400">
-                      File Size: {formatFileSize(gatewayConfig.khqrFileSize)} • Stored in Database &amp; Disk
+                      File Size: {formatFileSize(gatewayConfig.khqrFileSize)} • Scoped to Your Client Account
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <a
-                    href="/@neonstreamer"
+                    href={`/@${currentStreamerUsername}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-200 border border-slate-800 flex items-center justify-center gap-1.5 transition-colors"
@@ -1376,7 +1397,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
               <AlertCircle size={16} className="text-amber-400 flex-shrink-0" />
               <span>
-                No custom Master KHQR image uploaded yet. The donation page currently generates dynamic Bakong QR codes as a fallback.
+                No custom Master KHQR image uploaded for your account yet. Your donation page currently generates dynamic Bakong QR codes as a fallback.
               </span>
             </div>
           )}

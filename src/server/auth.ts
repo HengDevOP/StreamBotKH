@@ -3,11 +3,21 @@ import { NextRequest } from 'next/server';
 import { db } from './database/db';
 
 export function getAuthenticatedUser(req: NextRequest) {
+  let token: string | null = null;
   const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else {
+    token = req.cookies.get('streamneon_auth_token')?.value || req.cookies.get('token')?.value || null;
+    if (!token) {
+      token = req.nextUrl?.searchParams?.get('token') || null;
+    }
+  }
+
+  if (!token) {
     return null;
   }
-  const token = authHeader.split(' ')[1];
+
   try {
     const jwtSecret = process.env.JWT_SECRET || 'streamneon_super_secret_jwt_key_2026';
     const decoded = jwt.verify(token, jwtSecret) as any;

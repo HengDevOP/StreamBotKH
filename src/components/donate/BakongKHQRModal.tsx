@@ -61,19 +61,28 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
     };
   }, [socket, isOpen, donationData, paid]);
 
-  // Load custom master KHQR if configured
+  // Load custom master KHQR if configured for this streamer
   useEffect(() => {
     if (isOpen) {
-      fetch('/api/payment-gateway/config')
+      const params = new URLSearchParams();
+      if (streamerId) params.set('streamerId', streamerId);
+      if (streamerUsername) params.set('username', streamerUsername);
+      const query = params.toString() ? `?${params.toString()}` : '';
+
+      fetch(`/api/payment-gateway/config${query}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.config?.khqrImageUrl) {
             setMasterKhqrImage(data.config.khqrImageUrl);
+          } else {
+            setMasterKhqrImage(null);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          setMasterKhqrImage(null);
+        });
     }
-  }, [isOpen]);
+  }, [isOpen, streamerId, streamerUsername]);
 
   // Clean up temporary database helper
   const cleanupTemporaryDonation = async (donationId?: string) => {
