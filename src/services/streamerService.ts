@@ -61,5 +61,17 @@ export const streamerService = {
       method: 'PUT',
       body: JSON.stringify(profile)
     });
+  },
+
+  async deleteDonation(donationId: string): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(`/streamer/donations/${donationId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async deleteAllDonations(): Promise<{ success: boolean; message: string; count: number }> {
+    return request<{ success: boolean; message: string; count: number }>('/streamer/donations/clear-all', {
+      method: 'POST'
+    });
   }
 };

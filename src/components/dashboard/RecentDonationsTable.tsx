@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, CheckCircle2, Clock, MessageSquare } from 'lucide-react';
+import { Play, CheckCircle2, Clock, MessageSquare, Trash2, Loader2 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 
@@ -19,11 +19,15 @@ interface RecentDonationsTableProps {
     paid_at?: string;
   }>;
   onReplayAlert?: (donation: any) => void;
+  onDeleteDonation?: (donationId: string) => void;
+  deletingId?: string | null;
 }
 
 export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
   donations = [],
-  onReplayAlert
+  onReplayAlert,
+  onDeleteDonation,
+  deletingId
 }) => {
   return (
     <Card className="p-0 overflow-hidden">
@@ -102,15 +106,33 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
                     )}
                   </td>
                   <td className="py-3.5 px-5 text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onReplayAlert?.(d)}
-                      icon={<Play size={12} />}
-                      title="Replay Alert on OBS"
-                    >
-                      Replay
-                    </Button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onReplayAlert?.(d)}
+                        icon={<Play size={12} />}
+                        title="Replay Alert on OBS"
+                      >
+                        Replay
+                      </Button>
+
+                      {onDeleteDonation && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteDonation(d.id)}
+                          disabled={deletingId === d.id}
+                          className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/25 text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                          title="Delete donation record"
+                        >
+                          {deletingId === d.id ? (
+                            <Loader2 size={13} className="animate-spin text-red-400" />
+                          ) : (
+                            <Trash2 size={13} />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

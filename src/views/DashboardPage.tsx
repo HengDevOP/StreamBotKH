@@ -48,6 +48,7 @@ import {
   Video,
   Lock,
   Timer,
+  Trash2,
   Users,
   GitPullRequest,
   MessageSquare,
@@ -407,6 +408,70 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         amount: donation.amount
       });
     }
+  };
+
+  const [deletingDonationId, setDeletingDonationId] = useState<string | null>(null);
+
+  const handleDeleteDonation = (donationId: string) => {
+    const targetDonation = stats?.recentDonations?.find((d: any) => d.id === donationId);
+    const donorName = targetDonation?.donor_name || 'Anonymous';
+    const amountStr = targetDonation
+      ? targetDonation.currency === 'KHR'
+        ? `${targetDonation.amount.toLocaleString()} ៛`
+        : `$${Number(targetDonation.amount).toFixed(2)}`
+      : '';
+
+    showConfirm({
+      title: 'Delete Donation Record?',
+      message: `Are you sure you want to permanently delete this donation record from "${donorName}" (${amountStr})? This action cannot be undone.`,
+      type: 'danger',
+      confirmText: 'Delete Record',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          setDeletingDonationId(donationId);
+          await streamerService.deleteDonation(donationId);
+          await loadData(true);
+        } catch (err: any) {
+          console.error('Failed to delete donation:', err);
+          showAlert({
+            title: 'Delete Failed',
+            message: err.message || 'Could not delete donation record.',
+            type: 'danger'
+          });
+        } finally {
+          setDeletingDonationId(null);
+        }
+      }
+    });
+  };
+
+  const handleClearAllDonations = () => {
+    if (!stats?.recentDonations || stats.recentDonations.length === 0) return;
+    showConfirm({
+      title: 'Clear All Donation Records?',
+      message: 'Are you sure you want to permanently delete ALL donation transaction records for your streamer account? This will clear your donation audit history.',
+      type: 'danger',
+      confirmText: 'Clear All Records',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const res = await streamerService.deleteAllDonations();
+          await loadData(true);
+          showAlert({
+            title: 'Ledger Cleared',
+            message: res.message || 'All donation records have been cleared.',
+            type: 'info'
+          });
+        } catch (err: any) {
+          showAlert({
+            title: 'Failed',
+            message: err.message || 'Could not clear donation records.',
+            type: 'danger'
+          });
+        }
+      }
+    });
   };
 
   const handleRegenerateToken = () => {
@@ -1232,6 +1297,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               <RecentDonationsTable
                 donations={stats?.recentDonations}
                 onReplayAlert={handleReplayAlert}
+                onDeleteDonation={handleDeleteDonation}
+                deletingId={deletingDonationId}
               />
             </div>
           )}
@@ -1250,13 +1317,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     Audit log of all tips received via ABA PayWay, Bakong KHQR, and credit cards.
                   </p>
                 </div>
-                <button
-                  onClick={loadData}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 transition-colors"
-                >
-                  <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                  <span>Refresh Records</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => loadData(false)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 transition-colors"
+                  >
+                    <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                    <span>Refresh Records</span>
+                  </button>
+                  {stats?.recentDonations && stats.recentDonations.length > 0 && (
+                    <button
+                      onClick={handleClearAllDonations}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-xs text-red-400 hover:text-red-300 transition-colors"
+                      title="Clear all donation records"
+                    >
+                      <Trash2 size={13} />
+                      <span>Clear All</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Search & Filter Toolbar */}
@@ -1312,6 +1391,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               <RecentDonationsTable
                 donations={filteredDonations}
                 onReplayAlert={handleReplayAlert}
+                onDeleteDonation={handleDeleteDonation}
+                deletingId={deletingDonationId}
               />
             </div>
           )}
