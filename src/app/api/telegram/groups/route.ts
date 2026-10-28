@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { getMonitoredGroups, addMonitoredGroup, deleteMonitoredGroup } from '@/server/database/db';
+import { 
+  getMongoMonitoredGroups, 
+  addMongoMonitoredGroup, 
+  deleteMongoMonitoredGroup 
+} from '@/server/database/mongo';
 import { telegramUserManager } from '@backend/telegram/telegramUserClient';
 
 export async function GET(req: NextRequest) {
@@ -8,7 +13,7 @@ export async function GET(req: NextRequest) {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
 
-    const status = telegramUserManager.getStatus(streamerId);
+    const status = await telegramUserManager.getStatus(streamerId);
     if (!status.isConnected) {
       return NextResponse.json({
         success: true,
@@ -17,7 +22,24 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const groups = getMonitoredGroups(streamerId);
+    let groups: any[] = [];
+    try {
+      const mongoGroups = await getMongoMonitoredGroups(streamerId);
+      if (mongoGroups && mongoGroups.length > 0) {
+        groups = mongoGroups.map(g => ({
+          id: g.id,
+          streamer_id: g.streamerId,
+          chat_id: g.chatId,
+          title: g.title,
+          username: g.username,
+          created_at: g.createdAt ? g.createdAt.toISOString() : new Date().toISOString()
+        }));
+      } else {
+        groups = getMonitoredGroups(streamerId);
+      }
+    } catch (e) {
+      groups = getMonitoredGroups(streamerId);
+    }
     let availableDialogs: any[] = [];
     try {
       availableDialogs = await telegramUserManager.getAvailableDialogs(streamerId);
@@ -44,7 +66,7 @@ export async function POST(req: NextRequest) {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
 
-    const status = telegramUserManager.getStatus(streamerId);
+    const status = await telegramUserManager.getStatus(streamerId);
     if (!status.isConnected) {
       return NextResponse.json(
         { error: 'GramJS is not connected. Please connect your Telegram account in Step 1 first.' },
@@ -93,7 +115,19 @@ export async function POST(req: NextRequest) {
       finalTitle = `Telegram Group (${finalChatId})`;
     }
 
-    const group = addMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername);
+    // Save to MongoDB Primary
+    let group: any = null;
+    try {
+      group = await addMongoMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername);
+    } catch (mongoErr) {
+      console.warn('[MongoDB] Failed adding monitored group, using sqlite fallback:', mongoErr);
+    }
+
+    // Safe SQLite backup
+    try {
+      const sqlGroup = addMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername);
+      if (!group) group = sqlGroup;
+    } catch (e) {}
 
     return NextResponse.json({
       success: true,
@@ -129,7 +163,13 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    deleteMonitoredGroup(id, streamerId);
+    try {
+      await deleteMongoMonitoredGroup(id, streamerId);
+    } catch (e) {}
+
+    try {
+      deleteMonitoredGroup(id, streamerId);
+    } catch (e) {}
 
     return NextResponse.json({
       success: true,

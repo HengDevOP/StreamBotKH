@@ -7,7 +7,12 @@ import { db, cleanupExpiredPendingDonations } from '../../../src/server/database
 import { broadcastAlertToOverlay, broadcastDonationToDashboard } from '../../../src/server/services/socketService';
 import { PhraseCatcher } from './phraseCatcher';
 import { findMatchingTemporaryDonation, matchBankNames, isGenericBankKeyword } from '../../../src/server/utils/nameMatching';
-import { getTemporaryDonationsCollection, getAlertBoxesCollection } from '../../../src/server/database/mongo';
+import {
+  getTemporaryDonationsCollection,
+  getAlertBoxesCollection,
+  getTelegramSessionsCollection,
+  getTelegramMonitoredGroupsCollection
+} from '../../../src/server/database/mongo';
 
 export interface PendingAuth {
   client?: TelegramClient;
@@ -128,7 +133,33 @@ class TelegramUserClientManager {
       this.pendingAuth.set(sendResult.phoneCodeHash, record);
       this.pendingAuth.set(cleanPhone, record);
 
-      // Persist pending auth state to SQLite for rock-solid recovery across reloads
+      // Persist pending auth state to MongoDB (with SQLite fallback)
+      try {
+        const sessionsCol = await getTelegramSessionsCollection();
+        await sessionsCol.updateOne(
+          { streamerId },
+          {
+            $set: {
+              streamerId,
+              phoneNumber: cleanPhone,
+              pendingPhone: cleanPhone,
+              pendingHash: sendResult.phoneCodeHash,
+              sessionString: pendingSession,
+              apiId,
+              apiHash,
+              isConnected: false,
+              updatedAt: new Date()
+            },
+            $setOnInsert: { createdAt: new Date() }
+          },
+          { upsert: true }
+        );
+        console.log(`💾 [MongoDB] Pending Telegram auth saved for streamer [${streamerId}] (${cleanPhone})`);
+      } catch (mongoErr) {
+        console.error('[MongoDB] Failed saving pending auth:', mongoErr);
+      }
+
+      // Safe SQLite backup
       try {
         db.prepare(`
           UPDATE streamers 
@@ -139,10 +170,7 @@ class TelegramUserClientManager {
               telegram_api_hash = ?
           WHERE id = ?
         `).run(cleanPhone, sendResult.phoneCodeHash, pendingSession, apiId, apiHash, streamerId);
-        console.log(`💾 [TelegramJS] Pending verification saved to SQLite for ${cleanPhone} (Hash: ${sendResult.phoneCodeHash.slice(0, 8)}...)`);
-      } catch (dbErr) {
-        console.error('[DB] Failed saving pending auth in SQLite:', dbErr);
-      }
+      } catch (dbErr) {}
 
       console.log(`⚡ [TelegramJS] Official verification code delivered by Telegram to ${cleanPhone}!`);
 
@@ -190,9 +218,47 @@ class TelegramUserClientManager {
       pending = this.pendingAuth.values().next().value;
     }
 
-    // 2. Fallback: Restore from SQLite if memory was purged or compiled separately
+    // 2. Fallback: Restore from MongoDB or SQLite if memory was purged or compiled separately
     if (!pending) {
-      console.log(`🔍 [TelegramJS] Checking SQLite for pending login: streamerId=${streamerId}, hash=${phoneCodeHash}...`);
+      console.log(`🔍 [TelegramJS] Checking MongoDB for pending login: streamerId=${streamerId}, hash=${phoneCodeHash}...`);
+      try {
+        const sessionsCol = await getTelegramSessionsCollection();
+        let doc: any = await sessionsCol.findOne({
+          $or: [
+            { streamerId, pendingHash: { $exists: true, $ne: '' } },
+            ...(phoneCodeHash ? [{ pendingHash: phoneCodeHash }] : [])
+          ]
+        });
+
+        if (doc && doc.sessionString && doc.pendingHash) {
+          console.log(`⚡ [MongoDB] Restoring pending GramJS client session for ${doc.pendingPhone || doc.phoneNumber}...`);
+          const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
+          const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
+
+          const restoredClient = new TelegramClient(new StringSession(doc.sessionString), apiId, apiHash, {
+            connectionRetries: 5,
+          });
+          await restoredClient.connect();
+
+          pending = {
+            client: restoredClient,
+            phoneNumber: doc.pendingPhone || doc.phoneNumber || '',
+            phoneCodeHash: doc.pendingHash,
+            apiId,
+            apiHash,
+            isSimulation: false,
+            createdAt: doc.updatedAt ? new Date(doc.updatedAt).getTime() : Date.now()
+          };
+
+          this.pendingAuth.set(streamerId, pending);
+          this.pendingAuth.set(doc.pendingHash, pending);
+        }
+      } catch (mongoErr) {
+        console.error('[MongoDB] Error restoring pending session:', mongoErr);
+      }
+    }
+
+    if (!pending) {
       try {
         let row: any = db.prepare(`
           SELECT telegram_pending_phone, telegram_pending_hash, telegram_pending_session, telegram_api_id, telegram_api_hash
@@ -255,6 +321,34 @@ class TelegramUserClientManager {
 
       const userDisplay = `Telegram User (${pending.phoneNumber})`;
       const fakeSession = 'sim_session_' + Buffer.from(pending.phoneNumber).toString('base64');
+
+      // Persist simulation session in MongoDB
+      try {
+        const sessionsCol = await getTelegramSessionsCollection();
+        await sessionsCol.updateOne(
+          { streamerId },
+          {
+            $set: {
+              streamerId,
+              phoneNumber: pending.phoneNumber,
+              userName: userDisplay,
+              sessionString: fakeSession,
+              isSimulation: true,
+              isConnected: true,
+              updatedAt: new Date()
+            },
+            $unset: {
+              pendingPhone: "",
+              pendingHash: ""
+            },
+            $setOnInsert: { createdAt: new Date() }
+          },
+          { upsert: true }
+        );
+        console.log(`⚡ [MongoDB] Simulated GramJS session stored for streamer [${streamerId}]!`);
+      } catch (e) {
+        console.error('[MongoDB] Error storing simulation session:', e);
+      }
 
       try {
         db.prepare(`
@@ -337,19 +431,51 @@ class TelegramUserClientManager {
       const sessionString = client.session.save() as unknown as string;
       const displayName = user?.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : pending.phoneNumber;
 
-      // Save authenticated session to SQLite & clear pending auth state
-      db.prepare(`
-        UPDATE streamers 
-        SET telegram_phone = ?,
-            telegram_user_name = ?,
-            telegram_session = ?,
-            telegram_api_id = ?,
-            telegram_api_hash = ?,
-            telegram_pending_phone = NULL,
-            telegram_pending_hash = NULL,
-            telegram_pending_session = NULL
-        WHERE id = ?
-      `).run(pending.phoneNumber, displayName, sessionString, pending.apiId, pending.apiHash, streamerId);
+      // Save authenticated GramJS session in MongoDB
+      try {
+        const sessionsCol = await getTelegramSessionsCollection();
+        await sessionsCol.updateOne(
+          { streamerId },
+          {
+            $set: {
+              streamerId,
+              phoneNumber: pending.phoneNumber,
+              userName: displayName,
+              sessionString,
+              apiId: pending.apiId,
+              apiHash: pending.apiHash,
+              isSimulation: false,
+              isConnected: true,
+              updatedAt: new Date()
+            },
+            $unset: {
+              pendingPhone: "",
+              pendingHash: ""
+            },
+            $setOnInsert: { createdAt: new Date() }
+          },
+          { upsert: true }
+        );
+        console.log(`⚡ [MongoDB] GramJS session successfully stored in MongoDB for streamer [${streamerId}] (${displayName})!`);
+      } catch (mongoErr) {
+        console.error('[MongoDB] Failed saving authenticated session:', mongoErr);
+      }
+
+      // Safe SQLite backup & clear pending auth state
+      try {
+        db.prepare(`
+          UPDATE streamers 
+          SET telegram_phone = ?,
+              telegram_user_name = ?,
+              telegram_session = ?,
+              telegram_api_id = ?,
+              telegram_api_hash = ?,
+              telegram_pending_phone = NULL,
+              telegram_pending_hash = NULL,
+              telegram_pending_session = NULL
+          WHERE id = ?
+        `).run(pending.phoneNumber, displayName, sessionString, pending.apiId, pending.apiHash, streamerId);
+      } catch (e) {}
 
       // Attach PhraseCatcher message listener for live donations
       this.attachMessageListener(streamerId, client);
@@ -390,10 +516,22 @@ class TelegramUserClientManager {
       const text = msg.message || msg.text || '';
       if (!text.trim()) return;
 
-      // STRICT TARGET GROUP ENFORCEMENT: GramJS will ONLY listen from configured target groups!
+      // STRICT TARGET GROUP ENFORCEMENT: GramJS will ONLY listen from configured target groups (MongoDB & SQLite)!
       let targetGroups: Array<{ id: string; streamer_id: string; chat_id: string; title: string; username?: string }> = [];
       try {
-        targetGroups = db.prepare('SELECT * FROM telegram_monitored_groups WHERE streamer_id = ?').all(streamerId) as any[];
+        const groupsCol = await getTelegramMonitoredGroupsCollection();
+        const mongoGroups = await groupsCol.find({ streamerId }).toArray();
+        if (mongoGroups && mongoGroups.length > 0) {
+          targetGroups = mongoGroups.map(g => ({
+            id: g.id,
+            streamer_id: g.streamerId,
+            chat_id: g.chatId,
+            title: g.title,
+            username: g.username
+          }));
+        } else {
+          targetGroups = db.prepare('SELECT * FROM telegram_monitored_groups WHERE streamer_id = ?').all(streamerId) as any[];
+        }
       } catch (e) {}
 
       // If no target groups configured, ignore incoming message
@@ -756,10 +894,17 @@ class TelegramUserClientManager {
   }
 
   /**
-   * Refresh list of target groups for the streamer
+   * Refresh list of target groups for the streamer (MongoDB & SQLite)
    */
   private async refreshMonitoredChats(streamerId: string, client: TelegramClient) {
     try {
+      const groupsCol = await getTelegramMonitoredGroupsCollection();
+      const savedMongo = await groupsCol.find({ streamerId }).toArray();
+      if (savedMongo && savedMongo.length > 0) {
+        this.monitoredChats.set(streamerId, savedMongo.map(s => `${s.title} (${s.chatId})`));
+        return;
+      }
+
       const saved = db.prepare('SELECT title, chat_id FROM telegram_monitored_groups WHERE streamer_id = ?').all(streamerId) as any[];
       if (saved && saved.length > 0) {
         this.monitoredChats.set(streamerId, saved.map(s => `${s.title} (${s.chat_id})`));
@@ -846,9 +991,9 @@ class TelegramUserClientManager {
   }
 
   /**
-   * Get live connection status
+   * Get live connection status (MongoDB Primary with SQLite fallback)
    */
-  public getStatus(streamerId: string): {
+  public async getStatus(streamerId: string): Promise<{
     isConnected: boolean;
     phoneNumber?: string;
     userName?: string;
@@ -857,31 +1002,65 @@ class TelegramUserClientManager {
     hasPendingCode?: boolean;
     pendingPhone?: string;
     pendingHash?: string;
-  } {
-    const streamer = db.prepare('SELECT telegram_phone, telegram_user_name, telegram_session, telegram_pending_phone, telegram_pending_hash FROM streamers WHERE id = ?').get(streamerId) as any;
+  }> {
+    // 1. Primary: Check MongoDB
+    let mongoSession: any = null;
+    try {
+      const sessionsCol = await getTelegramSessionsCollection();
+      mongoSession = await sessionsCol.findOne({ streamerId });
+    } catch (e) {}
+
+    // Fallback: Check SQLite
+    let sqliteRow: any = null;
+    if (!mongoSession) {
+      try {
+        sqliteRow = db.prepare('SELECT telegram_phone, telegram_user_name, telegram_session, telegram_pending_phone, telegram_pending_hash FROM streamers WHERE id = ?').get(streamerId) as any;
+      } catch (e) {}
+    }
 
     const hasActiveClient = this.activeClients.has(streamerId);
-    const hasSession = Boolean(streamer?.telegram_session);
+    const hasSession = Boolean(
+      (mongoSession && mongoSession.isConnected && mongoSession.sessionString) ||
+      (sqliteRow && sqliteRow.telegram_session)
+    );
 
     let chats: string[] = [];
     try {
-      const saved = db.prepare('SELECT title, chat_id FROM telegram_monitored_groups WHERE streamer_id = ?').all(streamerId) as any[];
-      if (saved && saved.length > 0) {
-        chats = saved.map(g => `${g.title} (${g.chat_id})`);
+      const groupsCol = await getTelegramMonitoredGroupsCollection();
+      const savedMongo = await groupsCol.find({ streamerId }).toArray();
+      if (savedMongo && savedMongo.length > 0) {
+        chats = savedMongo.map(g => `${g.title} (${g.chatId})`);
+      } else {
+        const savedSql = db.prepare('SELECT title, chat_id FROM telegram_monitored_groups WHERE streamer_id = ?').all(streamerId) as any[];
+        if (savedSql && savedSql.length > 0) {
+          chats = savedSql.map(g => `${g.title} (${g.chat_id})`);
+        }
       }
     } catch (e) {}
 
     const pending = this.pendingAuth.get(streamerId);
-    const hasPending = Boolean(pending || streamer?.telegram_pending_hash);
-    const pendingPhone = pending?.phoneNumber || streamer?.telegram_pending_phone || undefined;
-    const pendingHash = pending?.phoneCodeHash || streamer?.telegram_pending_hash || undefined;
+    const hasPending = Boolean(
+      pending ||
+      mongoSession?.pendingHash ||
+      sqliteRow?.telegram_pending_hash
+    );
+    const pendingPhone = pending?.phoneNumber || mongoSession?.pendingPhone || sqliteRow?.telegram_pending_phone || undefined;
+    const pendingHash = pending?.phoneCodeHash || mongoSession?.pendingHash || sqliteRow?.telegram_pending_hash || undefined;
+
+    const phoneNumber = mongoSession?.phoneNumber || sqliteRow?.telegram_phone || undefined;
+    const userName = mongoSession?.userName || sqliteRow?.telegram_user_name || undefined;
+    const isSimulation = Boolean(
+      mongoSession?.isSimulation ||
+      mongoSession?.sessionString?.startsWith('sim_session') ||
+      sqliteRow?.telegram_session?.startsWith('sim_session')
+    );
 
     return {
       isConnected: hasActiveClient || hasSession,
-      phoneNumber: streamer?.telegram_phone || undefined,
-      userName: streamer?.telegram_user_name || undefined,
+      phoneNumber,
+      userName,
       monitoredChats: chats,
-      isSimulation: streamer?.telegram_session?.startsWith('sim_session'),
+      isSimulation,
       hasPendingCode: hasPending && !hasActiveClient && !hasSession,
       pendingPhone,
       pendingHash
@@ -889,7 +1068,7 @@ class TelegramUserClientManager {
   }
 
   /**
-   * Disconnect Telegram account
+   * Disconnect Telegram account (Clears MongoDB session & monitored groups)
    */
   public async disconnect(streamerId: string): Promise<{ success: boolean; message: string }> {
     const client = this.activeClients.get(streamerId);
@@ -903,6 +1082,18 @@ class TelegramUserClientManager {
     this.pendingAuth.delete(streamerId);
     this.monitoredChats.delete(streamerId);
 
+    // 1. Delete session from MongoDB
+    try {
+      const sessionsCol = await getTelegramSessionsCollection();
+      await sessionsCol.deleteOne({ streamerId });
+      const groupsCol = await getTelegramMonitoredGroupsCollection();
+      await groupsCol.deleteMany({ streamerId });
+      console.log(`⚡ [MongoDB] Purged GramJS session and monitored groups for streamer [${streamerId}]`);
+    } catch (e) {
+      console.error('[MongoDB] Error removing telegram session on disconnect:', e);
+    }
+
+    // 2. Safe SQLite backup cleanup
     try {
       db.prepare(`
         UPDATE streamers 
@@ -916,7 +1107,6 @@ class TelegramUserClientManager {
       `).run(streamerId);
     } catch (e) {}
 
-    // When disconnected from GramJS, also clear all monitored groups for this streamer
     try {
       db.prepare('DELETE FROM telegram_monitored_groups WHERE streamer_id = ?').run(streamerId);
     } catch (e) {}
@@ -928,15 +1118,60 @@ class TelegramUserClientManager {
   }
 
   /**
-   * Restore all saved sessions on startup
+   * Restore all saved sessions on startup (MongoDB Primary & SQLite Migration)
    */
   private async restoreAllSavedSessions() {
+    // 1. Primary: Restore active sessions from MongoDB
+    try {
+      const sessionsCol = await getTelegramSessionsCollection();
+      const docs = await sessionsCol.find({
+        sessionString: { $exists: true, $ne: '' },
+        isConnected: true
+      }).toArray();
+
+      for (const doc of docs) {
+        if (!doc.sessionString || doc.isSimulation || doc.sessionString.startsWith('sim_session')) {
+          continue;
+        }
+
+        const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
+        const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
+
+        try {
+          console.log(`⚡ [MongoDB] Restoring GramJS session for streamer [${doc.streamerId}] (${doc.phoneNumber || ''})...`);
+          const client = new TelegramClient(new StringSession(doc.sessionString), apiId, apiHash, {
+            connectionRetries: 5
+          });
+
+          await client.connect();
+
+          if (await client.isUserAuthorized()) {
+            this.attachMessageListener(doc.streamerId, client);
+            this.activeClients.set(doc.streamerId, client);
+            await this.refreshMonitoredChats(doc.streamerId, client);
+            console.log(`✅ [MongoDB] GramJS session successfully connected and listening for streamer [${doc.streamerId}]!`);
+          } else {
+            console.warn(`⚠️ [MongoDB] Saved GramJS session for [${doc.streamerId}] is no longer authorized.`);
+            await sessionsCol.updateOne({ streamerId: doc.streamerId }, { $set: { isConnected: false } });
+          }
+        } catch (err: any) {
+          console.error(`❌ [MongoDB] Error restoring GramJS client for [${doc.streamerId}]:`, err?.message || err);
+        }
+      }
+    } catch (mongoErr) {
+      console.error('[MongoDB] Error during GramJS restoreAllSavedSessions:', mongoErr);
+    }
+
+    // 2. Migration fallback: Check SQLite for any sessions not yet in MongoDB
     try {
       const rows = db.prepare('SELECT id, telegram_phone, telegram_session, telegram_api_id, telegram_api_hash FROM streamers WHERE telegram_session IS NOT NULL').all() as any[];
 
       for (const row of rows) {
         if (!row.telegram_session || row.telegram_session.startsWith('sim_session')) {
           continue;
+        }
+        if (this.activeClients.has(row.id)) {
+          continue; // Already restored from MongoDB
         }
 
         const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
@@ -945,7 +1180,7 @@ class TelegramUserClientManager {
         if (!apiId || !apiHash) continue;
 
         try {
-          console.log(`⚡ [TelegramJS] Restoring saved session for ${row.telegram_phone}...`);
+          console.log(`⚡ [Migration] Restoring and migrating saved session from SQLite for ${row.telegram_phone}...`);
           const client = new TelegramClient(new StringSession(row.telegram_session), apiId, apiHash, {
             connectionRetries: 5
           });
@@ -955,8 +1190,29 @@ class TelegramUserClientManager {
           if (await client.isUserAuthorized()) {
             this.attachMessageListener(row.id, client);
             this.activeClients.set(row.id, client);
-            this.refreshMonitoredChats(row.id, client);
-            console.log(`⚡ [TelegramJS] Session restored successfully for ${row.telegram_phone}!`);
+            await this.refreshMonitoredChats(row.id, client);
+
+            // Save to MongoDB
+            try {
+              const sessionsCol = await getTelegramSessionsCollection();
+              await sessionsCol.updateOne(
+                { streamerId: row.id },
+                {
+                  $set: {
+                    streamerId: row.id,
+                    phoneNumber: row.telegram_phone,
+                    sessionString: row.telegram_session,
+                    apiId,
+                    apiHash,
+                    isConnected: true,
+                    updatedAt: new Date()
+                  },
+                  $setOnInsert: { createdAt: new Date() }
+                },
+                { upsert: true }
+              );
+              console.log(`✅ [MongoDB] Migrated SQLite GramJS session to MongoDB for [${row.id}]!`);
+            } catch (e) {}
           }
         } catch (err) {
           console.error(`❌ [TelegramJS] Failed restoring session for ${row.telegram_phone}:`, err);

@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface UserDoc {
   _id?: ObjectId;
@@ -135,6 +136,33 @@ export interface TemporaryDonationDoc {
   createdAt: Date;
 }
 
+export interface TelegramSessionDoc {
+  _id?: ObjectId;
+  streamerId: string;
+  phoneNumber?: string;
+  userName?: string;
+  sessionString?: string;
+  apiId?: number | string;
+  apiHash?: string;
+  isSimulation?: boolean;
+  isConnected: boolean;
+  pendingPhone?: string;
+  pendingHash?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TelegramMonitoredGroupDoc {
+  _id?: ObjectId;
+  id: string; // unique uuid string
+  streamerId: string;
+  chatId: string;
+  title: string;
+  username?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /**
  * Safely extract MONGODB_URI directly from process.env with fallback
  */
@@ -266,6 +294,95 @@ export async function getIssueReportsCollection(): Promise<Collection<IssueRepor
   return db.collection<IssueReportDoc>('issue_reports');
 }
 
+export async function getTelegramSessionsCollection(): Promise<Collection<TelegramSessionDoc>> {
+  const db = await getMongoDb();
+  return db.collection<TelegramSessionDoc>('telegram_sessions');
+}
+
+export async function getTelegramMonitoredGroupsCollection(): Promise<Collection<TelegramMonitoredGroupDoc>> {
+  const db = await getMongoDb();
+  return db.collection<TelegramMonitoredGroupDoc>('telegram_monitored_groups');
+}
+
+export async function getMongoMonitoredGroups(streamerId: string) {
+  try {
+    const col = await getTelegramMonitoredGroupsCollection();
+    const docs = await col.find({ streamerId }).sort({ createdAt: -1 }).toArray();
+    return docs.map((d) => ({
+      id: d.id,
+      streamer_id: d.streamerId,
+      chat_id: d.chatId,
+      title: d.title,
+      username: d.username,
+      created_at: d.createdAt.toISOString()
+    }));
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function addMongoMonitoredGroup(streamerId: string, chatId: string, title: string, username?: string) {
+  const cleanChatId = chatId.trim();
+  const cleanTitle = title.trim();
+  const cleanUsername = username ? username.trim().replace(/^@/, '') : undefined;
+  const col = await getTelegramMonitoredGroupsCollection();
+
+  const existing = await col.findOne({ streamerId, chatId: cleanChatId });
+  if (existing) {
+    await col.updateOne(
+      { _id: existing._id },
+      { $set: { title: cleanTitle, username: cleanUsername, updatedAt: new Date() } }
+    );
+    return {
+      id: existing.id,
+      streamer_id: streamerId,
+      chat_id: cleanChatId,
+      title: cleanTitle,
+      username: cleanUsername,
+      created_at: existing.createdAt.toISOString()
+    };
+  }
+
+  const id = uuidv4();
+  const now = new Date();
+  await col.insertOne({
+    id,
+    streamerId,
+    chatId: cleanChatId,
+    title: cleanTitle,
+    username: cleanUsername,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  return {
+    id,
+    streamer_id: streamerId,
+    chat_id: cleanChatId,
+    title: cleanTitle,
+    username: cleanUsername,
+    created_at: now.toISOString()
+  };
+}
+
+export async function deleteMongoMonitoredGroup(id: string, streamerId: string) {
+  try {
+    const col = await getTelegramMonitoredGroupsCollection();
+    return await col.deleteOne({ id, streamerId });
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function clearMongoMonitoredGroups(streamerId: string) {
+  try {
+    const col = await getTelegramMonitoredGroupsCollection();
+    return await col.deleteMany({ streamerId });
+  } catch (e) {
+    return null;
+  }
+}
+
 /**
  * Initialize MongoDB indexes and default data for streamer
  */
@@ -280,6 +397,8 @@ export async function initMongo() {
     await db.collection('overlays').createIndex({ userId: 1, createdAt: -1 });
     await db.collection('temporary_donations').createIndex({ id: 1 }, { unique: true });
     await db.collection('temporary_donations').createIndex({ streamerId: 1, createdAt: -1 });
+    await db.collection('telegram_sessions').createIndex({ streamerId: 1 }, { unique: true });
+    await db.collection('telegram_monitored_groups').createIndex({ streamerId: 1, chatId: 1 }, { unique: true });
 
     // Seed default user if not exists
     const usersCol = await getUsersCollection();

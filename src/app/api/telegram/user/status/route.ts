@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
 
-    const status = telegramUserManager.getStatus(streamerId);
+    const status = await telegramUserManager.getStatus(streamerId);
     return NextResponse.json(status);
   } catch (err: any) {
     console.error('API /telegram/user/status error:', err);

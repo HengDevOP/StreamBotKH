@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { telegramUserManager } from '@backend/telegram/telegramUserClient';
 import { clearMonitoredGroups } from '@/server/database/db';
+import { clearMongoMonitoredGroups } from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,6 +12,7 @@ export async function POST(req: NextRequest) {
     // Disconnect user client and clear monitored groups
     const result = await telegramUserManager.disconnect(streamerId);
     try {
+      await clearMongoMonitoredGroups(streamerId);
       clearMonitoredGroups(streamerId);
     } catch (e) {}
 
