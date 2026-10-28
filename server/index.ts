@@ -77,6 +77,11 @@ function createRouteHandler(handler: Function) {
         return res.status(204).end();
       }
 
+      const location = nextRes.headers.get('location');
+      if (location && nextRes.status >= 300 && nextRes.status < 400) {
+        return res.redirect(nextRes.status, location);
+      }
+
       res.status(nextRes.status || 200);
       nextRes.headers.forEach((val: string, key: string) => {
         res.setHeader(key, val);

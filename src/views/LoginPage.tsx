@@ -1,63 +1,62 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Bot, ShieldCheck, Sparkles, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bot, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/common/Button';
 
 interface LoginPageProps {
   onSuccess: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
-  const { loginWithGoogle, loginDemo, loading } = useAuth();
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleName, setGoogleName] = useState('');
-  const [showCustomGoogle, setShowCustomGoogle] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const { user, loading, loginWithGoogleRedirect, setTokenAndRefresh } = useAuth();
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleDemoLogin = async () => {
-    setError(null);
-    try {
-      await loginDemo();
-      onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Demo login failed');
-    }
-  };
+  // Handle OAuth callback query parameters (?token=... or ?error=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
 
-  const handleQuickGoogleDemo = async () => {
-    setError(null);
-    setSubmitting(true);
-    try {
-      await loginWithGoogle(
-        'mock-google-token',
-        'cambodia.streamer@gmail.com',
-        'Cambodia Pro Gamer'
+    const params = new URLSearchParams(window.location.search);
+    const urlError = params.get('error');
+    const urlToken = params.get('token');
+
+    if (urlError) {
+      setError(urlError);
+      params.delete('error');
+      const newQuery = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`
       );
-      onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Quick Google login failed');
-    } finally {
-      setSubmitting(false);
     }
-  };
 
-  const handleCustomGoogleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!googleEmail.trim()) return;
+    if (urlToken) {
+      params.delete('token');
+      const newQuery = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`
+      );
+      setTokenAndRefresh(urlToken).then(() => {
+        onSuccess();
+      });
+    }
+  }, []);
 
+  // Automatically navigate to dashboard once user is authenticated
+  useEffect(() => {
+    if (!loading && user) {
+      onSuccess();
+    }
+  }, [user, loading, onSuccess]);
+
+  const handleGoogleSignIn = () => {
     setError(null);
-    setSubmitting(true);
-    try {
-      await loginWithGoogle('mock-google-token', googleEmail.trim(), googleName.trim() || undefined);
-      onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Google login failed');
-    } finally {
-      setSubmitting(false);
-    }
+    setRedirecting(true);
+    loginWithGoogleRedirect();
   };
 
   return (
@@ -73,119 +72,60 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
             streambot<span className="text-cyan-400">kh</span>.com
           </h2>
           <p className="text-xs text-slate-400">
-            Sign in to access your livestream alerts & ABA Bakong dashboard
+            Sign in with your Google account to access your livestream alerts &amp; ABA Bakong dashboard
           </p>
         </div>
 
         {/* Error notification banner */}
         {error && (
-          <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2 text-left animate-fadeIn">
-            <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
-            <div className="flex-1 font-mono">{error}</div>
+          <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-start gap-2.5 text-left animate-fadeIn">
+            <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 font-mono leading-relaxed">{error}</div>
           </div>
         )}
 
-        {/* 1-Click Instant Demo Streamer Button */}
-        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-          <div className="flex items-center justify-center gap-1.5 text-xs text-cyan-400 font-semibold font-mono">
-            <Sparkles size={14} />
-            <span>TEST / DEMO ONBOARDING</span>
-          </div>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={handleDemoLogin}
-            loading={loading && !submitting}
-            className="w-full font-bold text-xs tracking-wider uppercase"
+        {/* Full Google OAuth 2.0 Sign In Button */}
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={redirecting || loading}
+            className="w-full py-3.5 px-5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 border border-white/20 shadow-lg shadow-cyan-500/10 transition-all cursor-pointer disabled:opacity-60"
           >
-            1-Click Demo Login (@neonstreamer)
-          </Button>
-          <span className="text-[11px] text-slate-400 block font-sans">
-            Instant entry as pre-configured streamer with test alerts and real-time transactions.
-          </span>
+            {redirecting || loading ? (
+              <>
+                <Loader2 size={18} className="animate-spin text-slate-700" />
+                <span>Connecting to Google...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
+              </>
+            )}
+          </button>
         </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3">
-          <div className="h-px bg-slate-800 flex-1" />
-          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">OR USE GOOGLE</span>
-          <div className="h-px bg-slate-800 flex-1" />
-        </div>
-
-        {/* Google Sign In Options */}
-        {!showCustomGoogle ? (
-          <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={handleQuickGoogleDemo}
-              disabled={submitting || loading}
-              className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-3 border border-slate-700 hover:border-cyan-500/50 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-              </svg>
-              <span>Instant Google Sign In</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowCustomGoogle(true)}
-              className="text-[11px] text-slate-400 hover:text-cyan-400 underline font-mono cursor-pointer transition-colors"
-            >
-              Custom Google Account / Email &rarr;
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleCustomGoogleSubmit} className="space-y-3 text-left">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1 font-mono">Google Email</label>
-              <input
-                type="email"
-                required
-                placeholder="streamer@gmail.com"
-                value={googleEmail}
-                onChange={(e) => setGoogleEmail(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1 font-mono">Channel Name</label>
-              <input
-                type="text"
-                placeholder="My Channel"
-                value={googleName}
-                onChange={(e) => setGoogleName(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                loading={submitting}
-                className="flex-1 font-bold"
-              >
-                Sign In
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="md"
-                onClick={() => setShowCustomGoogle(false)}
-              >
-                Back
-              </Button>
-            </div>
-          </form>
-        )}
 
         <div className="pt-2 text-[11px] font-mono text-slate-500 flex items-center justify-center gap-1.5">
           <ShieldCheck size={14} className="text-cyan-400" />
-          <span>SSL 256-Bit Encrypted Streamer Auth</span>
+          <span>Google OAuth 2.0 • SSL 256-Bit Encrypted Auth</span>
         </div>
       </div>
     </div>

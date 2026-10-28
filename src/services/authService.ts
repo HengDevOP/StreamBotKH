@@ -6,17 +6,28 @@ export interface AuthResponse {
   user: Streamer;
 }
 
+export interface GoogleOAuthConfigResponse {
+  configured: boolean;
+  redirectUri: string;
+}
+
 export const authService = {
-  async googleLogin(credential: string, email?: string, name?: string, picture?: string): Promise<AuthResponse> {
-    return request<AuthResponse>('/auth/google', {
-      method: 'POST',
-      body: JSON.stringify({ credential, email, name, picture })
-    });
+  initiateGoogleOAuth() {
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin;
+      window.location.href = `/api/auth/google?origin=${encodeURIComponent(origin)}`;
+    }
   },
 
-  async demoLogin(): Promise<AuthResponse> {
-    return request<AuthResponse>('/auth/demo', {
-      method: 'POST'
+  async getGoogleConfig(): Promise<GoogleOAuthConfigResponse> {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return request<GoogleOAuthConfigResponse>(`/auth/google?config=1&origin=${encodeURIComponent(origin)}`);
+  },
+
+  async googleLogin(credential?: string, code?: string): Promise<AuthResponse> {
+    return request<AuthResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ credential, code })
     });
   },
 

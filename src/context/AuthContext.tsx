@@ -8,8 +8,9 @@ interface AuthContextType {
   user: Streamer | null;
   token: string | null;
   loading: boolean;
-  loginWithGoogle: (credential: string, email?: string, name?: string, picture?: string) => Promise<void>;
-  loginDemo: () => Promise<void>;
+  loginWithGoogleRedirect: () => void;
+  loginWithGoogle: (credential?: string, code?: string) => Promise<void>;
+  setTokenAndRefresh: (newToken: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -41,18 +42,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('streamneon_auth_token');
-      if (stored) {
-        setToken(stored);
+      const params = new URLSearchParams(window.location.search);
+      const callbackToken = params.get('token');
+
+      if (callbackToken) {
+        localStorage.setItem('streamneon_auth_token', callbackToken);
+        setToken(callbackToken);
+
+        // Clean ?token=... from URL
+        params.delete('token');
+        const newQuery = params.toString();
+        const cleanUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}${window.location.hash}`;
+        window.history.replaceState({}, '', cleanUrl);
+      } else {
+        const stored = localStorage.getItem('streamneon_auth_token');
+        if (stored) {
+          setToken(stored);
+        }
       }
     }
     refreshUser();
   }, []);
 
-  const loginWithGoogle = async (credential: string, email?: string, name?: string, picture?: string) => {
+  const loginWithGoogleRedirect = () => {
+    authService.initiateGoogleOAuth();
+  };
+
+  const loginWithGoogle = async (credential?: string, code?: string) => {
     setLoading(true);
     try {
-      const res = await authService.googleLogin(credential, email, name, picture);
+      const res = await authService.googleLogin(credential, code);
       if (typeof window !== 'undefined') {
         localStorage.setItem('streamneon_auth_token', res.token);
       }
@@ -63,15 +82,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginDemo = async () => {
+  const setTokenAndRefresh = async (newToken: string) => {
     setLoading(true);
     try {
-      const res = await authService.demoLogin();
       if (typeof window !== 'undefined') {
-        localStorage.setItem('streamneon_auth_token', res.token);
+        localStorage.setItem('streamneon_auth_token', newToken);
       }
-      setToken(res.token);
-      setUser(res.user);
+      setToken(newToken);
+      await refreshUser();
     } finally {
       setLoading(false);
     }
@@ -84,7 +102,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, loginWithGoogle, loginDemo, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        loginWithGoogleRedirect,
+        loginWithGoogle,
+        setTokenAndRefresh,
+        logout,
+        refreshUser
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
