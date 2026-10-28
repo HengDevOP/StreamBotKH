@@ -98,7 +98,7 @@ export const StreamSoundboardOverlay: React.FC<StreamSoundboardOverlayProps> = (
     // Connect socket
     const socket: Socket = io({
       path: '/socket.io',
-      transports: ['websocket', 'polling']
+      transports: ['polling', 'websocket']
     });
 
     socket.on('connect', () => {

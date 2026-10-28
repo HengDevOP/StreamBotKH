@@ -13,37 +13,52 @@ interface SocketContextType {
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
-export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [connected, setConnected] = useState<boolean>(false);
+// Maintain a global singleton socket instance across React re-renders & React 18 StrictMode mount/unmount cycles
+let globalSocket: Socket | null = null;
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Connect to current host with resilient auto-reconnect
-    const s = io(window.location.origin, {
-      transports: ['websocket', 'polling'],
+function getGlobalSocket(): Socket {
+  if (!globalSocket && typeof window !== 'undefined') {
+    globalSocket = io(window.location.origin, {
+      path: '/socket.io',
+      transports: ['polling', 'websocket'], // Start with HTTP polling handshake -> smooth WebSocket upgrade (prevents connection abortion during React StrictMode)
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 10000
     });
+  }
+  return globalSocket!;
+}
 
-    s.on('connect', () => {
+export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [socket, setSocket] = useState<Socket | null>(() => (typeof window !== 'undefined' ? getGlobalSocket() : null));
+  const [connected, setConnected] = useState<boolean>(() => Boolean(globalSocket?.connected));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const s = getGlobalSocket();
+    setSocket(s);
+    setConnected(s.connected);
+
+    const onConnect = () => {
       console.log('⚡ [Socket] Connected to streambotkh gateway:', s.id);
       setConnected(true);
-    });
+    };
 
-    s.on('disconnect', () => {
+    const onDisconnect = () => {
       console.log('⚡ [Socket] Disconnected from gateway');
       setConnected(false);
-    });
+    };
 
-    setSocket(s);
+    s.on('connect', onConnect);
+    s.on('disconnect', onDisconnect);
 
+    // Unbind listeners on unmount without destroying the active socket connection
     return () => {
-      s.disconnect();
+      s.off('connect', onConnect);
+      s.off('disconnect', onDisconnect);
     };
   }, []);
 
