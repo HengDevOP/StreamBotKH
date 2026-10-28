@@ -191,6 +191,27 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [isSimulating, setIsSimulating] = useState(false);
   const [isTtsPlaying, setIsTtsPlaying] = useState(false);
 
+  // Mobile responsive categories drawer / tab toggle
+  const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
+
+  // Responsive zoom scale for device screens
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const updateResponsiveZoom = () => {
+        if (window.innerWidth < 640) {
+          setZoomScale(0.7);
+        } else if (window.innerWidth < 1024) {
+          setZoomScale(0.85);
+        } else {
+          setZoomScale(1);
+        }
+      };
+      updateResponsiveZoom();
+      window.addEventListener('resize', updateResponsiveZoom);
+      return () => window.removeEventListener('resize', updateResponsiveZoom);
+    }
+  }, []);
+
   // Sample Simulation Data
   const [demoDonorName, setDemoDonorName] = useState('CyberValkyrie');
   const [demoAmount, setDemoAmount] = useState(minAmountCondition >= 10 ? minAmountCondition : 5.0);
@@ -548,38 +569,50 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       {/* ============================================================== */}
       {/* TOP HEADER NAVIGATION & ACTION BAR                             */}
       {/* ============================================================== */}
-      <header className="flex-shrink-0 h-16 border-b border-slate-800/80 bg-[#090D18]/95 px-4 sm:px-6 flex items-center justify-between gap-4 z-20 backdrop-blur-md">
+      <header className="flex-shrink-0 min-h-16 border-b border-slate-800/80 bg-[#090D18]/95 px-3 sm:px-6 py-2 sm:py-0 flex items-center justify-between gap-2 sm:gap-4 z-20 backdrop-blur-md">
         
         {/* Left: Back/Collapse Button & Title */}
-        <div className="flex items-center gap-3.5 min-w-0">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 text-slate-200 hover:text-white text-xs font-mono font-bold transition-all shadow-md group"
-          >
-            {inlineMode ? (
-              <>
-                <ChevronUp size={15} className="text-cyan-400 group-hover:-translate-y-0.5 transition-transform" />
-                <span>Collapse Box</span>
-              </>
-            ) : (
-              <>
-                <ArrowLeft size={15} className="text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
-                <span>Back to Dashboard</span>
-              </>
-            )}
-          </button>
+        <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+          {mobileCategoriesOpen ? (
+            <button
+              type="button"
+              onClick={() => setMobileCategoriesOpen(false)}
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 text-cyan-300 hover:text-white text-xs font-mono font-bold transition-all shadow-md group flex-shrink-0"
+              title="Return to Live Canvas Preview"
+            >
+              <ArrowLeft size={15} className="text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
+              <span>Back to Preview</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 text-slate-200 hover:text-white text-xs font-mono font-bold transition-all shadow-md group flex-shrink-0"
+            >
+              {inlineMode ? (
+                <>
+                  <ChevronUp size={15} className="text-cyan-400 group-hover:-translate-y-0.5 transition-transform" />
+                  <span className="hidden sm:inline">Collapse Box</span>
+                </>
+              ) : (
+                <>
+                  <ArrowLeft size={15} className="text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
+                  <span className="hidden sm:inline">Back to Dashboard</span>
+                </>
+              )}
+            </button>
+          )}
 
           <div className="h-5 w-[1px] bg-slate-800 hidden sm:block" />
 
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <span className="text-xs font-mono text-slate-500 uppercase tracking-wider hidden md:inline">Donation Studio /</span>
-              <h2 className="text-sm sm:text-base font-bold text-white truncate font-['Chakra_Petch']">
+              <h2 className="text-xs sm:text-base font-bold text-white truncate font-['Chakra_Petch'] max-w-[110px] sm:max-w-xs md:max-w-md">
                 {name || 'Untitled Donation Alert'}
               </h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex-shrink-0">
-                Condition ≥ ${minAmountCondition.toFixed(2)}
+              <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex-shrink-0">
+                ≥ ${minAmountCondition.toFixed(2)}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 truncate hidden md:block">
@@ -588,9 +621,22 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
           </div>
         </div>
 
-        {/* Right: OBS Studio Browser Source URL with Copy Icon & Save Actions */}
-        <div className="flex items-center gap-2.5 flex-shrink-0">
-          {/* OBS Studio Browser Source URL with Copy Icon */}
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
+          {/* Mobile Categories Toggle Icon Button (only visible on device screen < lg when categories drawer is closed) */}
+          {!mobileCategoriesOpen && (
+            <button
+              type="button"
+              onClick={() => setMobileCategoriesOpen(true)}
+              className="lg:hidden flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 font-mono text-xs font-bold transition-all shadow-sm active:scale-95 flex-shrink-0"
+              title="Open customization categories"
+            >
+              <Sliders size={14} className="text-cyan-400" />
+              <span>Categories</span>
+            </button>
+          )}
+
+          {/* OBS Studio Browser Source URL with Copy Icon (desktop only) */}
           <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono max-w-[320px]">
             <Monitor size={14} className="text-cyan-400 flex-shrink-0" />
             <span className="text-[11px] text-slate-400 truncate select-all flex-1" title={obsUrl}>
@@ -613,29 +659,30 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
             size="sm"
             onClick={handleSimulateAlert}
             disabled={isSimulating}
-            className="border-cyan-500/40 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-900/50 font-mono text-xs font-bold shadow-[0_0_12px_rgba(0,240,255,0.15)] flex items-center gap-1.5"
+            className="border-cyan-500/40 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-900/50 font-mono text-xs font-bold shadow-[0_0_12px_rgba(0,240,255,0.15)] flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3"
           >
             <Play size={13} className={isSimulating ? 'text-cyan-400 animate-spin fill-cyan-400' : 'text-cyan-400 fill-cyan-400'} />
             <span className="hidden sm:inline">{isSimulating ? 'Playing Alert...' : 'Test Alert'}</span>
           </Button>
 
+          {/* Save Button */}
           <Button
             type="button"
             variant="primary"
             size="sm"
             onClick={handleSave}
             loading={saving}
-            className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold font-mono text-xs px-4 shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+            className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold font-mono text-xs px-2.5 sm:px-4 shadow-[0_0_15px_rgba(0,240,255,0.3)] flex-shrink-0"
           >
             {savedSuccess ? (
               <>
                 <Check size={14} className="text-slate-950" />
-                <span>Saved!</span>
+                <span className="hidden sm:inline">Saved!</span>
               </>
             ) : (
               <>
                 <Save size={14} className="text-slate-950" />
-                <span>Save Box</span>
+                <span>Save</span>
               </>
             )}
           </Button>
@@ -645,9 +692,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
               type="button"
               onClick={handleDelete}
               title="Delete this donation box"
-              className="p-2 rounded-xl bg-slate-900 hover:bg-red-950/40 border border-slate-800 hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-red-950/40 border border-slate-800 hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
             >
-              <Trash2 size={15} />
+              <Trash2 size={14} />
             </button>
           )}
         </div>
@@ -662,9 +709,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         {/* LEFT PANE: EXPANDABLE CATEGORY ACCORDION LIST                */}
         {/* ============================================================ */}
         <aside
-          className={`w-full lg:w-[440px] flex-shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#090D18] z-10 ${
+          className={`w-full lg:w-[440px] flex-shrink-0 flex-col border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#090D18] z-10 ${
             inlineMode ? '' : 'overflow-hidden'
-          }`}
+          } ${mobileCategoriesOpen ? 'flex flex-1' : 'hidden lg:flex'}`}
         >
           <div className="px-4 py-3 bg-[#060912] border-b border-slate-800/80 flex items-center justify-between">
             <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
@@ -1641,10 +1688,10 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
               type="button"
               variant="outline"
               size="sm"
-              onClick={onBack}
+              onClick={mobileCategoriesOpen ? () => setMobileCategoriesOpen(false) : onBack}
               className="text-xs font-mono"
             >
-              {inlineMode ? 'Collapse' : 'Cancel'}
+              {mobileCategoriesOpen ? 'Done & Preview' : inlineMode ? 'Collapse' : 'Cancel'}
             </Button>
 
             <Button
@@ -1663,7 +1710,34 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         {/* ============================================================ */}
         {/* CENTER MAIN WORKBENCH: LIVE PREVIEW OF ALERTS DONATIONS      */}
         {/* ============================================================ */}
-        <main className="flex-1 flex flex-col overflow-y-auto bg-[#070A12] p-4 sm:p-6 lg:p-8 space-y-6">
+        <main
+          className={`flex-1 flex-col overflow-y-auto bg-[#070A12] p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 ${
+            mobileCategoriesOpen ? 'hidden lg:flex' : 'flex'
+          }`}
+        >
+          {/* Mobile Categories Floating Banner on device screens */}
+          <div className="lg:hidden flex items-center justify-between p-3 rounded-2xl bg-[#090D18] border border-cyan-500/30 shadow-lg">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
+                <Sliders size={15} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate font-['Chakra_Petch']">
+                  Alert Configuration
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Text, Audio, GIF, Font &amp; TTS
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileCategoriesOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs font-mono transition-all flex items-center gap-1 shadow-sm shadow-cyan-400/20 flex-shrink-0 cursor-pointer"
+            >
+              <span>Edit Settings</span>
+            </button>
+          </div>
           
           {/* Top Preview Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono">

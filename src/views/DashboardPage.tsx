@@ -1055,61 +1055,29 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             </div>
           </div>
 
-          {/* Quick Action Command Deck */}
+          {/* Quick Action Command Deck: Upgrade / Pro Status */}
           <div className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0">
-            {/* Plan & Commission HUD Pill */}
-            <button
-              onClick={() => setActiveTab('billing')}
-              className={`hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl border transition-all group ${
-                currentPlan === 'free'
-                  ? 'bg-amber-950/40 border-amber-500/40 hover:border-amber-400 text-amber-300'
-                  : 'bg-emerald-950/40 border-emerald-500/40 hover:border-emerald-400 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.12)]'
-              }`}
-              title="Manage Plan & Platform Commission"
-            >
-              <Sparkles size={14} className={currentPlan === 'free' ? 'text-amber-400' : 'text-emerald-400'} />
-              <div className="flex flex-col text-left leading-none">
-                <span className="text-[9px] font-mono uppercase font-bold tracking-wider">
-                  {currentPlan === 'free' ? '10% Commission Fee' : '0% Commission Fee'}
-                </span>
-                <span className="text-xs font-black text-white font-['Chakra_Petch'] mt-0.5">
-                  {currentPlan === 'free' ? 'Starter (Upgrade)' : 'Pro Streamer Tier'}
-                </span>
+            {currentPlan === 'free' ? (
+              <button
+                onClick={() => {
+                  setUpgradeFeatureName(undefined);
+                  setIsVideoUpgradeModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-black text-xs sm:text-sm font-['Chakra_Petch'] transition-all shadow-[0_0_20px_rgba(0,240,255,0.35)] hover:shadow-[0_0_28px_rgba(0,240,255,0.6)] cursor-pointer"
+                title="Upgrade to Pro Plan"
+              >
+                <Sparkles size={16} className="text-slate-950" />
+                <span>Upgrade</span>
+              </button>
+            ) : (
+              <div
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-bold text-xs sm:text-sm font-['Chakra_Petch'] shadow-[0_0_15px_rgba(16,185,129,0.15)] select-none"
+                title="Pro Streamer Plan Active"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>You are on Pro Plan</span>
               </div>
-            </button>
-
-            {/* Quick Tip Link Copier */}
-            <button
-              onClick={handleCopyDonateLink}
-              className="hidden md:flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-semibold transition-all group"
-              title="Copy your public tip page URL"
-            >
-              {copiedDonateLink ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} className="text-cyan-400" />}
-              <span className="font-mono text-xs">{copiedDonateLink ? 'Copied Tip URL!' : `@${user.username}`}</span>
-            </button>
-
-            {/* Quick Test Alert Action */}
-            <button
-              onClick={() => handleTriggerTest()}
-              disabled={testFiring}
-              className="hidden lg:flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 text-xs font-semibold text-cyan-400 transition-all"
-              title="Fire an instant sample alert to your overlay"
-            >
-              <Send size={14} className={testFiring ? 'animate-bounce' : ''} />
-              <span>{testFiring ? 'Firing Alert...' : 'Test Alert'}</span>
-            </button>
-
-            {/* HERO BUTTON: OBS BROWSER SOURCE */}
-            <button
-              onClick={() => setIsOverlayModalOpen(true)}
-              className="flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-[0_0_20px_rgba(0,240,255,0.35)] hover:shadow-[0_0_28px_rgba(0,240,255,0.6)] transform hover:-translate-y-0.5 active:translate-y-0 flex-shrink-0 cursor-pointer"
-            >
-              <Tv size={16} className="text-slate-950" />
-              <div className="flex flex-col text-left leading-none">
-                <span className="tracking-tight uppercase font-['Chakra_Petch']">OBS Source</span>
-                <span className="text-[9px] font-mono opacity-85 mt-0.5">1080p • 60 FPS</span>
-              </div>
-            </button>
+            )}
           </div>
         </header>
 
