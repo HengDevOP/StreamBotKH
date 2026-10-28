@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/server/database/db';
 import { getUsersCollection, getOverlaysCollection } from '@/server/database/mongo';
 
 export function generateToken(user: { id: string; username: string; email: string }) {
+  dotenv.config({ override: true });
   return jwt.sign(
     { id: user.id, username: user.username, email: user.email },
     process.env.JWT_SECRET || 'streamneon_super_secret_jwt_key_2026',
@@ -13,6 +15,7 @@ export function generateToken(user: { id: string; username: string; email: strin
 }
 
 export function isGoogleOAuthConfigured(): boolean {
+  dotenv.config({ override: true });
   const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
   return (
