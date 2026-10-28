@@ -43,6 +43,44 @@ try {
 try {
   db.exec('ALTER TABLE streamers ADD COLUMN plan TEXT DEFAULT "free"');
 } catch (e) {}
+try {
+  db.exec('ALTER TABLE streamers ADD COLUMN plan_started_at TEXT');
+} catch (e) {}
+try {
+  db.exec('ALTER TABLE streamers ADD COLUMN plan_expires_at TEXT');
+} catch (e) {}
+try {
+  db.exec('ALTER TABLE streamers ADD COLUMN plan_duration_days INTEGER DEFAULT 0');
+} catch (e) {}
+
+// Client Issue Reports / Pull Requests table for Admin Panel
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS issue_reports (
+      id TEXT PRIMARY KEY,
+      streamer_id TEXT NOT NULL,
+      streamer_username TEXT,
+      streamer_display_name TEXT,
+      streamer_email TEXT,
+      streamer_avatar TEXT,
+      title TEXT NOT NULL,
+      category TEXT DEFAULT 'bug',
+      priority TEXT DEFAULT 'medium',
+      description TEXT NOT NULL,
+      status TEXT DEFAULT 'open',
+      admin_note TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+} catch (e) {}
+
+export const ADMIN_EMAILS = ['hchenheng@gmail.com'];
+
+export function isAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.trim().toLowerCase());
+}
 
 // Video overlay & temporary listener migrations
 try {

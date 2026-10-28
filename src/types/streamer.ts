@@ -6,9 +6,31 @@ export interface Streamer {
   avatarUrl?: string;
   bio?: string;
   plan?: string;
+  planStartedAt?: string | null;
+  planExpiresAt?: string | null;
+  planDurationDays?: number;
+  isAdmin?: boolean;
   overlayToken: string;
   telegramChatId?: string;
   telegramPairingCode?: string;
+  createdAt?: string;
+}
+
+export interface IssueReport {
+  id: string;
+  streamerId: string;
+  streamerUsername: string;
+  streamerDisplayName: string;
+  streamerEmail: string;
+  streamerAvatar?: string;
+  title: string;
+  category: 'bug' | 'plan_upgrade' | 'payment' | 'feature' | 'other';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  description: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  adminNote?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface StreamerDashboardStats {

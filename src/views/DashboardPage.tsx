@@ -46,7 +46,10 @@ import {
   Disc,
   Video,
   Lock,
-  Timer
+  Timer,
+  Users,
+  GitPullRequest,
+  MessageSquare
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -75,6 +78,8 @@ import { VideoAlertsManager } from '../components/dashboard/VideoAlertsManager';
 import { ProUpgradeModal } from '../components/dashboard/ProUpgradeModal';
 import { TimerWidgetManager } from '../components/dashboard/TimerWidgetManager';
 import { SoundboardManager } from '../components/dashboard/SoundboardManager';
+import { AdminUsersManager } from '../components/dashboard/AdminUsersManager';
+import { AdminPullRequestsManager } from '../components/dashboard/AdminPullRequestsManager';
 import { useModal } from '../context/ModalContext';
 import { useAudio } from '../hooks/useAudio';
 
@@ -100,7 +105,10 @@ export type DashboardTab =
   | 'telegram'
   | 'account'
   | 'billing'
-  | 'security';
+  | 'security'
+  | 'report-issue'
+  | 'admin-users'
+  | 'admin-requests';
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initialTab, initialSelectedId }) => {
   const { user, refreshUser, logout } = useAuth();
@@ -469,8 +477,33 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     );
   }
 
+  const isAdmin = Boolean(
+    user.isAdmin || (user.email && user.email.trim().toLowerCase() === 'hchenheng@gmail.com')
+  );
+
   // Sidebar Category Navigation Definition (Clean, Organized)
   const sidebarSections = [
+    ...(isAdmin
+      ? [
+          {
+            category: 'Admin Panel',
+            items: [
+              {
+                id: 'admin-users' as DashboardTab,
+                label: 'Users Management',
+                icon: Users,
+                badge: null
+              },
+              {
+                id: 'admin-requests' as DashboardTab,
+                label: 'Pull Requests',
+                icon: GitPullRequest,
+                badge: null
+              }
+            ]
+          }
+        ]
+      : []),
     {
       category: 'PORTAL',
       items: [
@@ -548,14 +581,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           label: 'Payment Gateway',
           icon: CreditCard,
           badge: null,
-          isLocked: currentPlan === 'free'
+          isLocked: currentPlan === 'free' && !isAdmin
         },
         {
           id: 'telegram' as DashboardTab,
           label: 'Telegram Bot',
           icon: Bot,
           badge: null,
-          isLocked: currentPlan === 'free'
+          isLocked: currentPlan === 'free' && !isAdmin
         }
       ]
     },
@@ -567,6 +600,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           label: 'Plans & Commission',
           icon: Sparkles,
           badge: currentPlan === 'free' ? '10% Fee' : '0% Fee'
+        },
+        {
+          id: 'report-issue' as DashboardTab,
+          label: 'Report Issue',
+          icon: MessageSquare,
+          badge: null
         },
         {
           id: 'security' as DashboardTab,
@@ -1676,20 +1715,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                   <div className="flex-1 flex flex-col space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold uppercase text-purple-400">PRO PLAN</span>
+                      <span className="text-xs font-mono font-bold uppercase text-purple-400">PRO PLAN (31 DAYS)</span>
                       {currentPlan === 'pro' && (
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold border border-purple-500/40">
-                          ACTIVE PLAN
+                          ACTIVE • 31D CYCLE
                         </span>
                       )}
                     </div>
                     <div>
                       <div className="text-3xl font-extrabold text-white font-mono">
-                        $4.99 <span className="text-xs font-normal text-slate-400 font-sans">/ month</span>
+                        $4.99 <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days (1 month)</span>
                       </div>
                       <div className="text-xs text-emerald-400 font-mono font-bold pt-1">
                         0% Platform Fee (Keep 100% of your earnings)
                       </div>
+                      {currentPlan === 'pro' && user.planExpiresAt && (
+                        <div className="text-[11px] text-purple-300 font-mono mt-1">
+                          Expires: {new Date(user.planExpiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </div>
+                      )}
                     </div>
                     <p className="text-xs text-slate-400">
                       Full access to Payment Gateway, Telegram Auto-Listener, and high-capacity storage.
@@ -1728,7 +1772,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                   <div className="mt-6 pt-5 border-t border-purple-500/30 w-full">
                     <button
-                      onClick={() => setPlan('pro')}
+                      onClick={() => {
+                        if (isAdmin) {
+                          setPlan('pro');
+                        } else {
+                          setIsVideoUpgradeModalOpen(true);
+                        }
+                      }}
                       disabled={currentPlan === 'pro'}
                       className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${
                         currentPlan === 'pro'
@@ -1736,12 +1786,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           : 'bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-slate-950 shadow-lg shadow-purple-500/20 font-extrabold cursor-pointer'
                       }`}
                     >
-                      {currentPlan === 'pro' ? 'Active Plan (0% Fee)' : 'Switch to Pro ($4.99/mo)'}
+                      {currentPlan === 'pro' ? 'Active Plan (31d • 0% Fee)' : 'Upgrade to Pro ($4.99 / 31d)'}
                     </button>
                   </div>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* ADMIN PANEL: USERS MANAGEMENT                                  */}
+          {/* ============================================================== */}
+          {activeTab === 'admin-users' && isAdmin && (
+            <AdminUsersManager
+              onCurrentUserPlanUpdated={() => {
+                refreshUser();
+                loadData();
+              }}
+            />
+          )}
+
+          {/* ============================================================== */}
+          {/* ADMIN PANEL: PULL REQUESTS / CLIENT ISSUE REPORTS              */}
+          {/* ============================================================== */}
+          {(activeTab === 'admin-requests' || activeTab === 'report-issue') && (
+            <AdminPullRequestsManager
+              isAdmin={isAdmin && activeTab === 'admin-requests'}
+              onUserPlanUpdated={() => {
+                refreshUser();
+                loadData();
+              }}
+            />
           )}
 
           {/* ============================================================== */}

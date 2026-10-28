@@ -10,8 +10,30 @@ export interface UserDoc {
   displayName: string;
   email?: string;
   avatarUrl?: string;
+  plan?: string;
+  planStartedAt?: string | null;
+  planExpiresAt?: string | null;
+  planDurationDays?: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface IssueReportDoc {
+  _id?: ObjectId;
+  id: string;
+  streamerId: string;
+  streamerUsername?: string;
+  streamerDisplayName?: string;
+  streamerEmail?: string;
+  streamerAvatar?: string;
+  title: string;
+  category: string;
+  priority: string;
+  description: string;
+  status: string;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MediaDoc {
@@ -235,6 +257,11 @@ export async function getGatewayConfigCollection(): Promise<Collection<GatewayCo
 export async function getTemporaryDonationsCollection(): Promise<Collection<TemporaryDonationDoc>> {
   const db = await getMongoDb();
   return db.collection<TemporaryDonationDoc>('temporary_donations');
+}
+
+export async function getIssueReportsCollection(): Promise<Collection<IssueReportDoc>> {
+  const db = await getMongoDb();
+  return db.collection<IssueReportDoc>('issue_reports');
 }
 
 /**
