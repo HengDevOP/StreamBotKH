@@ -693,19 +693,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       ]
     },
     {
-      category: 'ADMIN GATEWAY',
+      category: 'GATEWAY',
       items: [
         {
           id: 'payments' as DashboardTab,
           label: 'Payment Gateway',
           icon: CreditCard,
-          badge: null,
-          isLocked: false
-        },
-        {
-          id: 'telegram' as DashboardTab,
-          label: 'Telegram Bot',
-          icon: Bot,
           badge: null,
           isLocked: false
         }
