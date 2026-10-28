@@ -1,66 +1,38 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAlertBoxesCollection, AlertBoxDoc } from '@/server/database/mongo';
-import { ObjectId } from 'mongodb';
+import { getAuthenticatedUser } from '@/server/auth';
+import { db } from '@/server/database/db';
 
 export const dynamic = 'force-dynamic';
 
 const DEMO_USER_ID = 'demo-streamer-id-1001';
 
-export async function GET(req: Request) {
-  try {
-    const col = await getAlertBoxesCollection();
-    let boxes = await col.find({ userId: DEMO_USER_ID }).sort({ minAmountCondition: 1 }).toArray();
+function resolveStreamerUserId(req: NextRequest, bodyToken?: string): string {
+  const user = getAuthenticatedUser(req);
+  if (user?.id) {
+    return user.id;
+  }
 
-    // If no alert boxes exist yet, create default boxes: Standard ($1.00) and VIP Whale ($10.00)
-    if (boxes.length === 0) {
-      const defaultBoxes: AlertBoxDoc[] = [
-        {
-          userId: DEMO_USER_ID,
-          name: 'Standard Tip Alert',
-          minAmountCondition: 1.0,
-          isEnabled: true,
-          templateStyle: 'neon-box',
-          showImage: true,
-          mediaUrl: 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
-          soundUrl: '/sounds/neon-chime.mp3',
-          soundVolume: 0.85,
-          durationSeconds: 8,
-          glowColor: '#00F0FF',
-          fontFamily: 'Chakra Petch',
-          fontSize: 24,
-          ttsEnabled: true,
-          ttsMinAmount: 1.0,
-          ttsType: 'google',
-          textTemplate: '{donator} donated {amount} through superchat!',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        },
-        {
-          userId: DEMO_USER_ID,
-          name: 'VIP Whale Alert ($10+)',
-          minAmountCondition: 10.0,
-          isEnabled: true,
-          templateStyle: 'cyber-glitch',
-          showImage: true,
-          mediaUrl: 'https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif',
-          soundUrl: '/sounds/victory-chime.mp3',
-          soundVolume: 0.95,
-          durationSeconds: 12,
-          glowColor: '#FFE600',
-          fontFamily: 'Orbitron',
-          fontSize: 28,
-          ttsEnabled: true,
-          ttsMinAmount: 10.0,
-          ttsType: 'kiritts-male',
-          textTemplate: '{donator} donated {amount} through superchat!',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      ];
-
-      await col.insertMany(defaultBoxes);
-      boxes = await col.find({ userId: DEMO_USER_ID }).sort({ minAmountCondition: 1 }).toArray();
+  const { searchParams } = new URL(req.url);
+  const token = (searchParams.get('token') || bodyToken || searchParams.get('userId') || '').trim();
+  if (token) {
+    const streamer = db.prepare(`
+      SELECT id FROM streamers
+      WHERE overlay_token = ? OR id = ? OR LOWER(username) = LOWER(?)
+    `).get(token, token, token) as any;
+    if (streamer?.id) {
+      return streamer.id;
     }
+  }
+
+  return DEMO_USER_ID;
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const userId = resolveStreamerUserId(req);
+    const col = await getAlertBoxesCollection();
+    const boxes = await col.find({ userId }).sort({ minAmountCondition: 1 }).toArray();
 
     return NextResponse.json({ success: true, alertBoxes: boxes });
   } catch (err: any) {
@@ -69,9 +41,10 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const userId = resolveStreamerUserId(req, body.token);
     const {
       name,
       minAmountCondition = 1.0,
@@ -103,7 +76,7 @@ export async function POST(req: Request) {
 
     const col = await getAlertBoxesCollection();
     const newDoc: AlertBoxDoc = {
-      userId: DEMO_USER_ID,
+      userId,
       name: name.trim(),
       minAmountCondition: Math.max(0.1, Number(minAmountCondition) || 1.0),
       isEnabled: Boolean(isEnabled),

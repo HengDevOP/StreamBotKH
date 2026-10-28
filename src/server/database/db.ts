@@ -265,12 +265,12 @@ try {
 
 
 
-// Video alert settings table (Media Share configuration)
+// Video alert settings table (Media Share configuration - disabled by default)
 try {
   db.exec(`
     CREATE TABLE IF NOT EXISTS video_alert_settings (
       streamer_id TEXT PRIMARY KEY,
-      is_enabled INTEGER DEFAULT 1,
+      is_enabled INTEGER DEFAULT 0,
       min_tip_amount REAL DEFAULT 2.0,
       max_duration_seconds INTEGER DEFAULT 30,
       video_volume INTEGER DEFAULT 85,
@@ -283,7 +283,7 @@ try {
   // Ensure default row for demo streamer
   db.prepare(`
     INSERT OR IGNORE INTO video_alert_settings (streamer_id, is_enabled, min_tip_amount, max_duration_seconds, video_volume, auto_ducking)
-    VALUES ('demo-streamer-id-1001', 1, 2.0, 30, 85, 1)
+    VALUES ('demo-streamer-id-1001', 0, 2.0, 30, 85, 1)
   `).run();
 } catch (e) {}
 

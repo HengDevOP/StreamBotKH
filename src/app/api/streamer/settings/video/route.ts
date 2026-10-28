@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     if (!row) {
       db.prepare(`
         INSERT INTO video_alert_settings (streamer_id, is_enabled, min_tip_amount, max_duration_seconds, video_volume, auto_ducking)
-        VALUES (?, 1, 2.0, 30, 85, 1)
+        VALUES (?, 0, 2.0, 30, 85, 1)
       `).run(streamerId);
       row = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(streamerId) as any;
     }
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { streamerId, overlayToken } = resolveStreamer(req, body.token);
 
-    const isEnabled = body.isEnabled !== undefined ? (body.isEnabled ? 1 : 0) : 1;
+    const isEnabled = body.isEnabled !== undefined ? (body.isEnabled ? 1 : 0) : 0;
     // Allowed minimum tip start from $0.25 to $50
     const rawMinTip = body.minTipAmount !== undefined ? Number(body.minTipAmount) : 2.0;
     const minTipAmount = Math.max(0.25, Math.min(50.0, isNaN(rawMinTip) ? 2.0 : rawMinTip));

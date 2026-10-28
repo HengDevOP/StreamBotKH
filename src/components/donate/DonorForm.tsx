@@ -295,8 +295,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
   const totalClipSeconds = Math.max(5, videoEndTime - videoStartTime);
   const activeVideoId = extractYouTubeId(videoUrl);
 
-  // Video alert configuration constraints from streamer settings
-  const isVideoAlertsEnabled = streamer.videoAlertEnabled !== false && streamer.hasVideoOverlay !== false;
+  // Video alert configuration constraints from streamer settings (disabled by default unless explicitly enabled)
+  const isVideoAlertsEnabled = Boolean(streamer.videoAlertEnabled) && streamer.hasVideoOverlay !== false;
   const videoMinTip = Number(streamer.videoMinTipAmount ?? 0.25);
   const videoMaxDuration = Number(streamer.videoMaxDurationSeconds ?? 300); // up to 5 minutes
   const currentAmountInUsd = currency === 'KHR' ? (amount || 0) / 4000 : (amount || 0);

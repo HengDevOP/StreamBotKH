@@ -41,9 +41,7 @@ export async function GET(
       }
     }
 
-    const videoAlertEnabled = streamer.video_enabled === undefined || streamer.video_enabled === null
-      ? true
-      : streamer.video_enabled === 1;
+    const videoAlertEnabled = streamer.video_enabled === 1;
 
     return NextResponse.json({
       id: streamer.id,

@@ -56,7 +56,11 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
   const fetchAlertBoxes = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/alert-boxes');
+      const tokenParam = streamerToken ? `?token=${encodeURIComponent(streamerToken)}` : '';
+      const authToken = typeof window !== 'undefined' ? localStorage.getItem('streamneon_token') : null;
+      const res = await fetch(`/api/alert-boxes${tokenParam}`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined
+      });
       const data = await res.json();
       if (res.ok && data.success) {
         setAlertBoxes(data.alertBoxes || []);
@@ -70,7 +74,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
 
   useEffect(() => {
     fetchAlertBoxes();
-  }, []);
+  }, [streamerToken]);
 
   // Sync with initialSelectedBoxId or URL search params
   useEffect(() => {

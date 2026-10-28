@@ -11,41 +11,13 @@ export async function GET(req: NextRequest) {
     const token = searchParams.get('token') || 'demo-token';
     const goalId = searchParams.get('goalId');
 
-    let goals = db.prepare(`
+    const goals = db.prepare(`
       SELECT * FROM stream_goals 
       WHERE streamer_token = ? 
       ORDER BY is_active DESC, created_at DESC
     `).all(token) as any[];
 
-    // If no goals exist yet, seed a default goal
-    if (!goals || goals.length === 0) {
-      const defaultId = uuidv4();
-      const defaultEndDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-      db.prepare(`
-        INSERT INTO stream_goals (
-          id, streamer_token, title, target_amount, current_amount,
-          initial_amount, accent_color, end_date, is_active, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
-      `).run(
-        defaultId,
-        token,
-        'New Stream Microphone & Cam',
-        200.0,
-        78.5,
-        0.0,
-        '#10B981',
-        defaultEndDate
-      );
-
-      goals = db.prepare(`
-        SELECT * FROM stream_goals 
-        WHERE streamer_token = ? 
-        ORDER BY is_active DESC, created_at DESC
-      `).all(token) as any[];
-    }
-
-    const activeGoal = goals.find((g) => g.is_active === 1) || goals[0];
+    const activeGoal = goals.find((g) => g.is_active === 1) || goals[0] || null;
     const specificGoal = goalId ? goals.find((g) => g.id === goalId) : null;
 
     return NextResponse.json({

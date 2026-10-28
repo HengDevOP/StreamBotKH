@@ -236,7 +236,7 @@ export async function POST(req: NextRequest) {
     try {
       const alertBoxesCol = await getAlertBoxesCollection();
       const activeBoxes = await alertBoxesCol
-        .find({ isEnabled: true })
+        .find({ userId: streamer.id, isEnabled: true })
         .sort({ minAmountCondition: -1 })
         .toArray();
       matchingBox = activeBoxes.find((b) => effectiveAmount >= (Number(b.minAmountCondition) || 0)) || activeBoxes[0];
@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
       videoTitle: effectiveVideoTitle,
       videoStartTime: effectiveVideoStartTime,
       videoEndTime: effectiveVideoEndTime,
-      videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : true,
+      videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : false,
       videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
       videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
       templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',

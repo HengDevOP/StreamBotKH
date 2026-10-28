@@ -45,8 +45,8 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
   const { socket } = useSocket();
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  // Video Alert Configuration State
-  const [isEnabled, setIsEnabled] = useState(true);
+  // Video Alert Configuration State (Disabled by default until enabled by streamer)
+  const [isEnabled, setIsEnabled] = useState(false);
   const [minTipAmount, setMinTipAmount] = useState<number>(2.0); // Allowed: $0.25 to $50
   const [maxDurationSeconds, setMaxDurationSeconds] = useState<number>(30); // Allowed: up to 300s (5m)
   const [videoVolume, setVideoVolume] = useState<number>(85);
@@ -97,7 +97,7 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
       .then((data) => {
         if (data.success && data.settings) {
           const s = data.settings;
-          setIsEnabled(s.isEnabled ?? true);
+          setIsEnabled(s.isEnabled ?? false);
           setMinTipAmount(Number(s.minTipAmount ?? 2.0));
           setMaxDurationSeconds(Number(s.maxDurationSeconds ?? 30));
           setVideoVolume(Number(s.videoVolume ?? 85));

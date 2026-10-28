@@ -471,11 +471,17 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         clonedVoiceSampleUrl
       };
 
+      const authToken = typeof window !== 'undefined' ? localStorage.getItem('streamneon_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+
       if (!isNew && box?._id) {
         const res = await fetch(`/api/alert-boxes/${box._id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          headers,
+          body: JSON.stringify({ ...payload, token: effectiveToken })
         });
         const data = await res.json();
         if (res.ok && data.success) {
@@ -488,8 +494,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       } else {
         const res = await fetch('/api/alert-boxes', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          headers,
+          body: JSON.stringify({ ...payload, token: effectiveToken })
         });
         const data = await res.json();
         if (res.ok && data.success) {

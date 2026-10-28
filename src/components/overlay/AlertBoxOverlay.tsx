@@ -62,8 +62,9 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
   };
 
   useEffect(() => {
-    // Fetch active condition alert boxes
-    fetch('/api/alert-boxes')
+    // Fetch active condition alert boxes for this streamer's overlay token
+    const tokenParam = overlayToken ? `?token=${encodeURIComponent(overlayToken)}` : '';
+    fetch(`/api/alert-boxes${tokenParam}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.alertBoxes) {
@@ -71,7 +72,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         }
       })
       .catch((e) => console.error('Error fetching alert boxes for overlay:', e));
-  }, []);
+  }, [overlayToken]);
 
   const speakAlertTTS = (
     headlineTemplate: string | undefined,
@@ -260,7 +261,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       const minTipRequired = Number(payload.videoMinTipAmount ?? overlayConfig?.videoMinTipAmount ?? 0.25);
       const videoAlertsEnabled = payload.videoAlertEnabled !== undefined
         ? Boolean(payload.videoAlertEnabled)
-        : (overlayConfig?.videoAlertEnabled !== false);
+        : Boolean(overlayConfig?.videoAlertEnabled);
 
       const hasValidVideo = Boolean(payload.videoUrl) && tipAmountInUsd >= minTipRequired && videoAlertsEnabled;
 
