@@ -198,6 +198,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // UI / Action Modals
   const [isOverlayModalOpen, setIsOverlayModalOpen] = useState(false);
   const [isVideoUpgradeModalOpen, setIsVideoUpgradeModalOpen] = useState(false);
+  const [upgradeFeatureName, setUpgradeFeatureName] = useState<string | undefined>(undefined);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [copiedDonateLink, setCopiedDonateLink] = useState(false);
   const [copiedOverlayUrl, setCopiedOverlayUrl] = useState(false);
@@ -655,37 +656,43 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'leaderboard' as DashboardTab,
           label: 'Leaderboard',
           icon: Trophy,
-          badge: null
+          badge: null,
+          isLocked: currentPlan === 'free' && !isAdmin
         },
         {
           id: 'goal' as DashboardTab,
           label: 'Goals',
           icon: Target,
-          badge: null
+          badge: null,
+          isLocked: currentPlan === 'free' && !isAdmin
         },
         {
           id: 'timer' as DashboardTab,
           label: 'Timer',
           icon: Timer,
-          badge: null
+          badge: null,
+          isLocked: currentPlan === 'free' && !isAdmin
         },
         {
           id: 'soundboard' as DashboardTab,
           label: 'Soundboard',
           icon: Volume2,
-          badge: null
+          badge: null,
+          isLocked: currentPlan === 'free' && !isAdmin
         },
         {
           id: 'video-alerts' as DashboardTab,
           label: 'Video Alerts',
           icon: Video,
-          badge: null
+          badge: null,
+          isLocked: currentPlan === 'free' && !isAdmin
         },
         {
           id: 'wheel' as DashboardTab,
           label: 'Wheels',
           icon: Disc,
-          badge: null
+          badge: null,
+          isLocked: currentPlan === 'free' && !isAdmin
         }
       ]
     },
@@ -697,14 +704,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           label: 'Payment Gateway',
           icon: CreditCard,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: false
         },
         {
           id: 'telegram' as DashboardTab,
           label: 'Telegram Bot',
           icon: Bot,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: false
         }
       ]
     },
@@ -768,6 +775,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   title={isCollapsed ? `${item.label}${(item as any).isLocked ? ' (Locked - Pro Plan)' : ''}` : undefined}
                   onClick={() => {
                     if ((item as any).isLocked) {
+                      setUpgradeFeatureName(item.label);
                       setIsVideoUpgradeModalOpen(true);
                       return;
                     }
@@ -1135,7 +1143,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       Current Plan: Free Plan (10% Platform Fee Cut Active)
                     </div>
                     <p className="text-xs text-slate-400">
-                      Upgrade to Pro Plan ($4.99/mo) to unlock the Payment Gateway (Custom ABA Merchant & Bakong direct settlement), GramJS Telegram auto-listener, 500MB storage, and keep 100% of your earnings with 0% fee!
+                      Upgrade to Pro Plan ($4.99/mo) to unlock Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Spinning Wheels, 500MB storage, removed watermark, and 0% fee!
                     </p>
                   </div>
                   <button
@@ -1168,6 +1176,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                 <div
                   onClick={() => {
+                    if (currentPlan === 'free' && !isAdmin) {
+                      setUpgradeFeatureName('Soundboard');
+                      setIsVideoUpgradeModalOpen(true);
+                      return;
+                    }
                     setActiveTab('soundboard');
                     if (typeof window !== 'undefined') {
                       window.history.pushState(null, '', '/dashboard?tab=soundboard');
@@ -1179,12 +1192,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     <span className="text-xs font-bold text-slate-400 font-mono">PC HOTKEYS</span>
                     <Volume2 size={16} className="text-cyan-400 group-hover:scale-110 transition-transform" />
                   </div>
-                  <div className="text-sm font-bold text-white">Stream Soundboard</div>
-                  <p className="text-xs text-slate-400">Listen to PC keyboard hotkeys & trigger stream SFX with OBS broadcast.</p>
+                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <span>Stream Soundboard</span>
+                    {currentPlan === 'free' && !isAdmin && <Lock size={13} className="text-amber-400" />}
+                  </div>
+                  <p className="text-xs text-slate-400">Listen to PC keyboard hotkeys &amp; trigger stream SFX with OBS broadcast.</p>
                 </div>
 
                 <div
                   onClick={() => {
+                    if (currentPlan === 'free' && !isAdmin) {
+                      setUpgradeFeatureName('Leaderboard');
+                      setIsVideoUpgradeModalOpen(true);
+                      return;
+                    }
                     setActiveTab('leaderboard');
                     if (typeof window !== 'undefined') {
                       window.history.pushState(null, '', '/dashboard?tab=leaderboard');
@@ -1196,12 +1217,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     <span className="text-xs font-bold text-slate-400 font-mono">LIVE RANKING</span>
                     <Trophy size={16} className="text-amber-400 group-hover:scale-110 transition-transform" />
                   </div>
-                  <div className="text-sm font-bold text-white">Donor Leaderboard</div>
+                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <span>Donor Leaderboard</span>
+                    {currentPlan === 'free' && !isAdmin && <Lock size={13} className="text-amber-400" />}
+                  </div>
                   <p className="text-xs text-slate-400">Top supporters ranking widget with medals and crowns for stream.</p>
                 </div>
 
                 <div
                   onClick={() => {
+                    if (currentPlan === 'free' && !isAdmin) {
+                      setUpgradeFeatureName('Wheels');
+                      setIsVideoUpgradeModalOpen(true);
+                      return;
+                    }
                     setActiveTab('wheel');
                     if (typeof window !== 'undefined') {
                       window.history.pushState(null, '', '/dashboard?tab=wheel');
@@ -1215,9 +1244,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   </div>
                   <div className="text-sm font-bold text-white flex items-center gap-1.5">
                     <span>Spinning Wheels</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
-                      FREE
-                    </span>
+                    {currentPlan === 'free' && !isAdmin ? (
+                      <Lock size={13} className="text-amber-400" />
+                    ) : (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold">
+                        PRO
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-400">Interactive stream wheel simulator and giveaway rewards for donors.</p>
                 </div>
@@ -1344,71 +1377,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           )}
 
           {/* ============================================================== */}
-          {/* TAB: LEADERBOARD WIDGET (ASSET)                                */}
+          {/* PRO PLAN STREAM ASSETS (LEADERBOARD, GOALS, TIMER, SOUNDBOARD, VIDEO ALERTS, WHEELS) */}
           {/* ============================================================== */}
-          {activeTab === 'leaderboard' && (
-            <LeaderboardWidgetManager
-              streamerToken={user?.overlayToken}
-              recentDonations={stats?.recentDonations}
-            />
-          )}
-
-          {/* ============================================================== */}
-          {/* TAB: GOAL BAR WIDGET (ASSET)                                   */}
-          {/* ============================================================== */}
-          {activeTab === 'goal' && (
-            <GoalWidgetManager
-              streamerToken={user?.overlayToken}
-              totalRaised={stats?.summary?.totalRevenueUsd || 0}
-            />
-          )}
-
-          {/* ============================================================== */}
-          {/* TAB: SUBATHON TIMER WIDGET (ASSET)                             */}
-          {/* ============================================================== */}
-          {activeTab === 'timer' && (
-            <TimerWidgetManager
-              streamerToken={user?.overlayToken}
-            />
-          )}
-
-          {/* ============================================================== */}
-          {/* TAB: SOUNDBOARD & PC KEYBIND ENGINE (ASSET)                    */}
-          {/* ============================================================== */}
-          {activeTab === 'soundboard' && (
-            <SoundboardManager
-              streamerToken={user?.overlayToken}
-            />
-          )}
-
-          {/* ============================================================== */}
-          {/* TAB: VIDEO ALERTS (MEDIA SHARE ASSET - FREE & PRO)             */}
-          {/* ============================================================== */}
-          {activeTab === 'video-alerts' && (
-            <VideoAlertsManager
-              streamerToken={user?.overlayToken}
-              isLocked={false}
-              currentPlan={currentPlan}
-              onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
-            />
-          )}
-
-          {/* ============================================================== */}
-          {/* TAB: WHEELS WIDGET (ASSET - FREE & PRO)                        */}
-          {/* ============================================================== */}
-          {activeTab === 'wheel' && (
-            <SpinningWheelManager
-              streamerToken={user?.overlayToken}
-              isLocked={false}
-              onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
-            />
-          )}
-
-          {/* ============================================================== */}
-          {/* TAB 6: PAYMENT GATEWAY (PRO PLAN ONLY)                         */}
-          {/* ============================================================== */}
-          {(activeTab === 'payments' || activeTab === 'telegram') && (
-            currentPlan === 'free' ? (
+          {(['leaderboard', 'goal', 'timer', 'soundboard', 'video-alerts', 'wheel'] as DashboardTab[]).includes(activeTab) &&
+            currentPlan === 'free' &&
+            !isAdmin && (
               <div className="p-8 sm:p-12 rounded-2xl bg-gradient-to-b from-[#0e1424] to-[#090D18] border border-amber-500/30 text-center max-w-2xl mx-auto space-y-6 my-8 shadow-2xl">
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/20 mx-auto">
                   <Lock size={32} />
@@ -1418,45 +1391,77 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     Pro Plan Feature
                   </span>
                   <h3 className="text-2xl font-bold text-white font-['Chakra_Petch']">
-                    Payment Gateway & Telegram Auto-Listener
+                    {currentTabTitle} is Available on Pro Plan
                   </h3>
                   <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
-                    Custom ABA PayWay direct merchant settlement, Bakong KHQR account linking, and GramJS Telegram group listener are exclusive to the <strong className="text-white">Pro Plan ($4.99/mo)</strong>. Free plan users receive donations through standard checkout with a 10% platform fee.
+                    Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels are included in the{' '}
+                    <strong className="text-white">Pro Plan ($4.99/mo)</strong> along with 0% platform fee, 500MB storage, and removed donation page watermark.
                   </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-left max-w-md mx-auto space-y-2 text-xs">
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                    <span>0% Platform Commission (Keep 100% of tips)</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                    <span>Direct ABA Merchant ID & API Key Settlement</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                    <span>GramJS Telegram Group & Bot Auto-Push</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                    <span>500MB Media Library Cloud Storage (All Formats)</span>
-                  </div>
                 </div>
 
                 <div className="flex items-center justify-center gap-3 pt-2">
                   <button
-                    onClick={() => setActiveTab('billing')}
-                    className="py-3 px-6 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
+                    onClick={() => {
+                      setUpgradeFeatureName(currentTabTitle);
+                      setIsVideoUpgradeModalOpen(true);
+                    }}
+                    className="py-3 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
                   >
                     <Sparkles size={14} />
-                    <span>Upgrade to Pro ($4.99/mo)</span>
+                    <span>Upgrade to Pro Plan</span>
                   </button>
                 </div>
               </div>
-            ) : (
-              <PaymentGatewayAdmin />
-            )
+            )}
+
+          {activeTab === 'leaderboard' && (currentPlan !== 'free' || isAdmin) && (
+            <LeaderboardWidgetManager
+              streamerToken={user?.overlayToken}
+              recentDonations={stats?.recentDonations}
+            />
+          )}
+
+          {activeTab === 'goal' && (currentPlan !== 'free' || isAdmin) && (
+            <GoalWidgetManager
+              streamerToken={user?.overlayToken}
+              totalRaised={stats?.summary?.totalRevenueUsd || 0}
+            />
+          )}
+
+          {activeTab === 'timer' && (currentPlan !== 'free' || isAdmin) && (
+            <TimerWidgetManager
+              streamerToken={user?.overlayToken}
+            />
+          )}
+
+          {activeTab === 'soundboard' && (currentPlan !== 'free' || isAdmin) && (
+            <SoundboardManager
+              streamerToken={user?.overlayToken}
+            />
+          )}
+
+          {activeTab === 'video-alerts' && (currentPlan !== 'free' || isAdmin) && (
+            <VideoAlertsManager
+              streamerToken={user?.overlayToken}
+              isLocked={false}
+              currentPlan={currentPlan}
+              onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'wheel' && (currentPlan !== 'free' || isAdmin) && (
+            <SpinningWheelManager
+              streamerToken={user?.overlayToken}
+              isLocked={false}
+              onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
+            />
+          )}
+
+          {/* ============================================================== */}
+          {/* TAB 6: PAYMENT GATEWAY (AVAILABLE FOR ALL PLANS)               */}
+          {/* ============================================================== */}
+          {(activeTab === 'payments' || activeTab === 'telegram') && (
+            <PaymentGatewayAdmin />
           )}
 
           {/* ============================================================== */}
@@ -1827,32 +1832,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <div className="text-xs text-amber-400 font-mono font-bold pt-1">10% Platform Fee Cut</div>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Ideal for new streamers starting out. Includes all interactive stream assets.
+                      Ideal for new streamers starting out. Includes Donations Alerts, Payment Gateway, and 20MB storage.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-300 flex-1">
                       <li className="flex items-center gap-2 text-cyan-300 font-semibold">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
                         <span>20MB Media Storage Quota</span>
                       </li>
-                      <li className="flex items-center gap-2">
-                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>All Stream Assets: Video Alerts & Wheels included</span>
+                      <li className="flex items-center gap-2 text-emerald-300 font-semibold">
+                        <Check size={14} className="text-emerald-400 flex-shrink-0" />
+                        <span>Payment Gateway Included (ABA PayWay &amp; Bakong KHQR)</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>Soundboard, Leaderboard, Goals & Subathon Timer</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>Dynamic Bakong KHQR checkout</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>OBS 60FPS browser source overlay</span>
+                        <span>Donations Alerts &amp; OBS 60FPS Browser Overlay</span>
                       </li>
                       <li className="flex items-center gap-2 text-amber-300 font-medium">
                         <span className="font-mono font-bold text-amber-400">10%</span>
                         <span>Fee cut deducted from incoming tips</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-slate-500">
+                        <span className="w-3.5 text-center font-mono">-</span>
+                        <span>Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Wheels</span>
                       </li>
                       <li className="flex items-center gap-2 text-slate-500">
                         <span className="w-3.5 text-center font-mono">-</span>
@@ -1930,16 +1931,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Full access to Payment Gateway, Telegram Auto-Listener, and high-capacity storage.
+                      Unlocks all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Alerts, Wheels), 0% fee, and 500MB storage.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                        <span>Exclusive Payment Gateway (Custom ABA Merchant & Bakong)</span>
+                        <span>Unlock Leaderboard, Goals, Timer &amp; Soundboard</span>
                       </li>
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                        <span>Telegram Bot & GramJS Group Auto-Listener</span>
+                        <span>Unlock Video Alerts (Media Share) &amp; Spinning Wheels</span>
                       </li>
                       <li className="flex items-center gap-2 text-emerald-400 font-semibold">
                         <Check size={14} className="flex-shrink-0" />
@@ -1955,11 +1956,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>Text-to-Speech (TTS) Voice Announcer</span>
+                        <span>Payment Gateway &amp; Telegram Auto-Listener</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>All Free features & assets included</span>
+                        <span>Text-to-Speech (TTS) Voice Announcer</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
@@ -2100,7 +2101,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       {/* Pro Plan Upgrade Modal */}
       <ProUpgradeModal
         isOpen={isVideoUpgradeModalOpen}
-        onClose={() => setIsVideoUpgradeModalOpen(false)}
+        onClose={() => {
+          setIsVideoUpgradeModalOpen(false);
+          setUpgradeFeatureName(undefined);
+        }}
+        featureName={upgradeFeatureName}
         telegramContactUrl="https://t.me/@hchenheng"
       />
 

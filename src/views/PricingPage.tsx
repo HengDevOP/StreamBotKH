@@ -71,15 +71,15 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
   const faqs = [
     {
       q: 'What are the differences between the Free and Pro plans?',
-      a: 'The Free plan ($0) includes 20MB media storage and full access to all 8 interactive streaming widgets (Video Alerts, Spinning Wheels, Soundboard, Leaderboard, Goals, Timer, Donations Alerts, Media Share) with a 10% platform fee on incoming tips. The Pro plan ($4.99/mo or $3.99/mo annual) eliminates the platform fee (0% fee - keep 100% of your earnings), removes the donation page watermark, expands storage to 500MB (supporting MP4, GIF, MP3, WAV, PNG, JPG & all formats), and unlocks the Payment Gateway (custom ABA PayWay merchant credentials & direct Bakong KHQR) and GramJS Telegram group auto-listener.'
+      a: 'The Free plan ($0) includes 20MB media storage, Donations Alerts, and the Payment Gateway (ABA PayWay & Bakong KHQR) with a 10% platform fee on incoming tips. The Pro plan ($4.99/mo or $3.99/mo annual) eliminates the platform fee (0% fee - keep 100% of your earnings), removes the donation page watermark, expands storage to 500MB (supporting MP4, GIF, MP3, WAV & all formats), and unlocks all advanced stream assets: Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels.'
     },
     {
-      q: 'How does the Payment Gateway work in the Pro plan?',
-      a: 'Pro members gain access to the Payment Gateway Admin to connect their own ABA PayWay Merchant ID and API Key, Bakong Account ID, and GramJS Telegram listener. This allows viewer tips to settle directly into your private business bank account with 0% platform deductions.'
+      q: 'Is the Payment Gateway available on both Free and Pro plans?',
+      a: 'Yes! The Payment Gateway (ABA PayWay & Bakong KHQR checkout) is available on all plans so every streamer can start receiving viewer tips right away.'
     },
     {
-      q: 'Are Video Alerts and Wheels free for everyone?',
-      a: 'Yes! Both YouTube Media Share Video Alerts and interactive Spinning Wheels are available on both Free and Pro plans, so every creator can boost chat engagement.'
+      q: 'Which stream widgets are unlocked on the Pro plan?',
+      a: 'Upgrading to the Pro plan unlocks Donor Leaderboard, Goal Progress Bars, Subathon Countdown Timer, PC Hotkey Soundboard, YouTube Media Share Video Alerts, and Interactive Spinning Wheels.'
     },
     {
       q: 'Which Cambodian banks are supported by Bakong KHQR?',
@@ -107,7 +107,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
           Simple, transparent plans for Cambodian streamers
         </h1>
         <p className="text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Start free with all interactive stream widgets and 20MB storage, or upgrade to Pro to unlock the Payment Gateway, Telegram group listener, and keep 100% of your earnings with 0% fee.
+          Start free with Donations Alerts, Payment Gateway, and 20MB storage, or upgrade to Pro to unlock Leaderboard, Goals, Timer, Soundboard, Video Alerts, Spinning Wheels, 500MB storage, and 0% fee.
         </p>
 
         {/* Currency & Billing Controls */}
@@ -209,7 +209,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <span className="text-sm font-normal text-slate-400 ml-1">/ month</span>
               </div>
               <p className="text-xs text-amber-400 font-mono font-medium">10% platform fee per donation</p>
-              <p className="text-xs text-slate-400">Everything you need to launch your stream with all interactive alert widgets.</p>
+              <p className="text-xs text-slate-400">Everything you need to start accepting donations with Payment Gateway &amp; live OBS alerts.</p>
             </div>
 
             <div className="h-px bg-slate-800 my-6" />
@@ -221,31 +221,15 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               </li>
               <li className="flex items-center gap-3 text-emerald-300 font-semibold">
                 <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                <span>Video Alerts (Media Share) Included</span>
-              </li>
-              <li className="flex items-center gap-3 text-emerald-300 font-semibold">
-                <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                <span>Spinning Wheels Giveaway Widget Included</span>
+                <span>Payment Gateway Included (ABA PayWay &amp; Bakong KHQR)</span>
               </li>
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                <span>Soundboard with PC Hotkey SFX Engine</span>
+                <span>Donations Alerts &amp; 60FPS OBS Browser Overlay</span>
               </li>
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                <span>Leaderboard Widget (20 Unique Styles)</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                <span>Goal Progress Bar & Subathon Timer</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                <span>Dynamic Bakong KHQR checkout</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                <span>60FPS OBS browser source overlay</span>
+                <span>Telegram Bot Notification Integration</span>
               </li>
               <li className="flex items-center gap-3 text-amber-300">
                 <span className="font-mono font-bold text-amber-400">10%</span>
@@ -257,11 +241,19 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               </li>
               <li className="flex items-center gap-3 text-slate-600">
                 <span className="w-4 text-center">-</span>
-                <span>Payment Gateway Admin (ABA PayWay direct credentials)</span>
+                <span>Donor Leaderboard (20 Unique Styles)</span>
               </li>
               <li className="flex items-center gap-3 text-slate-600">
                 <span className="w-4 text-center">-</span>
-                <span>GramJS Telegram Group auto-listener</span>
+                <span>Goal Progress Bar &amp; Subathon Timer</span>
+              </li>
+              <li className="flex items-center gap-3 text-slate-600">
+                <span className="w-4 text-center">-</span>
+                <span>Soundboard with PC Hotkey SFX Engine</span>
+              </li>
+              <li className="flex items-center gap-3 text-slate-600">
+                <span className="w-4 text-center">-</span>
+                <span>Video Alerts (Media Share) &amp; Spinning Wheels</span>
               </li>
             </ul>
           </div>
@@ -314,7 +306,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                   </span>
                 </p>
               )}
-              <p className="text-xs text-slate-400">Exclusive Payment Gateway, GramJS Telegram Auto-Listener & 500MB storage.</p>
+              <p className="text-xs text-slate-400">Unlocks Leaderboard, Goals, Timer, Soundboard, Video Alerts, Spinning Wheels &amp; 500MB storage.</p>
             </div>
 
             <div className="h-px bg-purple-500/20 my-6" />
@@ -322,11 +314,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
             <ul className="space-y-3.5 text-xs text-slate-200 flex-1">
               <li className="flex items-center gap-3 text-emerald-300 font-semibold">
                 <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                <span>Direct ABA PayWay Merchant ID & Key Settlement</span>
+                <span>Unlock Leaderboard, Goals &amp; Subathon Timer</span>
               </li>
               <li className="flex items-center gap-3 text-emerald-300 font-semibold">
                 <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                <span>GramJS Telegram Group & Bot Auto-Listener</span>
+                <span>Unlock Soundboard, Video Alerts &amp; Spinning Wheels</span>
               </li>
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-emerald-400 flex-shrink-0" />
@@ -342,11 +334,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               </li>
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-purple-400 flex-shrink-0" />
-                <span>Text-to-Speech (TTS) Voice Donor Reader</span>
+                <span>Payment Gateway (ABA PayWay &amp; Bakong KHQR) + Telegram Bot</span>
               </li>
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-purple-400 flex-shrink-0" />
-                <span>All 8 Stream Assets: Video, Wheels, Soundboard & Leaderboard</span>
+                <span>Text-to-Speech (TTS) Voice Donor Reader</span>
               </li>
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-purple-400 flex-shrink-0" />
@@ -355,10 +347,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-purple-400 flex-shrink-0" />
                 <span>Multiple caster overlay tokens</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <Check size={16} className="text-purple-400 flex-shrink-0" />
-                <span>Custom domain tip portal</span>
               </li>
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-purple-400 flex-shrink-0" />
@@ -409,49 +397,44 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Custom ABA PayWay Direct Settlement</td>
-                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 font-medium text-white">Payment Gateway (ABA PayWay &amp; Bakong KHQR)</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">GramJS Telegram Group & Bot Listener</td>
-                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
-              </tr>
-              <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Bakong KHQR Dynamic Checkout</td>
+                <td className="py-3.5 px-6 font-medium text-white">Telegram Bot &amp; GramJS Listener</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
-              </tr>
-              <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Video Alerts (YouTube Media Share)</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Interactive Spinning Wheels Widget</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
-              </tr>
-              <tr>
-                <td className="py-3.5 px-6 font-medium text-white">PC Hotkey Soundboard Engine</td>
+                <td className="py-3.5 px-6 font-medium text-white">Donations Alerts &amp; OBS 60FPS Browser Overlay</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Donor Leaderboard (20 Unique Styles)</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
+                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Goal Progress Bar & Subathon Timer</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
+                <td className="py-3.5 px-6 font-medium text-white">Goal Progress Bar &amp; Subathon Timer</td>
+                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">OBS 60FPS Browser Overlay</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
+                <td className="py-3.5 px-6 font-medium text-white">PC Hotkey Soundboard Engine</td>
+                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+              </tr>
+              <tr>
+                <td className="py-3.5 px-6 font-medium text-white">Video Alerts (YouTube Media Share)</td>
+                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+              </tr>
+              <tr>
+                <td className="py-3.5 px-6 font-medium text-white">Interactive Spinning Wheels Widget</td>
+                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Web Speech TTS Donor Voice Reader</td>
