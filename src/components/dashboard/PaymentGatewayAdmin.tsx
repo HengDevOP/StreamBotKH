@@ -1634,7 +1634,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
               )}
             </div>
 
-            {/* Groups Grid Rendered as High-Craft Cards */}
+            {/* Groups Grid Rendered as High-Craft Cards (Active Groups Sorted First) */}
             {(() => {
               const filtered = availableDialogs.filter((d) => {
                 const matchesSearch =
@@ -1648,7 +1648,16 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 return matchesSearch;
               });
 
-              if (filtered.length === 0) {
+              // Sort active listening groups to the top
+              const sorted = [...filtered].sort((a, b) => {
+                const aActive = targetGroups.some((g) => g.chat_id === a.id);
+                const bActive = targetGroups.some((g) => g.chat_id === b.id);
+                if (aActive && !bActive) return -1;
+                if (!aActive && bActive) return 1;
+                return 0;
+              });
+
+              if (sorted.length === 0) {
                 return (
                   <div className="p-8 rounded-2xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400 space-y-1 font-mono">
                     <p className="text-white font-bold">No groups match your search or filter.</p>
@@ -1659,7 +1668,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
               return (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                  {filtered.map((dialog) => {
+                  {sorted.map((dialog) => {
                     const isMonitored = targetGroups.some((g) => g.chat_id === dialog.id);
                     const isConnecting = connectingGroupId === dialog.id;
                     const isCopied = copiedChatId === dialog.id;
