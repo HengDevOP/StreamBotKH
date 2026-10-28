@@ -16,7 +16,9 @@ import {
   Mic,
   Cpu,
   Monitor,
-  CheckCircle2
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
@@ -108,25 +110,35 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setTimeout(() => setCopiedUrl(false), 2000);
   };
 
-  // Open Target Alert Box Studio Page
+  // Toggle Target Alert Box Accordion Inline
   const handleOpenStudio = (box: AlertBox) => {
-    setSelectedBoxId(box._id);
-    onSelectBoxId?.(box._id);
+    const nextId = selectedBoxId === box._id ? null : box._id;
+    setSelectedBoxId(nextId);
+    onSelectBoxId?.(nextId);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/dashboard?tab=donation?id=${box._id}`);
+      window.history.pushState(
+        null,
+        '',
+        nextId ? `/dashboard?tab=donation&id=${nextId}` : '/dashboard?tab=donation'
+      );
     }
   };
 
-  // Open Create New Box Studio Page
+  // Toggle Create New Box Accordion Inline
   const handleCreateNewBox = () => {
-    setSelectedBoxId('new');
-    onSelectBoxId?.('new');
+    const nextId = selectedBoxId === 'new' ? null : 'new';
+    setSelectedBoxId(nextId);
+    onSelectBoxId?.(nextId);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', '/dashboard?tab=donation?id=new');
+      window.history.pushState(
+        null,
+        '',
+        nextId ? '/dashboard?tab=donation&id=new' : '/dashboard?tab=donation'
+      );
     }
   };
 
-  // Back to list view
+  // Collapse inline studio view
   const handleBackToList = () => {
     setSelectedBoxId(null);
     onSelectBoxId?.(null);
@@ -147,7 +159,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setSelectedBoxId(savedBox._id);
     onSelectBoxId?.(savedBox._id);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/dashboard?tab=donation?id=${savedBox._id}`);
+      window.history.pushState(null, '', `/dashboard?tab=donation&id=${savedBox._id}`);
     }
   };
 
@@ -227,37 +239,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
   };
 
   // ====================================================================
-  // VIEW 1: TARGET STUDIO PAGE (WHEN A BOX OR 'NEW' IS SELECTED)
-  // ====================================================================
-  if (selectedBoxId) {
-    if (loading && alertBoxes.length === 0 && selectedBoxId !== 'new') {
-      return (
-        <div className="flex flex-col items-center justify-center p-16 text-cyan-400 gap-3 min-h-[400px]">
-          <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-mono tracking-wider text-slate-400">LOADING ALERT STUDIO...</span>
-        </div>
-      );
-    }
-
-    const targetBox =
-      selectedBoxId === 'new'
-        ? null
-        : alertBoxes.find((b) => b._id === selectedBoxId || b._id.toString() === selectedBoxId) || null;
-
-    return (
-      <DonationAlertStudio
-        box={targetBox}
-        streamerToken={streamerToken}
-        onBack={handleBackToList}
-        onSaveSuccess={handleSaveSuccess}
-        onDeleteSuccess={handleDeleteSuccess}
-        onNavigateToStorage={onNavigateToMedia}
-      />
-    );
-  }
-
-  // ====================================================================
-  // VIEW 2: DONATION ALERT BOXES LIST (DEFAULT VIEW)
+  // DONATION ALERT CATEGORIES & TIERS ACCORDION LIST VIEW
   // ====================================================================
   return (
     <div className="space-y-6">
@@ -272,7 +254,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
               </h3>
             </div>
             <p className="text-xs text-slate-400">
-              Paste this URL into OBS Studio as a Browser Source. It automatically matches incoming tips to your condition alert boxes.
+              Paste this URL into OBS Studio as a Browser Source. It automatically matches incoming tips to your condition alert categories.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -303,44 +285,59 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
         />
       </Card>
 
-      {/* Donation Alert Boxes Section Header */}
+      {/* Donation Alert Categories Section Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
             <Bell size={18} className="text-cyan-400" />
-            Donation Alert Boxes & Condition Tiers
+            Donation Categories &amp; Condition Tiers
           </h3>
           <p className="text-xs text-slate-400">
-            Click on any donation box to open the full studio with real-time preview, custom font, reaction GIF, and TTS Voice Clone.
+            Click on any donation category in the list below to expand its configuration content and live preview inline.
           </p>
         </div>
         <Button
           variant="primary"
           size="sm"
           onClick={handleCreateNewBox}
-          icon={<Plus size={14} />}
+          icon={selectedBoxId === 'new' ? <ChevronUp size={14} /> : <Plus size={14} />}
           className="bg-cyan-400 text-slate-950 font-bold text-xs shadow-[0_0_15px_rgba(0,240,255,0.3)]"
         >
-          Create Donation Box
+          {selectedBoxId === 'new' ? 'Close New Box Editor' : 'Create Donation Category'}
         </Button>
       </div>
 
-      {/* Donation Boxes Card Grid */}
+      {/* Expandable Inline Create New Box Accordion */}
+      {selectedBoxId === 'new' && (
+        <div className="animate-fadeIn">
+          <DonationAlertStudio
+            box={null}
+            streamerToken={streamerToken}
+            onBack={handleBackToList}
+            onSaveSuccess={handleSaveSuccess}
+            onDeleteSuccess={handleDeleteSuccess}
+            onNavigateToStorage={onNavigateToMedia}
+            inlineMode={true}
+          />
+        </div>
+      )}
+
+      {/* Donation Categories Vertical Expandable List */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="space-y-3">
           {[1, 2, 3].map((n) => (
-            <div key={n} className="h-64 rounded-2xl bg-slate-900/60 animate-pulse border border-slate-800" />
+            <div key={n} className="h-20 rounded-2xl bg-slate-900/60 animate-pulse border border-slate-800" />
           ))}
         </div>
-      ) : alertBoxes.length === 0 ? (
+      ) : alertBoxes.length === 0 && selectedBoxId !== 'new' ? (
         <Card className="p-12 text-center space-y-4 border-dashed border-slate-800">
           <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto text-cyan-400">
             <Bell size={28} />
           </div>
           <div className="space-y-1">
-            <h4 className="text-base font-bold text-white font-['Chakra_Petch']">No Donation Boxes Created</h4>
+            <h4 className="text-base font-bold text-white font-['Chakra_Petch']">No Donation Categories Created</h4>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Create your first donation alert box with condition threshold, custom font, and voice model.
+              Create your first donation alert category with condition threshold, custom font, and voice model.
             </p>
           </div>
           <Button
@@ -350,123 +347,150 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
             icon={<Plus size={15} />}
             className="bg-cyan-400 text-slate-950 font-bold text-xs"
           >
-            Create Standard Box
+            Create Standard Category
           </Button>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="space-y-3">
           {alertBoxes.map((box) => {
             const isPlaying = testingId === box._id;
+            const isExpanded = selectedBoxId === box._id || selectedBoxId === box._id?.toString();
+
             return (
               <div
                 key={box._id}
-                onClick={() => handleOpenStudio(box)}
-                className={`group p-5 rounded-2xl bg-[#090D18] border transition-all duration-300 hover:border-cyan-500/50 hover:shadow-[0_0_25px_rgba(0,240,255,0.15)] cursor-pointer flex flex-col justify-between space-y-4 relative overflow-hidden ${
-                  box.isEnabled ? 'border-slate-800' : 'border-slate-800/40 opacity-60'
+                className={`rounded-2xl bg-[#090D18] border transition-all duration-300 overflow-hidden ${
+                  isExpanded
+                    ? 'border-cyan-500/60 shadow-[0_0_30px_rgba(0,240,255,0.18)]'
+                    : box.isEnabled
+                    ? 'border-slate-800 hover:border-cyan-500/40'
+                    : 'border-slate-800/40 opacity-65 hover:opacity-100'
                 }`}
               >
-                {/* Card Top: Name & Condition Badge */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-extrabold border"
-                      style={{
-                        backgroundColor: `${box.glowColor}15`,
-                        color: box.glowColor,
-                        borderColor: `${box.glowColor}40`
-                      }}
+                {/* List Item Header Row (Click to Expand / Collapse) */}
+                <div
+                  onClick={() => handleOpenStudio(box)}
+                  className="p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors"
+                >
+                  {/* Left: Mascot Thumbnail + Name + Condition Tier & Tags */}
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div
+                      className="w-12 h-12 rounded-xl bg-slate-950 border-2 flex items-center justify-center overflow-hidden flex-shrink-0"
+                      style={{ borderColor: `${box.glowColor || '#00F0FF'}60` }}
                     >
-                      &ge; ${Number(box.minAmountCondition).toFixed(2)} USD
-                    </span>
+                      {box.showImage && box.mediaUrl ? (
+                        <img
+                          src={box.mediaUrl}
+                          alt="Alert mascot"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Bell size={18} className="text-slate-500" />
+                      )}
+                    </div>
 
-                    {/* Toggle ON/OFF Switch */}
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm sm:text-base font-bold text-white font-['Chakra_Petch'] truncate">
+                          {box.name}
+                        </h4>
+                        <span
+                          className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-extrabold border flex-shrink-0"
+                          style={{
+                            backgroundColor: `${box.glowColor || '#00F0FF'}15`,
+                            color: box.glowColor || '#00F0FF',
+                            borderColor: `${box.glowColor || '#00F0FF'}40`
+                          }}
+                        >
+                          &ge; ${Number(box.minAmountCondition).toFixed(2)} USD
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
+                        <span style={{ fontFamily: box.fontFamily }} className="text-slate-300 font-semibold">
+                          Font: {box.fontFamily}
+                        </span>
+                        <span className="text-slate-700">•</span>
+                        <span>{box.durationSeconds}s</span>
+                        <span className="text-slate-700">•</span>
+                        {box.ttsEnabled ? (
+                          <span className="text-cyan-400 flex items-center gap-1">
+                            <Mic size={11} />
+                            <span>TTS ({box.ttsType === 'cloned' ? 'AI Clone' : box.ttsType})</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">TTS Off</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Quick Test, Active Switch & Expand/Collapse Toggle */}
+                  <div className="flex items-center justify-between sm:justify-end gap-2.5 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
+                    {/* Quick Test Sound */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleTestAlertBox(box, e)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-cyan-950/50 border border-slate-800 hover:border-cyan-500/40 text-xs font-mono text-cyan-300 transition-colors"
+                    >
+                      <Play size={12} className={isPlaying ? 'text-cyan-400 animate-spin fill-cyan-400' : 'text-cyan-400 fill-cyan-400'} />
+                      <span>{isPlaying ? 'Playing...' : 'Test Alert'}</span>
+                    </button>
+
+                    {/* Active / Muted Switch */}
                     <button
                       type="button"
                       onClick={(e) => handleToggleBoxStatus(box, e)}
-                      className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-slate-800 transition-colors"
-                      title={box.isEnabled ? 'Click to deactivate' : 'Click to activate'}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors"
+                      title={box.isEnabled ? 'Click to mute category' : 'Click to activate category'}
                     >
                       <span className={`text-[10px] font-mono font-bold ${box.isEnabled ? 'text-emerald-400' : 'text-slate-500'}`}>
                         {box.isEnabled ? 'ACTIVE' : 'MUTED'}
                       </span>
                       <div
-                        className={`w-8 h-4 rounded-full transition-colors relative p-0.5 ${
+                        className={`w-7 h-4 rounded-full transition-colors relative p-0.5 ${
                           box.isEnabled ? 'bg-cyan-400' : 'bg-slate-700'
                         }`}
                       >
                         <div
                           className={`w-3 h-3 rounded-full bg-slate-950 transition-transform ${
-                            box.isEnabled ? 'translate-x-4' : 'translate-x-0'
+                            box.isEnabled ? 'translate-x-3' : 'translate-x-0'
                           }`}
                         />
                       </div>
                     </button>
-                  </div>
 
-                  <h4 className="text-base font-bold text-white font-['Chakra_Petch'] leading-tight group-hover:text-cyan-300 transition-colors">
-                    {box.name}
-                  </h4>
-                </div>
-
-                {/* Card Middle: Thumbnail Preview & Feature Badges */}
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center gap-3">
-                  {/* Thumbnail / Mascot */}
-                  <div className="w-14 h-14 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {box.showImage && box.mediaUrl ? (
-                      <img
-                        src={box.mediaUrl}
-                        alt="Alert mascot"
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                    ) : (
-                      <Bell size={20} className="text-slate-600" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="text-xs font-mono text-slate-300 font-bold truncate" style={{ fontFamily: box.fontFamily }}>
-                      Font: {box.fontFamily}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-400">
-                        {box.durationSeconds}s
-                      </span>
-                      {box.ttsEnabled ? (
-                        <span className="px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-500/30 text-[10px] font-mono text-cyan-300 flex items-center gap-1">
-                          <Mic size={10} />
-                          <span>TTS {box.ttsType === 'cloned' ? 'AI Clone' : box.ttsType}</span>
-                        </span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-slate-900 text-[10px] font-mono text-slate-500">
-                          TTS OFF
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Bottom: Test and Edit Buttons */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
-                  <button
-                    type="button"
-                    onClick={(e) => handleTestAlertBox(box, e)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-cyan-950/50 border border-slate-800 hover:border-cyan-500/40 text-xs font-mono text-cyan-300 transition-colors"
-                  >
-                    <Play size={12} className={isPlaying ? 'text-cyan-400 animate-spin fill-cyan-400' : 'text-cyan-400 fill-cyan-400'} />
-                    <span>{isPlaying ? 'Playing...' : 'Test Sound'}</span>
-                  </button>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenStudio(box)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-xs font-mono text-cyan-300 font-bold transition-colors"
+                    {/* Expand / Collapse Pill */}
+                    <div
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-colors ${
+                        isExpanded
+                          ? 'bg-cyan-400 text-slate-950 border-cyan-400'
+                          : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/20'
+                      }`}
                     >
-                      <Edit2 size={12} />
-                      <span>Manage Studio</span>
-                    </button>
+                      <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
+                      <ChevronDown
+                        size={14}
+                        className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </div>
                   </div>
                 </div>
+
+                {/* Expanded Inline Studio Content */}
+                {isExpanded && (
+                  <div className="border-t border-slate-800/80 p-3 sm:p-4 bg-[#060911] animate-fadeIn">
+                    <DonationAlertStudio
+                      box={box}
+                      streamerToken={streamerToken}
+                      onBack={handleBackToList}
+                      onSaveSuccess={handleSaveSuccess}
+                      onDeleteSuccess={handleDeleteSuccess}
+                      onNavigateToStorage={onNavigateToMedia}
+                      inlineMode={true}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}

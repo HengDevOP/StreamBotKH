@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { RESOURCE_FEATURE_PAGES } from './ResourceFeaturePage';
 
 interface ResourcesPageProps {
   onNavigate: (page: string) => void;
@@ -53,6 +54,69 @@ export const ResourcesPage: React.FC<ResourcesPageProps> = ({ onNavigate }) => {
         <p className="text-sm sm:text-base text-slate-400 leading-relaxed">
           Step-by-step setup guides, payment integration tutorials, and technical reference docs to optimize your live stream alerts.
         </p>
+      </div>
+
+      {/* Dedicated Feature Landing Pages Grid */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-white font-['Chakra_Petch']">
+              Interactive Stream Overlays &amp; Feature Landing Pages
+            </h2>
+            <p className="text-xs text-slate-400">
+              Click any feature below to open its dedicated landing page, live interactive simulator, and OBS setup guide.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {RESOURCE_FEATURE_PAGES.map((feat) => {
+            const FeatIcon = feat.icon;
+            return (
+              <div
+                key={feat.slug}
+                onClick={() => onNavigate(`resources/${feat.slug}`)}
+                className="group p-4 rounded-2xl bg-[#090D18] border border-slate-800 hover:border-cyan-500/50 cursor-pointer transition-all space-y-3 flex flex-col justify-between"
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+                      style={{
+                        backgroundColor: `${feat.color}15`,
+                        color: feat.color
+                      }}
+                    >
+                      <FeatIcon size={18} />
+                    </div>
+                    <span
+                      className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                        feat.planBadge === 'PRO PLAN'
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                          : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      }`}
+                    >
+                      {feat.planBadge}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors font-['Chakra_Petch']">
+                      {feat.title}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">
+                      {feat.shortSub}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 text-[11px] font-mono text-cyan-400 font-bold pt-1">
+                  <span>Explore Landing Page</span>
+                  <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Navigation Category Tabs */}

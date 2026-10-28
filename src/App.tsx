@@ -13,6 +13,7 @@ import { OverlayPage } from './views/OverlayPage';
 import { DonatePage } from './views/DonatePage';
 import { LoginPage } from './views/LoginPage';
 import { ResourcesPage } from './views/ResourcesPage';
+import { ResourceFeaturePage } from './views/ResourceFeaturePage';
 import { PricingPage } from './views/PricingPage';
 import { DiscordPage } from './views/DiscordPage';
 
@@ -249,6 +250,7 @@ function AppRoutes() {
         <Route path="/" element={<HomePage onNavigate={handleNav} />} />
         <Route path="/pricing" element={<PricingPage onNavigate={handleNav} />} />
         <Route path="/resources" element={<ResourcesPage onNavigate={handleNav} />} />
+        <Route path="/resources/:featureSlug" element={<ResourceFeaturePage onNavigate={handleNav} />} />
         <Route path="/discord" element={<DiscordPage onNavigate={handleNav} />} />
         <Route path="/dashboard" element={<DashboardRouteWrapper />} />
         <Route path="/dashboard/*" element={<DashboardRouteWrapper />} />

@@ -908,27 +908,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     </div>
   );
 
-  // When a target donation box is selected, render the dedicated Target Donation Studio as a new dashboard
-  // (The main sidebar is completely hidden and replaced by our new sidebar, with the top back button)
-  if (selectedDonationId && (activeTab === 'donation' || activeTab === 'alerts' || activeTab === 'donations')) {
-    return (
-      <div className="h-screen w-screen overflow-hidden bg-[#070A12] text-slate-100 flex flex-col antialiased">
-        <DonationAlertsManager
-          streamerToken={user?.overlayToken}
-          initialSelectedBoxId={selectedDonationId}
-          onSelectBoxId={(id) => setSelectedDonationId(id)}
-          onNavigateToMedia={() => {
-            setSelectedDonationId(null);
-            setActiveTab('media');
-            if (typeof window !== 'undefined') {
-              window.history.pushState(null, '', '/dashboard?tab=media');
-            }
-          }}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="h-full w-full flex flex-row overflow-hidden bg-[#060911] text-slate-100 antialiased relative">
       {/* ============================================================== */}

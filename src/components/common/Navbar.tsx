@@ -61,12 +61,13 @@ const TelegramIcon = () => (
   </svg>
 );
 
-// 8 Interactive Resource Features
+// 8 Interactive Resource Features (Each with its own dedicated landing page)
 const RESOURCE_FEATURES = [
   {
     title: 'Donations',
     sub: 'Live ABA & Bakong KHQR tip alerts',
     tab: 'donation',
+    slug: 'donations-alerts',
     icon: Bell,
     color: '#00F0FF'
   },
@@ -74,6 +75,7 @@ const RESOURCE_FEATURES = [
     title: 'Media Share',
     sub: 'Viewer audio & visual stream sync',
     tab: 'media',
+    slug: 'media-share',
     icon: Layers,
     color: '#3B82F6'
   },
@@ -81,6 +83,7 @@ const RESOURCE_FEATURES = [
     title: 'Video',
     sub: 'YouTube media share video alerts',
     tab: 'video-alerts',
+    slug: 'video-alerts',
     icon: Video,
     color: '#EC4899'
   },
@@ -88,6 +91,7 @@ const RESOURCE_FEATURES = [
     title: 'Leaderboard',
     sub: 'Top supporters ranking (20 designs)',
     tab: 'leaderboard',
+    slug: 'leaderboard',
     icon: Trophy,
     color: '#F59E0B'
   },
@@ -95,6 +99,7 @@ const RESOURCE_FEATURES = [
     title: 'Soundboard',
     sub: 'PC hotkey SFX engine with instant play',
     tab: 'soundboard',
+    slug: 'soundboard',
     icon: Volume2,
     color: '#10B981'
   },
@@ -102,6 +107,7 @@ const RESOURCE_FEATURES = [
     title: 'Wheels',
     sub: 'Interactive spinning wheel giveaways',
     tab: 'wheel',
+    slug: 'wheels',
     icon: Disc,
     color: '#8B5CF6'
   },
@@ -109,6 +115,7 @@ const RESOURCE_FEATURES = [
     title: 'Goal',
     sub: 'Customizable stream donation progress',
     tab: 'goal',
+    slug: 'goal',
     icon: Target,
     color: '#14B8A6'
   },
@@ -116,6 +123,7 @@ const RESOURCE_FEATURES = [
     title: 'Timer',
     sub: 'Subathon countdown with auto top-ups',
     tab: 'timer',
+    slug: 'timer',
     icon: Timer,
     color: '#F97316'
   }
@@ -280,11 +288,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                           <div
                             key={item.title}
                             onClick={() => {
-                              if (user) {
-                                handleNav(`/dashboard?tab=${item.tab}`, 'dashboard', { tab: item.tab });
-                              } else {
-                                handleNav('/resources', 'resources');
-                              }
+                              handleNav(`/resources/${item.slug}`, `resources/${item.slug}`);
                             }}
                             className="p-2.5 rounded-xl hover:bg-white/[0.05] border border-transparent hover:border-slate-800 cursor-pointer transition-all group"
                           >
@@ -477,11 +481,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                   <button
                     key={item.title}
                     onClick={() => {
-                      if (user) {
-                        handleNav(`/dashboard?tab=${item.tab}`, 'dashboard', { tab: item.tab });
-                      } else {
-                        handleNav('/resources', 'resources');
-                      }
+                      handleNav(`/resources/${item.slug}`, `resources/${item.slug}`);
                     }}
                     className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:text-cyan-400 hover:bg-slate-800/60 flex items-center justify-between"
                   >
