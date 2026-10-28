@@ -186,6 +186,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               </li>
               <li className="flex items-center gap-3 text-slate-600">
                 <span className="w-4 text-center">-</span>
+                <span>Removed Watermark on Donation Page</span>
+              </li>
+              <li className="flex items-center gap-3 text-slate-600">
+                <span className="w-4 text-center">-</span>
                 <span>Payment Gateway Admin (ABA PayWay direct credentials)</span>
               </li>
               <li className="flex items-center gap-3 text-slate-600">
@@ -236,6 +240,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-emerald-400 flex-shrink-0" />
                 <span className="font-semibold text-emerald-400">0% platform fee cut (Keep 100% of tips)</span>
+              </li>
+              <li className="flex items-center gap-3 text-emerald-300 font-semibold">
+                <Check size={16} className="text-emerald-400 flex-shrink-0" />
+                <span>Removed Watermark (Clean Donation Page)</span>
               </li>
               <li className="flex items-center gap-3 text-purple-300 font-semibold">
                 <Check size={16} className="text-purple-400 flex-shrink-0" />
@@ -301,6 +309,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 font-medium text-white">Platform Commission Cut</td>
                 <td className="py-3.5 px-6 text-center text-amber-400 font-bold">10% Fee</td>
                 <td className="py-3.5 px-6 text-center text-emerald-400 font-bold">0% (Keep 100%)</td>
+              </tr>
+              <tr>
+                <td className="py-3.5 px-6 font-medium text-white">Removed Watermark (Clean Donation Page)</td>
+                <td className="py-3.5 px-6 text-center text-slate-500">Shows Branding</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Custom ABA PayWay Direct Settlement</td>

@@ -1837,6 +1837,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         <span className="font-mono font-bold text-amber-400">10%</span>
                         <span>Fee cut deducted from incoming tips</span>
                       </li>
+                      <li className="flex items-center gap-2 text-slate-500">
+                        <span className="w-3.5 text-center font-mono">-</span>
+                        <span>Shows streambotkh.com watermark on donation page</span>
+                      </li>
                     </ul>
                   </div>
 
@@ -1904,6 +1908,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <li className="flex items-center gap-2 text-emerald-400 font-semibold">
                         <Check size={14} className="flex-shrink-0" />
                         <span>0% platform fee (Keep 100%)</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-emerald-300 font-semibold">
+                        <Check size={14} className="text-emerald-400 flex-shrink-0" />
+                        <span>Removed Watermark (Clean Donation Page)</span>
                       </li>
                       <li className="flex items-center gap-2 text-purple-300 font-semibold">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
