@@ -765,41 +765,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         </div>
       )}
 
-      {/* Engine Status Line & Quick Collapse */}
-      <div className={`flex items-center ${isCollapsed ? 'justify-center flex-col gap-2' : 'justify-between px-1'} text-[10px] font-mono text-slate-500`}>
-        {!isCollapsed ? (
-          <>
-            <span className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              <span className="font-medium text-slate-400">{connected ? 'OBS ENGINE ACTIVE' : 'SYNCING'}</span>
-            </span>
-            <button
-              onClick={() => setSidebarCollapsed(true)}
-              className="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors"
-              title="Collapse"
-            >
-              <ChevronLeft size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => setSidebarCollapsed(false)}
-              className="p-1.5 rounded bg-slate-900 text-slate-400 hover:text-white transition-colors"
-              title="Expand"
-            >
-              <ChevronRight size={14} />
-            </button>
-            <button
-              onClick={logout}
-              title="Sign Out"
-              className="p-1.5 rounded text-slate-500 hover:text-red-400 transition-colors"
-            >
-              <LogOut size={14} />
-            </button>
-          </>
-        )}
-      </div>
+      {isCollapsed && (
+        <div className="flex items-center justify-center flex-col gap-2 text-[10px] font-mono text-slate-500">
+          <button
+            onClick={() => setSidebarCollapsed(false)}
+            className="p-1.5 rounded bg-slate-900 text-slate-400 hover:text-white transition-colors"
+            title="Expand"
+          >
+            <ChevronRight size={14} />
+          </button>
+          <button
+            onClick={logout}
+            title="Sign Out"
+            className="p-1.5 rounded text-slate-500 hover:text-red-400 transition-colors"
+          >
+            <LogOut size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 
