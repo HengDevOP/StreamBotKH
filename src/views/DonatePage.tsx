@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   donationService,
   PublicStreamerInfo
@@ -18,7 +19,8 @@ import {
   Sparkles,
   Youtube,
   XCircle,
-  X
+  X,
+  Bot
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 
@@ -325,6 +327,38 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
           streamerUsername={streamer.username}
           onPaymentSuccess={handlePaymentSuccess}
         />
+
+        {/* Website Branding Logo on Bottom Right (Only visible when streamer is on Free Plan) */}
+        {(!streamer.plan || streamer.plan.toLowerCase() === 'free') && (
+          <Link
+            to="/"
+            onClick={(e) => {
+              if (onNavigate) {
+                e.preventDefault();
+                onNavigate('home');
+              }
+            }}
+            title="Powered by streambotkh.com"
+            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 group flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#0C101C]/95 hover:bg-[#111728] backdrop-blur-md border border-slate-800 hover:border-cyan-500/50 shadow-2xl shadow-black/60 transition-all duration-200 select-none"
+          >
+            <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700/80 flex items-center justify-center group-hover:border-cyan-400 transition-colors">
+              <Bot className="text-cyan-400 w-4 h-4" />
+            </div>
+            <div className="flex flex-col leading-none">
+              <span className="text-[9px] font-mono uppercase tracking-wider text-slate-500 group-hover:text-slate-400 transition-colors">
+                Powered by
+              </span>
+              <div className="flex items-baseline mt-0.5">
+                <span className="text-xs sm:text-sm font-bold tracking-tight text-white font-['Chakra_Petch']">
+                  streambot<span className="text-cyan-400">kh</span>
+                </span>
+                <span className="text-[10px] font-mono font-semibold text-slate-400 ml-0.5">
+                  .com
+                </span>
+              </div>
+            </div>
+          </Link>
+        )}
     </div>
   );
 };

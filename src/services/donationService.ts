@@ -7,6 +7,7 @@ export interface PublicStreamerInfo {
   displayName: string;
   avatarUrl?: string;
   bio?: string;
+  plan?: 'free' | 'pro' | string;
   glowColor: string;
   minAmountAlert: number;
   ttsMinAmount: number;

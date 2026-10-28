@@ -11,6 +11,7 @@ export async function GET(
 
     const streamer = db.prepare(`
       SELECT s.id, s.username, s.display_name, s.avatar_url, s.bio,
+             s.plan, s.plan_expires_at,
              a.glow_color, a.template_style, a.min_amount_alert, a.tts_min_amount,
              p.bakong_account_name, p.is_sandbox,
              v.is_enabled as video_enabled,
@@ -27,6 +28,19 @@ export async function GET(
       return NextResponse.json({ error: 'Streamer not found' }, { status: 404 });
     }
 
+    let currentPlan = (streamer.plan || 'free').toLowerCase();
+    if (currentPlan === 'pro' && streamer.plan_expires_at) {
+      const expiresTime = new Date(streamer.plan_expires_at).getTime();
+      if (!isNaN(expiresTime) && expiresTime < Date.now()) {
+        db.prepare(`
+          UPDATE streamers
+          SET plan = 'free', plan_started_at = NULL, plan_expires_at = NULL, plan_duration_days = 0
+          WHERE id = ?
+        `).run(streamer.id);
+        currentPlan = 'free';
+      }
+    }
+
     const videoAlertEnabled = streamer.video_enabled === undefined || streamer.video_enabled === null
       ? true
       : streamer.video_enabled === 1;
@@ -37,6 +51,7 @@ export async function GET(
       displayName: streamer.display_name,
       avatarUrl: streamer.avatar_url,
       bio: streamer.bio,
+      plan: currentPlan,
       glowColor: streamer.glow_color || '#00F0FF',
       minAmountAlert: streamer.min_amount_alert || 1.0,
       ttsMinAmount: streamer.tts_min_amount || 2.0,
