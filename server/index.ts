@@ -1,5 +1,9 @@
 import dotenv from 'dotenv';
+const cliPort = process.env.PORT;
 dotenv.config({ override: true });
+if (cliPort) {
+  process.env.PORT = cliPort;
+}
 
 import express from 'express';
 import http from 'http';
