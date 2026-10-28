@@ -101,6 +101,22 @@ body:has(.obs-overlay) {
   animation-play-state: paused;
 }
 
+/* Reverse Continuous Horizontal Marquee (Left to Right) */
+@keyframes marquee-reverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
+
+.animate-marquee-reverse {
+  display: flex;
+  width: max-content;
+  animation: marquee-reverse 35s linear infinite;
+}
+
+.animate-marquee-reverse:hover {
+  animation-play-state: paused;
+}
+
 /* Shimmer animated gradient text */
 @keyframes shimmer {
   0% { background-position: -200% 0; }

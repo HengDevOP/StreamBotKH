@@ -25,7 +25,9 @@ import {
   Send,
   Eye,
   CreditCard,
-  Crown
+  Crown,
+  BadgeCheck,
+  Heart
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { useAudio } from '../hooks/useAudio';
@@ -34,6 +36,130 @@ import confetti from 'canvas-confetti';
 interface HomePageProps {
   onNavigate: (page: string, params?: any) => void;
 }
+
+interface VerifiedCreatorCard {
+  name: string;
+  username: string;
+  tag: string;
+  avatar: string;
+  supporters?: string;
+  verified: boolean;
+  glowColor?: string;
+}
+
+const DEFAULT_LANE_1_CREATORS: VerifiedCreatorCard[] = [
+  {
+    name: 'Heng Farm 07',
+    username: 'hengfarm07',
+    tag: 'MLBB & Variety Live',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=hengfarm07',
+    supporters: '1.4k Tips',
+    verified: true,
+    glowColor: '#00F0FF'
+  },
+  {
+    name: 'Neon Master VIP',
+    username: 'neonstreamer',
+    tag: 'Valorant & Tournament Caster',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=neonmaster',
+    supporters: '3.8k Tips',
+    verified: true,
+    glowColor: '#EC4899'
+  },
+  {
+    name: 'Sokha Gaming KH',
+    username: 'sokhagaming',
+    tag: 'PUBG Mobile Cambodia',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=sokhagaming',
+    supporters: '890 Tips',
+    verified: true,
+    glowColor: '#10B981'
+  },
+  {
+    name: 'Dara Esports Live',
+    username: 'daraesports',
+    tag: 'FPS & Community Tournaments',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=daraesports',
+    supporters: '2.1k Tips',
+    verified: true,
+    glowColor: '#A855F7'
+  },
+  {
+    name: 'Sreypov Streamer',
+    username: 'sreypovlive',
+    tag: 'Just Chatting & Mobile Legends',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=sreypovlive',
+    supporters: '950 Tips',
+    verified: true,
+    glowColor: '#F59E0B'
+  },
+  {
+    name: 'ProGamerKH',
+    username: 'progamerkh',
+    tag: 'Apex Legends & Warzone 2',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=progamerkh',
+    supporters: '1.2k Tips',
+    verified: true,
+    glowColor: '#38BDF8'
+  }
+];
+
+const DEFAULT_LANE_2_CREATORS: VerifiedCreatorCard[] = [
+  {
+    name: 'KompongGamer',
+    username: 'komponggamer',
+    tag: 'GTA V Roleplay Cambodia',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=komponggamer',
+    supporters: '1.7k Tips',
+    verified: true,
+    glowColor: '#10B981'
+  },
+  {
+    name: 'CyberNinja99',
+    username: 'cyberninja99',
+    tag: 'Speedruns & Retro Games',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=cyberninja99',
+    supporters: '720 Tips',
+    verified: true,
+    glowColor: '#00F0FF'
+  },
+  {
+    name: 'Piseth Live Cast',
+    username: 'pisethlive',
+    tag: 'E-Sports Analyst & Podcast',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=pisethlive',
+    supporters: '2.5k Tips',
+    verified: true,
+    glowColor: '#EC4899'
+  },
+  {
+    name: 'Apsara Gaming TV',
+    username: 'apsaragaming',
+    tag: 'League of Legends & Wild Rift',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=apsaragaming',
+    supporters: '1.9k Tips',
+    verified: true,
+    glowColor: '#8B5CF6'
+  },
+  {
+    name: 'Vannak Playz',
+    username: 'vannakplayz',
+    tag: 'Free Fire & Mobile Tournaments',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=vannakplayz',
+    supporters: '1.1k Tips',
+    verified: true,
+    glowColor: '#06B6D4'
+  },
+  {
+    name: 'Phnom Penh Streamers',
+    username: 'ppstreamers',
+    tag: 'IRL Street Food & City Walks',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=ppstreamers',
+    supporters: '3.1k Tips',
+    verified: true,
+    glowColor: '#F43F5E'
+  }
+];
 
 const SUPPORTED_BANKS = [
   'ABA Bank',
@@ -54,6 +180,91 @@ const SUPPORTED_BANKS = [
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { playSynthNeonChime } = useAudio();
+
+  // Dynamic Verified Streamers State from Database
+  const [dbVerifiedStreamers, setDbVerifiedStreamers] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetch('/api/streamer/verified')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.streamers) && data.streamers.length > 0) {
+          setDbVerifiedStreamers(data.streamers);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const lane1List = React.useMemo(() => {
+    if (!dbVerifiedStreamers || dbVerifiedStreamers.length === 0) return DEFAULT_LANE_1_CREATORS;
+    const fromDb = dbVerifiedStreamers.filter((_, i) => i % 2 === 0).map((s) => ({
+      name: s.displayName,
+      username: s.username,
+      tag: s.bio || 'Verified Streamer',
+      avatar: s.avatarUrl,
+      supporters: s.totalTips > 0 ? `${s.totalTips} Tips` : 'Verified Creator',
+      verified: true
+    }));
+    return [...fromDb, ...DEFAULT_LANE_1_CREATORS];
+  }, [dbVerifiedStreamers]);
+
+  const lane2List = React.useMemo(() => {
+    if (!dbVerifiedStreamers || dbVerifiedStreamers.length === 0) return DEFAULT_LANE_2_CREATORS;
+    const fromDb = dbVerifiedStreamers.filter((_, i) => i % 2 === 1).map((s) => ({
+      name: s.displayName,
+      username: s.username,
+      tag: s.bio || 'Verified Streamer',
+      avatar: s.avatarUrl,
+      supporters: s.totalTips > 0 ? `${s.totalTips} Tips` : 'Verified Creator',
+      verified: true
+    }));
+    return [...fromDb, ...DEFAULT_LANE_2_CREATORS];
+  }, [dbVerifiedStreamers]);
+
+  const renderStreamerCard = (creator: VerifiedCreatorCard, key: string) => (
+    <div
+      key={key}
+      onClick={() => onNavigate('donate', { username: creator.username })}
+      className="w-[280px] sm:w-[320px] flex-shrink-0 p-4 rounded-2xl bg-[#0C101C]/90 hover:bg-[#121829] border border-slate-800/90 hover:border-cyan-500/50 shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer group flex flex-col justify-between space-y-3.5 select-none"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="relative flex-shrink-0">
+          <div className="w-12 h-12 rounded-xl p-0.5 bg-gradient-to-tr from-cyan-500 via-indigo-500 to-pink-500 shadow-md">
+            <img
+              src={creator.avatar}
+              alt={creator.name}
+              className="w-full h-full rounded-[10px] bg-slate-900 object-cover"
+            />
+          </div>
+          <div className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-slate-950">
+            <BadgeCheck size={14} className="text-cyan-400 fill-cyan-400/20" />
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] truncate group-hover:text-cyan-300 transition-colors">
+              {creator.name}
+            </h4>
+            <BadgeCheck size={14} className="text-cyan-400 fill-cyan-400/20 flex-shrink-0" />
+          </div>
+          <p className="text-[11px] font-mono text-cyan-400 truncate">@{creator.username}</p>
+          <p className="text-[11px] text-slate-400 truncate mt-0.5">{creator.tag}</p>
+        </div>
+      </div>
+
+      <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono">
+        <div className="flex items-center gap-1.5 text-slate-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-emerald-400 font-semibold">{creator.supporters || 'Active Live'}</span>
+        </div>
+        <div className="flex items-center gap-1 text-cyan-400 font-bold group-hover:translate-x-0.5 transition-transform">
+          <span>Tip Page</span>
+          <ArrowRight size={12} />
+        </div>
+      </div>
+    </div>
+  );
 
   // Interactive Live Simulator State
   const [demoAmount, setDemoAmount] = useState<number>(10);
@@ -384,6 +595,52 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 </div>
                 <Play size={14} className="text-emerald-400 group-hover:scale-110 transition-transform" />
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===================== VERIFIED STREAMERS SEAMLESS CARDS MARQUEE (2 SECTIONS) ===================== */}
+      <section className="space-y-8 py-6 relative overflow-hidden">
+        {/* Subtle Ambient Radial Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-cyan-500/5 blur-[120px] pointer-events-none rounded-full" />
+
+        <div className="max-w-6xl mx-auto px-4 text-center space-y-3 relative z-10">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold tracking-wider uppercase shadow-[0_0_20px_rgba(0,240,255,0.12)]">
+            <BadgeCheck size={15} className="text-cyan-400 fill-cyan-400/20" />
+            <span>VERIFIED CREATOR NETWORK</span>
+          </div>
+
+          <h2 className="text-3xl sm:text-5xl font-extrabold text-white font-['Chakra_Petch'] uppercase tracking-tight">
+            TRUSTED BY VERIFIED CAMBODIAN STREAMERS
+          </h2>
+
+          <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
+            Leading gaming creators, esports casters, and livestreamers accept direct tips with 0% platform cuts, instant ABA Mobile &amp; Bakong KHQR transfers, and real-time alerts.
+          </p>
+        </div>
+
+        {/* 2-Section Seamless Moving Tickers */}
+        <div className="relative w-full space-y-4 overflow-hidden py-3">
+          {/* Left and Right Smooth Edge Fade Vignettes */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-16 sm:w-44 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-transparent z-20" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-44 bg-gradient-to-l from-[#070A12] via-[#070A12]/85 to-transparent z-20" />
+
+          {/* Section 1: Seamless moving right-to-left */}
+          <div className="overflow-hidden w-full flex">
+            <div className="animate-marquee flex items-center gap-4 py-1">
+              {lane1List.concat(lane1List).map((creator, idx) =>
+                renderStreamerCard(creator, `lane1-${creator.username}-${idx}`)
+              )}
+            </div>
+          </div>
+
+          {/* Section 2: Seamless moving left-to-right (opposite direction) */}
+          <div className="overflow-hidden w-full flex">
+            <div className="animate-marquee-reverse flex items-center gap-4 py-1">
+              {lane2List.concat(lane2List).map((creator, idx) =>
+                renderStreamerCard(creator, `lane2-${creator.username}-${idx}`)
+              )}
             </div>
           </div>
         </div>
