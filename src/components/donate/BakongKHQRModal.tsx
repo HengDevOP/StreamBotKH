@@ -24,6 +24,10 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
   onClose,
   onCancel,
   donationData,
+  donorName,
+  bankingName,
+  streamerId,
+  streamerUsername,
   onPaymentSuccess
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(300);
