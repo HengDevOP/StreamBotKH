@@ -19,6 +19,7 @@ import {
   CornerDownLeft
 } from 'lucide-react';
 import { request } from '../../services/api';
+import { useModal } from '../../context/ModalContext';
 
 const USERS_PER_PAGE = 20;
 const CLIENT_CACHE_TTL_MS = 60 * 1000; // 60s client-side page cache to prevent server overload
@@ -67,6 +68,7 @@ interface AdminUsersManagerProps {
 }
 
 export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentUserPlanUpdated }) => {
+  const { showConfirm } = useModal();
   const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [summary, setSummary] = useState({ totalUsers: 0, proUsers: 0, freeUsers: 0 });
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -212,38 +214,66 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
     loadUsersPage(currentPage, committedSearch, planFilter, { forceRefresh: true });
   };
 
-  const handleUpdateUserPlan = async (
-    userId: string,
+  const handleUpdateUserPlan = (
+    targetUser: AdminUserItem,
     plan: 'free' | 'pro',
     durationDays = 31,
     action?: 'set' | 'extend'
   ) => {
-    try {
-      setUpdatingId(userId);
-      setErrorMsg(null);
-      const res = await request<{ success: boolean; message: string; user: AdminUserItem }>(
-        '/admin/users',
-        {
-          method: 'PUT',
-          body: JSON.stringify({ userId, plan, durationDays, action })
+    const isExtend = plan === 'pro' && action === 'extend';
+    const isProUpgrade = plan === 'pro' && action !== 'extend';
+
+    const modalTitle = isExtend
+      ? `Extend Pro Plan (+${durationDays} Days)?`
+      : isProUpgrade
+      ? `Upgrade @${targetUser.username} to Pro Plan?`
+      : `Downgrade @${targetUser.username} to Free Plan?`;
+
+    const modalMessage = isExtend
+      ? `Are you sure you want to add +${durationDays} days to @${targetUser.username} (${targetUser.email})'s active Pro Plan subscription?`
+      : isProUpgrade
+      ? `Are you sure you want to upgrade @${targetUser.username} (${targetUser.email}) to the Pro Plan (0% platform fee, 500MB storage, removed watermark) for ${durationDays} days?`
+      : `Are you sure you want to switch @${targetUser.username} (${targetUser.email}) back to the Free Plan (10% platform fee, 20MB storage)?`;
+
+    showConfirm({
+      title: modalTitle,
+      message: modalMessage,
+      type: plan === 'free' ? 'danger' : 'info',
+      confirmText: isExtend
+        ? `Extend +${durationDays}d`
+        : isProUpgrade
+        ? `Confirm Pro (${durationDays}d)`
+        : 'Confirm Free Plan',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          setUpdatingId(targetUser.id);
+          setErrorMsg(null);
+          const res = await request<{ success: boolean; message: string; user: AdminUserItem }>(
+            '/admin/users',
+            {
+              method: 'PUT',
+              body: JSON.stringify({ userId: targetUser.id, plan, durationDays, action })
+            }
+          );
+
+          setToastMsg(res.message);
+          setTimeout(() => setToastMsg(null), 3500);
+
+          // Invalidate client cache and reload current page
+          clientUsersPageCache.clear();
+          await loadUsersPage(currentPage, committedSearch, planFilter, { forceRefresh: true });
+
+          if (onCurrentUserPlanUpdated) {
+            onCurrentUserPlanUpdated();
+          }
+        } catch (err: any) {
+          setErrorMsg(err.message || 'Failed to update user plan');
+        } finally {
+          setUpdatingId(null);
         }
-      );
-
-      setToastMsg(res.message);
-      setTimeout(() => setToastMsg(null), 3500);
-
-      // Invalidate client cache and reload current page
-      clientUsersPageCache.clear();
-      await loadUsersPage(currentPage, committedSearch, planFilter, { forceRefresh: true });
-
-      if (onCurrentUserPlanUpdated) {
-        onCurrentUserPlanUpdated();
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to update user plan');
-    } finally {
-      setUpdatingId(null);
-    }
+    });
   };
 
   const formatDate = (iso?: string | null) => {
@@ -534,7 +564,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                         <div className="inline-flex items-center justify-end gap-2">
                           {!isPro ? (
                             <button
-                              onClick={() => handleUpdateUserPlan(u.id, 'pro', 31, 'set')}
+                              onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}
                               disabled={isUpdating}
                               className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-slate-950 font-extrabold text-[11px] font-mono uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50"
                             >
@@ -543,7 +573,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                           ) : (
                             <>
                               <button
-                                onClick={() => handleUpdateUserPlan(u.id, 'pro', 31, 'extend')}
+                                onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'extend')}
                                 disabled={isUpdating}
                                 title="Add +31 days to current expiration"
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 font-bold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
@@ -552,7 +582,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                                 <span>31d</span>
                               </button>
                               <button
-                                onClick={() => handleUpdateUserPlan(u.id, 'free', 0, 'set')}
+                                onClick={() => handleUpdateUserPlan(u, 'free', 0, 'set')}
                                 disabled={isUpdating}
                                 className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-red-950/60 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/40 font-semibold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
                               >

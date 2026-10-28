@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { request } from '../../services/api';
 import { IssueReport } from '../../types/streamer';
+import { useModal } from '../../context/ModalContext';
 
 interface AdminPullRequestsManagerProps {
   isAdmin: boolean;
@@ -41,6 +42,7 @@ export const AdminPullRequestsManager: React.FC<AdminPullRequestsManagerProps> =
   isAdmin,
   onUserPlanUpdated
 }) => {
+  const { showConfirm } = useModal();
   const [issues, setIssues] = useState<IssueReport[]>([]);
   const [summary, setSummary] = useState({
     total: 0,
@@ -123,7 +125,7 @@ export const AdminPullRequestsManager: React.FC<AdminPullRequestsManagerProps> =
     }
   };
 
-  const handleAdminUpdate = async (
+  const executeAdminUpdate = async (
     id: string,
     newStatus: string,
     upgradeUserPlan = false
@@ -156,6 +158,33 @@ export const AdminPullRequestsManager: React.FC<AdminPullRequestsManagerProps> =
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const handleAdminUpdate = (
+    id: string,
+    newStatus: string,
+    upgradeUserPlan = false
+  ) => {
+    if (upgradeUserPlan) {
+      const targetIssue = issues.find((item) => item.id === id);
+      const targetUserLabel = targetIssue?.streamerUsername
+        ? `@${targetIssue.streamerUsername}`
+        : targetIssue?.streamerEmail || 'this user';
+
+      showConfirm({
+        title: `Upgrade ${targetUserLabel} to Pro Plan (31 Days)?`,
+        message: `Are you sure you want to resolve this pull request and upgrade ${targetUserLabel} to the Pro Plan (0% fee, 500MB storage, removed watermark) for 31 days?`,
+        type: 'info',
+        confirmText: 'Confirm Pro (31d)',
+        cancelText: 'Cancel',
+        onConfirm: async () => {
+          await executeAdminUpdate(id, newStatus, true);
+        }
+      });
+      return;
+    }
+
+    executeAdminUpdate(id, newStatus, false);
   };
 
   const handleDeleteIssue = async (id: string) => {
