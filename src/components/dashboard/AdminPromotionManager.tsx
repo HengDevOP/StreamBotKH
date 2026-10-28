@@ -597,7 +597,7 @@ export const AdminPromotionManager: React.FC = () => {
               </li>
               <li className="flex items-center gap-2 text-purple-300 font-semibold">
                 <Check size={14} className="text-purple-400" />
-                <span>10GB Media Cloud Storage</span>
+                <span>500MB Media Cloud Storage (MP4, GIF, MP3, WAV)</span>
               </li>
             </ul>
           </div>

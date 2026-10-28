@@ -10,12 +10,11 @@ import {
   AlertCircle,
   CheckCircle2,
   RefreshCw,
-  Plus,
-  Sparkles,
-  ExternalLink,
-  Layers
+  Layers,
+  Video,
+  Volume2,
+  FileText
 } from 'lucide-react';
-import { Button } from '../common/Button';
 import { useModal } from '../../context/ModalContext';
 
 export interface MediaItem {
@@ -31,6 +30,24 @@ export interface MediaItem {
 
 interface MediaLibraryManagerProps {
   onSelectForOverlay?: (media: MediaItem) => void;
+}
+
+export function isVideoAsset(item: Pick<MediaItem, 'fileType' | 'url' | 'filename'>): boolean {
+  const ft = (item.fileType || '').toLowerCase();
+  const name = (item.url || item.filename || '').toLowerCase();
+  return ft.startsWith('video/') || /\.(mp4|webm|mov|m4v|avi|mkv)$/i.test(name);
+}
+
+export function isAudioAsset(item: Pick<MediaItem, 'fileType' | 'url' | 'filename'>): boolean {
+  const ft = (item.fileType || '').toLowerCase();
+  const name = (item.url || item.filename || '').toLowerCase();
+  return ft.startsWith('audio/') || /\.(mp3|wav|wave|ogg|m4a|aac|flac)$/i.test(name);
+}
+
+export function isImageAsset(item: Pick<MediaItem, 'fileType' | 'url' | 'filename'>): boolean {
+  const ft = (item.fileType || '').toLowerCase();
+  const name = (item.url || item.filename || '').toLowerCase();
+  return ft.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(name);
 }
 
 export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
@@ -55,9 +72,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Maximum allowed file size: 2MB in bytes
-  const MAX_SIZE_BYTES = 2 * 1024 * 1024;
-  const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif'];
+  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // Up to 100MB per file (bounded by plan quota: 20MB Free / 500MB Pro)
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
@@ -88,7 +103,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     fetchMedia();
   }, []);
 
-  // Format bytes to human readable string (KB / MB)
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -99,22 +113,21 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    // 1. Client-side size validation (2MB limit)
     if (file.size > MAX_SIZE_BYTES) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      setErrorMsg(`File exceeds the 2MB limit (${sizeMb} MB). Please choose an image or GIF under 2MB.`);
+      setErrorMsg(`File size (${sizeMb} MB) exceeds the 100MB per-file upload limit.`);
       return;
     }
 
-    // 2. Client-side type validation
-    const fileType = file.type.toLowerCase();
-    const isImage = ALLOWED_TYPES.includes(fileType) || /\.(png|jpe?g|gif)$/i.test(file.name);
-    if (!isImage) {
-      setErrorMsg('Unsupported file format. Please upload PNG, JPG, or GIF only.');
+    if (storageInfo && file.size > storageInfo.remainingBytes) {
+      setErrorMsg(
+        `File size (${formatFileSize(file.size)}) exceeds your remaining quota (${formatFileSize(
+          storageInfo.remainingBytes
+        )} left of ${storageInfo.planLabel}).`
+      );
       return;
     }
 
-    // 3. Upload to backend & save in MongoDB
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
@@ -188,6 +201,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
           const data = await res.json();
           if (res.ok && data.success) {
             setMediaList((prev) => prev.filter((m) => m._id !== id));
+            await fetchMedia();
             showAlert({
               title: 'Asset Deleted',
               message: `"${name}" has been removed successfully.`,
@@ -228,7 +242,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
             Media Library
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Upload custom PNG, JPG, or animated GIFs to display on your live OBS alert overlays. Stored securely in MongoDB.
+            Upload MP4, GIF, MP3, WAV, PNG, JPG, WEBP, and all formatted files for your live OBS overlays &amp; soundboard.
           </p>
         </div>
 
@@ -237,7 +251,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
             {mediaList.length} {mediaList.length === 1 ? 'file' : 'files'}
           </span>
           <span className="px-2.5 py-1 rounded-md bg-cyan-950 text-cyan-300">
-            Max 2MB / file
+            All Formats Supported
           </span>
         </div>
       </div>
@@ -298,7 +312,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
           </div>
 
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
-            <span>Free: 20MB • Starter: 1GB • Pro: 10GB</span>
+            <span>Free: 20MB • Pro: 500MB</span>
             <span>{formatFileSize(storageInfo.remainingBytes)} available</span>
           </div>
         </div>
@@ -319,7 +333,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/jpg,image/gif"
+          accept="*/*"
           className="hidden"
           onChange={handleInputChange}
           disabled={uploading}
@@ -338,7 +352,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
             {uploading ? 'Uploading media to MongoDB...' : 'Click to upload or drag and drop'}
           </div>
           <p className="text-xs text-slate-400">
-            Supports <strong className="text-slate-300">PNG</strong>, <strong className="text-slate-300">JPG</strong>, or <strong className="text-slate-300">GIF</strong>. Maximum file size is <strong className="text-cyan-400">2MB</strong>.
+            Supports <strong className="text-slate-300">MP4</strong>, <strong className="text-slate-300">GIF</strong>, <strong className="text-slate-300">MP3</strong>, <strong className="text-slate-300">WAV</strong>, <strong className="text-slate-300">PNG</strong>, <strong className="text-slate-300">JPG</strong>, <strong className="text-slate-300">WEBP</strong> &amp; all formatted files (Free: <strong className="text-cyan-400">20MB</strong> • Pro: <strong className="text-purple-400">500MB</strong>).
           </p>
         </div>
       </div>
@@ -368,74 +382,107 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
             <ImageIcon size={32} className="mx-auto text-slate-600" />
             <div className="text-sm font-medium text-slate-400">No media uploaded yet</div>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Upload your stream reaction GIFs, victory icons, or sponsor logos above (up to 2MB).
+              Upload your stream MP4 clips, reaction GIFs, MP3/WAV sound effects, or logos above.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {mediaList.map((item) => (
-              <div
-                key={item._id}
-                className="group rounded-xl bg-slate-900/60 border border-slate-800/80 overflow-hidden flex flex-col justify-between hover:border-slate-700 transition-all shadow-sm"
-              >
-                {/* Media Image / GIF Preview */}
-                <div className="w-full aspect-square bg-slate-950 flex items-center justify-center relative overflow-hidden p-2">
-                  <img
-                    src={item.url}
-                    alt={item.filename}
-                    className="max-w-full max-h-full object-contain rounded-lg"
-                    loading="lazy"
-                  />
-                  <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-black/70 text-slate-300">
-                    {item.filename.split('.').pop() || 'IMG'}
-                  </span>
-                </div>
+            {mediaList.map((item) => {
+              const isVideo = isVideoAsset(item);
+              const isAudio = isAudioAsset(item);
+              const isImage = isImageAsset(item);
+              const extBadge = (item.filename.split('.').pop() || 'FILE').toUpperCase();
 
-                {/* Info Bar */}
-                <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="text-xs font-semibold text-slate-200 truncate" title={item.filename}>
-                      {item.filename}
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-1">
-                      <span>{formatFileSize(item.fileSize)}</span>
-                      <span>{new Date(item.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between gap-1">
-                    <button
-                      onClick={() => copyUrl(item.url, item._id)}
-                      title="Copy Public URL"
-                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono flex items-center gap-1 transition-colors flex-1 justify-center"
-                    >
-                      {copiedId === item._id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                      <span>{copiedId === item._id ? 'Copied' : 'Copy'}</span>
-                    </button>
-
-                    {onSelectForOverlay && (
-                      <button
-                        onClick={() => onSelectForOverlay(item)}
-                        title="Use in Overlay"
-                        className="px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/60 text-[11px] font-mono flex items-center gap-1 transition-colors"
-                      >
-                        <Layers size={12} />
-                        <span>Use</span>
-                      </button>
+              return (
+                <div
+                  key={item._id}
+                  className="group rounded-xl bg-slate-900/60 border border-slate-800/80 overflow-hidden flex flex-col justify-between hover:border-slate-700 transition-all shadow-sm"
+                >
+                  {/* Media Preview (Image / GIF / Video / Audio) */}
+                  <div className="w-full aspect-square bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden p-3">
+                    {isVideo ? (
+                      <video
+                        src={item.url}
+                        controls
+                        muted
+                        loop
+                        playsInline
+                        className="max-w-full max-h-full object-contain rounded-lg"
+                      />
+                    ) : isAudio ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-3 px-2 text-center">
+                        <div className="w-14 h-14 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                          <Volume2 size={28} />
+                        </div>
+                        <audio src={item.url} controls className="w-full h-8" />
+                      </div>
+                    ) : isImage ? (
+                      <img
+                        src={item.url}
+                        alt={item.filename}
+                        className="max-w-full max-h-full object-contain rounded-lg"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+                        <FileText size={32} className="text-cyan-400" />
+                        <span className="text-xs font-mono">{extBadge}</span>
+                      </div>
                     )}
 
-                    <button
-                      onClick={() => handleDelete(item._id, item.filename)}
-                      title="Delete from MongoDB"
-                      className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-black/75 text-slate-200 flex items-center gap-1">
+                      {isVideo && <Video size={10} className="text-cyan-400" />}
+                      {isAudio && <Volume2 size={10} className="text-purple-400" />}
+                      {extBadge}
+                    </span>
+                  </div>
+
+                  {/* Info Bar */}
+                  <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-200 truncate" title={item.filename}>
+                        {item.filename}
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-1">
+                        <span>{formatFileSize(item.fileSize)}</span>
+                        <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between gap-1">
+                      <button
+                        onClick={() => copyUrl(item.url, item._id)}
+                        title="Copy Public URL"
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono flex items-center gap-1 transition-colors flex-1 justify-center"
+                      >
+                        {copiedId === item._id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                        <span>{copiedId === item._id ? 'Copied' : 'Copy'}</span>
+                      </button>
+
+                      {onSelectForOverlay && (
+                        <button
+                          onClick={() => onSelectForOverlay(item)}
+                          title="Use in Overlay"
+                          className="px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/60 text-[11px] font-mono flex items-center gap-1 transition-colors"
+                        >
+                          <Layers size={12} />
+                          <span>Use</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleDelete(item._id, item.filename)}
+                        title="Delete from MongoDB"
+                        className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

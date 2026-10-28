@@ -9,9 +9,12 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Video,
+  Volume2,
+  FileText
 } from 'lucide-react';
-import { MediaItem } from './MediaLibraryManager';
+import { MediaItem, isVideoAsset, isAudioAsset, isImageAsset } from './MediaLibraryManager';
 
 interface MediaPickerModalProps {
   isOpen: boolean;
@@ -28,7 +31,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   onSelect,
   currentUrl,
   title = 'Choose from Media Library',
-  subtitle = 'Select an image or GIF from your library, or upload a new file directly.'
+  subtitle = 'Select a file from your library, or upload MP4, GIF, MP3, WAV, PNG, JPG directly.'
 }) => {
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [selectedUrl, setSelectedUrl] = useState<string>(currentUrl || '');
@@ -42,13 +45,13 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     planLabel: string;
     usedBytes: number;
     limitBytes: number;
+    remainingBytes: number;
     percentUsed: number;
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2MB per file
-  const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // Up to 100MB per file (bounded by plan quota: 20MB Free / 500MB Pro)
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
@@ -64,13 +67,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        // Filter to image/gif assets suitable for profile logos & visual media
-        const images = (data.media || []).filter(
-          (item: MediaItem) =>
-            (item.fileType && item.fileType.startsWith('image/')) ||
-            /\.(png|jpe?g|gif|webp)$/i.test(item.url || item.filename || '')
-        );
-        setMediaList(images);
+        setMediaList(data.media || []);
         if (data.storage) {
           setStorageInfo(data.storage);
         }
@@ -107,14 +104,16 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
     if (file.size > MAX_SIZE_BYTES) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      setErrorMsg(`File exceeds the 2MB limit (${sizeMb} MB). Please choose an image under 2MB.`);
+      setErrorMsg(`File exceeds the 100MB per-file limit (${sizeMb} MB).`);
       return;
     }
 
-    const fileType = (file.type || '').toLowerCase();
-    const isImage = ALLOWED_TYPES.includes(fileType) || /\.(png|jpe?g|gif|webp)$/i.test(file.name);
-    if (!isImage) {
-      setErrorMsg('Unsupported file format. Please upload PNG, JPG, GIF, or WEBP only.');
+    if (storageInfo && file.size > storageInfo.remainingBytes) {
+      setErrorMsg(
+        `File size (${formatFileSize(file.size)}) exceeds your remaining quota (${formatFileSize(
+          storageInfo.remainingBytes
+        )} left of ${storageInfo.planLabel}).`
+      );
       return;
     }
 
@@ -225,7 +224,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                accept="*/*"
                 onChange={handleInputChange}
                 className="hidden"
               />
@@ -249,7 +248,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               </button>
 
               <span className="text-[11px] font-mono text-slate-400">
-                PNG, JPG, GIF up to 2MB (or drag &amp; drop here)
+                MP4, GIF, MP3, WAV, PNG, JPG &amp; all formats supported
               </span>
             </div>
 
@@ -298,7 +297,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               <ImageIcon size={32} className="text-slate-600 mx-auto" />
               <div className="text-sm font-bold text-white">Your Media Library is Empty</div>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Click &ldquo;Upload New Media&rdquo; above to upload a profile logo or image directly into your library.
+                Click &ldquo;Upload New Media&rdquo; above to upload MP4, GIF, MP3, WAV, PNG, or JPG files directly into your library.
               </p>
               <button
                 type="button"
@@ -306,13 +305,18 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-colors cursor-pointer"
               >
                 <UploadCloud size={14} />
-                <span>Upload First Image</span>
+                <span>Upload First File</span>
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {mediaList.map((item) => {
                 const isSelected = selectedUrl === item.url;
+                const isVideo = isVideoAsset(item);
+                const isAudio = isAudioAsset(item);
+                const isImage = isImageAsset(item);
+                const extBadge = (item.filename.split('.').pop() || 'FILE').toUpperCase();
+
                 return (
                   <div
                     key={item._id || item.url}
@@ -327,12 +331,39 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                         : 'border-slate-800 hover:border-slate-600'
                     }`}
                   >
-                    <div className="aspect-square w-full bg-slate-900/80 flex items-center justify-center overflow-hidden relative">
-                      <img
-                        src={item.url}
-                        alt={item.filename}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      />
+                    <div className="aspect-square w-full bg-slate-900/80 flex items-center justify-center overflow-hidden relative p-2">
+                      {isVideo ? (
+                        <video
+                          src={item.url}
+                          muted
+                          loop
+                          playsInline
+                          className="w-full h-full object-contain rounded-lg"
+                        />
+                      ) : isAudio ? (
+                        <div className="flex flex-col items-center justify-center gap-2 text-purple-400">
+                          <Volume2 size={28} />
+                          <span className="text-[10px] font-mono text-slate-300">{extBadge}</span>
+                        </div>
+                      ) : isImage ? (
+                        <img
+                          src={item.url}
+                          alt={item.filename}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-2 text-cyan-400">
+                          <FileText size={28} />
+                          <span className="text-[10px] font-mono text-slate-300">{extBadge}</span>
+                        </div>
+                      )}
+
+                      <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-black/75 text-slate-200 flex items-center gap-1">
+                        {isVideo && <Video size={9} className="text-cyan-400" />}
+                        {isAudio && <Volume2 size={9} className="text-purple-400" />}
+                        {extBadge}
+                      </span>
+
                       {isSelected && (
                         <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-lg">
                           <Check size={14} strokeWidth={3} />
@@ -355,12 +386,16 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-[#0B0F19] flex items-center justify-between gap-3">
-          <div className="text-xs font-mono text-slate-400 truncate">
-            {selectedUrl ? '1 media item selected' : 'Click an image above to select it'}
+        <div className="px-6 py-4 border-t border-slate-800 bg-[#0B0F19] flex items-center justify-between gap-4">
+          <div className="text-xs text-slate-400 truncate">
+            {selectedUrl ? (
+              <span className="font-mono text-cyan-400">Selected: {selectedUrl.split('/').pop()}</span>
+            ) : (
+              <span>Click any item above to select it</span>
+            )}
           </div>
 
-          <div className="flex items-center gap-2.5 flex-shrink-0">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
@@ -372,10 +407,9 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               type="button"
               onClick={handleConfirmSelection}
               disabled={!selectedUrl}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-extrabold text-xs transition-all cursor-pointer disabled:opacity-40"
+              className="px-5 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 text-slate-950 font-extrabold text-xs transition-all cursor-pointer"
             >
-              <Check size={14} />
-              <span>Use Selected Logo</span>
+              Apply Selected Media
             </button>
           </div>
         </div>

@@ -71,7 +71,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
   const faqs = [
     {
       q: 'What are the differences between the Free and Pro plans?',
-      a: 'The Free plan ($0) includes 20MB media storage and full access to all 8 interactive streaming widgets (Video Alerts, Spinning Wheels, Soundboard, Leaderboard, Goals, Timer, Donations Alerts, Media Share) with a 10% platform fee on incoming tips. The Pro plan ($4.99/mo or $3.99/mo annual) eliminates the platform fee (0% fee - keep 100% of your earnings), expands storage to 10GB, and unlocks the Payment Gateway (custom ABA PayWay merchant credentials & direct Bakong KHQR) and GramJS Telegram group auto-listener.'
+      a: 'The Free plan ($0) includes 20MB media storage and full access to all 8 interactive streaming widgets (Video Alerts, Spinning Wheels, Soundboard, Leaderboard, Goals, Timer, Donations Alerts, Media Share) with a 10% platform fee on incoming tips. The Pro plan ($4.99/mo or $3.99/mo annual) eliminates the platform fee (0% fee - keep 100% of your earnings), removes the donation page watermark, expands storage to 500MB (supporting MP4, GIF, MP3, WAV, PNG, JPG & all formats), and unlocks the Payment Gateway (custom ABA PayWay merchant credentials & direct Bakong KHQR) and GramJS Telegram group auto-listener.'
     },
     {
       q: 'How does the Payment Gateway work in the Pro plan?',
@@ -314,7 +314,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                   </span>
                 </p>
               )}
-              <p className="text-xs text-slate-400">Exclusive Payment Gateway, GramJS Telegram Auto-Listener & 10GB storage.</p>
+              <p className="text-xs text-slate-400">Exclusive Payment Gateway, GramJS Telegram Auto-Listener & 500MB storage.</p>
             </div>
 
             <div className="h-px bg-purple-500/20 my-6" />
@@ -338,7 +338,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               </li>
               <li className="flex items-center gap-3 text-purple-300 font-semibold">
                 <Check size={16} className="text-purple-400 flex-shrink-0" />
-                <span>10GB Media Cloud Storage (High Capacity)</span>
+                <span>500MB Media Cloud Storage (MP4, GIF, MP3, WAV & All Formats)</span>
               </li>
               <li className="flex items-center gap-3">
                 <Check size={16} className="text-purple-400 flex-shrink-0" />
@@ -394,9 +394,9 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Media Storage Limit</td>
+                <td className="py-3.5 px-6 font-medium text-white">Media Storage Limit (MP4, GIF, MP3, WAV, All Formats)</td>
                 <td className="py-3.5 px-6 text-center text-cyan-400 font-bold">20MB</td>
-                <td className="py-3.5 px-6 text-center text-purple-400 font-bold">10GB</td>
+                <td className="py-3.5 px-6 text-center text-purple-400 font-bold">500MB</td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Platform Commission Cut</td>

@@ -1135,7 +1135,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       Current Plan: Free Plan (10% Platform Fee Cut Active)
                     </div>
                     <p className="text-xs text-slate-400">
-                      Upgrade to Pro Plan ($4.99/mo) to unlock the Payment Gateway (Custom ABA Merchant & Bakong direct settlement), GramJS Telegram auto-listener, 10GB storage, and keep 100% of your earnings with 0% fee!
+                      Upgrade to Pro Plan ($4.99/mo) to unlock the Payment Gateway (Custom ABA Merchant & Bakong direct settlement), GramJS Telegram auto-listener, 500MB storage, and keep 100% of your earnings with 0% fee!
                     </p>
                   </div>
                   <button
@@ -1440,7 +1440,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   </div>
                   <div className="flex items-center gap-2 text-slate-300">
                     <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                    <span>10GB Media Library Cloud Storage</span>
+                    <span>500MB Media Library Cloud Storage (All Formats)</span>
                   </div>
                 </div>
 
@@ -1693,7 +1693,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         }`}
                       >
-                        {currentPlan === 'pro' ? 'Pro (10GB)' : 'Free (20MB)'}
+                        {currentPlan === 'pro' ? 'Pro (500MB)' : 'Free (20MB)'}
                       </span>
                     </div>
 
@@ -1707,10 +1707,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         <span className="font-mono text-white font-bold">
                           {storageInfo
                             ? `${(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB / ${
-                                currentPlan === 'pro' ? '10GB' : '20MB'
+                                currentPlan === 'pro' ? '500MB' : '20MB'
                               }`
                             : currentPlan === 'pro'
-                            ? '0 MB / 10GB'
+                            ? '0 MB / 500MB'
                             : '0 MB / 20MB'}
                         </span>
                       </div>
@@ -1951,7 +1951,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </li>
                       <li className="flex items-center gap-2 text-purple-300 font-semibold">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
-                        <span>10GB Media Cloud Storage</span>
+                        <span>500MB Media Cloud Storage (MP4, GIF, MP3, WAV, All Formats)</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
