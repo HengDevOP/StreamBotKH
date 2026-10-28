@@ -3,6 +3,20 @@ import { getAuthenticatedUser } from '@/server/auth';
 import { db, isAdminEmail } from '@/server/database/db';
 import { getUsersCollection } from '@/server/database/mongo';
 
+const DEFAULT_PAGE_LIMIT = 20;
+const CACHE_TTL_MS = 30 * 1000; // 30s server-side cache to prevent DB overload
+
+interface CachedResponse {
+  timestamp: number;
+  payload: any;
+}
+
+const adminUsersCache = new Map<string, CachedResponse>();
+
+export function clearAdminUsersCache() {
+  adminUsersCache.clear();
+}
+
 function checkAdmin(req: NextRequest) {
   const authUser = getAuthenticatedUser(req);
   if (!authUser) return null;
@@ -20,6 +34,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: Admin access required (hchenheng@gmail.com)' }, { status: 403 });
     }
 
+    const searchParams = req.nextUrl.searchParams;
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || String(DEFAULT_PAGE_LIMIT), 10) || DEFAULT_PAGE_LIMIT));
+    const q = (searchParams.get('q') || searchParams.get('search') || '').trim().toLowerCase();
+    const planFilter = (searchParams.get('plan') || 'ALL').trim();
+    const forceRefresh = searchParams.get('refresh') === '1';
+
+    const cacheKey = `${page}:${limit}:${q}:${planFilter}`;
+    if (!forceRefresh) {
+      const cached = adminUsersCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return NextResponse.json({ ...cached.payload, fromCache: true });
+      }
+    }
+
     const rows = db.prepare(`
       SELECT id, email, username, display_name, avatar_url, bio, plan,
              plan_started_at, plan_expires_at, plan_duration_days,
@@ -29,7 +58,7 @@ export async function GET(req: NextRequest) {
     `).all() as any[];
 
     const now = Date.now();
-    const users = rows.map((r) => {
+    const allUsers = rows.map((r) => {
       let currentPlan = (r.plan || 'free').toLowerCase();
       let planStartedAt = r.plan_started_at || null;
       let planExpiresAt = r.plan_expires_at || null;
@@ -75,17 +104,49 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const proUsers = users.filter((u) => u.plan === 'pro').length;
-    const freeUsers = users.length - proUsers;
+    const proUsers = allUsers.filter((u) => u.plan === 'pro').length;
+    const freeUsers = allUsers.length - proUsers;
 
-    return NextResponse.json({
-      users,
+    // Filter by search query & plan filter
+    const filteredUsers = allUsers.filter((u) => {
+      const matchesSearch =
+        !q ||
+        (u.displayName && u.displayName.toLowerCase().includes(q)) ||
+        (u.username && u.username.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q));
+      const matchesPlan = planFilter === 'ALL' || u.plan === planFilter.toLowerCase();
+      return matchesSearch && matchesPlan;
+    });
+
+    const totalMatched = filteredUsers.length;
+    const totalPages = Math.max(1, Math.ceil(totalMatched / limit));
+    const safePage = Math.min(page, totalPages);
+    const startIndex = (safePage - 1) * limit;
+    const paginatedUsers = filteredUsers.slice(startIndex, startIndex + limit);
+
+    const payload = {
+      users: paginatedUsers,
+      pagination: {
+        page: safePage,
+        limit,
+        totalMatched,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPrevPage: safePage > 1
+      },
       summary: {
-        totalUsers: users.length,
+        totalUsers: allUsers.length,
         proUsers,
         freeUsers
       }
+    };
+
+    adminUsersCache.set(cacheKey, {
+      timestamp: Date.now(),
+      payload
     });
+
+    return NextResponse.json(payload);
   } catch (err: any) {
     console.error('[Admin Users GET] Error:', err);
     return NextResponse.json({ error: err.message || 'Failed to load users' }, { status: 500 });
@@ -139,6 +200,9 @@ export async function PUT(req: NextRequest) {
       SET plan = ?, plan_started_at = ?, plan_expires_at = ?, plan_duration_days = ?
       WHERE id = ?
     `).run(normalizedPlan, planStartedAt, planExpiresAt, planDurationDays, userId);
+
+    // Clear server cache when user plan changes
+    clearAdminUsersCache();
 
     // Sync to MongoDB Atlas
     try {
