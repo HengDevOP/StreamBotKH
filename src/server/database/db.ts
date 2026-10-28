@@ -75,6 +75,36 @@ try {
   `);
 } catch (e) {}
 
+// Platform Promotions table for Admin Panel (Pro Plan Promotional Pricing)
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS platform_promotions (
+      id TEXT PRIMARY KEY,
+      is_enabled INTEGER DEFAULT 0,
+      promo_title TEXT DEFAULT 'SPECIAL PROMOTION',
+      promo_price_usd REAL DEFAULT 2.99,
+      promo_price_khr INTEGER DEFAULT 12000,
+      original_price_usd REAL DEFAULT 4.99,
+      original_price_khr INTEGER DEFAULT 20000,
+      start_date TEXT,
+      end_date TEXT,
+      updated_by TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  const existingPromo = db.prepare('SELECT id FROM platform_promotions WHERE id = ?').get('pro_plan_promo');
+  if (!existingPromo) {
+    const now = new Date();
+    const nextMonth = new Date(now.getTime() + 31 * 24 * 60 * 60 * 1000);
+    db.prepare(`
+      INSERT INTO platform_promotions (
+        id, is_enabled, promo_title, promo_price_usd, promo_price_khr,
+        original_price_usd, original_price_khr, start_date, end_date
+      ) VALUES (?, 0, 'SPECIAL PROMOTION', 2.99, 12000, 4.99, 20000, ?, ?)
+    `).run('pro_plan_promo', now.toISOString(), nextMonth.toISOString());
+  }
+} catch (e) {}
+
 export const ADMIN_EMAILS = ['hchenheng@gmail.com'];
 
 export function isAdminEmail(email?: string | null): boolean {

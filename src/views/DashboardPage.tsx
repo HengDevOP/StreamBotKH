@@ -49,7 +49,8 @@ import {
   Timer,
   Users,
   GitPullRequest,
-  MessageSquare
+  MessageSquare,
+  Tag
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -80,7 +81,9 @@ import { TimerWidgetManager } from '../components/dashboard/TimerWidgetManager';
 import { SoundboardManager } from '../components/dashboard/SoundboardManager';
 import { AdminUsersManager } from '../components/dashboard/AdminUsersManager';
 import { AdminPullRequestsManager } from '../components/dashboard/AdminPullRequestsManager';
+import { AdminPromotionManager, PromotionConfig } from '../components/dashboard/AdminPromotionManager';
 import { MediaPickerModal } from '../components/dashboard/MediaPickerModal';
+import { request } from '../services/api';
 import { useModal } from '../context/ModalContext';
 import { useAudio } from '../hooks/useAudio';
 
@@ -109,7 +112,8 @@ export type DashboardTab =
   | 'security'
   | 'report-issue'
   | 'admin-users'
-  | 'admin-requests';
+  | 'admin-requests'
+  | 'admin-promotion';
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initialTab, initialSelectedId }) => {
   const { user, loading: authLoading, refreshUser, logout } = useAuth();
@@ -120,6 +124,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Desktop App Layout State
   const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab || 'overview');
   const [selectedDonationId, setSelectedDonationId] = useState<string | null>(initialSelectedId || null);
+  const [activePromo, setActivePromo] = useState<PromotionConfig | null>(null);
+
+  useEffect(() => {
+    request<PromotionConfig>('/promotions')
+      .then((data) => setActivePromo(data))
+      .catch(() => {});
+  }, [activeTab]);
 
   useEffect(() => {
     if (initialTab) {
@@ -598,6 +609,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 label: 'Pull Requests',
                 icon: GitPullRequest,
                 badge: null
+              },
+              {
+                id: 'admin-promotion' as DashboardTab,
+                label: 'Promotion Pricing',
+                icon: Tag,
+                badge: activePromo?.isActive ? 'LIVE' : null
               }
             ]
           }
@@ -1867,8 +1884,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       : 'border-slate-800 bg-[#0B0F19]'
                   }`}
                 >
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[9px] font-bold uppercase tracking-widest shadow-md shadow-purple-500/20">
-                    RECOMMENDED &bull; 0% FEE
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[9px] font-bold uppercase tracking-widest shadow-md shadow-purple-500/20 whitespace-nowrap">
+                    {activePromo?.isActive
+                      ? `${activePromo.promoTitle} • ${activePromo.discountPercent}% OFF`
+                      : 'RECOMMENDED • 0% FEE'}
                   </div>
 
                   <div className="flex-1 flex flex-col space-y-4">
@@ -1881,12 +1900,29 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       )}
                     </div>
                     <div>
-                      <div className="text-3xl font-extrabold text-white font-mono">
-                        $4.99 <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days (1 month)</span>
-                      </div>
+                      {activePromo?.isActive ? (
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-extrabold text-white font-mono">
+                            ${activePromo.promoPriceUsd.toFixed(2)}
+                          </span>
+                          <span className="text-sm font-mono text-slate-500 line-through">
+                            ${activePromo.originalPriceUsd.toFixed(2)}
+                          </span>
+                          <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days (1 month)</span>
+                        </div>
+                      ) : (
+                        <div className="text-3xl font-extrabold text-white font-mono">
+                          $4.99 <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days (1 month)</span>
+                        </div>
+                      )}
                       <div className="text-xs text-emerald-400 font-mono font-bold pt-1">
                         0% Platform Fee (Keep 100% of your earnings)
                       </div>
+                      {activePromo?.isActive && activePromo.endDate && (
+                        <div className="text-[11px] text-cyan-300 font-mono mt-1">
+                          Promo valid until {new Date(activePromo.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </div>
+                      )}
                       {currentPlan === 'pro' && user.planExpiresAt && (
                         <div className="text-[11px] text-purple-300 font-mono mt-1">
                           Expires: {new Date(user.planExpiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -1948,12 +1984,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           : 'bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-slate-950 shadow-lg shadow-purple-500/20 font-extrabold cursor-pointer'
                       }`}
                     >
-                      {currentPlan === 'pro' ? 'Active Plan (31d • 0% Fee)' : 'Upgrade to Pro ($4.99 / 31d)'}
+                      {currentPlan === 'pro'
+                        ? 'Active Plan (31d • 0% Fee)'
+                        : `Upgrade to Pro ($${activePromo?.isActive ? activePromo.promoPriceUsd.toFixed(2) : '4.99'} / 31d)`}
                     </button>
                   </div>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* ADMIN PANEL: PROMOTION PRICING                                 */}
+          {/* ============================================================== */}
+          {activeTab === 'admin-promotion' && isAdmin && (
+            <AdminPromotionManager />
           )}
 
           {/* ============================================================== */}
