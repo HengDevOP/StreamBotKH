@@ -297,6 +297,28 @@ try {
   `).run();
 } catch (e) {}
 
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pokemon_widget_settings (
+      streamer_token TEXT PRIMARY KEY,
+      youtube_url TEXT DEFAULT '',
+      listener_active INTEGER DEFAULT 0,
+      default_pokemon INTEGER DEFAULT 1,
+      allowed_pokemon TEXT DEFAULT '1,4,7,25,39,54,94,133,143,149,151,448',
+      bubble_duration INTEGER DEFAULT 8,
+      max_on_screen INTEGER DEFAULT 12,
+      walk_speed TEXT DEFAULT 'normal',
+      scale TEXT DEFAULT 'medium',
+      show_name INTEGER DEFAULT 1,
+      sound_enabled INTEGER DEFAULT 1,
+      theme TEXT DEFAULT 'transparent',
+      overlay_width INTEGER DEFAULT 1920,
+      overlay_height INTEGER DEFAULT 360,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+} catch (e) {}
+
 
 
 

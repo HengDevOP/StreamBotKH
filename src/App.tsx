@@ -22,6 +22,7 @@ import { StreamSoundboardOverlay } from './components/overlay/StreamSoundboardOv
 import { StreamGoalOverlay } from './components/overlay/StreamGoalOverlay';
 import { StreamLeaderboardOverlay } from './components/overlay/StreamLeaderboardOverlay';
 import { StreamTimerOverlay } from './components/overlay/StreamTimerOverlay';
+import { PokemonStreamOverlay } from './components/overlay/PokemonStreamOverlay';
 
 // Wrapper for Dashboard Page reading query parameters (?tab=...&id=...)
 function DashboardRouteWrapper() {
@@ -177,6 +178,23 @@ function TimerOverlayRouteWrapper() {
   );
 }
 
+// Wrapper for 2D Pokémon Stream Avatars Overlay
+function PokemonOverlayRouteWrapper() {
+  const { token } = useParams<{ token?: string }>();
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0 flex flex-col justify-end">
+      <style>{`
+        html, body, #root, main {
+          background: transparent !important;
+          background-color: transparent !important;
+          background-image: none !important;
+        }
+      `}</style>
+      <PokemonStreamOverlay token={token || ''} />
+    </div>
+  );
+}
+
 // Layout wrapper determining whether to display Navbar and Footer
 function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -272,12 +290,14 @@ function AppRoutes() {
         <Route path="/overlay/goal/:token" element={<GoalOverlayRouteWrapper />} />
         <Route path="/overlay/leaderboard/:token" element={<LeaderboardOverlayRouteWrapper />} />
         <Route path="/overlay/timer/:token" element={<TimerOverlayRouteWrapper />} />
+        <Route path="/overlay/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
 
         {/* Widget Aliases */}
         <Route path="/widget/soundboard/:token" element={<SoundboardOverlayRouteWrapper />} />
         <Route path="/widget/goal/:token" element={<GoalOverlayRouteWrapper />} />
         <Route path="/widget/leaderboard/:token" element={<LeaderboardOverlayRouteWrapper />} />
         <Route path="/widget/timer/:token" element={<TimerOverlayRouteWrapper />} />
+        <Route path="/widget/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
       </Routes>
     </AppLayout>
   );

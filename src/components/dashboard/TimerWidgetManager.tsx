@@ -304,30 +304,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
             Display a live stream countdown timer that automatically extends whenever viewers donate (e.g. $1 = +10 mins).
           </p>
         </div>
-
-        {/* OBS URL Box */}
-        <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 max-w-md w-full sm:w-auto">
-          <Monitor size={14} className="text-cyan-400 flex-shrink-0" />
-          <span className="text-[11px] font-mono text-slate-400 truncate flex-1">
-            {obsUrl}
-          </span>
-          <button
-            onClick={copyObsUrl}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-mono transition-colors"
-          >
-            {copiedUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-            <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
-          </button>
-          <a
-            href={obsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-            title="Open in new window"
-          >
-            <ExternalLink size={13} />
-          </a>
-        </div>
       </div>
 
       {/* ============================================================== */}

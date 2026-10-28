@@ -220,21 +220,6 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
             Allow viewers to submit and play YouTube video clips on your stream when tipping via ABA PayWay or Bakong KHQR.
           </p>
         </div>
-
-        {/* OBS Browser Source URL Box */}
-        <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 max-w-md w-full sm:w-auto">
-          <Monitor size={14} className="text-cyan-400 flex-shrink-0" />
-          <span className="text-[11px] font-mono text-slate-400 truncate flex-1">
-            {obsUrl}
-          </span>
-          <button
-            onClick={copyObsUrl}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-mono transition-colors"
-          >
-            {copiedUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-            <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
-          </button>
-        </div>
       </div>
 
       {/* ============================================================== */}

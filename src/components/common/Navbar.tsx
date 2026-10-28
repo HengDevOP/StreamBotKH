@@ -3,8 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Bot,
-  ExternalLink,
   LogOut,
   Menu,
   X,
@@ -153,6 +151,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
       loginWithGoogleRedirect();
       return;
     }
+    if (key === 'home' || path === '/') {
+      if (pathname === '/') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
     if (onNavigate) {
       onNavigate(key, params);
     } else {
@@ -186,13 +189,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
   return (
     <header className="sticky top-0 z-50 w-full bg-[#070A12]/95 backdrop-blur-md border-b border-white/[0.08]">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-15 sm:h-18">
+        <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Left: Mobile Menu Toggle + Logo + Title ("streambotkh.com") + Nav Menu */}
-          <div className="flex items-center gap-2 sm:gap-6 lg:gap-8 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 min-w-0">
             {/* Mobile menu toggle on the left side */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors flex-shrink-0"
+              className="md:hidden p-1.5 sm:p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors flex-shrink-0"
               aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -202,45 +205,51 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             <Link
               to="/"
               onClick={(e) => {
+                if (pathname === '/') {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
                 if (onNavigate) {
                   e.preventDefault();
                   onNavigate('home');
                 }
               }}
-              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0"
+              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0 mr-1 sm:mr-2"
             >
-              <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center flex-shrink-0">
+              <div className="relative w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center flex-shrink-0">
                 <img
                   src="/images/logo-192.png"
                   alt="streambotkh.com logo"
-                  className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow-[0_0_10px_rgba(0,240,255,0.4)] group-hover:scale-105 group-hover:drop-shadow-[0_0_14px_rgba(0,240,255,0.6)] transition-all duration-200"
+                  className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)] group-hover:scale-105 group-hover:drop-shadow-[0_0_12px_rgba(0,240,255,0.6)] transition-all duration-200"
                 />
               </div>
 
               <div className="flex items-center min-w-0">
-                <span className="text-lg xs:text-xl sm:text-2xl font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
+                <span className="text-base sm:text-lg font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
                   streambot<span className="text-cyan-400">kh</span>
                 </span>
-                <span className="hidden xxs:inline text-xs font-mono font-semibold text-slate-400 ml-0.5">
+                <span className="hidden xxs:inline text-[10px] sm:text-xs font-mono font-semibold text-slate-400 ml-0.5">
                   .com
                 </span>
               </div>
             </Link>
 
             {/* Nav Menu directly after the title with own route page links */}
-            <nav className="hidden md:flex items-center gap-1 pl-4 border-l border-slate-800">
+            <nav className="hidden md:flex items-center gap-1 lg:gap-1.5 pl-3 lg:pl-4 border-l border-slate-800/80">
               {/* 1. Home Route (/) */}
               <Link
                 to="/"
                 onClick={(e) => {
+                  if (pathname === '/') {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
                   if (onNavigate) {
                     e.preventDefault();
                     onNavigate('home');
                   }
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+                className={`px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
                   active('/', 'home')
-                    ? 'text-white bg-white/[0.08]'
+                    ? 'text-white bg-white/[0.08] shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
@@ -255,9 +264,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
               >
                 <button
                   onClick={() => handleNav('/resources', 'resources')}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+                  className={`flex items-center gap-1 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
                     active('/resources', 'resources') || dropdownOpen
-                      ? 'text-white bg-white/[0.08]'
+                      ? 'text-white bg-white/[0.08] shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
                   }`}
                 >
@@ -272,14 +281,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
                 {/* Dropdown Menu */}
                 {dropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-[480px] p-3 rounded-2xl bg-[#090D18]/95 backdrop-blur-2xl border border-slate-800 shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-2 py-1.5 mb-2 border-b border-slate-800/80 flex items-center justify-between">
+                  <div className="absolute top-full left-0 mt-2 w-[440px] sm:w-[460px] p-2.5 rounded-2xl bg-[#090D18]/95 backdrop-blur-2xl border border-slate-800 shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-2 py-1 mb-1.5 border-b border-slate-800/80 flex items-center justify-between">
                       <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-                        STREAMBOTKH FEATURES & OVERLAYS
+                        STREAMBOTKH FEATURES &amp; OVERLAYS
                       </span>
                       <button
                         onClick={() => handleNav('/resources', 'resources')}
-                        className="text-[10px] font-mono text-cyan-400 hover:underline"
+                        className="text-[10px] font-mono text-cyan-400 hover:underline font-semibold"
                       >
                         View All Docs →
                       </button>
@@ -294,23 +303,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                             onClick={() => {
                               handleNav(`/resources/${item.slug}`, `resources/${item.slug}`);
                             }}
-                            className="p-2.5 rounded-xl hover:bg-white/[0.05] border border-transparent hover:border-slate-800 cursor-pointer transition-all group"
+                            className="p-2 rounded-xl hover:bg-white/[0.05] border border-transparent hover:border-slate-800/80 cursor-pointer transition-all group"
                           >
                             <div className="flex items-start gap-2.5">
                               <div
-                                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
                                 style={{
                                   backgroundColor: `${item.color}15`,
                                   color: item.color
                                 }}
                               >
-                                <IconComponent size={16} />
+                                <IconComponent size={15} />
                               </div>
-                              <div className="space-y-0.5">
-                                <div className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">
                                   {item.title}
                                 </div>
-                                <div className="text-[11px] text-slate-400 leading-tight">
+                                <div className="text-[11px] text-slate-400 leading-tight line-clamp-1">
                                   {item.sub}
                                 </div>
                               </div>
@@ -332,9 +341,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                     onNavigate('pricing');
                   }
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+                className={`px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
                   active('/pricing', 'pricing')
-                    ? 'text-white bg-white/[0.08]'
+                    ? 'text-white bg-white/[0.08] shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
@@ -346,7 +355,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 href="https://t.me/streambotkh"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors text-slate-400 hover:text-[#229ED9] hover:bg-white/[0.04]"
+                className="flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors text-slate-400 hover:text-[#229ED9] hover:bg-white/[0.04]"
               >
                 <TelegramIcon />
                 <span>Telegram</span>
@@ -361,9 +370,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                     onNavigate('discord');
                   }
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+                className={`flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
                   active('/discord', 'discord')
-                    ? 'text-[#5865F2] bg-[#5865F2]/10 border border-[#5865F2]/30'
+                    ? 'text-[#5865F2] bg-[#5865F2]/10 border border-[#5865F2]/30 shadow-sm'
                     : 'text-slate-400 hover:text-[#5865F2] hover:bg-white/[0.04]'
                 }`}
               >
@@ -381,24 +390,24 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                       onNavigate('dashboard');
                     }
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ml-1 ${
+                  className={`flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ml-1 ${
                     active('/dashboard', 'dashboard')
-                      ? 'text-cyan-400 bg-cyan-950/40 border border-cyan-500/40'
+                      ? 'text-cyan-400 bg-cyan-950/40 border border-cyan-500/40 shadow-sm'
                       : 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.04]'
                   }`}
                 >
                   <span>Dashboard</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f0ff]" />
                 </Link>
               )}
             </nav>
           </div>
 
           {/* Right Section: Sign in with Google / Profile */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             {/* User authenticated or Sign In with Google */}
             {user ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <Link
                   to="/dashboard"
                   onClick={(e) => {
@@ -407,12 +416,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                       onNavigate('dashboard');
                     }
                   }}
-                  className="flex items-center gap-2.5 p-1.5 pr-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors"
+                  className="flex items-center gap-2 p-1.5 pr-2.5 sm:pr-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors"
                 >
                   <img
                     src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
                     alt={user.displayName}
-                    className="w-7 h-7 rounded-lg bg-slate-800 object-cover"
+                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-slate-800 object-cover ring-1 ring-white/10"
                   />
                   <div className="hidden sm:block text-left">
                     <div className="text-xs font-bold text-white leading-tight">
@@ -427,9 +436,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 <button
                   onClick={logout}
                   title="Sign Out"
-                  className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/50 hover:text-red-400 text-slate-400 transition-colors"
+                  className="p-1.5 sm:p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/50 hover:text-red-400 text-slate-400 transition-colors cursor-pointer"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={15} />
                 </button>
               </div>
             ) : (
@@ -440,7 +449,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                     e.preventDefault();
                     loginWithGoogleRedirect();
                   }}
-                  className="group relative inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.25] text-white text-xs font-medium transition-all duration-200 cursor-pointer flex-shrink-0"
+                  className="group relative inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] hover:border-white/[0.25] text-white text-xs font-semibold transition-all duration-200 cursor-pointer flex-shrink-0 shadow-sm"
                 >
                   <GoogleIcon />
                   <span className="hidden sm:inline">Sign in with Google</span>
@@ -455,13 +464,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#070A12] border-b border-slate-800 px-4 py-3 space-y-1 animate-fadeIn">
+        <div className="md:hidden bg-[#070A12]/98 border-b border-slate-800 px-4 py-3 space-y-1 animate-fadeIn shadow-2xl">
           <button
             onClick={() => handleNav('/', 'home')}
             className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold ${
               active('/', 'home')
                 ? 'text-white bg-white/[0.08]'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
             Home
@@ -471,27 +480,27 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
           <div>
             <button
               onClick={() => setMobileResourcesOpen(!mobileResourcesOpen)}
-              className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white flex items-center justify-between"
+              className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.04] flex items-center justify-between"
             >
-              <span>Resources & Features</span>
+              <span>Resources &amp; Features</span>
               <ChevronDown
                 size={14}
-                className={`transition-transform ${mobileResourcesOpen ? 'rotate-180 text-cyan-400' : ''}`}
+                className={`transition-transform duration-200 ${mobileResourcesOpen ? 'rotate-180 text-cyan-400' : 'text-slate-500'}`}
               />
             </button>
 
             {mobileResourcesOpen && (
-              <div className="pl-4 pr-1 py-1 space-y-1">
+              <div className="pl-3 pr-1 py-1 space-y-1 border-l border-slate-800 ml-3 my-1">
                 {RESOURCE_FEATURES.map((item) => (
                   <button
                     key={item.title}
                     onClick={() => {
                       handleNav(`/resources/${item.slug}`, `resources/${item.slug}`);
                     }}
-                    className="w-full text-left px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:text-cyan-400 hover:bg-slate-800/60 flex items-center justify-between"
+                    className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-cyan-400 hover:bg-slate-800/60 flex items-center justify-between"
                   >
                     <span>{item.title}</span>
-                    <span className="text-[10px] text-slate-500 font-mono truncate max-w-[160px]">
+                    <span className="text-[10px] text-slate-500 font-mono truncate max-w-[140px]">
                       {item.sub}
                     </span>
                   </button>
@@ -505,7 +514,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold ${
               active('/pricing', 'pricing')
                 ? 'text-white bg-white/[0.08]'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
             Pricing
@@ -515,7 +524,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             href="https://t.me/streambotkh"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 text-slate-400 hover:text-[#229ED9]"
+            onClick={() => setMobileMenuOpen(false)}
+            className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 text-slate-300 hover:text-[#229ED9] hover:bg-white/[0.04]"
           >
             <TelegramIcon />
             <span>Telegram Channel (t.me/streambotkh)</span>
@@ -526,7 +536,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 ${
               active('/discord', 'discord')
                 ? 'text-[#5865F2] bg-[#5865F2]/10'
-                : 'text-slate-400 hover:text-[#5865F2]'
+                : 'text-slate-300 hover:text-[#5865F2] hover:bg-white/[0.04]'
             }`}
           >
             <DiscordIcon />
@@ -536,9 +546,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
           {user && (
             <button
               onClick={() => handleNav('/dashboard', 'dashboard')}
-              className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-cyan-400 hover:bg-slate-800"
+              className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-cyan-400 hover:bg-cyan-950/30 flex items-center justify-between"
             >
-              Streamer Dashboard
+              <span>Streamer Dashboard</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
             </button>
           )}
 
@@ -551,7 +562,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                   setMobileMenuOpen(false);
                   loginWithGoogleRedirect();
                 }}
-                className="w-full py-2.5 px-3 rounded-xl bg-white/[0.06] border border-white/[0.12] text-white font-medium text-xs flex items-center justify-center gap-2.5 cursor-pointer"
+                className="w-full py-2 px-3 rounded-xl bg-white/[0.08] border border-white/[0.12] text-white font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <GoogleIcon />
                 <span>Sign in with Google</span>

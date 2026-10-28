@@ -55,7 +55,8 @@ import {
   Tag,
   Link as LinkIcon,
   Plus,
-  Globe
+  Globe,
+  Gamepad2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -83,6 +84,7 @@ import { LeaderboardWidgetManager } from '../components/dashboard/LeaderboardWid
 import { GoalWidgetManager } from '../components/dashboard/GoalWidgetManager';
 import { SpinningWheelManager } from '../components/dashboard/SpinningWheelManager';
 import { VideoAlertsManager } from '../components/dashboard/VideoAlertsManager';
+import { PokemonWidgetManager } from '../components/dashboard/PokemonWidgetManager';
 import { ProUpgradeModal } from '../components/dashboard/ProUpgradeModal';
 import { TimerWidgetManager } from '../components/dashboard/TimerWidgetManager';
 import { SoundboardManager } from '../components/dashboard/SoundboardManager';
@@ -112,6 +114,7 @@ export type DashboardTab =
   | 'leaderboard'
   | 'goal'
   | 'wheel'
+  | 'pokemon'
   | 'payments'
   | 'telegram'
   | 'account'
@@ -375,6 +378,125 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const publicDonateUrl = `${origin}/@${user?.username || 'neonstreamer'}`;
   const overlayUrl = `${origin}/overlay/${user?.overlayToken || ''}`;
+
+  // Dynamic OBS Browser Source Configuration for the Dashboard Navbar
+  const currentObsConfig = useMemo(() => {
+    const effectiveToken = user?.overlayToken || 'demo_token';
+
+    switch (activeTab) {
+      case 'goal':
+        return {
+          featureKey: 'goal',
+          label: 'Goals OBS',
+          shortLabel: 'Goal',
+          url: `${origin}/overlay/goal/${effectiveToken}`,
+          icon: Target,
+          color: '#10B981', // Emerald
+          bgGlow: 'hover:border-emerald-500/50',
+          copyMessage: 'Copied Goals OBS URL!'
+        };
+      case 'donation':
+      case 'alerts':
+      case 'donations':
+        return {
+          featureKey: 'donation',
+          label: 'Donation Alerts OBS',
+          shortLabel: 'Alerts',
+          url: `${origin}/overlay/${effectiveToken}`,
+          icon: Bell,
+          color: '#00F0FF', // Cyan
+          bgGlow: 'hover:border-cyan-500/50',
+          copyMessage: 'Copied Donation Alerts OBS URL!'
+        };
+      case 'leaderboard':
+        return {
+          featureKey: 'leaderboard',
+          label: 'Leaderboard OBS',
+          shortLabel: 'Leaderboard',
+          url: `${origin}/overlay/leaderboard/${effectiveToken}`,
+          icon: Trophy,
+          color: '#F59E0B', // Amber
+          bgGlow: 'hover:border-amber-500/50',
+          copyMessage: 'Copied Leaderboard OBS URL!'
+        };
+      case 'timer':
+        return {
+          featureKey: 'timer',
+          label: 'Subathon Timer OBS',
+          shortLabel: 'Timer',
+          url: `${origin}/overlay/timer/${effectiveToken}`,
+          icon: Timer,
+          color: '#F97316', // Orange
+          bgGlow: 'hover:border-orange-500/50',
+          copyMessage: 'Copied Timer OBS URL!'
+        };
+      case 'soundboard':
+        return {
+          featureKey: 'soundboard',
+          label: 'Soundboard OBS',
+          shortLabel: 'Soundboard',
+          url: `${origin}/overlay/soundboard/${effectiveToken}`,
+          icon: Volume2,
+          color: '#10B981', // Emerald
+          bgGlow: 'hover:border-emerald-500/50',
+          copyMessage: 'Copied Soundboard OBS URL!'
+        };
+      case 'video-alerts':
+        return {
+          featureKey: 'video-alerts',
+          label: 'Video Alerts OBS',
+          shortLabel: 'Video',
+          url: `${origin}/overlay/video/${effectiveToken}`,
+          icon: Video,
+          color: '#EC4899', // Pink
+          bgGlow: 'hover:border-pink-500/50',
+          copyMessage: 'Copied Video Alerts OBS URL!'
+        };
+      case 'wheel':
+        return {
+          featureKey: 'wheel',
+          label: 'Wheel OBS',
+          shortLabel: 'Wheel',
+          url: `${origin}/widget/wheel/${effectiveToken}`,
+          icon: Disc,
+          color: '#8B5CF6', // Purple
+          bgGlow: 'hover:border-purple-500/50',
+          copyMessage: 'Copied Wheel OBS URL!'
+        };
+      case 'pokemon':
+        return {
+          featureKey: 'pokemon',
+          label: '2D Pokémon OBS',
+          shortLabel: 'Pokémon',
+          url: `${origin}/overlay/pokemon/${effectiveToken}`,
+          icon: Gamepad2,
+          color: '#10B981', // Bulbasaur Emerald/Cyan
+          bgGlow: 'hover:border-emerald-500/50',
+          copyMessage: 'Copied 2D Pokémon OBS URL!'
+        };
+      default:
+        return {
+          featureKey: 'default',
+          label: 'OBS Browser Source',
+          shortLabel: 'OBS',
+          url: `${origin}/overlay/${effectiveToken}`,
+          icon: Monitor,
+          color: '#00F0FF', // Cyan
+          bgGlow: 'hover:border-cyan-500/50',
+          copyMessage: 'Copied OBS Browser Source URL!'
+        };
+    }
+  }, [activeTab, user?.overlayToken, origin]);
+
+  const [copiedObsUrl, setCopiedObsUrl] = useState(false);
+  const handleCopyCurrentObsUrl = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(currentObsConfig.url);
+      setCopiedObsUrl(true);
+      playSynthNeonChime(0.6);
+      setTimeout(() => setCopiedObsUrl(false), 2000);
+    }
+  };
 
   const handleCopyDonateLink = () => {
     navigator.clipboard.writeText(publicDonateUrl);
@@ -821,6 +943,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           icon: Disc,
           badge: null,
           isLocked: currentPlan === 'free' && !isAdmin
+        },
+        {
+          id: 'pokemon' as DashboardTab,
+          label: '2D Pokémon',
+          icon: Gamepad2,
+          badge: 'NEW',
+          isLocked: currentPlan === 'free' && !isAdmin
         }
       ]
     },
@@ -1085,16 +1214,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
                   />
                 </div>
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center leading-tight">
-                    <span className="text-base font-bold tracking-tight text-white font-['Chakra_Petch']">
-                      streambot<span className="text-cyan-400">kh</span>
-                    </span>
-                    <span className="text-xs font-mono text-slate-500 ml-0.5">.com</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-400 tracking-wider uppercase mt-0.5 font-medium">
-                    Streamer Workstation
+                <div className="flex items-center min-w-0 leading-tight">
+                  <span className="text-base font-bold tracking-tight text-white font-['Chakra_Petch']">
+                    streambot<span className="text-cyan-400">kh</span>
                   </span>
+                  <span className="text-xs font-mono text-slate-500 ml-0.5">.com</span>
                 </div>
               </button>
               <button
@@ -1144,16 +1268,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               />
             </div>
             {!sidebarCollapsed && (
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center leading-tight">
-                  <span className="text-base font-bold tracking-tight text-white font-['Chakra_Petch']">
-                    streambot<span className="text-cyan-400">kh</span>
-                  </span>
-                  <span className="text-xs font-mono text-slate-500 ml-0.5">.com</span>
-                </div>
-                <span className="text-[10px] font-mono text-slate-400 tracking-wider uppercase mt-0.5 font-medium">
-                  Streamer Workstation
+              <div className="flex items-center min-w-0 leading-tight">
+                <span className="text-base font-bold tracking-tight text-white font-['Chakra_Petch']">
+                  streambot<span className="text-cyan-400">kh</span>
                 </span>
+                <span className="text-xs font-mono text-slate-500 ml-0.5">.com</span>
               </div>
             )}
           </button>
@@ -1170,9 +1289,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       {/* WORKBENCH & MAIN CONTENT AREA                                  */}
       {/* ============================================================== */}
       <main className="flex-1 h-full overflow-y-auto min-w-0 flex flex-col bg-[#060911]">
-        {/* Top Desktop Application Header Bar (Spacious Executive Header) */}
-        <header className="sticky top-0 z-20 h-16 sm:h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-8 flex items-center justify-between gap-2.5 sm:gap-4 flex-shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+        {/* Top Desktop Application Header Bar (Executive Workbench Header) */}
+        <header className="sticky top-0 z-20 h-16 sm:h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-shrink-0">
             {/* Mobile Menu Hamburger */}
             <button
               onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
@@ -1191,6 +1310,79 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 <h1 className="text-sm xs:text-base sm:text-lg font-black text-white font-['Chakra_Petch'] tracking-tight truncate">
                   {currentTabTitle}
                 </h1>
+              </div>
+            </div>
+          </div>
+
+          {/* DYNAMIC OBS BROWSER SOURCE BAR (Dynamic Target Feature Overlay Deck) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 max-w-xs sm:max-w-md lg:max-w-xl mx-1.5 sm:mx-4 min-w-0 justify-center">
+            <div
+              className={`w-full flex items-center justify-between gap-1.5 sm:gap-2.5 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-slate-950/90 border border-slate-800 shadow-inner transition-all ${currentObsConfig.bgGlow}`}
+            >
+              {/* Feature Icon + Badge & URL */}
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform"
+                  style={{
+                    backgroundColor: `${currentObsConfig.color}20`,
+                    color: currentObsConfig.color
+                  }}
+                  title={currentObsConfig.label}
+                >
+                  {React.createElement(currentObsConfig.icon, { size: 14, className: 'sm:w-4 sm:h-4' })}
+                </div>
+
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span
+                    className="hidden xl:inline text-[11px] font-mono font-bold uppercase tracking-wider shrink-0"
+                    style={{ color: currentObsConfig.color }}
+                  >
+                    {currentObsConfig.shortLabel}:
+                  </span>
+                  <span
+                    onClick={handleCopyCurrentObsUrl}
+                    className="text-[11px] font-mono text-slate-300 hover:text-white truncate cursor-pointer select-all"
+                    title={`Click to copy: ${currentObsConfig.url}`}
+                  >
+                    {currentObsConfig.url}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons: Copy Icon Button + External Link */}
+              <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCopyCurrentObsUrl}
+                  className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl font-mono text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                    copiedObsUrl
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750 hover:border-slate-600'
+                  }`}
+                  title={copiedObsUrl ? 'Copied to Clipboard!' : `Copy ${currentObsConfig.label} URL`}
+                >
+                  {copiedObsUrl ? (
+                    <>
+                      <Check size={13} className="text-emerald-400 flex-shrink-0" />
+                      <span className="hidden xs:inline text-[11px] text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={13} className="text-slate-400 hover:text-cyan-400 flex-shrink-0" />
+                      <span className="hidden md:inline text-[11px]">Copy URL</span>
+                    </>
+                  )}
+                </button>
+
+                <a
+                  href={currentObsConfig.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-400 hover:text-white transition-colors flex-shrink-0"
+                  title="Open OBS Overlay in new tab"
+                >
+                  <ExternalLink size={13} className="sm:w-3.5 sm:h-3.5" />
+                </a>
               </div>
             </div>
           </div>
@@ -1260,7 +1452,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               )}
 
               {/* Streamer Quick Access Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 <div
                   onClick={() => {
                     setActiveTab('donation');
@@ -1357,6 +1549,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     )}
                   </div>
                   <p className="text-xs text-slate-400">Interactive stream wheel simulator and giveaway rewards for donors.</p>
+                </div>
+
+                <div
+                  onClick={() => {
+                    if (currentPlan === 'free' && !isAdmin) {
+                      setUpgradeFeatureName('2D Pokémon');
+                      setIsVideoUpgradeModalOpen(true);
+                      return;
+                    }
+                    setActiveTab('pokemon');
+                    if (typeof window !== 'undefined') {
+                      window.history.pushState(null, '', '/dashboard?tab=pokemon');
+                    }
+                  }}
+                  className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 hover:border-emerald-500/50 cursor-pointer transition-colors space-y-2 group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-400 font-mono">2D CHAT AVATARS</span>
+                    <Gamepad2 size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                  </div>
+                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <span>2D Pokémon Pets</span>
+                    {currentPlan === 'free' && !isAdmin ? (
+                      <Lock size={13} className="text-amber-400" />
+                    ) : (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
+                        PRO
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400">Bulbasaur &amp; popular Pokémon roam screen on YouTube live comments.</p>
                 </div>
               </div>
 
@@ -1575,6 +1798,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               isLocked={false}
               onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
             />
+          )}
+
+          {activeTab === 'pokemon' && (currentPlan !== 'free' || isAdmin) && (
+            <PokemonWidgetManager streamerToken={user?.overlayToken} />
           )}
 
           {/* ============================================================== */}

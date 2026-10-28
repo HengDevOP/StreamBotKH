@@ -105,58 +105,6 @@ export const SpinningWheelManager: React.FC<SpinningWheelManagerProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* OBS Browser Source URL Card */}
-      <Card className="p-5 sm:p-6 bg-[#090D18] border border-purple-500/20 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Disc size={16} className="text-purple-400" />
-              <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                Wheels OBS Browser Source
-              </h3>
-              {isLocked ? (
-                <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold">
-                  <Lock size={10} />
-                  PRO ONLY
-                </span>
-              ) : (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold">
-                  PRO ACTIVE
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-400">
-              Interactive stream wheel widget that automatically spins when a viewer sends a qualifying donation tip.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={copyObsUrl}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-400 hover:bg-purple-300 text-slate-950 font-bold text-xs transition-all shadow-[0_0_15px_rgba(168,85,247,0.25)]"
-            >
-              {copiedUrl ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedUrl ? 'Copied URL!' : 'Copy Wheel URL'}</span>
-            </button>
-            <a
-              href={obsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors"
-              title="Open Wheel Widget"
-            >
-              <ExternalLink size={15} />
-            </a>
-          </div>
-        </div>
-
-        <input
-          type="text"
-          readOnly
-          value={obsUrl}
-          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs select-all focus:outline-none"
-        />
-      </Card>
-
       {/* Pro Locked Callout Banner */}
       {isLocked && (
         <div className="p-6 sm:p-7 rounded-2xl bg-gradient-to-br from-amber-950/30 via-slate-900/80 to-slate-950 border border-amber-500/30 relative overflow-hidden">

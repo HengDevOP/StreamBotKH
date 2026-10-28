@@ -510,59 +510,8 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   return (
     <div className="space-y-6">
       {/* ============================================================== */}
-      {/* 1. OBS BROWSER SOURCE URL CARD & ACTIVE GOAL BANNER            */}
+      {/* 1. ACTIVE GOAL LIVE OBS PREVIEW & 20-TEMPLATE SWITCHER         */}
       {/* ============================================================== */}
-      <Card className="p-5 sm:p-6 bg-[#090D18] border border-emerald-500/20 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                <Target size={16} />
-              </div>
-              <h3 className="text-base font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                Goals OBS Browser Source
-              </h3>
-              {activeGoal && (
-                <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  ACTIVE: {activeGoal.title} ({currentTemplate.name})
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-400">
-              Embed a glowing donation goal progress bar widget directly into OBS Studio. 20 unique template styles available!
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={copyObsUrl}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)]"
-            >
-              {copiedUrl ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedUrl ? 'Copied OBS URL!' : 'Copy Goal URL'}</span>
-            </button>
-            <a
-              href={obsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors"
-              title="Open Goal Overlay in New Tab"
-            >
-              <ExternalLink size={15} />
-            </a>
-          </div>
-        </div>
-
-        <input
-          type="text"
-          readOnly
-          value={obsUrl}
-          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs select-all focus:outline-none"
-        />
-      </Card>
-
-      {/* ============================================================== */}
-      {/* 2. ACTIVE GOAL LIVE OBS PREVIEW & 20-TEMPLATE SWITCHER         */}
       {/* ============================================================== */}
       {activeGoal && (
         <Card className="p-5 sm:p-6 bg-[#090D18] border border-slate-800 space-y-5">

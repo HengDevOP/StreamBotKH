@@ -37,6 +37,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const publicDir = path.resolve(process.cwd(), 'public');
 app.use('/sounds', express.static(path.join(publicDir, 'sounds')));
 app.use('/uploads', express.static(path.join(publicDir, 'uploads')));
+app.use('/assets', express.static(path.join(publicDir, 'assets')));
 
 /**
  * Adapter bridging Express Request/Response to Next.js Web standard Request/Response handlers

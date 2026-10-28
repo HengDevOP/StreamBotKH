@@ -269,48 +269,6 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
   // ====================================================================
   return (
     <div className="space-y-6">
-      {/* OBS Browser Source URL Card */}
-      <Card className="p-5 sm:p-6 bg-[#090D18] border border-cyan-500/20 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                OBS Studio Browser Source URL
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400">
-              Paste this URL into OBS Studio as a Browser Source. It automatically matches incoming tips to your condition alert boxes.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={copyObsUrl}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs transition-all shadow-[0_0_15px_rgba(0,240,255,0.25)]"
-            >
-              {copiedUrl ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedUrl ? 'Copied URL!' : 'Copy OBS URL'}</span>
-            </button>
-            <a
-              href={obsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors"
-              title="Open OBS overlay page"
-            >
-              <ExternalLink size={15} />
-            </a>
-          </div>
-        </div>
-
-        <input
-          type="text"
-          readOnly
-          value={obsUrl}
-          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs select-all focus:outline-none"
-        />
-      </Card>
-
       {/* Donation Alert Boxes Section Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

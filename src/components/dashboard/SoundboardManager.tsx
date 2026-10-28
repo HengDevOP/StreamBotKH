@@ -806,41 +806,6 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
             </button>
           </div>
         </div>
-
-        {/* OBS Browser Source URL Bar */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-            <Radio size={14} className="text-cyan-400" />
-            <span>OBS Browser Source URL:</span>
-            <span className="text-slate-300 truncate max-w-xs md:max-w-md bg-slate-950 px-2 py-0.5 rounded border border-slate-800 select-all">
-              {obsUrl}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(obsUrl);
-                setCopiedUrl(true);
-                setTimeout(() => setCopiedUrl(false), 2000);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-xs font-mono text-cyan-400 transition-colors"
-            >
-              {copiedUrl ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-              <span>{copiedUrl ? 'Copied!' : 'Copy OBS URL'}</span>
-            </button>
-
-            <a
-              href={obsUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="p-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors"
-              title="Open test overlay in new window"
-            >
-              <ExternalLink size={14} />
-            </a>
-          </div>
-        </div>
       </div>
 
       {/* 2. Filter & Search Bar */}

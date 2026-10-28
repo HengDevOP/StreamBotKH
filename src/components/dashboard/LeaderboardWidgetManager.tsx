@@ -174,48 +174,6 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
 
   return (
     <div className="space-y-6">
-      {/* OBS Browser Source URL Card */}
-      <Card className="p-5 sm:p-6 bg-[#090D18] border border-amber-500/30 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Trophy size={18} className="text-amber-400" />
-              <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                Top Donors Leaderboard OBS Widget
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400">
-              Embed a live, automatically updated top supporters leaderboard directly into OBS Studio. Supports 20 custom styles and 1 to 10 donors.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={copyObsUrl}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition-all shadow-[0_0_15px_rgba(251,191,36,0.25)]"
-            >
-              {copiedUrl ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedUrl ? 'Copied URL!' : 'Copy Leaderboard URL'}</span>
-            </button>
-            <a
-              href={obsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors"
-              title="Open Live Leaderboard Overlay"
-            >
-              <ExternalLink size={15} />
-            </a>
-          </div>
-        </div>
-
-        <input
-          type="text"
-          readOnly
-          value={obsUrl}
-          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-xs select-all focus:outline-none"
-        />
-      </Card>
-
       {/* Main Settings & Live Preview Split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* ============================================================== */}
