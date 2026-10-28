@@ -162,27 +162,47 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { userId, plan, durationDays = 31, action, isVerified } = body;
+    const { userId, id, username, email, plan, durationDays = 31, action, isVerified } = body;
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const lookupKey = userId || id || username || email;
+    if (!lookupKey) {
+      return NextResponse.json(
+        { error: 'User identifier is required (userId, id, username, or email)' },
+        { status: 400 }
+      );
     }
 
-    const target = db.prepare('SELECT * FROM streamers WHERE id = ?').get(userId) as any;
+    let target: any = null;
+    if (userId || id) {
+      target = db.prepare('SELECT * FROM streamers WHERE id = ?').get(userId || id);
+    }
+    if (!target && username) {
+      target = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE').get(username);
+    }
+    if (!target && email) {
+      target = db.prepare('SELECT * FROM streamers WHERE email = ? COLLATE NOCASE').get(email);
+    }
+    if (!target) {
+      target = db
+        .prepare('SELECT * FROM streamers WHERE id = ? OR username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE')
+        .get(lookupKey, lookupKey, lookupKey);
+    }
+
     if (!target) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    const resolvedUserId = target.id;
     let successMessage = '';
 
-    // 1. Handle verified badge toggle if provided
+    // 1. Handle verified badge toggle if provided (bypasses plan requirement - works for free & pro)
     if (isVerified !== undefined) {
       const verifiedVal = isVerified ? 1 : 0;
-      db.prepare('UPDATE streamers SET is_verified = ? WHERE id = ?').run(verifiedVal, userId);
+      db.prepare('UPDATE streamers SET is_verified = ? WHERE id = ?').run(verifiedVal, resolvedUserId);
       try {
         const usersCol = await getUsersCollection();
         await usersCol.updateOne(
-          { userId },
+          { userId: resolvedUserId },
           { $set: { isVerified: Boolean(isVerified), updatedAt: new Date() } }
         );
       } catch (mongoErr) {
@@ -193,7 +213,7 @@ export async function PUT(req: NextRequest) {
         : `Verified Creator badge removed from @${target.username}`;
     }
 
-    // 2. Handle plan change if plan is provided
+    // 2. Handle plan change if plan is provided (optional)
     if (plan !== undefined) {
       const normalizedPlan = String(plan).toLowerCase() === 'pro' ? 'pro' : 'free';
       const days = Math.max(1, Number(durationDays) || 31);
@@ -222,13 +242,13 @@ export async function PUT(req: NextRequest) {
         UPDATE streamers
         SET plan = ?, plan_started_at = ?, plan_expires_at = ?, plan_duration_days = ?
         WHERE id = ?
-      `).run(normalizedPlan, planStartedAt, planExpiresAt, planDurationDays, userId);
+      `).run(normalizedPlan, planStartedAt, planExpiresAt, planDurationDays, resolvedUserId);
 
       // Sync to MongoDB Atlas
       try {
         const usersCol = await getUsersCollection();
         await usersCol.updateOne(
-          { userId },
+          { userId: resolvedUserId },
           {
             $set: {
               plan: normalizedPlan,
@@ -252,7 +272,7 @@ export async function PUT(req: NextRequest) {
     // Clear server cache when user is updated
     clearAdminUsersCache();
 
-    const updated = db.prepare('SELECT * FROM streamers WHERE id = ?').get(userId) as any;
+    const updated = db.prepare('SELECT * FROM streamers WHERE id = ?').get(resolvedUserId) as any;
     const remainingDays =
       updated.plan === 'pro' && updated.plan_expires_at
         ? Math.max(1, Math.ceil((new Date(updated.plan_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))

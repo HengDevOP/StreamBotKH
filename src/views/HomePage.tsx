@@ -10,28 +10,21 @@ import {
   ExternalLink,
   ShieldCheck,
   ArrowRight,
-  Play,
   Sparkles,
   Volume2,
   Tv,
   CheckCircle2,
-  Flame,
   QrCode,
-  Landmark,
-  Sliders,
   Check,
   ChevronDown,
   Layers,
   Send,
-  Eye,
   CreditCard,
   Crown,
   BadgeCheck,
   Heart
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
-import { useAudio } from '../hooks/useAudio';
-import confetti from 'canvas-confetti';
 
 interface HomePageProps {
   onNavigate: (page: string, params?: any) => void;
@@ -161,26 +154,7 @@ const DEFAULT_LANE_2_CREATORS: VerifiedCreatorCard[] = [
   }
 ];
 
-const SUPPORTED_BANKS = [
-  'ABA Bank',
-  'ACLEDA Bank',
-  'Canadia Bank',
-  'Wing Bank',
-  'Bakong KHQR',
-  'Sathapana Bank',
-  'J Trust Royal',
-  'CPBank',
-  'Chip Mong Bank',
-  'Shinhan Bank',
-  'Phillip Bank',
-  'Prince Bank',
-  'Woori Bank',
-  'Campu Bank'
-];
-
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
-  const { playSynthNeonChime } = useAudio();
-
   // Dynamic Verified Streamers State from Database
   const [dbVerifiedStreamers, setDbVerifiedStreamers] = useState<any[]>([]);
 
@@ -266,51 +240,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     </div>
   );
 
-  // Interactive Live Simulator State
-  const [demoAmount, setDemoAmount] = useState<number>(10);
-  const [demoCurrency, setDemoCurrency] = useState<'USD' | 'KHR'>('USD');
-  const [demoDonor, setDemoDonor] = useState<string>('CyberNinja99');
-  const [demoBank, setDemoBank] = useState<string>('ABA Bank');
-  const [demoMessage, setDemoMessage] = useState<string>('Awesome clutch round! Keep dominating the stream! 🚀🔥');
-  const [isPlayingDemo, setIsPlayingDemo] = useState<boolean>(false);
-
   // Fee Calculator State
   const [monthlyTips, setMonthlyTips] = useState<number>(1000);
 
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
-
-  const triggerLiveDemoAlert = (
-    amount: number,
-    donor: string,
-    bank: string,
-    msg: string,
-    currency: 'USD' | 'KHR' = 'USD'
-  ) => {
-    setDemoAmount(amount);
-    setDemoDonor(donor);
-    setDemoBank(bank);
-    setDemoMessage(msg);
-    setDemoCurrency(currency);
-    setIsPlayingDemo(true);
-
-    playSynthNeonChime(0.9);
-
-    try {
-      if (typeof window !== 'undefined') {
-        confetti({
-          particleCount: 100,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ['#00F0FF', '#38BDF8', '#EC4899', '#A855F7', '#10B981']
-        });
-      }
-    } catch (e) {}
-
-    setTimeout(() => {
-      setIsPlayingDemo(false);
-    }, 4500);
-  };
 
   // Fee math
   const twitchYoutubeFee = monthlyTips * 0.3; // 30% cut on Twitch/YT
@@ -410,196 +344,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* ===================== INTERACTIVE BROADCAST STUDIO HUD ===================== */}
-      <section className="max-w-6xl mx-auto px-4">
-        <div className="rounded-2xl border border-slate-800 bg-[#090D18] overflow-hidden shadow-2xl">
-          {/* Top Simulated OBS Director Bar */}
-          <div className="px-4 sm:px-6 py-3 bg-slate-950/80 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-600/90 text-white font-bold text-[10px] tracking-wider uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                OBS LIVE 1080p60
-              </span>
-              <span className="hidden sm:inline text-slate-400">|</span>
-              <span className="text-slate-300 font-semibold truncate max-w-xs sm:max-w-md">
-                VALORANT CAMBODIA TOURNAMENT • TIPS TRIGGER VOICE TTS
-              </span>
-            </div>
-
-            <div className="flex items-center gap-4 text-[11px] text-slate-400">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <b className="text-white">6,800</b> kbps
-              </span>
-              <span className="flex items-center gap-1">
-                <Eye size={12} className="text-cyan-400" />
-                <b className="text-white">5,420</b> Viewers
-              </span>
-              <span className="hidden sm:inline text-slate-500">0% Drops</span>
-            </div>
-          </div>
-
-          {/* Main Stage: Simulated Game Screen & Live Alert Overlay */}
-          <div className="relative min-h-[380px] sm:min-h-[440px] bg-gradient-to-br from-slate-950 via-[#0B0F1E] to-[#120D24] p-6 sm:p-10 flex flex-col items-center justify-center overflow-hidden">
-            {/* Cyber Grid backdrop lines */}
-            <div className="absolute inset-0 cyber-grid-dense opacity-20 pointer-events-none" />
-
-            {/* Corner Bracket Accents */}
-            <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-cyan-400/60" />
-            <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-cyan-400/60" />
-            <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-cyan-400/60" />
-            <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-cyan-400/60" />
-
-            {/* Floating Live Broadcast HUD Badges */}
-            <div className="absolute top-6 left-6 hidden sm:flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px] font-mono text-cyan-300 backdrop-blur-sm animate-float">
-              <Zap size={12} className="text-cyan-400" />
-              <span>ABA Pushback: 280ms</span>
-            </div>
-
-            <div className="absolute top-6 right-6 hidden sm:flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px] font-mono text-pink-300 backdrop-blur-sm animate-float-delayed">
-              <Volume2 size={12} className="text-pink-400" />
-              <span>Khmer & English TTS: Active</span>
-            </div>
-
-            {/* The Animated Live Alert Overlay Card */}
-            <div
-              className={`max-w-lg w-full rounded-2xl border-2 border-cyan-400 bg-slate-950/95 p-6 text-center space-y-4 backdrop-blur-xl transition-all duration-300 ${
-                isPlayingDemo ? 'scale-105 border-pink-400' : 'hover:scale-[1.01]'
-              }`}
-            >
-              {/* Alert Header Pill */}
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[10px] font-mono font-bold text-cyan-300 uppercase">
-                  <Flame size={12} className="text-pink-400" />
-                  <span>NEW TIP RECEIVED</span>
-                </span>
-                <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-400 flex items-center gap-1">
-                  <Landmark size={10} className="text-cyan-400" />
-                  <span>{demoBank}</span>
-                </span>
-              </div>
-
-              {/* Reaction Mascot & Waveform */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 text-left">
-                <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-slate-700 p-1 bg-slate-900 flex-shrink-0">
-                  <img
-                    src="https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif"
-                    alt="Reaction"
-                    className="w-full h-full object-cover rounded-lg"
-                  />
-                </div>
-
-                <div className="flex-1 space-y-1 text-center sm:text-left">
-                  <div className="text-xs font-mono text-cyan-400 font-semibold">
-                    via {demoBank} • NBC Bakong KHQR
-                  </div>
-                  <h3 className="text-2xl sm:text-3xl font-extrabold text-white font-['Chakra_Petch'] uppercase flex items-center justify-center sm:justify-start gap-2">
-                    <span>{demoDonor}</span>
-                    <span className="text-cyan-400 font-mono">
-                      {demoCurrency === 'KHR'
-                        ? `${demoAmount.toLocaleString()} ៛`
-                        : `$${demoAmount.toFixed(2)}`}
-                    </span>
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-200 italic line-clamp-2">
-                    "{demoMessage}"
-                  </p>
-                </div>
-              </div>
-
-              {/* Equalizer Sound Wave Animation */}
-              <div className="flex items-center justify-center gap-1 pt-1">
-                <div className="w-1 bg-cyan-400 rounded-full eq-bar-1" />
-                <div className="w-1 bg-pink-500 rounded-full eq-bar-2" />
-                <div className="w-1 bg-purple-400 rounded-full eq-bar-3" />
-                <div className="w-1 bg-cyan-400 rounded-full eq-bar-4" />
-                <div className="w-1 bg-pink-500 rounded-full eq-bar-5" />
-                <div className="w-1 bg-purple-400 rounded-full eq-bar-2" />
-                <div className="w-1 bg-cyan-400 rounded-full eq-bar-1" />
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Trigger Control Deck */}
-          <div className="p-4 sm:p-6 bg-slate-950 border-t border-slate-800 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <span className="text-xs font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-bold">
-                <Sliders size={14} className="text-cyan-400" />
-                <span>Live Interactive Alert Trigger:</span>
-              </span>
-              <span className="text-[11px] text-slate-400 font-mono">
-                Click any preset below to trigger live audio chime & screen animation!
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <button
-                onClick={() =>
-                  triggerLiveDemoAlert(
-                    5,
-                    'CyberNinja99',
-                    'ABA Bank',
-                    'Insane sniper clutch bro! Outstanding aim 🔥',
-                    'USD'
-                  )
-                }
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-cyan-400/60 text-left transition-colors flex items-center justify-between group"
-              >
-                <div>
-                  <div className="text-xs font-bold text-white group-hover:text-cyan-300">
-                    ⚡ $5.00 Sniper Tip
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-400">CyberNinja99 • ABA Bank</div>
-                </div>
-                <Play size={14} className="text-cyan-400 group-hover:scale-110 transition-transform" />
-              </button>
-
-              <button
-                onClick={() =>
-                  triggerLiveDemoAlert(
-                    50,
-                    'WhaleSupporter',
-                    'Bakong App',
-                    'VIP donation for the stream quality upgrade! 👑💎',
-                    'USD'
-                  )
-                }
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-pink-500/60 text-left transition-colors flex items-center justify-between group"
-              >
-                <div>
-                  <div className="text-xs font-bold text-white group-hover:text-pink-300">
-                    👑 $50.00 VIP Drop
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-400">WhaleSupporter • Bakong App</div>
-                </div>
-                <Play size={14} className="text-pink-400 group-hover:scale-110 transition-transform" />
-              </button>
-
-              <button
-                onClick={() =>
-                  triggerLiveDemoAlert(
-                    40000,
-                    'KompongGamer',
-                    'ACLEDA Bank',
-                    'Keep up the amazing stream bro! 🇰🇭✨',
-                    'KHR'
-                  )
-                }
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-400/60 text-left transition-colors flex items-center justify-between group"
-              >
-                <div>
-                  <div className="text-xs font-bold text-white group-hover:text-emerald-300">
-                    🇰🇭 40,000 ៛ Khmer Riel
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-400">KompongGamer • ACLEDA Bank</div>
-                </div>
-                <Play size={14} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ===================== VERIFIED STREAMERS SEAMLESS CARDS MARQUEE (2 SECTIONS) ===================== */}
       <section className="space-y-8 py-6 relative overflow-hidden">
         {/* Subtle Ambient Radial Glow */}
@@ -642,28 +386,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 renderStreamerCard(creator, `lane2-${creator.username}-${idx}`)
               )}
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===================== CONTINUOUS LOGO MARQUEE ===================== */}
-      <section className="border-y border-slate-800/80 bg-slate-950/60 py-4 overflow-hidden relative">
-        <div className="flex items-center gap-6">
-          <div className="px-4 flex-shrink-0 text-xs font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-            <Landmark size={14} className="text-cyan-400" />
-            <span>SUPPORTED CAMBODIAN BANKS:</span>
-          </div>
-
-          <div className="animate-marquee flex items-center gap-6 text-xs font-mono text-slate-300">
-            {SUPPORTED_BANKS.concat(SUPPORTED_BANKS).map((bank, index) => (
-              <span
-                key={`${bank}-${index}`}
-                className="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 whitespace-nowrap flex items-center gap-1.5"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                <span>{bank}</span>
-              </span>
-            ))}
           </div>
         </div>
       </section>
