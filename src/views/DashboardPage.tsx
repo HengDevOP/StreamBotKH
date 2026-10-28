@@ -56,6 +56,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/authService';
 import { useSocket } from '../context/SocketContext';
 import { streamerService } from '../services/streamerService';
 import { StreamerDashboardStats, PaymentSettings } from '../types/streamer';
@@ -315,8 +316,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   };
 
   useEffect(() => {
-    loadData();
+    if (user) {
+      loadData();
+    }
   }, [user]);
+
+  // Automatically redirect unauthenticated visitors on /dashboard directly to Google Sign-In URL
+  useEffect(() => {
+    if (authLoading || user) return;
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('token') || localStorage.getItem('streamneon_auth_token')) {
+        return;
+      }
+      authService.initiateGoogleOAuth();
+    }
+  }, [authLoading, user]);
 
   // Join Socket.io dashboard room & listen for live incoming donations
   useEffect(() => {
@@ -558,31 +573,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     });
   }, [stats?.recentDonations, searchQuery, currencyFilter, bankFilter]);
 
-  if (authLoading) {
+  if (authLoading || !user) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="flex flex-col items-center gap-3 text-slate-400 text-xs font-mono">
           <div className="w-8 h-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
-          <span>Signing in to your dashboard...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-[80vh] flex items-center justify-center px-4">
-        <div className="w-full max-w-md p-8 text-center space-y-5 rounded-2xl border border-slate-800 bg-[#0B0F19]">
-          <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 mx-auto flex items-center justify-center">
-            <Bot size={24} className="text-cyan-400" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold text-white font-['Chakra_Petch']">Authentication Required</h2>
-            <p className="text-xs text-slate-400">Please sign in to access your streamer dashboard.</p>
-          </div>
-          <Button variant="primary" size="md" className="w-full font-bold" onClick={() => onNavigate('login')}>
-            Sign in with Google
-          </Button>
+          <span>{authLoading ? 'Signing in to your dashboard...' : 'Redirecting to Google Sign-In...'}</span>
         </div>
       </div>
     );
@@ -878,6 +874,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             onClick={(e) => {
               e.stopPropagation();
               logout();
+              onNavigate('home');
             }}
             title="Sign Out"
             className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -897,7 +894,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <ChevronRight size={14} />
           </button>
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              onNavigate('home');
+            }}
             title="Sign Out"
             className="p-1.5 rounded text-slate-500 hover:text-red-400 transition-colors"
           >
@@ -2076,7 +2076,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     <p className="text-xs text-slate-400">Signed in as {user.email}</p>
                   </div>
                   <button
-                    onClick={logout}
+                    onClick={() => {
+                      logout();
+                      onNavigate('home');
+                    }}
                     className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300 hover:text-red-400 transition-colors"
                   >
                     Log Out of All Devices

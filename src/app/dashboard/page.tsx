@@ -3,6 +3,7 @@
 import React, { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardPage, DashboardTab } from '@/views/DashboardPage';
+import { authService } from '@/services/authService';
 
 function DashboardContent() {
   const router = useRouter();
@@ -35,7 +36,7 @@ function DashboardContent() {
 
   const handleNavigate = (page: string) => {
     if (page === 'home') router.push('/');
-    else if (page === 'login') router.push('/login');
+    else if (page === 'login') authService.initiateGoogleOAuth();
     else if (page === 'pricing') router.push('/pricing');
     else router.push(`/${page}`);
   };
