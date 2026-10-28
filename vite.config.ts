@@ -13,6 +13,7 @@ export default defineConfig({
             req.url &&
             req.url.startsWith('/@') &&
             !req.url.startsWith('/@vite') &&
+            !req.url.startsWith('/@react-refresh') &&
             !req.url.startsWith('/@fs') &&
             !req.url.startsWith('/@id') &&
             !req.url.includes('.')
