@@ -208,7 +208,7 @@ if (distDir) {
         </head>
         <body style="background:#070A12;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;padding:60px 20px;text-align:center;">
           <h1 style="color:#00F0FF;margin-bottom:8px;">⚡ StreamBotKH Server Active</h1>
-          <p style="color:#94a3b8;font-size:16px;">Core API & Socket.IO are running successfully on port ${process.env.PORT || '3000'}.</p>
+          <p style="color:#94a3b8;font-size:16px;">Core API & Socket.IO are running successfully on port ${process.env.PORT || '5173'}.</p>
           <div style="margin:30px auto;max-width:500px;background:#0d1322;border:1px solid #1e293b;border-radius:12px;padding:20px;text-align:left;">
             <p style="color:#f59e0b;font-weight:bold;margin-top:0;">Notice: Frontend assets not built yet</p>
             <p style="color:#cbd5e1;font-size:14px;">To serve the full React web dashboard, run this in your server terminal:</p>
