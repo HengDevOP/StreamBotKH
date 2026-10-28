@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/server/database/db';
+import { getUsersCollection } from '@/server/database/mongo';
 
 export async function GET(
   _req: NextRequest,
@@ -11,7 +12,7 @@ export async function GET(
 
     const streamer = db.prepare(`
       SELECT s.id, s.username, s.display_name, s.avatar_url, s.bio, s.custom_thanks_message, s.is_verified,
-             s.plan, s.plan_expires_at,
+             s.plan, s.plan_expires_at, s.social_links,
              a.glow_color, a.template_style, a.min_amount_alert, a.tts_min_amount,
              p.bakong_account_name, p.is_sandbox,
              v.is_enabled as video_enabled,
@@ -41,6 +42,23 @@ export async function GET(
       }
     }
 
+    let userSocialLinks: any[] = [];
+    if (streamer.social_links) {
+      try {
+        userSocialLinks = JSON.parse(streamer.social_links);
+      } catch (e) {}
+    }
+
+    try {
+      const usersCol = await getUsersCollection();
+      const mongoUser = await usersCol.findOne({
+        $or: [{ userId: streamer.id }, { username: cleanUsername }]
+      });
+      if (Array.isArray(mongoUser?.socialLinks) && mongoUser.socialLinks.length > 0) {
+        userSocialLinks = mongoUser.socialLinks;
+      }
+    } catch (e) {}
+
     const videoAlertEnabled = streamer.video_enabled === 1;
 
     return NextResponse.json({
@@ -50,6 +68,8 @@ export async function GET(
       avatarUrl: streamer.avatar_url,
       bio: streamer.bio,
       customThanksMessage: streamer.custom_thanks_message || undefined,
+      socialLinks: userSocialLinks,
+      links: userSocialLinks,
       isVerified: streamer.is_verified === 1,
       plan: currentPlan,
       glowColor: streamer.glow_color || '#00F0FF',

@@ -19,6 +19,20 @@ export interface PublicStreamerInfo {
   videoMaxDurationSeconds?: number;
   customThanksMessage?: string;
   isVerified?: boolean;
+  socialLinks?: Array<{
+    id: string;
+    url: string;
+    title?: string;
+    platform?: string;
+    icon?: string;
+  }>;
+  links?: Array<{
+    id: string;
+    url: string;
+    title?: string;
+    platform?: string;
+    icon?: string;
+  }>;
 }
 
 export const donationService = {

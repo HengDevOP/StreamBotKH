@@ -52,7 +52,10 @@ import {
   Users,
   GitPullRequest,
   MessageSquare,
-  Tag
+  Tag,
+  Link as LinkIcon,
+  Plus,
+  Globe
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -63,6 +66,7 @@ import { useSocket } from '../context/SocketContext';
 import { streamerService } from '../services/streamerService';
 import { StreamerDashboardStats, PaymentSettings } from '../types/streamer';
 import { AlertSettings } from '../types/alert';
+import { detectPlatform, SocialLinkItem } from '../utils/socialPlatforms';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { OverviewStats } from '../components/dashboard/OverviewStats';
@@ -221,6 +225,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [usernameStatusMsg, setUsernameStatusMsg] = useState<string | null>(null);
   const [profileSavedMsg, setProfileSavedMsg] = useState(false);
   const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
+  const [profileLinks, setProfileLinks] = useState<SocialLinkItem[]>([]);
+  const [newLinkUrl, setNewLinkUrl] = useState<string>('');
+  const [newLinkTitle, setNewLinkTitle] = useState<string>('');
+  const [linkErrorMsg, setLinkErrorMsg] = useState<string | null>(null);
 
   // Donation Ledger Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -263,6 +271,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setProfileBio(user.bio || '');
       setProfileThanksMessage(user.customThanksMessage || '');
       setProfileAvatar(user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`);
+      const incomingLinks = (user as any).socialLinks || (user as any).links || [];
+      setProfileLinks(Array.isArray(incomingLinks) ? incomingLinks : []);
       if (user.plan) {
         const p = user.plan.toLowerCase();
         const resolved = (p === 'pro' || p === 'studio' || p === 'starter') ? 'pro' : 'free';
@@ -598,7 +608,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         bio: profileBio.trim(),
         description: profileBio.trim(),
         customThanksMessage: profileThanksMessage.trim(),
-        avatarUrl: profileAvatar.trim()
+        avatarUrl: profileAvatar.trim(),
+        socialLinks: profileLinks
       });
       await refreshUser();
       setProfileSavedMsg(true);
@@ -609,6 +620,51 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     } finally {
       setSavingProfile(false);
     }
+  };
+
+  const maxAllowedLinks = currentPlan === 'pro' ? 5 : 1;
+
+  const handleAddLink = () => {
+    setLinkErrorMsg(null);
+    const trimmedUrl = newLinkUrl.trim();
+    if (!trimmedUrl) {
+      setLinkErrorMsg('Please enter a valid link URL.');
+      return;
+    }
+
+    if (profileLinks.length >= maxAllowedLinks) {
+      setLinkErrorMsg(
+        currentPlan === 'pro'
+          ? 'Pro plan allows a maximum of 5 social links.'
+          : 'Free plan is limited to 1 social link. Upgrade to Pro to add up to 5 links!'
+      );
+      return;
+    }
+
+    let finalUrl = trimmedUrl;
+    if (!/^https?:\/\//i.test(finalUrl)) {
+      finalUrl = `https://${finalUrl}`;
+    }
+
+    const detected = detectPlatform(finalUrl);
+    const finalTitle = newLinkTitle.trim() || detected.defaultTitle;
+
+    const newLink: SocialLinkItem = {
+      id: `link-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      url: finalUrl,
+      title: finalTitle,
+      platform: detected.platform,
+      icon: detected.iconUrl,
+      color: detected.color
+    };
+
+    setProfileLinks([...profileLinks, newLink]);
+    setNewLinkUrl('');
+    setNewLinkTitle('');
+  };
+
+  const handleRemoveLink = (id: string) => {
+    setProfileLinks(profileLinks.filter((l) => l.id !== id));
   };
 
   const fireSimulatorAlert = (donor: string, amount: number, currency: 'USD' | 'KHR', bank: string, message: string) => {
@@ -1760,6 +1816,183 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         <span className="text-[10px] text-slate-500 mt-1 block font-mono">
                           Displayed to viewers immediately after their donation is completed. Placeholders: <code className="text-cyan-400 font-bold">&#123;donor&#125;</code>, <code className="text-cyan-400 font-bold">&#123;amount&#125;</code>, <code className="text-cyan-400 font-bold">&#123;streamer&#125;</code>
                         </span>
+                      </div>
+
+                      {/* 4. Creator Social & Channel Links (Displayed on Donation Page) */}
+                      <div className="pt-4 border-t border-slate-800/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-slate-300 font-semibold font-mono flex items-center gap-1.5">
+                            <LinkIcon size={14} className="text-cyan-400" />
+                            <span>Social &amp; Channel Links</span>
+                          </label>
+                          <span
+                            className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border ${
+                              profileLinks.length >= maxAllowedLinks
+                                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                : 'bg-slate-900 text-slate-400 border-slate-800'
+                            }`}
+                          >
+                            {profileLinks.length} / {maxAllowedLinks}{' '}
+                            {currentPlan === 'pro' ? 'Pro Links' : 'Free Link'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          Add links to your YouTube, Facebook, Instagram, TikTok, Telegram, Discord, Twitch, X, or personal website. They will be displayed right next to your profile logo on your public donation page with official logos!
+                          {currentPlan !== 'pro' && (
+                            <span className="text-amber-400 block mt-0.5">
+                              Free plan allows 1 link. Upgrade to Pro for up to 5 links.
+                            </span>
+                          )}
+                        </p>
+
+                        {/* Existing Links List */}
+                        {profileLinks.length > 0 && (
+                          <div className="space-y-2 pt-1">
+                            {profileLinks.map((link, idx) => {
+                              const detected = detectPlatform(link.url);
+                              return (
+                                <div
+                                  key={link.id || idx}
+                                  className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <img
+                                      src={link.icon || detected.iconUrl}
+                                      alt={link.title || detected.defaultTitle}
+                                      className="w-5 h-5 rounded-md object-contain bg-slate-900 flex-shrink-0"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = 'none';
+                                      }}
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5 leading-none">
+                                        <span className="text-xs font-bold text-white font-mono truncate">
+                                          {link.title || detected.defaultTitle}
+                                        </span>
+                                        <span className="text-[10px] text-cyan-400 uppercase font-mono px-1.5 py-0.2 rounded bg-cyan-950/60 border border-cyan-800/40">
+                                          {link.platform || detected.platform}
+                                        </span>
+                                      </div>
+                                      <a
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[11px] text-slate-400 hover:text-cyan-300 font-mono truncate block mt-0.5"
+                                      >
+                                        {link.url}
+                                      </a>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <a
+                                      href={link.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-lg transition-colors"
+                                      title="Open link"
+                                    >
+                                      <ExternalLink size={13} />
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveLink(link.id)}
+                                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                                      title="Remove link"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Add Link Input Controls */}
+                        {profileLinks.length < maxAllowedLinks ? (
+                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2.5">
+                            <span className="text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider block">
+                              Add New Social Link
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                              <div className="sm:col-span-3">
+                                <input
+                                  type="url"
+                                  value={newLinkUrl}
+                                  onChange={(e) => {
+                                    setNewLinkUrl(e.target.value);
+                                    if (linkErrorMsg) setLinkErrorMsg(null);
+                                  }}
+                                  placeholder="https://youtube.com/@yourchannel or fb.com/..."
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <input
+                                  type="text"
+                                  value={newLinkTitle}
+                                  onChange={(e) => setNewLinkTitle(e.target.value)}
+                                  placeholder="Title (optional)"
+                                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Detected preview if user entered URL */}
+                            {newLinkUrl.trim() && (
+                              <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 pt-0.5">
+                                <span className="text-slate-500">Auto-detected:</span>
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-cyan-300">
+                                  <img
+                                    src={detectPlatform(newLinkUrl).iconUrl}
+                                    alt="logo"
+                                    className="w-3.5 h-3.5 rounded-sm object-contain"
+                                    onError={(e) => {
+                                      (e.target as HTMLElement).style.display = 'none';
+                                    }}
+                                  />
+                                  <span>{detectPlatform(newLinkUrl).defaultTitle}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {linkErrorMsg && (
+                              <p className="text-xs text-red-400 font-mono flex items-center gap-1">
+                                <AlertCircle size={12} />
+                                <span>{linkErrorMsg}</span>
+                              </p>
+                            )}
+
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={handleAddLink}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs font-mono transition-colors cursor-pointer"
+                              >
+                                <Plus size={13} />
+                                <span>Add Link</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
+                            <span>
+                              {currentPlan === 'pro'
+                                ? '✓ Maximum of 5 Pro social links reached.'
+                                : 'Free plan limit reached (1/1 link). Upgrade to Pro for 5 links.'}
+                            </span>
+                            {currentPlan !== 'pro' && (
+                              <button
+                                type="button"
+                                onClick={() => onNavigate('pricing')}
+                                className="text-cyan-400 hover:underline font-bold"
+                              >
+                                Upgrade to Pro →
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 

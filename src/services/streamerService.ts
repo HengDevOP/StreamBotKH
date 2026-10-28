@@ -56,6 +56,8 @@ export const streamerService = {
     avatarUrl?: string;
     customThanksMessage?: string;
     plan?: string;
+    socialLinks?: any[];
+    links?: any[];
   }): Promise<{ success: boolean; user: any }> {
     return request<{ success: boolean; user: any }>('/streamer/profile', {
       method: 'PUT',

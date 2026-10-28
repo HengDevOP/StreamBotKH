@@ -59,6 +59,9 @@ try {
 try {
   db.exec('ALTER TABLE streamers ADD COLUMN plan_duration_days INTEGER DEFAULT 0');
 } catch (e) {}
+try {
+  db.exec('ALTER TABLE streamers ADD COLUMN social_links TEXT');
+} catch (e) {}
 
 // Client Issue Reports / Pull Requests table for Admin Panel
 try {

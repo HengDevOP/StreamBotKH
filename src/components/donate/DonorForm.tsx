@@ -18,13 +18,15 @@ import {
   BadgeCheck,
   Sliders,
   Landmark,
-  Lock
+  Lock,
+  ExternalLink
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { PublicStreamerInfo } from '../../services/donationService';
 import { VideoPlayerWithProgressBar } from '../common/VideoPlayerWithProgressBar';
 import { VideoClipScrubberLine } from './VideoClipScrubberLine';
+import { detectPlatform } from '../../utils/socialPlatforms';
 
 export interface DonorFormData {
   donorName: string;
@@ -353,6 +355,36 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
               <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
                 {streamer.bio}
               </p>
+            )}
+
+            {/* Social / Channel Links Displayed After Logo & Bio */}
+            {((streamer.socialLinks && streamer.socialLinks.length > 0) || (streamer.links && streamer.links.length > 0)) && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                {(streamer.socialLinks || streamer.links || []).map((link) => {
+                  const detected = detectPlatform(link.url);
+                  return (
+                    <a
+                      key={link.id || link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={link.title || detected.defaultTitle}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold font-mono border transition-all duration-200 hover:scale-105 shadow-sm ${detected.brandColor}`}
+                    >
+                      <img
+                        src={link.icon || detected.iconUrl}
+                        alt={link.title || detected.defaultTitle}
+                        className="w-3.5 h-3.5 rounded-sm object-contain flex-shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      <span className="truncate max-w-[130px]">{link.title || detected.defaultTitle}</span>
+                      <ExternalLink size={10} className="opacity-60 flex-shrink-0" />
+                    </a>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>

@@ -14,6 +14,13 @@ export interface UserDoc {
   bio?: string;
   customThanksMessage?: string;
   isVerified?: boolean;
+  socialLinks?: Array<{
+    id: string;
+    url: string;
+    title?: string;
+    platform?: string;
+    icon?: string;
+  }>;
   plan?: string;
   planStartedAt?: string | null;
   planExpiresAt?: string | null;

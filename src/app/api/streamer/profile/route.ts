@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { db } from '@/server/database/db';
 import { getUsersCollection } from '@/server/database/mongo';
+import { sanitizeSocialLinks } from '@/utils/socialPlatforms';
 
 const RESERVED_USERNAMES = new Set([
   'admin',
@@ -92,15 +93,25 @@ export async function GET(req: NextRequest) {
     }
 
     let customThanks = streamer.custom_thanks_message || '';
-    if (!customThanks) {
+    let userSocialLinks: any[] = [];
+
+    // Parse social links from SQLite fallback
+    if (streamer.social_links) {
       try {
-        const usersCol = await getUsersCollection();
-        const mongoUser = await usersCol.findOne({ userId: authUser.id });
-        if (mongoUser?.customThanksMessage) {
-          customThanks = mongoUser.customThanksMessage;
-        }
+        userSocialLinks = JSON.parse(streamer.social_links);
       } catch (e) {}
     }
+
+    try {
+      const usersCol = await getUsersCollection();
+      const mongoUser = await usersCol.findOne({ userId: authUser.id });
+      if (mongoUser?.customThanksMessage) {
+        customThanks = mongoUser.customThanksMessage;
+      }
+      if (Array.isArray(mongoUser?.socialLinks) && mongoUser.socialLinks.length > 0) {
+        userSocialLinks = mongoUser.socialLinks;
+      }
+    } catch (e) {}
 
     return NextResponse.json({
       id: streamer.id,
@@ -110,6 +121,8 @@ export async function GET(req: NextRequest) {
       avatarUrl: streamer.avatar_url,
       bio: streamer.bio,
       customThanksMessage: customThanks,
+      socialLinks: userSocialLinks,
+      links: userSocialLinks,
       isVerified: streamer.is_verified === 1,
       plan: streamer.plan || 'free',
       overlayToken: streamer.overlay_token,
@@ -130,6 +143,7 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const { username, description, bio, displayName, avatarUrl, plan, customThanksMessage } = body;
+    const incomingLinks = body.socialLinks !== undefined ? body.socialLinks : body.links;
 
     const current = db.prepare('SELECT * FROM streamers WHERE id = ?').get(authUser.id) as any;
     if (!current) {
@@ -162,14 +176,41 @@ export async function PUT(req: NextRequest) {
     const newPlan = plan !== undefined ? String(plan).toLowerCase() : (current.plan || 'free');
     const newThanks = customThanksMessage !== undefined ? String(customThanksMessage).trim() : (current.custom_thanks_message || '');
 
-    // 3. Update SQLite database
+    // 3. Process social links with plan limits: Free (1 link), Pro (5 links)
+    const isPro = newPlan === 'pro';
+    let currentLinks: any[] = [];
+    if (current.social_links) {
+      try {
+        currentLinks = JSON.parse(current.social_links);
+      } catch (e) {}
+    }
+
+    let finalLinks = currentLinks;
+    if (incomingLinks !== undefined) {
+      if (!Array.isArray(incomingLinks)) {
+        return NextResponse.json({ error: 'Social links must be an array' }, { status: 400 });
+      }
+      if (!isPro && incomingLinks.length > 1) {
+        return NextResponse.json({
+          error: 'Free plan is limited to 1 link. Upgrade to Pro to add up to 5 links!'
+        }, { status: 400 });
+      }
+      if (isPro && incomingLinks.length > 5) {
+        return NextResponse.json({
+          error: 'Pro plan allows a maximum of 5 links.'
+        }, { status: 400 });
+      }
+      finalLinks = sanitizeSocialLinks(incomingLinks, isPro);
+    }
+
+    // 4. Update SQLite database
     db.prepare(`
       UPDATE streamers
-      SET username = ?, display_name = ?, bio = ?, avatar_url = ?, plan = ?, custom_thanks_message = ?
+      SET username = ?, display_name = ?, bio = ?, avatar_url = ?, plan = ?, custom_thanks_message = ?, social_links = ?
       WHERE id = ?
-    `).run(newUsername, newDisplayName, newBio, newAvatarUrl, newPlan, newThanks, authUser.id);
+    `).run(newUsername, newDisplayName, newBio, newAvatarUrl, newPlan, newThanks, JSON.stringify(finalLinks), authUser.id);
 
-    // 4. Synchronize with MongoDB users collection
+    // 5. Synchronize with MongoDB users collection
     try {
       const usersCol = await getUsersCollection();
       await usersCol.updateOne(
@@ -181,6 +222,7 @@ export async function PUT(req: NextRequest) {
             avatarUrl: newAvatarUrl,
             bio: newBio,
             customThanksMessage: newThanks,
+            socialLinks: finalLinks,
             updatedAt: new Date()
           }
         },
@@ -203,6 +245,8 @@ export async function PUT(req: NextRequest) {
         avatarUrl: updated.avatar_url,
         bio: updated.bio,
         customThanksMessage: updated.custom_thanks_message || newThanks,
+        socialLinks: finalLinks,
+        links: finalLinks,
         isVerified: updated.is_verified === 1,
         plan: updated.plan || 'free',
         overlayToken: updated.overlay_token,

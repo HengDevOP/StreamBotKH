@@ -1,3 +1,11 @@
+export interface SocialLink {
+  id: string;
+  url: string;
+  title?: string;
+  platform?: string;
+  icon?: string;
+}
+
 export interface Streamer {
   id: string;
   email: string;
@@ -5,6 +13,8 @@ export interface Streamer {
   displayName: string;
   avatarUrl?: string;
   bio?: string;
+  socialLinks?: SocialLink[];
+  links?: SocialLink[];
   plan?: string;
   planStartedAt?: string | null;
   planExpiresAt?: string | null;
