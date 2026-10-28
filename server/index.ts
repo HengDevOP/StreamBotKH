@@ -230,7 +230,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // Port configuration: Always prioritize process.env.PORT
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || '5173', 10);
 const HOST = '0.0.0.0'; // Bound to all interfaces for universal reachability
 
 server.listen(PORT, HOST, () => {
@@ -240,7 +240,7 @@ server.listen(PORT, HOST, () => {
   if (distDir) {
     console.log(`⚡ [StreamBotKH Web] Production React SPA served from ${distDir}`);
   } else {
-    console.log(`⚡ [StreamBotKH Web] Development Vite frontend active at http://localhost:3000`);
+    console.log(`⚡ [StreamBotKH Web] Development Vite frontend active at http://localhost:5173`);
   }
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 });

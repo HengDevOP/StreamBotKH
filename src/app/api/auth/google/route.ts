@@ -46,11 +46,11 @@ export function resolveFrontendOrigin(req: NextRequest): string {
   }
 
   const proto = req.headers.get('x-forwarded-proto') || req.nextUrl.protocol.replace(':', '') || 'http';
-  const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || req.nextUrl.host || 'localhost:3000';
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || req.nextUrl.host || 'localhost:5173';
 
-  // In dev mode, if Express is hit on :5001 directly, prefer :3000 for frontend redirect
+  // In dev mode, if Express is hit on :5001 directly, prefer :5173 for frontend redirect
   if (host.includes('127.0.0.1:5001') || host.includes('localhost:5001')) {
-    return (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+    return (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/$/, '');
   }
 
   return `${proto}://${host}`.replace(/\/$/, '');
