@@ -36,23 +36,51 @@ export async function POST(req: NextRequest) {
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
 
     const body = await req.json().catch(() => ({}));
-    const { chatId, title, username } = body;
+    let { chatId, title, username, groupLink } = body;
 
-    if (!chatId || typeof chatId !== 'string' || !chatId.trim()) {
+    const rawTarget = (groupLink || chatId || '').trim();
+
+    if (!rawTarget) {
       return NextResponse.json(
-        { error: 'Group Chat ID is required (e.g. -1001234567890).' },
+        { error: 'Telegram group link or Chat ID is required (e.g. https://t.me/yourgroup or -1001234567890).' },
         { status: 400 }
       );
     }
 
-    const cleanTitle = (title && typeof title === 'string' && title.trim()) ? title.trim() : `Telegram Group (${chatId.trim()})`;
-    const cleanUsername = username && typeof username === 'string' ? username.trim() : undefined;
+    let finalChatId = rawTarget;
+    let finalTitle = (title && typeof title === 'string' && title.trim()) ? title.trim() : '';
+    let finalUsername = username && typeof username === 'string' ? username.trim() : undefined;
 
-    const group = addMonitoredGroup(streamerId, chatId.trim(), cleanTitle, cleanUsername);
+    // Try resolving link / entity via GramJS if active
+    try {
+      const resolved = await telegramUserManager.resolveGroupEntity(streamerId, rawTarget);
+      if (resolved) {
+        if (resolved.id) finalChatId = resolved.id;
+        if (!finalTitle && resolved.title) finalTitle = resolved.title;
+        if (!finalUsername && resolved.username) finalUsername = resolved.username;
+      }
+    } catch (e) {
+      // safe fallback
+    }
+
+    // Clean up link if still full URL
+    if (finalChatId.startsWith('http://') || finalChatId.startsWith('https://') || finalChatId.startsWith('t.me/')) {
+      const cleanHandle = finalChatId.replace(/^https?:\/\/t\.me\//i, '').replace(/^t\.me\//i, '').replace(/^\+/, '');
+      if (cleanHandle) {
+        if (!finalUsername) finalUsername = `@${cleanHandle.replace(/^@/, '')}`;
+        if (!finalTitle) finalTitle = `Telegram Group (${finalUsername})`;
+      }
+    }
+
+    if (!finalTitle) {
+      finalTitle = `Telegram Group (${finalChatId})`;
+    }
+
+    const group = addMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername);
 
     return NextResponse.json({
       success: true,
-      message: `Group "${cleanTitle}" added to GramJS target listening list.`,
+      message: `Group "${finalTitle}" successfully connected to GramJS target listener.`,
       group
     });
   } catch (err: any) {

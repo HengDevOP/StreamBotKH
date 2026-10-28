@@ -807,6 +807,45 @@ class TelegramUserClientManager {
   }
 
   /**
+   * Resolve a Telegram group by link (e.g. https://t.me/group or @group or chat ID)
+   */
+  public async resolveGroupEntity(streamerId: string, query: string): Promise<{
+    id: string;
+    title?: string;
+    username?: string;
+  } | null> {
+    const client = this.activeClients.get(streamerId);
+    if (!client) return null;
+    try {
+      let clean = query.trim()
+        .replace(/^https?:\/\/t\.me\//i, '')
+        .replace(/^t\.me\//i, '')
+        .replace(/^\+/, '');
+
+      if (!clean) return null;
+
+      const entity = await client.getEntity(clean) as any;
+      if (entity) {
+        const rawId = entity.id ? entity.id.toString() : '';
+        let formattedId = rawId;
+        if (formattedId && !formattedId.startsWith('-')) {
+          formattedId = `-100${formattedId}`;
+        }
+        const title = entity.title || entity.firstName || entity.username || clean;
+        const username = entity.username ? `@${entity.username.replace(/^@/, '')}` : undefined;
+        return {
+          id: formattedId || clean,
+          title,
+          username
+        };
+      }
+    } catch (err) {
+      // Entity not found via client cache or requires join
+    }
+    return null;
+  }
+
+  /**
    * Get live connection status
    */
   public getStatus(streamerId: string): {
