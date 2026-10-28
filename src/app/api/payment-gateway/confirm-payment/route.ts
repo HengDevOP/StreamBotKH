@@ -284,7 +284,12 @@ export async function POST(req: NextRequest) {
         ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
         : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8),
       ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1),
-      ttsType: matchingBox?.ttsType || alertSettings?.tts_type || 'google',
+      ttsType: matchingBox?.ttsType || (
+        (alertSettings?.tts_voice || '').toLowerCase().includes('female') || (alertSettings?.tts_voice || '').toLowerCase().includes('sreymom') ? 'kiritts-female'
+        : (alertSettings?.tts_voice || '').toLowerCase().includes('male') || (alertSettings?.tts_voice || '').toLowerCase().includes('piseth') ? 'kiritts-male'
+        : alertSettings?.tts_voice === 'cloned' ? 'cloned'
+        : (alertSettings?.tts_type || 'google')
+      ),
       clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url
     });
 

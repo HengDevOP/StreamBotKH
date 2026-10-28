@@ -23,26 +23,90 @@ try {
 export const VOICE_MAP: Record<string, string> = {
   'kiritts-male': 'km-KH-PisethNeural',
   'kiritts-female': 'km-KH-SreymomNeural',
+  'piseth': 'km-KH-PisethNeural',
+  'sreymom': 'km-KH-SreymomNeural',
+  'km-KH-PisethNeural': 'km-KH-PisethNeural',
+  'km-KH-SreymomNeural': 'km-KH-SreymomNeural',
   'google': 'en-US-JennyNeural',
-  'google-male': 'en-US-ChristopherNeural'
+  'google-female': 'en-US-JennyNeural',
+  'Google US English': 'en-US-JennyNeural',
+  'en-US-JennyNeural': 'en-US-JennyNeural',
+  'google-male': 'en-US-ChristopherNeural',
+  'en-US-ChristopherNeural': 'en-US-ChristopherNeural'
 };
+
+export function resolveVoice(type?: string, text?: string): { voice: string; isKhmer: boolean } {
+  const normType = (type || 'google').trim().toLowerCase();
+  const hasKhmerChars = /[\u1780-\u17FF]/.test(text || '');
+
+  if (
+    normType === 'kiritts-male' ||
+    normType === 'piseth' ||
+    normType === 'km-kh-pisethneural' ||
+    normType.includes('piseth')
+  ) {
+    return { voice: 'km-KH-PisethNeural', isKhmer: true };
+  }
+
+  if (
+    normType === 'kiritts-female' ||
+    normType === 'sreymom' ||
+    normType === 'km-kh-sreymomneural' ||
+    normType.includes('sreymom')
+  ) {
+    return { voice: 'km-KH-SreymomNeural', isKhmer: true };
+  }
+
+  if (normType === 'google-male' || normType === 'en-us-christopherneural') {
+    return {
+      voice: hasKhmerChars ? 'km-KH-PisethNeural' : 'en-US-ChristopherNeural',
+      isKhmer: hasKhmerChars
+    };
+  }
+
+  // Default to Google / universal neural voice, but automatically speak Khmer Piseth if text is Khmer
+  if (hasKhmerChars) {
+    return { voice: 'km-KH-PisethNeural', isKhmer: true };
+  }
+
+  return { voice: 'en-US-JennyNeural', isKhmer: false };
+}
 
 /**
  * Try executing edge-tts across common Linux/macOS binary locations & python3 module fallback
  */
 async function tryEdgeTtsToFile(voice: string, text: string, filePath: string): Promise<boolean> {
   const homeDir = os.homedir() || '/root';
+  const customPath = [
+    process.env.PATH || '',
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+    path.join(homeDir, '.local', 'bin'),
+    path.join(homeDir, 'bin')
+  ].filter(Boolean).join(':');
+
   const candidates: { cmd: string; args: string[] }[] = [
+    { cmd: '/opt/homebrew/bin/edge-tts', args: ['--voice', voice, '--text', text, '--write-media', filePath] },
     { cmd: 'edge-tts', args: ['--voice', voice, '--text', text, '--write-media', filePath] },
     { cmd: '/usr/local/bin/edge-tts', args: ['--voice', voice, '--text', text, '--write-media', filePath] },
     { cmd: '/usr/bin/edge-tts', args: ['--voice', voice, '--text', text, '--write-media', filePath] },
     { cmd: path.join(homeDir, '.local', 'bin', 'edge-tts'), args: ['--voice', voice, '--text', text, '--write-media', filePath] },
-    { cmd: 'python3', args: ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', filePath] }
+    { cmd: '/opt/homebrew/bin/python3', args: ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', filePath] },
+    { cmd: 'python3', args: ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', filePath] },
+    { cmd: 'python', args: ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', filePath] }
   ];
 
   for (const candidate of candidates) {
     try {
-      await execFileAsync(candidate.cmd, candidate.args, { timeout: 10000 });
+      await execFileAsync(candidate.cmd, candidate.args, {
+        timeout: 12000,
+        env: { ...process.env, PATH: customPath }
+      });
       if (fs.existsSync(filePath) && fs.statSync(filePath).size > 100) {
         return true;
       }
@@ -128,14 +192,8 @@ export async function synthesizeTTSWithBuffer(params: {
     };
   }
 
-  // Detect voice model
-  let voice = VOICE_MAP[type] || VOICE_MAP['google'];
-
-  // If text contains Khmer characters and type is google, fallback to Khmer Piseth voice
-  const hasKhmer = /[\u1780-\u17FF]/.test(cleanedText);
-  if (hasKhmer && type === 'google') {
-    voice = 'km-KH-PisethNeural';
-  }
+  // Detect voice model accurately - preserves kiritts-male / kiritts-female even if text contains English
+  const { voice, isKhmer } = resolveVoice(type, cleanedText);
 
   // Generate deterministic filename based on voice and text
   const hash = crypto.createHash('md5').update(`${voice}:${cleanedText}`).digest('hex');
@@ -163,7 +221,7 @@ export async function synthesizeTTSWithBuffer(params: {
   }
 
   // 3. Server-side Google Translate TTS download (works on any VPS without Python installed!)
-  const lang = hasKhmer || type.startsWith('kiritts') ? 'km' : 'en';
+  const lang = isKhmer ? 'km' : 'en';
   const googleSuccess = await fetchGoogleTranslateTtsToFile(lang, cleanedText, filePath);
   if (googleSuccess && fs.existsSync(filePath)) {
     return {

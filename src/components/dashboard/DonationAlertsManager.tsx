@@ -57,7 +57,9 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     try {
       setLoading(true);
       const tokenParam = streamerToken ? `?token=${encodeURIComponent(streamerToken)}` : '';
-      const authToken = typeof window !== 'undefined' ? localStorage.getItem('streamneon_token') : null;
+      const authToken = typeof window !== 'undefined'
+        ? (localStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_token'))
+        : null;
       const res = await fetch(`/api/alert-boxes${tokenParam}`, {
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined
       });

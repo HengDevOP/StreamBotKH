@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
 
+    const v = (body.ttsType || body.tts_voice || alertSettings?.tts_voice || '').toLowerCase();
+    const resolvedTtsType = v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
+      : v.includes('male') || v.includes('piseth') ? 'kiritts-male'
+      : v.includes('cloned') ? 'cloned'
+      : 'google';
+
     const testPayload = {
       donationId: 'test-' + Date.now(),
       donorName: body.donorName || 'Neon Supporter 🔥',
@@ -32,6 +38,7 @@ export async function POST(req: NextRequest) {
       soundVolume: alertSettings?.sound_volume ?? 0.8,
       durationSeconds: alertSettings?.duration_seconds ?? 8,
       ttsEnabled: alertSettings?.tts_enabled === 1,
+      ttsType: resolvedTtsType,
       ttsVoice: alertSettings?.tts_voice || 'Google US English',
       customGifUrl: alertSettings?.custom_gif_url,
       isTest: true

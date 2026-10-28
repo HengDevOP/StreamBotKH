@@ -85,6 +85,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
+export const PUT = PATCH;
+
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
     const { id } = params;

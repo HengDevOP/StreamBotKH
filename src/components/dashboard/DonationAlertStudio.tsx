@@ -493,7 +493,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         clonedVoiceSampleUrl
       };
 
-      const authToken = typeof window !== 'undefined' ? localStorage.getItem('streamneon_token') : null;
+      const authToken = typeof window !== 'undefined'
+        ? (localStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_token'))
+        : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (authToken) {
         headers.Authorization = `Bearer ${authToken}`;

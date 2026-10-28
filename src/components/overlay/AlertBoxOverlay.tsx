@@ -236,13 +236,18 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       const rawMsg = payload.donorMessage || payload.donor_message || payload.message || '';
       const resolvedDonorMessage = typeof rawMsg === 'string' ? rawMsg.trim() : '';
 
+      const isTestAlert = Boolean(payload.isTest);
+      const rawVoice = (isTestAlert && (payload.ttsType || payload.ttsVoice))
+        ? (payload.ttsType || payload.ttsVoice)
+        : (matchingBox?.ttsType || payload.ttsType || payload.ttsVoice || 'google');
+
       const finalPayload = {
         ...payload,
         donorMessage: resolvedDonorMessage,
         donor_message: resolvedDonorMessage,
         message: resolvedDonorMessage,
-        textTemplate: matchingBox?.textTemplate || payload.textTemplate,
-        textColor: matchingBox?.textColor || payload.textColor,
+        textTemplate: (isTestAlert && payload.textTemplate) ? payload.textTemplate : (matchingBox?.textTemplate || payload.textTemplate),
+        textColor: (isTestAlert && payload.textColor) ? payload.textColor : (matchingBox?.textColor || payload.textColor),
         customGifUrl: matchingBox?.mediaUrl || payload.customGifUrl || payload.mediaUrl || overlayConfig?.mediaUrl,
         showImage: matchingBox ? matchingBox.showImage !== false : (payload.showImage !== undefined ? payload.showImage : true),
         fontFamily: matchingBox?.fontFamily || payload.fontFamily || 'Chakra Petch',
@@ -257,7 +262,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         durationSeconds:
           matchingBox?.durationSeconds || payload.durationSeconds || overlayConfig?.durationSeconds || 8,
         ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (payload.ttsEnabled !== undefined ? payload.ttsEnabled : true),
-        ttsType: matchingBox?.ttsType || payload.ttsType || 'google',
+        ttsType: rawVoice,
         clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || payload.clonedVoiceSampleUrl
       };
 

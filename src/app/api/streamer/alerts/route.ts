@@ -9,11 +9,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let settings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id);
+    let settings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id) as any;
 
     if (!settings) {
       db.prepare('INSERT INTO alert_settings (streamer_id) VALUES (?)').run(user.id);
-      settings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id);
+      settings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id) as any;
+    }
+
+    if (settings) {
+      const v = (settings.tts_voice || '').toLowerCase();
+      settings.ttsType = v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
+        : v.includes('male') || v.includes('piseth') ? 'kiritts-male'
+        : v.includes('cloned') ? 'cloned'
+        : 'google';
     }
 
     return NextResponse.json(settings);
@@ -44,6 +52,8 @@ export async function PUT(req: NextRequest) {
       text_template
     } = body;
 
+    const resolvedVoice = body.ttsType || body.tts_type || body.tts_voice || tts_voice || 'Google US English';
+
     db.prepare(`
       INSERT INTO alert_settings (
         streamer_id, template_style, glow_color, sound_url, sound_volume,
@@ -72,12 +82,19 @@ export async function PUT(req: NextRequest) {
       duration_seconds ?? 8,
       tts_enabled ? 1 : 0,
       tts_min_amount ?? 2.0,
-      tts_voice || 'Google US English',
+      resolvedVoice,
       custom_gif_url || '',
       text_template || '{name} dropped {amount}!'
     );
 
-    const updated = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id);
+    const updated = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id) as any;
+    if (updated) {
+      const v = (updated.tts_voice || '').toLowerCase();
+      updated.ttsType = v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
+        : v.includes('male') || v.includes('piseth') ? 'kiritts-male'
+        : v.includes('cloned') ? 'cloned'
+        : 'google';
+    }
     return NextResponse.json({ success: true, settings: updated });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
