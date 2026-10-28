@@ -267,7 +267,7 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
               <Button
                 variant="primary"
                 size="lg"
-                onClick={onUpgrade || (() => window.open('https://t.me/@hchenheng', '_blank', 'noopener,noreferrer'))}
+                onClick={onUpgrade || (() => window.open('https://t.me/hchenheng', '_blank', 'noopener,noreferrer'))}
                 className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-extrabold shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
               >
                 <Sparkles size={16} />

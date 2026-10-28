@@ -181,7 +181,7 @@ export const SpinningWheelManager: React.FC<SpinningWheelManagerProps> = ({
               <Button
                 variant="primary"
                 size="md"
-                onClick={onUpgrade || (() => window.open('https://t.me/@hchenheng', '_blank', 'noopener,noreferrer'))}
+                onClick={onUpgrade || (() => window.open('https://t.me/hchenheng', '_blank', 'noopener,noreferrer'))}
                 className="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-extrabold shadow-lg shadow-amber-500/20 flex items-center gap-2"
               >
                 <Sparkles size={15} />

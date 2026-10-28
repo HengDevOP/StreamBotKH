@@ -2102,7 +2102,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           setUpgradeFeatureName(undefined);
         }}
         featureName={upgradeFeatureName}
-        telegramContactUrl="https://t.me/@hchenheng"
+        telegramContactUrl="https://t.me/hchenheng"
       />
 
       {/* Reusable Media Library Picker Modal (with direct upload) */}

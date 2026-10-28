@@ -14,17 +14,18 @@ interface ProUpgradeModalProps {
 export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
   isOpen,
   onClose,
-  telegramContactUrl = 'https://t.me/@hchenheng',
+  telegramContactUrl = 'https://t.me/hchenheng',
   featureName,
   title = 'This feature is available on Pro plan'
 }) => {
   if (!isOpen) return null;
 
   const handleUpgradeClick = () => {
-    let target = (telegramContactUrl || 'https://t.me/@hchenheng').trim();
+    let target = (telegramContactUrl || 'https://t.me/hchenheng').trim();
     if (!target.startsWith('http://') && !target.startsWith('https://')) {
       target = `https://${target}`;
     }
+    target = target.replace(/t\.me\/@/i, 't.me/');
     window.open(target, '_blank', 'noopener,noreferrer');
   };
 
