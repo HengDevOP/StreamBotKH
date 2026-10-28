@@ -38,18 +38,18 @@ export const ResourcesPage: React.FC<ResourcesPageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="relative min-h-screen py-12 px-4 sm:px-6 lg:px-8 space-y-16 max-w-7xl mx-auto">
+    <div className="relative min-h-screen py-8 sm:py-12 px-3 sm:px-6 lg:px-8 space-y-10 sm:space-y-16 max-w-7xl mx-auto">
       {/* Background Cyber Ambient Lights */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-cyan-500/10 rounded-full blur-[140px] pointer-events-none -z-10" />
 
       {/* Header Banner */}
-      <div className="text-center space-y-4 max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-400">
-          <BookOpen size={14} />
-          <span className="uppercase tracking-widest font-semibold">STREAMBOTKH CREATOR & DEVELOPER HUB</span>
+      <div className="text-center space-y-3 sm:space-y-4 max-w-3xl mx-auto">
+        <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-[10px] sm:text-xs font-mono text-cyan-400">
+          <BookOpen size={13} />
+          <span className="uppercase tracking-widest font-semibold">STREAMBOTKH CREATOR &amp; DEVELOPER HUB</span>
         </div>
-        <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-          Resources & Documentation
+        <h1 className="text-2xl xs:text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+          Resources &amp; Documentation
         </h1>
         <p className="text-sm sm:text-base text-slate-400 leading-relaxed">
           Step-by-step setup guides, payment integration tutorials, and technical reference docs to optimize your live stream alerts.

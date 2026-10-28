@@ -185,17 +185,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-[#070A12]/95 backdrop-blur-md border-b border-white/[0.08]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-18">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-15 sm:h-18">
           {/* Left: Mobile Menu Toggle + Logo + Title ("streambotkh.com") + Nav Menu */}
-          <div className="flex items-center gap-3 sm:gap-6 lg:gap-8">
+          <div className="flex items-center gap-2 sm:gap-6 lg:gap-8 min-w-0">
             {/* Mobile menu toggle on the left side */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors flex-shrink-0"
               aria-label="Toggle navigation menu"
             >
-              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
 
             {/* Logo on the left & Title "streambotkh.com" */}
@@ -207,21 +207,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                   onNavigate('home');
                 }
               }}
-              className="flex items-center gap-2.5 cursor-pointer group select-none"
+              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0"
             >
-              <div className="relative w-9 h-9 flex items-center justify-center flex-shrink-0">
+              <div className="relative w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center flex-shrink-0">
                 <img
                   src="/images/logo-192.png"
                   alt="streambotkh.com logo"
-                  className="w-9 h-9 object-contain drop-shadow-[0_0_10px_rgba(0,240,255,0.4)] group-hover:scale-105 group-hover:drop-shadow-[0_0_14px_rgba(0,240,255,0.6)] transition-all duration-200"
+                  className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow-[0_0_10px_rgba(0,240,255,0.4)] group-hover:scale-105 group-hover:drop-shadow-[0_0_14px_rgba(0,240,255,0.6)] transition-all duration-200"
                 />
               </div>
 
-              <div className="flex items-center">
-                <span className="text-xl sm:text-2xl font-bold tracking-tight text-white font-['Chakra_Petch']">
+              <div className="flex items-center min-w-0">
+                <span className="text-lg xs:text-xl sm:text-2xl font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
                   streambot<span className="text-cyan-400">kh</span>
                 </span>
-                <span className="text-xs font-mono font-semibold text-slate-400 ml-0.5">
+                <span className="hidden xxs:inline text-xs font-mono font-semibold text-slate-400 ml-0.5">
                   .com
                 </span>
               </div>
@@ -440,11 +440,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                     e.preventDefault();
                     loginWithGoogleRedirect();
                   }}
-                  className="group relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.25] text-white text-xs font-medium transition-all duration-200 cursor-pointer"
+                  className="group relative inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.25] text-white text-xs font-medium transition-all duration-200 cursor-pointer flex-shrink-0"
                 >
                   <GoogleIcon />
-                  <span className="hidden xs:inline">Sign in with Google</span>
-                  <span className="xs:hidden">Sign in</span>
+                  <span className="hidden sm:inline">Sign in with Google</span>
+                  <span className="hidden xxs:inline sm:hidden">Sign in</span>
+                  <span className="xxs:hidden">Login</span>
                 </a>
               </div>
             )}

@@ -96,17 +96,17 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
   ];
 
   return (
-    <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-20">
+    <div className="min-h-screen py-8 sm:py-16 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-12 sm:space-y-20">
       {/* Header */}
-      <div className="text-center space-y-4 max-w-3xl mx-auto">
+      <div className="text-center space-y-3 sm:space-y-4 max-w-3xl mx-auto">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-cyan-400">
           <Sparkles size={13} />
           <span>TRANSPARENT CREATOR PRICING</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
+        <h1 className="text-2xl xs:text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
           Simple, transparent plans for Cambodian streamers
         </h1>
-        <p className="text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
+        <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed px-1">
           Start free with Donations Alerts, Payment Gateway, and 20MB storage, or upgrade to Pro to unlock Leaderboard, Goals, Timer, Soundboard, Video Alerts, Spinning Wheels, 500MB storage, and 0% fee.
         </p>
 
@@ -198,9 +198,9 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
       )}
 
       {/* 2 Plans Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto items-stretch">
         {/* Plan 1: Free Plan */}
-        <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-7 sm:p-8 flex flex-col h-full justify-between hover:border-slate-700 transition-colors shadow-xl">
+        <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-5 xs:p-6 sm:p-8 flex flex-col h-full justify-between hover:border-slate-700 transition-colors shadow-xl">
           <div className="flex-1 flex flex-col">
             <div className="space-y-2">
               <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">FREE PLAN</span>
@@ -269,7 +269,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
         </div>
 
         {/* Plan 2: Pro Plan ($4.99/mo - 0% fee, 10GB storage, Payment Gateway) */}
-        <div className="rounded-2xl border-2 border-purple-500/80 bg-[#120E22] p-7 sm:p-8 flex flex-col h-full justify-between relative shadow-2xl shadow-purple-500/10">
+        <div className="rounded-2xl border-2 border-purple-500/80 bg-[#120E22] p-5 xs:p-6 sm:p-8 flex flex-col h-full justify-between relative shadow-2xl shadow-purple-500/10">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[10px] font-extrabold uppercase tracking-widest shadow-lg shadow-purple-500/30 whitespace-nowrap">
             {promo?.isActive
               ? `${promo.promoTitle} • ${promo.discountPercent}% OFF`

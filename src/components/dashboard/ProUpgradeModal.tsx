@@ -33,11 +33,11 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 xs:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn select-none"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-[#090D18] border border-amber-500/40 p-6 shadow-2xl shadow-amber-500/10 relative space-y-5 text-center"
+        className="w-full max-w-sm rounded-2xl bg-[#090D18] border border-amber-500/40 p-4 xs:p-6 shadow-2xl shadow-amber-500/10 relative space-y-4 xs:space-y-5 text-center"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}

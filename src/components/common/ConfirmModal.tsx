@@ -99,7 +99,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 xs:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
       {/* Backdrop */}
       <div
         className="fixed inset-0"
@@ -107,14 +107,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       />
 
       {/* Modal Dialog Card */}
-      <div className="relative w-full max-w-md bg-[#0B0F19] border border-slate-800 rounded-2xl p-6 shadow-2xl z-10 overflow-hidden space-y-5 animate-in zoom-in-95 duration-150">
-        <div className="flex items-start gap-4">
-          <div className={`p-3 rounded-xl border flex-shrink-0 ${getIconBg()}`}>
+      <div className="relative w-full max-w-md bg-[#0B0F19] border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl z-10 overflow-hidden space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-150">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className={`p-2.5 sm:p-3 rounded-xl border flex-shrink-0 ${getIconBg()}`}>
             {getIcon()}
           </div>
 
-          <div className="space-y-1.5 flex-1 min-w-0 pt-0.5">
-            <h3 className="text-base font-bold text-white font-['Chakra_Petch'] tracking-wide">
+          <div className="space-y-1 sm:space-y-1.5 flex-1 min-w-0 pt-0.5">
+            <h3 className="text-sm sm:text-base font-bold text-white font-['Chakra_Petch'] tracking-wide">
               {title}
             </h3>
             <div className="text-xs text-slate-400 leading-relaxed font-sans">
@@ -133,13 +133,13 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </div>
 
         {/* Modal Action Buttons */}
-        <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-800/80">
+        <div className="pt-2 flex items-center justify-end gap-2 sm:gap-3 border-t border-slate-800/80">
           {!isAlertOnly && (
             <button
               type="button"
               disabled={loading}
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors disabled:opacity-50"
+              className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors disabled:opacity-50 text-center"
             >
               {cancelText}
             </button>
@@ -149,7 +149,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             type="button"
             disabled={loading}
             onClick={handleConfirmClick}
-            className={`px-5 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2 ${getConfirmButtonClasses()}`}
+            className={`flex-1 sm:flex-initial px-4 sm:px-5 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${getConfirmButtonClasses()}`}
           >
             {loading && (
               <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />

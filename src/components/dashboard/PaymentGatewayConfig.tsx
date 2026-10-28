@@ -53,11 +53,11 @@ export const PaymentGatewayConfig: React.FC<PaymentGatewayConfigProps> = ({
 
   return (
     <Card className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-3 sm:gap-4">
         <div>
-          <h3 className="text-xl font-bold text-white flex items-center gap-2">
-            <CreditCard className="text-pink-400" size={20} />
-            ABA PayWay & Bakong KHQR Settings
+          <h3 className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
+            <CreditCard className="text-pink-400" size={18} />
+            <span>ABA PayWay &amp; Bakong KHQR Settings</span>
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
             Accept instant tips via ABA Mobile and all Bakong member banking apps in Cambodia
@@ -69,6 +69,7 @@ export const PaymentGatewayConfig: React.FC<PaymentGatewayConfigProps> = ({
           onClick={handleSave}
           loading={saving}
           icon={savedSuccess ? <Check size={14} /> : undefined}
+          className="w-full sm:w-auto justify-center"
         >
           {savedSuccess ? 'Saved!' : 'Save Payment Config'}
         </Button>

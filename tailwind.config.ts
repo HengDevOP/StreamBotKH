@@ -10,6 +10,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      screens: {
+        'xxs': '320px',
+        'xs': '375px',
+      },
       colors: {
         neon: {
           cyan: '#00F0FF',

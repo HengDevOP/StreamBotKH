@@ -478,34 +478,34 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
   return (
     <div className="space-y-6">
       {/* Mode Navigation Tabs */}
-      <div className="flex rounded-2xl bg-slate-950 p-1.5 border border-slate-800 text-xs font-mono font-bold flex-wrap gap-1">
+      <div className="flex rounded-2xl bg-slate-950 p-1.5 border border-slate-800 text-xs font-mono font-bold flex-wrap sm:flex-nowrap gap-1">
         <button
           onClick={() => setActiveMode('phone')}
-          className={`flex-1 min-w-[160px] py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap ${
             activeMode === 'phone'
               ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
-          <Phone size={14} />
-          <span>TelegramJS Phone Login</span>
+          <Phone size={13} />
+          <span>Phone Login</span>
           {userClientStatus.isConnected && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
           )}
         </button>
 
         <button
           onClick={() => setActiveMode('groups')}
-          className={`flex-1 min-w-[160px] py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap ${
             activeMode === 'groups'
               ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
-          <Users size={14} />
-          <span>Telegram Groups</span>
+          <Users size={13} />
+          <span>Groups</span>
           {targetGroups.length > 0 && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold flex-shrink-0 ${
               activeMode === 'groups' ? 'bg-slate-950 text-cyan-300' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
             }`}>
               {targetGroups.length}
@@ -515,14 +515,14 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
 
         <button
           onClick={() => setActiveMode('simulator')}
-          className={`flex-1 min-w-[160px] py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all ${
+          className={`flex-1 py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap ${
             activeMode === 'simulator'
               ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
-          <Zap size={14} />
-          <span>Phrase Simulator Deck</span>
+          <Zap size={13} />
+          <span>Simulator</span>
         </button>
       </div>
 

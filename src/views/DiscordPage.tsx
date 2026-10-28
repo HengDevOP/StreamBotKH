@@ -27,27 +27,27 @@ const DiscordIcon = () => (
 
 export const DiscordPage: React.FC<DiscordPageProps> = ({ onNavigate }) => {
   return (
-    <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-16">
+    <div className="min-h-screen py-8 sm:py-16 px-3 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-10 sm:space-y-16">
       {/* Header */}
-      <div className="text-center space-y-4 max-w-2xl mx-auto">
+      <div className="text-center space-y-3 sm:space-y-4 max-w-2xl mx-auto">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-[#5865F2]">
           <DiscordIcon />
           <span className="uppercase tracking-widest font-semibold">STREAMBOTKH COMMUNITY</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
+        <h1 className="text-2xl xs:text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
           Join Cambodia's Streamer Hub
         </h1>
-        <p className="text-sm sm:text-base text-slate-400 leading-relaxed">
+        <p className="text-xs sm:text-base text-slate-400 leading-relaxed px-1">
           Connect with 2,400+ live streamers, get instant OBS setup help, share custom alert overlays, and speak directly with our engineering team.
         </p>
 
         {/* Action Button */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <a
             href="https://discord.gg/streambotkh"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold text-sm transition-colors"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold text-sm transition-colors"
           >
             <DiscordIcon />
             <span>Join Official Discord Server</span>
@@ -55,7 +55,7 @@ export const DiscordPage: React.FC<DiscordPageProps> = ({ onNavigate }) => {
           </a>
           <button
             onClick={() => onNavigate('resources')}
-            className="px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-sm font-semibold transition-colors"
+            className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-sm font-semibold transition-colors"
           >
             Explore Resources
           </button>

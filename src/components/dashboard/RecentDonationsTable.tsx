@@ -44,7 +44,92 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
+      {/* Mobile Card List View (< 640px) */}
+      <div className="block sm:hidden divide-y divide-slate-800/60">
+        {donations.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-500 font-mono px-4">
+            No donations received yet. Share your stream link to start receiving tips!
+          </div>
+        ) : (
+          donations.map((d) => (
+            <div key={d.id} className="p-3.5 space-y-2 hover:bg-slate-900/40 transition-colors">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-cyan-600 to-pink-600 flex items-center justify-center text-xs font-bold text-white uppercase flex-shrink-0">
+                    {d.donor_name.slice(0, 1)}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-white truncate block">
+                      {d.donor_name}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {d.paid_at || d.created_at ? new Date(d.paid_at || d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right flex-shrink-0 font-mono font-black text-sm">
+                  {d.currency === 'KHR' ? (
+                    <span className="text-pink-400">{d.amount.toLocaleString()} ៛</span>
+                  ) : (
+                    <span className="text-cyan-400">${d.amount.toFixed(2)}</span>
+                  )}
+                </div>
+              </div>
+
+              {d.donor_message && (
+                <div className="text-xs text-slate-300 italic bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-start gap-1.5">
+                  <MessageSquare size={12} className="text-slate-500 mt-0.5 flex-shrink-0" />
+                  <span className="break-words line-clamp-3">"{d.donor_message}"</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1 text-[11px] font-mono">
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700/80 text-cyan-300 text-[10px]">
+                    {d.banking_name || (d.payment_method === 'ABA_PAYWAY' ? 'ABA PayWay' : 'Bakong KHQR')}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    d.status === 'PAID'
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {d.status === 'PAID' ? <CheckCircle2 size={10} /> : <Clock size={10} />} {d.status}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {onReplayAlert && (
+                    <button
+                      type="button"
+                      onClick={() => onReplayAlert(d)}
+                      className="px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/80 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Replay Alert"
+                    >
+                      <Play size={10} />
+                      <span>Replay</span>
+                    </button>
+                  )}
+                  {onDeleteDonation && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteDonation(d.id)}
+                      disabled={deletingId === d.id}
+                      className="p-1 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/25 text-red-400 transition-colors disabled:opacity-50"
+                      title="Delete record"
+                    >
+                      {deletingId === d.id ? <Loader2 size={12} className="animate-spin text-red-400" /> : <Trash2 size={12} />}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop & Tablet Table View (>= 640px) */}
+      <div className="hidden sm:block overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
         <table className="w-full min-w-[620px] text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-950/40 text-[11px] font-bold uppercase tracking-wider text-slate-400">

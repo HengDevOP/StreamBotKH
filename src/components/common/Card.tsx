@@ -27,7 +27,7 @@ export const Card: React.FC<CardProps> = ({
     <div
       onClick={onClick}
       className={clsx(
-        "bg-[#0B0F19] rounded-2xl border transition-colors duration-200 p-6 relative overflow-hidden",
+        "bg-[#0B0F19] rounded-2xl border transition-colors duration-200 p-4 sm:p-6 relative overflow-hidden",
         borderStyles[glow],
         className
       )}

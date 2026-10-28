@@ -179,11 +179,11 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Scan To Pay" maxWidth="sm">
-      <div className="flex flex-col items-center text-center space-y-4 py-2">
-        {/* Official Bakong KHQR Canvas (Show only the pure QR code) */}
-        <div className="p-3 bg-white border-2 border-slate-700 shadow-2xl">
+      <div className="flex flex-col items-center text-center space-y-3.5 py-1">
+        {/* Official Bakong KHQR Canvas (Show only the pure QR code, fluidly responsive for small devices) */}
+        <div className="p-2 sm:p-3 bg-white border-2 border-slate-700 shadow-2xl rounded-xl max-w-full">
           {paid ? (
-            <div className="w-64 h-64 flex flex-col items-center justify-center space-y-3 bg-[#090D18] rounded-xl border border-emerald-500/30">
+            <div className="w-52 h-52 xs:w-60 xs:h-60 sm:w-64 sm:h-64 flex flex-col items-center justify-center space-y-3 bg-[#090D18] rounded-xl border border-emerald-500/30">
               <style>{`
                 @keyframes modalDrawCircle {
                   0% { stroke-dashoffset: 155; opacity: 0; }
@@ -238,13 +238,13 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
             <img
               src={donationData.qrImage || masterKhqrImage || '/uploads/payment/khqr-1793011590730-7bad271c.jpg'}
               alt="Scan To Pay"
-              className="w-64 h-64 object-contain select-none"
+              className="w-52 h-52 xs:w-60 xs:h-60 sm:w-64 sm:h-64 object-contain select-none max-w-full"
             />
           )}
         </div>
 
         {/* Temporary Duration Countdown for the Alerts */}
-        <div className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-950 border border-slate-800 text-xs font-mono">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs font-mono">
           <Clock size={13} className="text-amber-400" />
           <span className="text-slate-400">Session Expires:</span>
           <span className="font-bold text-white font-mono">{formattedTime}</span>

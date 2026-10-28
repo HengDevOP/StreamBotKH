@@ -291,31 +291,33 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
         </div>
 
         {/* Tab Switcher: My Uploads vs Online Media */}
-        <div className="px-6 py-2.5 bg-[#070A12] border-b border-slate-800 flex items-center gap-2">
+        <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 bg-[#070A12] border-b border-slate-800 flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={() => setActiveSection('uploads')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSection === 'uploads'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Layers size={13} />
-            <span>My Uploads ({mediaList.length})</span>
+            <span className="hidden xs:inline">My Uploads ({mediaList.length})</span>
+            <span className="xs:hidden">Uploads ({mediaList.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSection('online')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 cursor-pointer ${
               activeSection === 'online'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Globe size={13} />
-            <span>Online Media (20 Sounds)</span>
+            <span className="hidden xs:inline">Online Media (20 Sounds)</span>
+            <span className="xs:hidden">Online (20)</span>
             <span className="px-1.5 py-0.2 rounded bg-pink-500 text-white text-[8px] font-bold uppercase tracking-wider animate-pulse">
               HOT
             </span>

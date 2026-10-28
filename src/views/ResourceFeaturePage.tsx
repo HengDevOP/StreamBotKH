@@ -406,7 +406,7 @@ export const ResourceFeaturePage: React.FC<ResourceFeaturePageProps> = ({ onNavi
   };
 
   return (
-    <div className="relative min-h-screen py-10 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-14">
+    <div className="relative min-h-screen py-8 sm:py-14 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-10 sm:space-y-14">
       {/* Ambient Glow */}
       <div
         className="absolute top-8 left-1/2 -translate-x-1/2 w-[650px] h-[320px] rounded-full blur-[150px] pointer-events-none -z-10 opacity-20"
@@ -481,20 +481,20 @@ export const ResourceFeaturePage: React.FC<ResourceFeaturePageProps> = ({ onNavi
             </span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-black text-white font-['Chakra_Petch'] tracking-tight leading-[1.1]">
+          <h1 className="text-2xl xs:text-3xl sm:text-5xl font-black text-white font-['Chakra_Petch'] tracking-tight leading-[1.1]">
             {feature.headline}
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl">
+          <p className="text-xs sm:text-base text-slate-300 leading-relaxed max-w-2xl px-0.5">
             {feature.description}
           </p>
 
-          <div className="flex flex-wrap items-center gap-3.5 pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
             <Button
               variant="primary"
               size="lg"
               onClick={handleLaunchFeature}
-              className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black font-mono text-xs sm:text-sm px-6 py-3.5 shadow-[0_0_25px_rgba(0,240,255,0.35)]"
+              className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black font-mono text-xs sm:text-sm px-6 py-3.5 shadow-[0_0_25px_rgba(0,240,255,0.35)] justify-center"
             >
               <span>{user ? `Open ${feature.title} in Dashboard` : `Sign In to Use ${feature.title}`}</span>
               <ArrowRight size={16} />
@@ -504,7 +504,7 @@ export const ResourceFeaturePage: React.FC<ResourceFeaturePageProps> = ({ onNavi
               variant="outline"
               size="lg"
               onClick={handleRunInteractiveDemo}
-              className="border-slate-700 hover:border-cyan-400 text-slate-200 font-mono text-xs sm:text-sm px-5 py-3.5"
+              className="border-slate-700 hover:border-cyan-400 text-slate-200 font-mono text-xs sm:text-sm px-5 py-3.5 justify-center"
             >
               <Play size={15} className="text-cyan-400 fill-cyan-400" />
               <span>{simTriggered ? 'Simulating Live Overlay...' : 'Test Live Preview'}</span>

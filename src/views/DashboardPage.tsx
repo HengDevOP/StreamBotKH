@@ -1171,24 +1171,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       {/* ============================================================== */}
       <main className="flex-1 h-full overflow-y-auto min-w-0 flex flex-col bg-[#060911]">
         {/* Top Desktop Application Header Bar (Spacious Executive Header) */}
-        <header className="sticky top-0 z-20 h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-4 sm:px-8 flex items-center justify-between gap-4 flex-shrink-0">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <header className="sticky top-0 z-20 h-16 sm:h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-8 flex items-center justify-between gap-2.5 sm:gap-4 flex-shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
             {/* Mobile Menu Hamburger */}
             <button
               onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-              className="md:hidden p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white focus:outline-none flex-shrink-0"
+              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white focus:outline-none flex-shrink-0"
               aria-label="Toggle Navigation Drawer"
             >
-              {mobileDrawerOpen ? <X size={20} /> : <Menu size={20} />}
+              {mobileDrawerOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
 
             {/* Active Section Title */}
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="hidden sm:flex w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 items-center justify-center text-cyan-400 flex-shrink-0 shadow-inner">
-                <CurrentTabIcon size={20} />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-700/80 items-center justify-center text-cyan-400 flex-shrink-0 shadow-inner">
+                <CurrentTabIcon size={18} />
               </div>
               <div className="flex flex-col justify-center min-w-0">
-                <h1 className="text-base sm:text-lg font-black text-white font-['Chakra_Petch'] tracking-tight truncate">
+                <h1 className="text-sm xs:text-base sm:text-lg font-black text-white font-['Chakra_Petch'] tracking-tight truncate">
                   {currentTabTitle}
                 </h1>
               </div>
@@ -1196,33 +1196,36 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           </div>
 
           {/* Quick Action Command Deck: Upgrade / Pro Status */}
-          <div className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             {currentPlan === 'free' ? (
               <button
                 onClick={() => {
                   setUpgradeFeatureName(undefined);
                   setIsVideoUpgradeModalOpen(true);
                 }}
-                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-black text-xs sm:text-sm font-['Chakra_Petch'] transition-all shadow-[0_0_20px_rgba(0,240,255,0.35)] hover:shadow-[0_0_28px_rgba(0,240,255,0.6)] cursor-pointer"
+                className="flex items-center gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-black text-xs sm:text-sm font-['Chakra_Petch'] transition-all shadow-[0_0_20px_rgba(0,240,255,0.35)] hover:shadow-[0_0_28px_rgba(0,240,255,0.6)] cursor-pointer"
                 title="Upgrade to Pro Plan"
               >
-                <Sparkles size={16} className="text-slate-950" />
-                <span>Upgrade</span>
+                <Sparkles size={14} className="text-slate-950 flex-shrink-0" />
+                <span className="hidden xxs:inline">Upgrade</span>
+                <span className="xxs:hidden">Pro</span>
               </button>
             ) : (
               <div
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-bold text-xs sm:text-sm font-['Chakra_Petch'] shadow-[0_0_15px_rgba(16,185,129,0.15)] select-none"
+                className="flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-bold text-xs sm:text-sm font-['Chakra_Petch'] shadow-[0_0_15px_rgba(16,185,129,0.15)] select-none"
                 title="Pro Streamer Plan Active"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>You are on Pro Plan</span>
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+                <span className="hidden sm:inline">You are on Pro Plan</span>
+                <span className="hidden xxs:inline sm:hidden">Pro Plan</span>
+                <span className="xxs:hidden">Pro</span>
               </div>
             )}
           </div>
         </header>
 
         {/* Dynamic Workbench Views */}
-        <div className="p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-8 animate-fadeIn pb-16">
+        <div className="p-3 xs:p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6 sm:space-y-8 animate-fadeIn pb-16">
           {loading ? (
             <DashboardSkeleton />
           ) : (

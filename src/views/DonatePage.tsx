@@ -174,28 +174,28 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
   }
 
   return (
-    <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col items-center justify-center py-8 sm:py-12 px-4 sm:px-6">
+    <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col items-center justify-center py-4 xs:py-6 sm:py-12 px-2.5 xs:px-4 sm:px-6">
       {/* Cancellation Notice Toast (Device: Pop top / Desktop: Pop slide left top-right) */}
       {cancelMessage && !isSuccess && (
         <div
           role="alert"
           aria-live="assertive"
-          className="fixed z-50 top-4 left-3 right-3 max-w-sm mx-auto md:top-6 md:right-6 md:left-auto md:w-96 md:max-w-none animate-cancel-toast pointer-events-auto"
+          className="fixed z-50 top-3 left-2 right-2 max-w-sm mx-auto md:top-6 md:right-6 md:left-auto md:w-96 md:max-w-none animate-cancel-toast pointer-events-auto"
         >
-          <div className="relative overflow-hidden rounded-xl bg-[#0d0910]/95 backdrop-blur-md border border-red-500/40 p-3.5 sm:p-4 shadow-2xl shadow-red-950/70 flex items-start gap-3 text-slate-100">
+          <div className="relative overflow-hidden rounded-xl bg-[#0d0910]/95 backdrop-blur-md border border-red-500/40 p-3 sm:p-4 shadow-2xl shadow-red-950/70 flex items-start gap-2.5 sm:gap-3 text-slate-100">
             {/* Ambient Red Glow Line */}
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500" />
 
-            <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shadow-inner shadow-red-500/20">
-              <XCircle size={18} className="animate-pulse" />
+            <div className="mt-0.5 flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shadow-inner shadow-red-500/20">
+              <XCircle size={16} className="animate-pulse" />
             </div>
 
             <div className="flex-1 min-w-0 pr-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase font-mono tracking-wider font-semibold text-red-400 bg-red-950/70 px-1.5 py-0.5 rounded border border-red-800/50">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-[9px] sm:text-[10px] uppercase font-mono tracking-wider font-semibold text-red-400 bg-red-950/70 px-1.5 py-0.5 rounded border border-red-800/50">
                   Cancelled
                 </span>
-                <span className="text-[11px] font-mono text-slate-400">
+                <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">
                   Payment Voided
                 </span>
               </div>
@@ -217,7 +217,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
 
       {/* Success Screen after Payment */}
       {isSuccess && activeDonation ? (
-        <div className="w-full max-w-md mx-auto py-4 animate-fadeIn">
+        <div className="w-full max-w-md mx-auto py-2 sm:py-4 animate-fadeIn">
           <DonationSuccess
             donorName={currentDonorName}
             bankingName={currentBankingName}
@@ -231,7 +231,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         </div>
       ) : (
         /* Main Centered Container Div: not full width and not full height, side-by-side equal height on desktop */
-        <div className="w-full max-w-4xl mx-auto flex flex-col md:flex-row md:items-stretch justify-center gap-6 animate-fadeIn">
+        <div className="w-full max-w-4xl mx-auto flex flex-col md:flex-row md:items-stretch justify-center gap-4 sm:gap-6 animate-fadeIn">
           
           {/* First Div: For the Content (left side) */}
           <div className="w-full md:w-[460px] lg:w-[480px] flex-shrink-0 min-w-0 flex flex-col">
@@ -244,7 +244,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
 
           {/* Second Div: For the Latest Support (right side, plain list) */}
           <div className="w-full md:w-[320px] lg:w-[360px] flex-shrink-0 min-w-0 flex flex-col">
-            <Card className="p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl flex flex-col h-full w-full">
+            <Card className="p-4 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl flex flex-col h-full w-full">
               {/* Header */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 flex-shrink-0">
                 <div className="flex items-center gap-2">

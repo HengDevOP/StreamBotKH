@@ -67,8 +67,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-16">
-      <div className="w-full max-w-md p-8 sm:p-10 space-y-7 text-center rounded-2xl border border-slate-800 bg-[#0B0F19] shadow-2xl">
+    <div className="min-h-[80vh] flex items-center justify-center px-3 xs:px-4 py-8 sm:py-16">
+      <div className="w-full max-w-md p-5 xs:p-8 sm:p-10 space-y-5 sm:space-y-7 text-center rounded-2xl border border-slate-800 bg-[#0B0F19] shadow-2xl">
         {/* Brand Logo */}
         <div className="w-16 h-16 mx-auto flex items-center justify-center">
           <img

@@ -319,12 +319,12 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
   };
 
   return (
-    <Card className="p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl space-y-5 w-full h-full flex flex-col justify-between">
+    <Card className="p-4 xs:p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl space-y-4 sm:space-y-5 w-full h-full flex flex-col justify-between">
       {/* 1. Streamer Profile & Bio Header */}
-      <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-800/80">
-        <div className="flex items-center gap-3.5 min-w-0">
+      <div className="flex items-start justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-800/80">
+        <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
           <div className="relative flex-shrink-0">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl p-0.5 bg-gradient-to-tr from-cyan-500 via-indigo-500 to-pink-500 shadow-md">
+            <div className="w-11 h-11 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl p-0.5 bg-gradient-to-tr from-cyan-500 via-indigo-500 to-pink-500 shadow-md">
               <img
                 src={streamer.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamer.username}`}
                 alt={streamer.displayName}
@@ -341,7 +341,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h1 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] truncate">
+              <h1 className="text-sm xs:text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] truncate">
                 {streamer.displayName}
               </h1>
               {streamer.isVerified && (
@@ -350,9 +350,9 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-cyan-400 font-mono">@{streamer.username}</p>
+            <p className="text-[10px] xs:text-[11px] text-cyan-400 font-mono">@{streamer.username}</p>
             {streamer.bio && (
-              <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+              <p className="text-[11px] xs:text-xs text-slate-400 line-clamp-2 mt-0.5 sm:mt-1 leading-relaxed">
                 {streamer.bio}
               </p>
             )}

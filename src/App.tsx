@@ -218,18 +218,18 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         }}
       />
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-slate-800/80 bg-[#06080F] py-8 text-center text-xs text-slate-400 space-y-2 font-mono">
-        <div className="flex items-center justify-center gap-2.5">
+      <footer className="border-t border-slate-800/80 bg-[#06080F] py-6 sm:py-8 px-4 text-center text-xs text-slate-400 space-y-2 font-mono">
+        <div className="flex flex-wrap items-center justify-center gap-2 text-center">
           <img
             src="/images/logo-64.png"
             alt="streambotkh.com"
-            className="w-5 h-5 object-contain"
+            className="w-4 h-4 sm:w-5 sm:h-5 object-contain"
           />
           <span className="font-bold text-slate-200">STREAMBOTKH.COM</span>
-          <span>•</span>
-          <span>ABA PAYWAY & BAKONG KHQR OVERLAY ENGINE</span>
+          <span className="hidden xxs:inline">•</span>
+          <span className="text-[10px] sm:text-xs text-slate-400">ABA PAYWAY &amp; BAKONG KHQR OVERLAY ENGINE</span>
         </div>
-        <p className="text-slate-400 text-[11px]">
+        <p className="text-slate-400 text-[10px] sm:text-[11px] max-w-lg mx-auto">
           Empowering live streamers across Cambodia with zero-latency tip alerts and Telegram notifications.
         </p>
       </footer>

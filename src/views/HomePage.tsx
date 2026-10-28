@@ -98,7 +98,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     <div
       key={key}
       onClick={() => onNavigate('donate', { username: creator.username })}
-      className="w-[280px] sm:w-[320px] flex-shrink-0 p-4 rounded-2xl bg-[#0C101C]/90 hover:bg-[#121829] border border-slate-800/90 hover:border-cyan-500/50 shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer group flex flex-col justify-between space-y-3.5 select-none"
+      className="w-[250px] xs:w-[280px] sm:w-[320px] flex-shrink-0 p-3.5 sm:p-4 rounded-2xl bg-[#0C101C]/90 hover:bg-[#121829] border border-slate-800/90 hover:border-cyan-500/50 shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer group flex flex-col justify-between space-y-3 sm:space-y-3.5 select-none"
     >
       <div className="flex items-center gap-3 min-w-0">
         <div className="relative flex-shrink-0">
@@ -162,30 +162,30 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       <div className="absolute inset-0 cyber-grid opacity-25 pointer-events-none -z-10" />
 
       {/* ===================== HERO SECTION ===================== */}
-      <section className="relative pt-12 sm:pt-20 text-center space-y-9 max-w-5xl mx-auto px-4">
+      <section className="relative pt-8 sm:pt-20 text-center space-y-6 sm:space-y-9 max-w-5xl mx-auto px-3 sm:px-4">
         {/* Holographic Live Status Pill */}
-        <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/30 text-xs font-mono text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)] backdrop-blur-md transition-all hover:border-cyan-400/50">
-          <span className="flex h-2 w-2 relative">
+        <div className="inline-flex items-center justify-center flex-wrap gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/30 text-xs font-mono text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)] backdrop-blur-md transition-all hover:border-cyan-400/50 max-w-full">
+          <span className="flex h-2 w-2 relative flex-shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
           </span>
-          <span className="tracking-widest uppercase font-semibold text-[11px] text-slate-200">
+          <span className="tracking-widest uppercase font-semibold text-[10px] sm:text-[11px] text-slate-200">
             LIVE IN CAMBODIA: ABA PAYWAY &amp; BAKONG KHQR 2.0
           </span>
-          <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 text-[10px] font-bold border border-pink-500/40 uppercase tracking-wider">
+          <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 text-[9px] sm:text-[10px] font-bold border border-pink-500/40 uppercase tracking-wider flex-shrink-0">
             0% FEE ON PRO
           </span>
         </div>
 
         {/* Hero Headline */}
-        <div className="space-y-5">
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white uppercase leading-[1.08] font-['Chakra_Petch']">
+        <div className="space-y-4 sm:space-y-5">
+          <h1 className="text-3xl xs:text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white uppercase leading-[1.08] font-['Chakra_Petch']">
             LEVEL UP YOUR LIVESTREAM <br />
             <span className="animate-shimmer text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-indigo-300 to-pink-500">
               WITH INSTANT DIRECT TIPS
             </span>
           </h1>
-          <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal">
+          <p className="text-sm sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal px-1">
             The next-generation live tipping engine built for Cambodian content creators. Accept instant payments via <b className="text-white font-semibold">ABA Mobile</b>, <b className="text-white font-semibold">ACLEDA</b>, and <b className="text-white font-semibold">Bakong KHQR</b> with 60 FPS OBS alerts, automated Khmer/English voice TTS, and Telegram alerts.
           </p>
         </div>
@@ -194,35 +194,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         <div className="flex items-center justify-center pt-2">
           <button
             onClick={() => onNavigate('dashboard')}
-            className="group relative inline-flex items-center justify-center gap-3 px-10 py-4 text-base font-bold text-slate-950 font-['Chakra_Petch'] uppercase tracking-wider bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 rounded-2xl shadow-[0_0_30px_rgba(0,240,255,0.4)] hover:shadow-[0_0_50px_rgba(0,240,255,0.65)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative inline-flex items-center justify-center gap-2.5 sm:gap-3 px-7 sm:px-10 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-slate-950 font-['Chakra_Petch'] uppercase tracking-wider bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 rounded-2xl shadow-[0_0_30px_rgba(0,240,255,0.4)] hover:shadow-[0_0_50px_rgba(0,240,255,0.65)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer overflow-hidden w-full xs:w-auto"
           >
             {/* Shimmer sweep effect */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none" />
-            <Zap size={20} className="fill-slate-950 text-slate-950 group-hover:rotate-12 transition-transform duration-300" />
+            <Zap size={18} className="fill-slate-950 text-slate-950 group-hover:rotate-12 transition-transform duration-300 flex-shrink-0" />
             <span className="relative z-10">Get Started</span>
-            <ArrowRight size={18} className="text-slate-950 group-hover:translate-x-1 transition-transform duration-300" />
+            <ArrowRight size={16} className="text-slate-950 group-hover:translate-x-1 transition-transform duration-300 flex-shrink-0" />
           </button>
         </div>
 
         {/* Micro Trust Badges */}
-        <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 text-xs font-mono">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
-            <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-mono">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
+            <CheckCircle2 size={13} className="text-emerald-400 flex-shrink-0" />
             <span>0% Platform Fee on Pro</span>
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
-            <CheckCircle2 size={14} className="text-cyan-400 flex-shrink-0" />
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
+            <CheckCircle2 size={13} className="text-cyan-400 flex-shrink-0" />
             <span>30+ Cambodian Banks via Bakong</span>
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
-            <CheckCircle2 size={14} className="text-pink-400 flex-shrink-0" />
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
+            <CheckCircle2 size={13} className="text-pink-400 flex-shrink-0" />
             <span>OBS Studio &amp; Streamlabs 60 FPS</span>
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
-            <CheckCircle2 size={14} className="text-amber-400 flex-shrink-0" />
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
+            <CheckCircle2 size={13} className="text-amber-400 flex-shrink-0" />
             <span>Instant Telegram Bot Dispatch</span>
           </div>
         </div>

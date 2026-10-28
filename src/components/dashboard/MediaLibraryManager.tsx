@@ -361,32 +361,35 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
       </div>
 
       {/* Section Switcher Tabs: My Uploads vs Online Media */}
-      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 w-full sm:w-fit">
+      <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 w-full sm:w-fit">
         <button
           type="button"
           onClick={() => setActiveSection('uploads')}
-          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
             activeSection === 'uploads'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
           <Layers size={14} />
-          <span>My Uploads ({mediaList.length})</span>
+          <span className="hidden xs:inline">My Uploads ({mediaList.length})</span>
+          <span className="xs:hidden">Uploads ({mediaList.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveSection('online')}
-          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
             activeSection === 'online'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
           <Globe size={14} />
-          <span>Online Media (20 Popular Sounds)</span>
-          <span className="px-1.5 py-0.2 rounded bg-pink-500 text-white text-[9px] font-bold uppercase tracking-wider animate-pulse">
+          <span className="hidden sm:inline">Online Media (20 Popular Sounds)</span>
+          <span className="hidden xs:inline sm:hidden">Online (20 Sounds)</span>
+          <span className="xs:hidden">Online (20)</span>
+          <span className="px-1.5 py-0.2 rounded bg-pink-500 text-white text-[8px] sm:text-[9px] font-bold uppercase tracking-wider animate-pulse flex-shrink-0">
             HOT
           </span>
         </button>

@@ -136,7 +136,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats }) => {
           </div>
         </div>
         <div className="mt-4 flex items-baseline gap-2">
-          <span className="text-3xl font-black tracking-tight text-white font-mono">
+          <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
             ${totalUsd.toFixed(2)}
           </span>
         </div>
@@ -157,8 +157,8 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats }) => {
           </div>
         </div>
         <div className="mt-4 flex items-baseline gap-2">
-          <span className="text-3xl font-black tracking-tight text-white font-mono">
-            {totalKhr.toLocaleString()} <span className="text-lg font-bold text-pink-400">៛</span>
+          <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
+            {totalKhr.toLocaleString()} <span className="text-base sm:text-lg font-bold text-pink-400">៛</span>
           </span>
         </div>
         <div className="mt-2 flex items-center text-xs text-slate-400">
@@ -176,7 +176,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats }) => {
           </div>
         </div>
         <div className="mt-4 flex items-baseline gap-2">
-          <span className="text-3xl font-black tracking-tight text-white font-mono">
+          <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
             ${todayUsd.toFixed(2)}
           </span>
           {todayKhr > 0 && (
@@ -200,7 +200,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats }) => {
           </div>
         </div>
         <div className="mt-4 flex items-baseline gap-2">
-          <span className="text-3xl font-black tracking-tight text-white font-mono">
+          <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
             {totalCount}
           </span>
         </div>

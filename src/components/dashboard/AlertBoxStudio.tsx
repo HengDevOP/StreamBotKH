@@ -78,23 +78,24 @@ export const AlertBoxStudio: React.FC<AlertBoxStudioProps> = ({
   return (
     <Card className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-3 sm:gap-4">
         <div>
-          <h3 className="text-xl font-bold text-white flex items-center gap-2">
-            <Sliders className="text-cyan-400" size={20} />
-            Alert Box Studio
+          <h3 className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
+            <Sliders className="text-cyan-400" size={18} />
+            <span>Alert Box Studio</span>
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">Customize your live stream overlay animation, sound effects, and TTS</p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={handleTestAlert}
             loading={testing}
             icon={<Send size={14} />}
+            className="flex-1 sm:flex-initial justify-center text-xs"
           >
-            Send Test Alert
+            Send Test
           </Button>
           <Button
             variant="primary"
@@ -102,8 +103,9 @@ export const AlertBoxStudio: React.FC<AlertBoxStudioProps> = ({
             onClick={handleSave}
             loading={saving}
             icon={savedSuccess ? <Check size={14} /> : <Settings2 size={14} />}
+            className="flex-1 sm:flex-initial justify-center text-xs"
           >
-            {savedSuccess ? 'Saved!' : 'Save Settings'}
+            {savedSuccess ? 'Saved!' : 'Save'}
           </Button>
         </div>
       </div>

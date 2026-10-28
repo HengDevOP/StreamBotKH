@@ -71,7 +71,7 @@ export const ObsOverlayModal: React.FC<ObsOverlayModalProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <input
               type={showToken ? 'text' : 'password'}
               readOnly
@@ -83,6 +83,7 @@ export const ObsOverlayModal: React.FC<ObsOverlayModalProps> = ({
               size="sm"
               onClick={handleCopy}
               icon={copied ? <Check size={14} /> : <Copy size={14} />}
+              className="justify-center sm:justify-start"
             >
               {copied ? 'Copied' : 'Copy'}
             </Button>
@@ -90,7 +91,7 @@ export const ObsOverlayModal: React.FC<ObsOverlayModalProps> = ({
         </div>
 
         {/* Quick Launch Preview */}
-        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/30">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/30">
           <div className="flex items-center gap-2 text-xs text-slate-300">
             <MonitorPlay size={16} className="text-cyan-400 flex-shrink-0" />
             <span>Open preview in separate browser tab to test alerts</span>
