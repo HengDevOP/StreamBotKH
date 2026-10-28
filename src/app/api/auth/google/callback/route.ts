@@ -92,9 +92,9 @@ export async function GET(req: NextRequest) {
       picture: userData.picture || ''
     });
 
-    // 4. Sign JWT and redirect back to frontend
+    // 4. Sign JWT and redirect directly to dashboard with token
     const jwtToken = generateToken(streamer);
-    return NextResponse.redirect(`${frontendOrigin}/login?token=${encodeURIComponent(jwtToken)}`, 302);
+    return NextResponse.redirect(`${frontendOrigin}/dashboard?token=${encodeURIComponent(jwtToken)}`, 302);
   } catch (err: any) {
     console.error('[Auth] Google OAuth callback error:', err);
     return NextResponse.redirect(

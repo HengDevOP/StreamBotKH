@@ -43,6 +43,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       setTokenAndRefresh(urlToken).then(() => {
         onSuccess();
       });
+      return;
+    }
+
+    // If visited directly without an error or token and not already authenticated, redirect straight to Google Sign-In URL
+    if (!urlError && !localStorage.getItem('streamneon_auth_token')) {
+      setRedirecting(true);
+      loginWithGoogleRedirect();
     }
   }, []);
 

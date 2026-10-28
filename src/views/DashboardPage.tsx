@@ -112,7 +112,7 @@ export type DashboardTab =
   | 'admin-requests';
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initialTab, initialSelectedId }) => {
-  const { user, refreshUser, logout } = useAuth();
+  const { user, loading: authLoading, refreshUser, logout } = useAuth();
   const { socket, joinDashboardRoom, connected } = useSocket();
   const { playSynthNeonChime } = useAudio();
   const { showConfirm, showAlert } = useModal();
@@ -546,6 +546,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     });
   }, [stats?.recentDonations, searchQuery, currencyFilter, bankFilter]);
 
+  if (authLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-3 text-slate-400 text-xs font-mono">
+          <div className="w-8 h-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
+          <span>Signing in to your dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4">
@@ -558,7 +569,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <p className="text-xs text-slate-400">Please sign in to access your streamer dashboard.</p>
           </div>
           <Button variant="primary" size="md" className="w-full font-bold" onClick={() => onNavigate('login')}>
-            Sign In to StreamBotKH
+            Sign in with Google
           </Button>
         </div>
       </div>

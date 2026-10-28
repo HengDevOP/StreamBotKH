@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ModalProvider } from './context/ModalContext';
 import { Navbar } from './components/common/Navbar';
+import { authService } from './services/authService';
 
 // Page Views
 import { HomePage } from './views/HomePage';
@@ -50,6 +51,7 @@ function DashboardRouteWrapper() {
 
   const handleNav = (page: string, params?: any) => {
     if (page === 'home') navigate('/');
+    else if (page === 'login') authService.initiateGoogleOAuth();
     else if (page === 'donate') navigate(`/@${params?.username || 'neonstreamer'}`);
     else navigate(`/${page}`);
   };
@@ -74,7 +76,9 @@ function DonateRouteWrapper() {
     <DonatePage
       username={cleanUsername}
       onNavigate={(page, params) => {
-        if (page === 'donate') {
+        if (page === 'login') {
+          authService.initiateGoogleOAuth();
+        } else if (page === 'donate') {
           navigate(`/@${params?.username || cleanUsername}`);
         } else {
           navigate(page === 'home' ? '/' : `/${page}`);
@@ -207,6 +211,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       <Navbar
         onNavigate={(page, params) => {
           if (page === 'home') navigate('/');
+          else if (page === 'login') authService.initiateGoogleOAuth();
           else if (page === 'donate') navigate(`/@${params?.username || 'neonstreamer'}`);
           else navigate(`/${page}`);
         }}
@@ -232,6 +237,7 @@ function AppRoutes() {
 
   const handleNav = (page: string, params?: any) => {
     if (page === 'home') navigate('/');
+    else if (page === 'login') authService.initiateGoogleOAuth();
     else if (page === 'donate') navigate(`/@${params?.username || 'neonstreamer'}`);
     else navigate(`/${page}`);
   };

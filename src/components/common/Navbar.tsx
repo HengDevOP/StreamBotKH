@@ -122,7 +122,7 @@ const RESOURCE_FEATURES = [
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, loginWithGoogleRedirect } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileResourcesOpen, setMobileResourcesOpen] = useState(false);
@@ -139,6 +139,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
   };
 
   const handleNav = (path: string, key: string, params?: any) => {
+    if (key === 'login' || path === '/login') {
+      setMobileMenuOpen(false);
+      setDropdownOpen(false);
+      loginWithGoogleRedirect();
+      return;
+    }
     if (onNavigate) {
       onNavigate(key, params);
     } else {
@@ -420,20 +426,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <Link
-                  to="/login"
+                <a
+                  href={`/api/auth/google?origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}
                   onClick={(e) => {
-                    if (onNavigate) {
-                      e.preventDefault();
-                      onNavigate('login');
-                    }
+                    e.preventDefault();
+                    loginWithGoogleRedirect();
                   }}
-                  className="group relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.25] text-white text-xs font-medium transition-all duration-200"
+                  className="group relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/[0.25] text-white text-xs font-medium transition-all duration-200 cursor-pointer"
                 >
                   <GoogleIcon />
                   <span className="hidden xs:inline">Sign in with Google</span>
                   <span className="xs:hidden">Sign in</span>
-                </Link>
+                </a>
               </div>
             )}
           </div>
@@ -535,13 +539,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
 
           {!user && (
             <div className="pt-2 border-t border-slate-800">
-              <button
-                onClick={() => handleNav('/login', 'login')}
-                className="w-full py-2.5 px-3 rounded-xl bg-white/[0.06] border border-white/[0.12] text-white font-medium text-xs flex items-center justify-center gap-2.5"
+              <a
+                href={`/api/auth/google?origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setMobileMenuOpen(false);
+                  loginWithGoogleRedirect();
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-white/[0.06] border border-white/[0.12] text-white font-medium text-xs flex items-center justify-center gap-2.5 cursor-pointer"
               >
                 <GoogleIcon />
                 <span>Sign in with Google</span>
-              </button>
+              </a>
             </div>
           )}
         </div>
