@@ -80,6 +80,7 @@ import { TimerWidgetManager } from '../components/dashboard/TimerWidgetManager';
 import { SoundboardManager } from '../components/dashboard/SoundboardManager';
 import { AdminUsersManager } from '../components/dashboard/AdminUsersManager';
 import { AdminPullRequestsManager } from '../components/dashboard/AdminPullRequestsManager';
+import { MediaPickerModal } from '../components/dashboard/MediaPickerModal';
 import { useModal } from '../context/ModalContext';
 import { useAudio } from '../hooks/useAudio';
 
@@ -186,6 +187,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // UI / Action Modals
   const [isOverlayModalOpen, setIsOverlayModalOpen] = useState(false);
   const [isVideoUpgradeModalOpen, setIsVideoUpgradeModalOpen] = useState(false);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [copiedDonateLink, setCopiedDonateLink] = useState(false);
   const [copiedOverlayUrl, setCopiedOverlayUrl] = useState(false);
   const [showOverlayToken, setShowOverlayToken] = useState(false);
@@ -1402,6 +1404,53 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   )}
 
                   <div className="space-y-4 text-xs font-mono">
+                    {/* Profile Logo / Avatar Picker Setting */}
+                    <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div
+                          onClick={() => setIsMediaPickerOpen(true)}
+                          className="relative w-16 h-16 rounded-2xl bg-slate-900 border-2 border-cyan-500/40 hover:border-cyan-400 overflow-hidden cursor-pointer group flex-shrink-0 transition-all shadow-lg"
+                          title="Click to choose logo from Media Library"
+                        >
+                          <img
+                            src={
+                              profileAvatar ||
+                              user.avatarUrl ||
+                              `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
+                            }
+                            alt="Profile Logo"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ImageIcon size={18} className="text-cyan-400" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1 font-sans">
+                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <span>Profile Logo</span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                              Media Library
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            Choose an existing image/GIF from your Media Library or upload a new logo directly.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsMediaPickerOpen(true)}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-extrabold text-xs transition-all cursor-pointer shadow-md shadow-cyan-500/10"
+                        >
+                          <ImageIcon size={14} />
+                          <span>Choose from Media Library</span>
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Username Field */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
@@ -1465,17 +1514,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </span>
                     </div>
 
-                    {/* Avatar URL with Generator */}
+                    {/* Avatar URL with Media Library & Generator */}
                     <div>
-                      <label className="block text-slate-300 mb-1.5 font-semibold">Avatar Image URL</label>
-                      <div className="flex items-center gap-2">
+                      <label className="block text-slate-300 mb-1.5 font-semibold">Profile Logo URL</label>
+                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                         <input
-                          type="url"
+                          type="text"
                           value={profileAvatar}
                           onChange={(e) => setProfileAvatar(e.target.value)}
-                          placeholder="https://..."
-                          className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors"
+                          placeholder="/uploads/media/... or https://..."
+                          className="flex-1 min-w-[200px] px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setIsMediaPickerOpen(true)}
+                          className="px-3.5 py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-bold text-xs whitespace-nowrap transition-colors border border-cyan-500/30 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <ImageIcon size={13} />
+                          <span>Media Library</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() =>
@@ -1485,7 +1542,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                               )}`
                             )
                           }
-                          className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold text-xs whitespace-nowrap transition-colors border border-slate-700"
+                          className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs whitespace-nowrap transition-colors border border-slate-700 cursor-pointer"
                         >
                           Random Seed
                         </button>
@@ -1895,6 +1952,36 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         isOpen={isVideoUpgradeModalOpen}
         onClose={() => setIsVideoUpgradeModalOpen(false)}
         telegramContactUrl="https://t.me/@hchenheng"
+      />
+
+      {/* Reusable Media Library Picker Modal (with direct upload) */}
+      <MediaPickerModal
+        isOpen={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        currentUrl={profileAvatar}
+        title="Choose Profile Logo from Media Library"
+        subtitle="Select an image or GIF from your library, or upload a new file directly."
+        onSelect={async (selectedUrl) => {
+          setProfileAvatar(selectedUrl);
+          try {
+            setSavingProfile(true);
+            await streamerService.updateProfile({
+              username: profileUsername.trim().replace(/^@/, '').toLowerCase() || user.username,
+              displayName: profileName.trim() || user.displayName,
+              bio: profileBio.trim(),
+              description: profileBio.trim(),
+              avatarUrl: selectedUrl
+            });
+            await refreshUser();
+            setProfileSavedMsg(true);
+            setTimeout(() => setProfileSavedMsg(false), 3000);
+            loadData();
+          } catch (err: any) {
+            setProfileErrorMsg(err.message || 'Failed to update profile logo');
+          } finally {
+            setSavingProfile(false);
+          }
+        }}
       />
     </div>
   );

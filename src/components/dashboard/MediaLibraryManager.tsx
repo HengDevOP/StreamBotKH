@@ -59,10 +59,17 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   const MAX_SIZE_BYTES = 2 * 1024 * 1024;
   const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif'];
 
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   const fetchMedia = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/media');
+      const res = await fetch('/api/media', {
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       if (res.ok && data.success) {
         setMediaList(data.media || []);
@@ -115,6 +122,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     try {
       const res = await fetch('/api/media', {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData
       });
 
@@ -174,7 +182,8 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/media/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getAuthHeaders()
           });
           const data = await res.json();
           if (res.ok && data.success) {
