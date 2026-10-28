@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/server/database/db';
+import { getUsersCollection } from '@/server/database/mongo';
 
 export async function GET(_req: NextRequest) {
   try {
+    // 1. Sync verified streamers from MongoDB Atlas in case verification was toggled in Mongo
+    try {
+      const usersCol = await getUsersCollection();
+      const mongoVerified = await usersCol.find({ isVerified: true }).toArray();
+      for (const mv of mongoVerified) {
+        db.prepare('UPDATE streamers SET is_verified = 1 WHERE id = ? OR username = ? COLLATE NOCASE').run(
+          mv.userId,
+          mv.username
+        );
+      }
+    } catch (mErr) {
+      // Non-fatal if mongo offline
+    }
+
+    // 2. Fetch all verified streamers from database (no LIMIT)
     const verifiedStreamers = db.prepare(`
       SELECT s.id, s.username, s.display_name, s.avatar_url, s.bio, s.plan,
              COALESCE(SUM(d.amount), 0) as total_volume,
@@ -12,7 +28,6 @@ export async function GET(_req: NextRequest) {
       WHERE s.is_verified = 1
       GROUP BY s.id
       ORDER BY total_volume DESC, s.created_at DESC
-      LIMIT 20
     `).all() as any[];
 
     return NextResponse.json({
