@@ -3,11 +3,87 @@ import { getAuthenticatedUser } from '@/server/auth';
 import { db } from '@/server/database/db';
 import { getUsersCollection } from '@/server/database/mongo';
 
+const RESERVED_USERNAMES = new Set([
+  'admin',
+  'api',
+  'login',
+  'logout',
+  'dashboard',
+  'pricing',
+  'resources',
+  'discord',
+  'donate',
+  'overlay',
+  'widget',
+  'settings',
+  'support',
+  'help'
+]);
+
+async function checkUsernameAvailability(cleanUsername: string, currentUserId: string): Promise<{ available: boolean; error?: string }> {
+  if (!/^[a-zA-Z0-9_]{3,24}$/.test(cleanUsername)) {
+    return {
+      available: false,
+      error: 'Username must be 3-24 characters and contain only letters, numbers, and underscores.'
+    };
+  }
+
+  if (RESERVED_USERNAMES.has(cleanUsername.toLowerCase())) {
+    return {
+      available: false,
+      error: `The username "@${cleanUsername}" is reserved. Please choose another.`
+    };
+  }
+
+  // Check SQLite streamers table (case-insensitive)
+  const existingSqlite = db
+    .prepare('SELECT id FROM streamers WHERE LOWER(username) = LOWER(?) AND id != ?')
+    .get(cleanUsername, currentUserId);
+
+  if (existingSqlite) {
+    return {
+      available: false,
+      error: `The username "@${cleanUsername}" is already taken. Please choose another.`
+    };
+  }
+
+  // Also check MongoDB users collection (case-insensitive)
+  try {
+    const usersCol = await getUsersCollection();
+    const escaped = cleanUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const existingMongo = await usersCol.findOne({
+      username: { $regex: new RegExp(`^${escaped}$`, 'i') },
+      userId: { $ne: currentUserId }
+    });
+    if (existingMongo) {
+      return {
+        available: false,
+        error: `The username "@${cleanUsername}" is already taken. Please choose another.`
+      };
+    }
+  } catch {
+    // Non-fatal if Mongo check skipped
+  }
+
+  return { available: true };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Optional live username availability check: GET /api/streamer/profile?checkUsername=...
+    const checkParam = req.nextUrl.searchParams.get('checkUsername');
+    if (checkParam !== null) {
+      const clean = checkParam.replace(/^@/, '').trim().toLowerCase();
+      if (!clean) {
+        return NextResponse.json({ available: false, error: 'Username cannot be empty.' });
+      }
+      const result = await checkUsernameAvailability(clean, authUser.id);
+      return NextResponse.json(result);
     }
 
     const streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(authUser.id) as any;
@@ -51,25 +127,16 @@ export async function PUT(req: NextRequest) {
     let newUsername = current.username;
     if (username !== undefined && typeof username === 'string') {
       const cleanUsername = username.replace(/^@/, '').trim().toLowerCase();
-      if (cleanUsername) {
-        if (!/^[a-zA-Z0-9_]{3,24}$/.test(cleanUsername)) {
-          return NextResponse.json(
-            { error: 'Username must be 3-24 characters and contain only letters, numbers, and underscores.' },
-            { status: 400 }
-          );
-        }
+      if (!cleanUsername) {
+        return NextResponse.json({ error: 'Username cannot be empty.' }, { status: 400 });
+      }
 
-        // Check uniqueness if changing
-        if (cleanUsername !== current.username.toLowerCase()) {
-          const existing = db.prepare('SELECT id FROM streamers WHERE username = ? COLLATE NOCASE AND id != ?').get(cleanUsername, authUser.id);
-          if (existing) {
-            return NextResponse.json(
-              { error: `The username "@${cleanUsername}" is already taken. Please choose another.` },
-              { status: 400 }
-            );
-          }
-          newUsername = cleanUsername;
+      if (cleanUsername !== current.username.toLowerCase()) {
+        const check = await checkUsernameAvailability(cleanUsername, authUser.id);
+        if (!check.available) {
+          return NextResponse.json({ error: check.error }, { status: 400 });
         }
+        newUsername = cleanUsername;
       }
     }
 

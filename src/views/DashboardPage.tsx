@@ -200,6 +200,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [profileBio, setProfileBio] = useState(user?.bio || '');
   const [profileAvatar, setProfileAvatar] = useState(user?.avatarUrl || '');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [changingUsername, setChangingUsername] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [usernameStatusMsg, setUsernameStatusMsg] = useState<string | null>(null);
   const [profileSavedMsg, setProfileSavedMsg] = useState(false);
   const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
 
@@ -386,6 +389,89 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       }
     });
   };
+
+  const handleChangeUsername = async () => {
+    setProfileErrorMsg(null);
+    setProfileSavedMsg(false);
+    const cleanUsername = profileUsername.trim().replace(/^@/, '').toLowerCase();
+
+    if (!cleanUsername) {
+      setUsernameStatus('taken');
+      setUsernameStatusMsg('Username cannot be empty.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]{3,24}$/.test(cleanUsername)) {
+      setUsernameStatus('taken');
+      setUsernameStatusMsg('Username must be 3–24 characters (letters, numbers, underscores only).');
+      return;
+    }
+    if (user && cleanUsername === user.username.toLowerCase()) {
+      setUsernameStatus('idle');
+      setUsernameStatusMsg('This is already your active username.');
+      return;
+    }
+
+    setChangingUsername(true);
+    try {
+      const check = await streamerService.checkUsername(cleanUsername);
+      if (!check.available) {
+        setUsernameStatus('taken');
+        setUsernameStatusMsg(check.error || `The username "@${cleanUsername}" is already taken.`);
+        setProfileErrorMsg(check.error || `The username "@${cleanUsername}" is already taken.`);
+        return;
+      }
+
+      await streamerService.updateProfile({ username: cleanUsername });
+      await refreshUser();
+      setUsernameStatus('available');
+      setUsernameStatusMsg(`Username updated to @${cleanUsername}!`);
+      setProfileSavedMsg(true);
+      setTimeout(() => setProfileSavedMsg(false), 3000);
+      loadData();
+    } catch (err: any) {
+      setUsernameStatus('taken');
+      setUsernameStatusMsg(err.message || 'Username is already taken.');
+      setProfileErrorMsg(err.message || 'Failed to change username');
+    } finally {
+      setChangingUsername(false);
+    }
+  };
+
+  // Real-time debounced username availability check while typing
+  useEffect(() => {
+    if (!user) return;
+    const clean = profileUsername.trim().replace(/^@/, '').toLowerCase();
+    if (!clean || clean === user.username.toLowerCase()) {
+      setUsernameStatus('idle');
+      setUsernameStatusMsg(null);
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]{3,24}$/.test(clean)) {
+      setUsernameStatus('taken');
+      setUsernameStatusMsg('Must be 3–24 characters (a-z, 0-9, _).');
+      return;
+    }
+
+    setUsernameStatus('checking');
+    setUsernameStatusMsg('Checking availability...');
+    const timer = setTimeout(async () => {
+      try {
+        const res = await streamerService.checkUsername(clean);
+        if (res.available) {
+          setUsernameStatus('available');
+          setUsernameStatusMsg(`@${clean} is available!`);
+        } else {
+          setUsernameStatus('taken');
+          setUsernameStatusMsg(res.error || `@${clean} is already taken.`);
+        }
+      } catch {
+        setUsernameStatus('idle');
+        setUsernameStatusMsg(null);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [profileUsername, user?.username]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1355,27 +1441,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   My Account
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Update your streamer username, channel description, display name, and manage your public donation portal.
+                  Click your profile logo to choose a new one from your Media Library, update your unique @username, and customize your public donation page.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left 2 cols: Profile & Account Settings Form */}
-                <form onSubmit={handleSaveProfile} className="lg:col-span-2 p-5 sm:p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-5">
-                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
-                    <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider flex items-center gap-2">
-                      <User size={16} className="text-cyan-400" />
-                      Account & Channel Profile
-                    </h3>
-                    <span className="text-[11px] font-mono text-cyan-400 px-2.5 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-800/40 font-semibold">
-                      @{user.username}
-                    </span>
-                  </div>
-
+                {/* Left 2 cols: Profile Logo, Unique Username, & Channel Details */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Feedback Banners */}
                   {profileSavedMsg && (
                     <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
                       <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
-                      <span>Account information updated successfully! Public tip link updated.</span>
+                      <span>Account updated successfully!</span>
                     </div>
                   )}
 
@@ -1386,166 +1463,192 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
                   )}
 
-                  <div className="space-y-4 text-xs font-mono">
-                    {/* Profile Logo / Avatar Picker Setting */}
-                    <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div
-                          onClick={() => setIsMediaPickerOpen(true)}
-                          className="relative w-16 h-16 rounded-2xl bg-slate-900 border-2 border-cyan-500/40 hover:border-cyan-400 overflow-hidden cursor-pointer group flex-shrink-0 transition-all shadow-lg"
-                          title="Click to choose logo from Media Library"
-                        >
-                          <img
-                            src={
-                              profileAvatar ||
-                              user.avatarUrl ||
-                              `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
-                            }
-                            alt="Profile Logo"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <ImageIcon size={18} className="text-cyan-400" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1 font-sans">
-                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <span>Profile Logo</span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                              Media Library
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400">
-                            Choose an existing image/GIF from your Media Library or upload a new logo directly.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setIsMediaPickerOpen(true)}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-extrabold text-xs transition-all cursor-pointer shadow-md shadow-cyan-500/10"
-                        >
-                          <ImageIcon size={14} />
-                          <span>Choose from Media Library</span>
-                        </button>
+                  {/* 1. Profile Logo Hero Card (Click Logo to Choose New One) */}
+                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col sm:flex-row items-center gap-6">
+                    <div
+                      onClick={() => setIsMediaPickerOpen(true)}
+                      className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-900 border-2 border-cyan-500/50 hover:border-cyan-400 overflow-hidden cursor-pointer group flex-shrink-0 transition-all shadow-[0_0_25px_rgba(0,240,255,0.15)]"
+                      title="Click to choose a new Profile Logo from Media Library"
+                    >
+                      <img
+                        src={
+                          profileAvatar ||
+                          user.avatarUrl ||
+                          `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
+                        }
+                        alt="Profile Logo"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                      <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-center p-2">
+                        <ImageIcon size={20} className="text-cyan-400" />
+                        <span className="text-[10px] font-mono font-bold text-white uppercase leading-tight">
+                          Change Logo
+                        </span>
                       </div>
                     </div>
 
-                    {/* Username Field */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                          <span>Username</span>
-                          <span className="text-cyan-400">*</span>
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          streambotkh.com/@{profileUsername || user.username}
+                    <div className="flex-1 text-center sm:text-left space-y-2">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <h3 className="text-lg font-extrabold text-white font-['Chakra_Petch']">
+                          {user.displayName || user.username}
+                        </h3>
+                        <span className="text-xs font-mono text-cyan-400 px-2.5 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-800/40 font-semibold">
+                          @{user.username}
                         </span>
                       </div>
-                      <div className="flex items-center rounded-xl bg-slate-950 border border-slate-800 focus-within:border-cyan-400 transition-colors overflow-hidden">
+                      <p className="text-xs font-mono text-slate-400">{user.email}</p>
+                      <p className="text-xs text-slate-400">
+                        Click on your profile logo to select an image/GIF from your Media Library or upload a new one.
+                      </p>
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsMediaPickerOpen(true)}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs transition-colors cursor-pointer"
+                        >
+                          <ImageIcon size={14} />
+                          <span>Click to Choose New Logo</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Unique Username Changer Card */}
+                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                          Unique Streamer Username
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Your public donation URL: <span className="font-mono text-cyan-400">{origin}/@{profileUsername || user.username}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div
+                        className={`flex-1 flex items-center rounded-xl bg-slate-950 border transition-colors overflow-hidden ${
+                          usernameStatus === 'taken'
+                            ? 'border-red-500/60 focus-within:border-red-400'
+                            : usernameStatus === 'available'
+                            ? 'border-emerald-500/60 focus-within:border-emerald-400'
+                            : 'border-slate-800 focus-within:border-cyan-400'
+                        }`}
+                      >
                         <span className="px-3.5 py-2.5 bg-slate-900/80 text-slate-400 font-mono text-xs border-r border-slate-800 select-none font-bold">
                           @
                         </span>
                         <input
                           type="text"
-                          required
                           value={profileUsername}
-                          onChange={(e) => setProfileUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                          onChange={(e) =>
+                            setProfileUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+                          }
                           placeholder="your_username"
-                          className="w-full px-3.5 py-2.5 bg-transparent text-cyan-400 font-bold font-mono focus:outline-none"
+                          className="w-full px-3.5 py-2.5 bg-transparent text-cyan-400 font-bold text-xs font-mono focus:outline-none"
                         />
                       </div>
-                      <span className="text-[10px] text-slate-500 mt-1 block">
-                        3 to 24 characters (letters, numbers, underscores). Changing this updates your donation link immediately.
-                      </span>
+
+                      <button
+                        type="button"
+                        onClick={handleChangeUsername}
+                        disabled={
+                          changingUsername ||
+                          usernameStatus === 'taken' ||
+                          usernameStatus === 'checking' ||
+                          profileUsername.trim().toLowerCase() === user.username.toLowerCase()
+                        }
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-extrabold text-xs font-mono uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap shadow-md shadow-cyan-500/10"
+                      >
+                        {changingUsername ? 'Checking & Saving...' : 'Change Username'}
+                      </button>
                     </div>
 
-                    {/* Description / Channel Bio */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-slate-300 font-semibold">Description</label>
-                        <span className="text-[10px] text-slate-500">Public Streamer Bio</span>
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={profileBio}
-                        onChange={(e) => setProfileBio(e.target.value)}
-                        placeholder="Tell your viewers what you stream, when you go live, and how tips support your channel..."
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors font-sans leading-relaxed"
-                      />
-                      <span className="text-[10px] text-slate-500 mt-1 block">
-                        This description will be visible to all donors on your public tip portal.
-                      </span>
+                    {/* Live Uniqueness Status Feedback */}
+                    <div className="flex items-center justify-between text-[11px] font-mono">
+                      {usernameStatusMsg ? (
+                        <span
+                          className={`flex items-center gap-1.5 font-semibold ${
+                            usernameStatus === 'taken'
+                              ? 'text-red-400'
+                              : usernameStatus === 'available'
+                              ? 'text-emerald-400'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          {usernameStatus === 'taken' && <AlertCircle size={13} />}
+                          {usernameStatus === 'available' && <CheckCircle2 size={13} />}
+                          <span>{usernameStatusMsg}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">
+                          3–24 characters (letters, numbers, underscores). Must be unique.
+                        </span>
+                      )}
                     </div>
+                  </div>
 
-                    {/* Streamer Display Name */}
-                    <div>
-                      <label className="block text-slate-300 mb-1.5 font-semibold">Display Name</label>
-                      <input
-                        type="text"
-                        required
-                        value={profileName}
-                        onChange={(e) => setProfileName(e.target.value)}
-                        placeholder="e.g. Sokha Streamer"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors font-sans"
-                      />
-                      <span className="text-[10px] text-slate-500 mt-1 block">
-                        Friendly creator name displayed on alerts, receipts, and headers.
-                      </span>
-                    </div>
+                  {/* 3. Channel Display Name & Bio Form */}
+                  <form
+                    onSubmit={handleSaveProfile}
+                    className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4"
+                  >
+                    <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider border-b border-slate-800/80 pb-3">
+                      Channel Profile Details
+                    </h3>
 
-                    {/* Avatar URL with Media Library & Generator */}
-                    <div>
-                      <label className="block text-slate-300 mb-1.5 font-semibold">Profile Logo URL</label>
-                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                    <div className="space-y-4 text-xs">
+                      {/* Streamer Display Name */}
+                      <div>
+                        <label className="block text-slate-300 mb-1.5 font-semibold font-mono">
+                          Display Name
+                        </label>
                         <input
                           type="text"
-                          value={profileAvatar}
-                          onChange={(e) => setProfileAvatar(e.target.value)}
-                          placeholder="/uploads/media/... or https://..."
-                          className="flex-1 min-w-[200px] px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors"
+                          required
+                          value={profileName}
+                          onChange={(e) => setProfileName(e.target.value)}
+                          placeholder="e.g. Sokha Streamer"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setIsMediaPickerOpen(true)}
-                          className="px-3.5 py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 font-bold text-xs whitespace-nowrap transition-colors border border-cyan-500/30 flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <ImageIcon size={13} />
-                          <span>Media Library</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setProfileAvatar(
-                              `https://api.dicebear.com/7.x/bottts/svg?seed=streamer_${Math.floor(
-                                1000 + Math.random() * 9000
-                              )}`
-                            )
-                          }
-                          className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs whitespace-nowrap transition-colors border border-slate-700 cursor-pointer"
-                        >
-                          Random Seed
-                        </button>
+                        <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                          Friendly creator name displayed on alerts, receipts, and headers.
+                        </span>
+                      </div>
+
+                      {/* Description / Channel Bio */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5 font-mono">
+                          <label className="text-slate-300 font-semibold">Description / Bio</label>
+                          <span className="text-[10px] text-slate-500">Public Donation Page Bio</span>
+                        </div>
+                        <textarea
+                          rows={4}
+                          value={profileBio}
+                          onChange={(e) => setProfileBio(e.target.value)}
+                          placeholder="Tell your viewers what you stream, when you go live, and how tips support your channel..."
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors leading-relaxed"
+                        />
                       </div>
                     </div>
-                  </div>
 
-                  <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-slate-500">All changes sync to MongoDB & SQLite</span>
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      loading={savingProfile}
-                      className="font-bold"
-                    >
-                      Save Account Changes
-                    </Button>
-                  </div>
-                </form>
+                    <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-slate-500">
+                        All changes sync to MongoDB &amp; SQLite
+                      </span>
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        size="md"
+                        loading={savingProfile}
+                        className="font-bold"
+                      >
+                        Save Profile Details
+                      </Button>
+                    </div>
+                  </form>
+                </div>
 
                 {/* Right col: Plan Status, Media Storage Quota, and Tip QR Code */}
                 <div className="space-y-6">

@@ -42,6 +42,12 @@ export const streamerService = {
     });
   },
 
+  async checkUsername(username: string): Promise<{ available: boolean; error?: string }> {
+    return request<{ available: boolean; error?: string }>(
+      `/streamer/profile?checkUsername=${encodeURIComponent(username)}`
+    );
+  },
+
   async updateProfile(profile: {
     username?: string;
     description?: string;
