@@ -211,6 +211,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [profileUsername, setProfileUsername] = useState(user?.username || '');
   const [profileName, setProfileName] = useState(user?.displayName || '');
   const [profileBio, setProfileBio] = useState(user?.bio || '');
+  const [profileThanksMessage, setProfileThanksMessage] = useState(user?.customThanksMessage || '');
   const [profileAvatar, setProfileAvatar] = useState(user?.avatarUrl || '');
   const [savingProfile, setSavingProfile] = useState(false);
   const [changingUsername, setChangingUsername] = useState(false);
@@ -258,6 +259,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setProfileUsername(user.username || '');
       setProfileName(user.displayName || '');
       setProfileBio(user.bio || '');
+      setProfileThanksMessage(user.customThanksMessage || '');
       setProfileAvatar(user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`);
       if (user.plan) {
         const p = user.plan.toLowerCase();
@@ -522,6 +524,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         displayName: profileName.trim(),
         bio: profileBio.trim(),
         description: profileBio.trim(),
+        customThanksMessage: profileThanksMessage.trim(),
         avatarUrl: profileAvatar.trim()
       });
       await refreshUser();
@@ -1624,6 +1627,27 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           placeholder="Tell your viewers what you stream, when you go live, and how tips support your channel..."
                           className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors leading-relaxed"
                         />
+                      </div>
+
+                      {/* Custom Thank You Message for Donors */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5 font-mono">
+                          <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                            <Sparkles size={13} className="text-pink-400" />
+                            <span>Custom Thank You Message</span>
+                          </label>
+                          <span className="text-[10px] text-slate-500">Post-Payment Modal Message</span>
+                        </div>
+                        <textarea
+                          rows={3}
+                          value={profileThanksMessage}
+                          onChange={(e) => setProfileThanksMessage(e.target.value)}
+                          placeholder="e.g. Thank you, {donor}! Your tip of {amount} has been broadcast live on stream. Your support means the world to me! 💖"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors leading-relaxed"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                          Displayed to viewers immediately after their donation is completed. Placeholders: <code className="text-cyan-400 font-bold">&#123;donor&#125;</code>, <code className="text-cyan-400 font-bold">&#123;amount&#125;</code>, <code className="text-cyan-400 font-bold">&#123;streamer&#125;</code>
+                        </span>
                       </div>
                     </div>
 

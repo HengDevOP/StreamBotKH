@@ -50,6 +50,9 @@ try {
   db.exec('ALTER TABLE streamers ADD COLUMN plan_expires_at TEXT');
 } catch (e) {}
 try {
+  db.exec('ALTER TABLE streamers ADD COLUMN custom_thanks_message TEXT');
+} catch (e) {}
+try {
   db.exec('ALTER TABLE streamers ADD COLUMN plan_duration_days INTEGER DEFAULT 0');
 } catch (e) {}
 

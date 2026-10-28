@@ -91,6 +91,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Streamer not found' }, { status: 404 });
     }
 
+    let customThanks = streamer.custom_thanks_message || '';
+    if (!customThanks) {
+      try {
+        const usersCol = await getUsersCollection();
+        const mongoUser = await usersCol.findOne({ userId: authUser.id });
+        if (mongoUser?.customThanksMessage) {
+          customThanks = mongoUser.customThanksMessage;
+        }
+      } catch (e) {}
+    }
+
     return NextResponse.json({
       id: streamer.id,
       email: streamer.email,
@@ -98,6 +109,7 @@ export async function GET(req: NextRequest) {
       displayName: streamer.display_name,
       avatarUrl: streamer.avatar_url,
       bio: streamer.bio,
+      customThanksMessage: customThanks,
       plan: streamer.plan || 'free',
       overlayToken: streamer.overlay_token,
       telegramChatId: streamer.telegram_chat_id,
@@ -116,7 +128,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { username, description, bio, displayName, avatarUrl, plan } = body;
+    const { username, description, bio, displayName, avatarUrl, plan, customThanksMessage } = body;
 
     const current = db.prepare('SELECT * FROM streamers WHERE id = ?').get(authUser.id) as any;
     if (!current) {
@@ -147,13 +159,14 @@ export async function PUT(req: NextRequest) {
     const newDisplayName = displayName !== undefined ? String(displayName).trim() : current.display_name;
     const newAvatarUrl = avatarUrl !== undefined ? String(avatarUrl).trim() : current.avatar_url;
     const newPlan = plan !== undefined ? String(plan).toLowerCase() : (current.plan || 'free');
+    const newThanks = customThanksMessage !== undefined ? String(customThanksMessage).trim() : (current.custom_thanks_message || '');
 
     // 3. Update SQLite database
     db.prepare(`
       UPDATE streamers
-      SET username = ?, display_name = ?, bio = ?, avatar_url = ?, plan = ?
+      SET username = ?, display_name = ?, bio = ?, avatar_url = ?, plan = ?, custom_thanks_message = ?
       WHERE id = ?
-    `).run(newUsername, newDisplayName, newBio, newAvatarUrl, newPlan, authUser.id);
+    `).run(newUsername, newDisplayName, newBio, newAvatarUrl, newPlan, newThanks, authUser.id);
 
     // 4. Synchronize with MongoDB users collection
     try {
@@ -165,6 +178,8 @@ export async function PUT(req: NextRequest) {
             username: newUsername,
             displayName: newDisplayName,
             avatarUrl: newAvatarUrl,
+            bio: newBio,
+            customThanksMessage: newThanks,
             updatedAt: new Date()
           }
         },
@@ -186,6 +201,7 @@ export async function PUT(req: NextRequest) {
         displayName: updated.display_name,
         avatarUrl: updated.avatar_url,
         bio: updated.bio,
+        customThanksMessage: updated.custom_thanks_message || newThanks,
         plan: updated.plan || 'free',
         overlayToken: updated.overlay_token,
         telegramChatId: updated.telegram_chat_id,

@@ -661,11 +661,13 @@ class TelegramUserClientManager {
                 const docId = doc.id || (doc as any).donationId || String(doc._id);
                 if (docId && !seenIds.has(docId)) {
                   seenIds.add(docId);
+                  const msg = doc.donorMessage || (doc as any).donor_message || '';
                   candidates.push({
                     id: docId,
                     streamer_id: doc.streamerId,
-                    donor_name: doc.donorName,
-                    donor_message: doc.donorMessage,
+                    donor_name: doc.donorName || (doc as any).donor_name,
+                    donor_message: msg,
+                    donorMessage: msg,
                     amount: doc.amount,
                     currency: doc.currency,
                     banking_name: doc.bankingName,
@@ -739,7 +741,12 @@ class TelegramUserClientManager {
             effectiveDonorName = matchedTemp?.donor_name || dbDonation?.donor_name || parsed.donorName || 'Generous Supporter';
           }
 
-          const effectiveDonorMessage = matchedTemp?.donor_message || dbDonation?.donor_message || (parsed.donorMessage ? parsed.donorMessage.trim() : '');
+          const effectiveDonorMessage =
+            matchedTemp?.donor_message ||
+            matchedTemp?.donorMessage ||
+            dbDonation?.donor_message ||
+            dbDonation?.donorMessage ||
+            (parsed.donorMessage ? parsed.donorMessage.trim() : '');
           const effectiveAmount = parsed.amount > 0 ? parsed.amount : (matchedTemp?.amount || dbDonation?.amount || 1.0);
           const effectiveCurrency = parsed.currency || matchedTemp?.currency || dbDonation?.currency || 'USD';
           const effectiveBankingName = matchedTemp?.banking_name || dbDonation?.banking_name || parsed.bankingName || 'Bakong KHQR';
@@ -849,6 +856,8 @@ class TelegramUserClientManager {
             donationId: activeDonationId,
             donorName: effectiveDonorName,
             donorMessage: effectiveDonorMessage,
+            donor_message: effectiveDonorMessage,
+            message: effectiveDonorMessage,
             amount: effectiveAmount,
             currency: effectiveCurrency,
             bankingName: effectiveBankingName,

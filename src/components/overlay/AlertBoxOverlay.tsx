@@ -233,9 +233,14 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         activeBoxes[0] ||
         overlayConfig;
 
+      const rawMsg = payload.donorMessage || payload.donor_message || payload.message || '';
+      const resolvedDonorMessage = typeof rawMsg === 'string' ? rawMsg.trim() : '';
+
       const finalPayload = {
         ...payload,
-        donorMessage: payload.donorMessage ? payload.donorMessage.trim() : '',
+        donorMessage: resolvedDonorMessage,
+        donor_message: resolvedDonorMessage,
+        message: resolvedDonorMessage,
         textTemplate: matchingBox?.textTemplate || payload.textTemplate,
         textColor: matchingBox?.textColor || payload.textColor,
         customGifUrl: matchingBox?.mediaUrl || payload.customGifUrl || payload.mediaUrl || overlayConfig?.mediaUrl,

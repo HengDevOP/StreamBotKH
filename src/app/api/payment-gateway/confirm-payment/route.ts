@@ -141,7 +141,10 @@ export async function POST(req: NextRequest) {
       effectiveDonorName = (matchedTemp && matchedTemp.donor_name) ? matchedTemp.donor_name : donorName.trim();
     }
 
-    const effectiveDonorMessage = (matchedTemp && matchedTemp.donor_message) ? matchedTemp.donor_message : (donorMessage ? donorMessage.trim() : '');
+    const effectiveDonorMessage =
+      (matchedTemp && (matchedTemp.donor_message || matchedTemp.donorMessage))
+        ? (matchedTemp.donor_message || matchedTemp.donorMessage)
+        : (donorMessage ? donorMessage.trim() : '');
     const effectiveAmount = numericAmount > 0 ? numericAmount : (matchedTemp?.amount || 1.0);
     const effectiveCurrency = currency.toUpperCase() === 'KHR' ? 'KHR' : (matchedTemp?.currency || 'USD');
     const effectiveBankingName = matchedTemp?.banking_name || bankingName;
@@ -252,6 +255,8 @@ export async function POST(req: NextRequest) {
       donationId: activeDonationId,
       donorName: effectiveDonorName,
       donorMessage: effectiveDonorMessage,
+      donor_message: effectiveDonorMessage,
+      message: effectiveDonorMessage,
       amount: effectiveAmount,
       currency: effectiveCurrency,
       bankingName: effectiveBankingName,

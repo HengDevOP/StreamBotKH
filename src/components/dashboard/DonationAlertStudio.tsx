@@ -227,8 +227,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       if (data) {
         if (data.donorName) setDemoDonorName(data.donorName);
         if (data.amount) setDemoAmount(Number(data.amount));
-        if (data.donorMessage !== undefined) {
-          setDemoMessage(data.donorMessage ? data.donorMessage.trim() : '');
+        const incomingMsg = data.donorMessage ?? data.donor_message ?? data.message;
+        if (incomingMsg !== undefined) {
+          setDemoMessage(typeof incomingMsg === 'string' ? incomingMsg.trim() : '');
         } else {
           setDemoMessage('');
         }

@@ -54,6 +54,7 @@ export const streamerService = {
     bio?: string;
     displayName?: string;
     avatarUrl?: string;
+    customThanksMessage?: string;
     plan?: string;
   }): Promise<{ success: boolean; user: any }> {
     return request<{ success: boolean; user: any }>('/streamer/profile', {

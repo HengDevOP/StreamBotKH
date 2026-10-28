@@ -59,16 +59,23 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
 
   // Format default headline: {donator} donated {amount} through superchat!
   const headlineTemplate = alert.textTemplate || '{donator} donated {amount} through superchat!';
-  const cleanDonorMessage = donorMessage ? donorMessage.trim() : '';
+  const rawMsg = donorMessage || (alert as any).donor_message || (alert as any).message || '';
+  const cleanDonorMessage = typeof rawMsg === 'string' ? rawMsg.trim() : '';
   let formattedHeadline = headlineTemplate
     .replace(/\{donator\}/gi, donorName)
     .replace(/\{name\}/gi, donorName)
     .replace(/\{amount\}/gi, formattedAmount)
-    .replace(/\{currency\}/gi, currency || 'USD');
+    .replace(/\{currency\}/gi, currency || 'USD')
+    .replace(/\{message\}/gi, cleanDonorMessage ? `"${cleanDonorMessage}"` : '')
+    .replace(/\{donor_message\}/gi, cleanDonorMessage ? `"${cleanDonorMessage}"` : '');
 
   // If {context} is embedded in headline template
-  const hasContextInHeadline = headlineTemplate.includes('{context}');
-  if (hasContextInHeadline) {
+  const hasContextInHeadline =
+    headlineTemplate.includes('{context}') ||
+    headlineTemplate.includes('{message}') ||
+    headlineTemplate.includes('{donor_message}');
+
+  if (headlineTemplate.includes('{context}')) {
     formattedHeadline = formattedHeadline.replace(/\{context\}/gi, cleanDonorMessage ? `"${cleanDonorMessage}"` : '');
   }
 

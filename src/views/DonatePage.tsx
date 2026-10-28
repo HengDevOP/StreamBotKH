@@ -224,6 +224,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             amount={activeDonation.amount}
             currency={activeDonation.currency}
             streamerName={streamer.displayName}
+            customThanksMessage={streamer.customThanksMessage}
             onReset={handleReset}
           />
         </div>

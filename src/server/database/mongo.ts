@@ -11,6 +11,8 @@ export interface UserDoc {
   displayName: string;
   email?: string;
   avatarUrl?: string;
+  bio?: string;
+  customThanksMessage?: string;
   plan?: string;
   planStartedAt?: string | null;
   planExpiresAt?: string | null;

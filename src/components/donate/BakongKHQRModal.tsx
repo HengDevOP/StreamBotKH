@@ -179,10 +179,56 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
         {/* Official Bakong KHQR Canvas (Show only the pure QR code) */}
         <div className="p-3 bg-white border-2 border-slate-700 shadow-2xl">
           {paid ? (
-            <div className="w-64 h-64 flex flex-col items-center justify-center text-emerald-600 space-y-2">
-              <CheckCircle2 size={56} className="animate-bounce" />
-              <span className="text-base font-bold text-slate-950 font-['Chakra_Petch']">PAYMENT CONFIRMED!</span>
-              <span className="text-xs text-slate-600 font-mono">Broadcasting alert on stream...</span>
+            <div className="w-64 h-64 flex flex-col items-center justify-center space-y-3 bg-[#090D18] rounded-xl border border-emerald-500/30">
+              <style>{`
+                @keyframes modalDrawCircle {
+                  0% { stroke-dashoffset: 155; opacity: 0; }
+                  100% { stroke-dashoffset: 0; opacity: 1; }
+                }
+                @keyframes modalDrawCheck {
+                  0% { stroke-dashoffset: 50; opacity: 0; transform: scale(0.85); }
+                  100% { stroke-dashoffset: 0; opacity: 1; transform: scale(1); }
+                }
+              `}</style>
+              <div className="relative w-16 h-16 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-lg animate-pulse" />
+                <svg
+                  className="w-16 h-16 drop-shadow-[0_0_12px_rgba(16,185,129,0.55)]"
+                  viewBox="0 0 52 52"
+                  fill="none"
+                >
+                  <circle
+                    cx="26"
+                    cy="26"
+                    r="23"
+                    stroke="#10B981"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    style={{
+                      strokeDasharray: 155,
+                      animation: 'modalDrawCircle 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards'
+                    }}
+                  />
+                  <path
+                    d="M15 27 L22.5 34.5 L37 19"
+                    stroke="#10B981"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      strokeDasharray: 50,
+                      animation: 'modalDrawCheck 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.3s both',
+                      transformOrigin: '26px 26px'
+                    }}
+                  />
+                </svg>
+              </div>
+              <span className="text-base font-extrabold text-white font-['Chakra_Petch'] tracking-wide">
+                PAYMENT CONFIRMED!
+              </span>
+              <span className="text-xs text-emerald-400 font-mono">
+                Broadcasting alert on stream...
+              </span>
             </div>
           ) : (
             <img

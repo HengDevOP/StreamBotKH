@@ -13,6 +13,7 @@ export interface Streamer {
   overlayToken: string;
   telegramChatId?: string;
   telegramPairingCode?: string;
+  customThanksMessage?: string;
   createdAt?: string;
 }
 

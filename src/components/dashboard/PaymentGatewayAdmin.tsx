@@ -20,7 +20,6 @@ import {
   DollarSign,
   Send,
   Sparkles,
-  Play,
   ChevronRight,
   ChevronLeft,
   ArrowRight,
@@ -101,9 +100,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // Active Wizard Step: 1 = Connect (GramJS), 2 = Provide Master KHQR, 3 = Connect Group Listener
   const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
 
-  // Simulation Drawer / Modal Open State
-  const [showSimulator, setShowSimulator] = useState(false);
-
   // ================================================================
   // STEP 1 STATE: GramJS MTProto User Client Connection
   // ================================================================
@@ -164,24 +160,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // Group Link input form
   const [groupLinkInput, setGroupLinkInput] = useState('');
   const [groupTitleInput, setGroupTitleInput] = useState('');
-
-  // ================================================================
-  // SIMULATOR STATE: Test Scan Payment & Real-Time Alert
-  // ================================================================
-  const [testStreamer, setTestStreamer] = useState(user?.username || 'neonstreamer');
-  const [testDonor, setTestDonor] = useState('SOKHA CHHIM');
-  const [testAmount, setTestAmount] = useState('5.00');
-  const [testCurrency, setTestCurrency] = useState<'USD' | 'KHR'>('USD');
-  const [testBank, setTestBank] = useState('ABA Bank');
-  const [testMessage, setTestMessage] = useState('Awesome gameplay! Keep it up 🔥');
-  const [triggeringPayment, setTriggeringPayment] = useState(false);
-  const [paymentResult, setPaymentResult] = useState<any>(null);
-
-  useEffect(() => {
-    if (user?.username) {
-      setTestStreamer(user.username);
-    }
-  }, [user?.username]);
 
   // ----------------------------------------------------------------
   // Authenticated Fetch Helper (Per Client Account Session)
@@ -639,53 +617,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
     setTimeout(() => setCopiedChatId(null), 2000);
   };
 
-  // ----------------------------------------------------------------
-  // SIMULATOR HANDLER: Test Scan Payment & Alert Dispatch
-  // ----------------------------------------------------------------
-  const handleTriggerTestPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTriggeringPayment(true);
-    setPaymentResult(null);
-
-    try {
-      const res = await authFetch('/api/payment-gateway/confirm-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          streamerUsername: testStreamer.trim(),
-          donorName: testDonor.trim(),
-          amount: parseFloat(testAmount) || 1.0,
-          currency: testCurrency,
-          bankingName: testBank,
-          donorMessage: testMessage.trim()
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setPaymentResult(data);
-      } else {
-        showAlert({
-          title: 'Simulation Failed',
-          message: data.error || 'Failed to trigger test payment',
-          type: 'danger'
-        });
-      }
-    } catch (err: any) {
-      showAlert({
-        title: 'Simulation Error',
-        message: 'Error triggering payment: ' + err.message,
-        type: 'danger'
-      });
-    } finally {
-      setTriggeringPayment(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* ============================================================== */}
-      {/* TOP HEADER: GATEWAY TITLE & REAL-TIME TEST SIMULATOR ACTION    */}
+      {/* TOP HEADER: GATEWAY TITLE                                      */}
       {/* ============================================================== */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
         <div>
@@ -696,21 +631,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
           <p className="text-xs text-slate-400 mt-0.5">
             Step-by-step setup for GramJS MTProto client, official Bakong Master KHQR code, and live Telegram bank listener.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setShowSimulator(!showSimulator)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-2 transition-all shadow-md ${
-              showSimulator
-                ? 'bg-amber-400 text-slate-950 shadow-amber-400/20'
-                : 'bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 hover:border-amber-400/40'
-            }`}
-          >
-            <Zap size={14} />
-            <span>{showSimulator ? 'Close Simulator' : 'Test Alert Simulation'}</span>
-          </button>
         </div>
       </div>
 
@@ -877,126 +797,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {/* ============================================================== */}
-      {/* SIMULATOR SLIDE-DOWN DRAWER (When Toggled)                     */}
-      {/* ============================================================== */}
-      {showSimulator && (
-        <form
-          onSubmit={handleTriggerTestPayment}
-          className="p-6 rounded-2xl bg-[#090D18] border-2 border-amber-500/40 space-y-4 animate-fadeIn shadow-2xl relative"
-        >
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 font-mono">
-              <Zap size={16} className="text-amber-400 animate-bounce" />
-              <span>Simulate Instant Scan Payment & Real-Time Alert</span>
-            </h3>
-            <button
-              type="button"
-              onClick={() => setShowSimulator(false)}
-              className="text-xs text-slate-400 hover:text-white font-mono"
-            >
-              ✕ Close
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
-            <div className="space-y-1">
-              <label className="text-slate-400 block">Streamer Username</label>
-              <input
-                type="text"
-                required
-                value={testStreamer}
-                onChange={(e) => setTestStreamer(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-slate-400 block">Donor Name</label>
-              <input
-                type="text"
-                required
-                value={testDonor}
-                onChange={(e) => setTestDonor(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-slate-400 block">Amount</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  required
-                  value={testAmount}
-                  onChange={(e) => setTestAmount(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400"
-                />
-                <select
-                  value={testCurrency}
-                  onChange={(e) => setTestCurrency(e.target.value as any)}
-                  className="px-2 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold"
-                >
-                  <option value="USD">USD</option>
-                  <option value="KHR">KHR</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-slate-400 block">Banking Provider</label>
-              <select
-                value={testBank}
-                onChange={(e) => setTestBank(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold"
-              >
-                <option value="ABA Bank">ABA Bank</option>
-                <option value="Bakong KHQR">Bakong KHQR</option>
-                <option value="Acleda Bank">Acleda Bank</option>
-                <option value="Wing Bank">Wing Bank</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-1 text-xs font-mono">
-            <label className="text-slate-400 block">Donor Message</label>
-            <input
-              type="text"
-              value={testMessage}
-              onChange={(e) => setTestMessage(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400"
-            />
-          </div>
-
-          <div className="pt-2 flex items-center justify-between">
-            <span className="text-[11px] text-slate-500 font-mono">
-              Fires live alert into OBS Studio overlay and updates streamer revenue immediately.
-            </span>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              loading={triggeringPayment}
-              className="font-bold shadow-md shadow-cyan-400/20"
-            >
-              <Play size={13} className="mr-1" />
-              Simulate & Fire Alert
-            </Button>
-          </div>
-
-          {paymentResult && (
-            <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs font-mono text-emerald-300 animate-fadeIn">
-              <span className="font-bold flex items-center gap-1.5">
-                <CheckCircle2 size={15} />
-                {paymentResult.message}
-              </span>
-            </div>
-          )}
-        </form>
-      )}
 
       {/* ============================================================== */}
       {/* STEP 1 CONTENT: "Connect" (GramJS Client Connection)           */}
@@ -1910,14 +1710,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
               <span>Back to Step 2</span>
             </Button>
 
-            <button
-              type="button"
-              onClick={() => setShowSimulator(true)}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-extrabold text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
-            >
-              <Zap size={14} />
-              <span>Complete Setup &amp; Test Live Alert</span>
-            </button>
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold shadow-md">
+              <CheckCircle2 size={16} className="text-emerald-400" />
+              <span>Step 3 Configured • Listener Active</span>
+            </div>
           </div>
         </Card>
       )}
