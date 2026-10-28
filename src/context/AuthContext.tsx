@@ -62,6 +62,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     refreshUser();
+
+    // Fail-safe: auth loading state should never block window beyond 5s
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    return () => clearTimeout(safetyTimer);
   }, []);
 
   const loginWithGoogleRedirect = () => {

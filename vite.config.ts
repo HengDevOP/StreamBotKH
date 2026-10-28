@@ -48,7 +48,14 @@ export default defineConfig({
       },
       '/socket.io': {
         target: 'http://127.0.0.1:5001',
-        ws: true
+        ws: true,
+        configure: (proxy) => {
+          proxy.on('error', (err: any) => {
+            if (err.code !== 'EPIPE' && err.code !== 'ECONNRESET') {
+              console.warn('[vite ws proxy error]', err.message);
+            }
+          });
+        }
       }
     }
   }

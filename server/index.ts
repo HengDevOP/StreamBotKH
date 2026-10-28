@@ -18,6 +18,10 @@ import { initSocketServer } from '../src/server/services/socketService';
 const app = express();
 const server = http.createServer(app);
 
+// Keep-alive timeouts to prevent idle connection stalls
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
 // CORS support for OBS Studio, external origins & Vite dev server
 app.use(cors({
   origin: true,
@@ -75,7 +79,22 @@ function createRouteHandler(handler: Function) {
         ...(body === req ? { duplex: 'half' } : {})
       } as any);
 
-      const nextRes = await handler(nextReq, { params: req.params });
+      // Safety timeout: prevent hanging API handlers from exhausting browser sockets
+      let timeoutHandle: NodeJS.Timeout | null = null;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`API request timed out after 15s on ${req.method} ${req.originalUrl}`));
+        }, 15000);
+      });
+
+      const nextRes = await Promise.race([
+        handler(nextReq, { params: req.params }),
+        timeoutPromise
+      ]);
+
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
 
       if (!nextRes) {
         return res.status(204).end();

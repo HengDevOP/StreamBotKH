@@ -11,6 +11,7 @@ export const db = new Database(dbPath);
 // Enable foreign keys and WAL mode for high concurrency
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 10000'); // Prevent SQLITE_BUSY: database is locked during concurrent writes
 
 // Immediate safe schema migrations for telegram user client
 try {

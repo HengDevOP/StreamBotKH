@@ -12,16 +12,30 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers
-  });
+  // 12-second timeout to prevent fetch from hanging the window forever
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-  const data = await response.json().catch(() => ({}));
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      signal: options.signal || controller.signal
+    });
 
-  if (!response.ok) {
-    throw new Error(data.error || `HTTP error ${response.status}`);
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP error ${response.status}`);
+    }
+
+    return data as T;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timed out for ${endpoint}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return data as T;
 }

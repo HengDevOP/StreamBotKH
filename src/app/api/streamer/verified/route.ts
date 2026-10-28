@@ -7,7 +7,7 @@ export async function GET(_req: NextRequest) {
     // 1. Sync verified streamers from MongoDB Atlas in case verification was toggled in Mongo
     try {
       const usersCol = await getUsersCollection();
-      const mongoVerified = await usersCol.find({ isVerified: true }).toArray();
+      const mongoVerified = await usersCol.find({ isVerified: true }).maxTimeMS(2500).toArray();
       for (const mv of mongoVerified) {
         db.prepare('UPDATE streamers SET is_verified = 1 WHERE id = ? OR username = ? COLLATE NOCASE').run(
           mv.userId,

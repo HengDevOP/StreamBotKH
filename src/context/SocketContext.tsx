@@ -20,11 +20,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Connect to current host
+    // Connect to current host with resilient auto-reconnect
     const s = io(window.location.origin, {
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000
     });
 
     s.on('connect', () => {

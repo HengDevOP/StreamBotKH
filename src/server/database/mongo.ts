@@ -220,7 +220,15 @@ export function getMongoClient(): Promise<MongoClient> {
 
   if (!globalWithMongo._mongoClientPromise || globalWithMongo._cachedMongoUri !== currentUri) {
     globalWithMongo._cachedMongoUri = currentUri;
-    const client = new MongoClient(currentUri);
+    const client = new MongoClient(currentUri, {
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 25000,
+      maxPoolSize: 25,
+      minPoolSize: 1,
+      maxIdleTimeMS: 60000,
+      waitQueueTimeoutMS: 8000
+    });
     
     globalWithMongo._mongoClientPromise = client.connect().then((c) => {
       const dbName = getMongoDbName();

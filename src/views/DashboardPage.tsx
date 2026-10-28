@@ -285,9 +285,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   };
 
   // Fetch initial streamer data
-  const loadData = async () => {
+  const loadData = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) {
+        setLoading(true);
+      }
       const [statsData, alertData, paymentData] = await Promise.all([
         streamerService.getDashboard(),
         streamerService.getAlertSettings(),
@@ -301,9 +303,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       try {
         const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
         if (token) {
-          const mediaRes = await fetch('/api/media', {
+          const mediaRes = await streamerService.getMediaStorageInfo?.() || await fetch('/api/media', {
             headers: { Authorization: `Bearer ${token}` }
-          }).then(r => r.json());
+          }).then(r => r.json()).catch(() => null);
           if (mediaRes?.storage) {
             setStorageInfo(mediaRes.storage);
           }
@@ -322,6 +324,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     if (user) {
       loadData();
     }
+    // Fail-safe: ensure loading skeleton never blocks screen indefinitely
+    const failSafe = setTimeout(() => {
+      setLoading(false);
+    }, 7000);
+    return () => clearTimeout(failSafe);
   }, [user]);
 
   // Automatically redirect unauthenticated visitors on /dashboard directly to Google Sign-In URL
@@ -344,7 +351,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
     const handleNewDonation = (newDonation: any) => {
       console.log('⚡ [Dashboard] Live new donation received:', newDonation);
-      loadData();
+      loadData(true);
     };
 
     socket.on('donation:new', handleNewDonation);
