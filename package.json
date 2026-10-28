@@ -20,6 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.475.0",
     "mongodb": "^7.7.0",
+    "msedge-tts": "^2.1.1",
     "multer": "^2.5.0",
     "next": "14.2.24",
     "qrcode": "^1.5.4",

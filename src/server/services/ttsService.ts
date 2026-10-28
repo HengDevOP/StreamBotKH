@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { pipeline } from 'stream/promises';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 
 const execFileAsync = promisify(execFile);
 
@@ -70,6 +72,29 @@ export function resolveVoice(type?: string, text?: string): { voice: string; isK
   }
 
   return { voice: 'en-US-JennyNeural', isKhmer: false };
+}
+
+/**
+ * Direct Node.js WebSocket Edge-TTS synthesis (works seamlessly on any VPS without Python / pip installed)
+ */
+async function tryNodeEdgeTtsToFile(voice: string, text: string, filePath: string): Promise<boolean> {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'edge-tts-'));
+  try {
+    const tts = new MsEdgeTTS();
+    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const res = await tts.toFile(tempDir, text);
+    if (res.audioFilePath && fs.existsSync(res.audioFilePath) && fs.statSync(res.audioFilePath).size > 100) {
+      fs.copyFileSync(res.audioFilePath, filePath);
+      return true;
+    }
+  } catch (err: any) {
+    console.warn(`[TTS Service] Node msedge-tts failed (${voice}):`, err?.message || err);
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
+  }
+  return false;
 }
 
 /**
@@ -210,7 +235,17 @@ export async function synthesizeTTSWithBuffer(params: {
     };
   }
 
-  // 2. Try edge-tts across standard binary paths and python3 -m edge_tts
+  // 2. Pure Node.js Edge-TTS direct synthesis (ZERO system/Python dependencies, works on any VPS out of the box!)
+  const nodeEdgeSuccess = await tryNodeEdgeTtsToFile(voice, cleanedText, filePath);
+  if (nodeEdgeSuccess && fs.existsSync(filePath)) {
+    return {
+      audioUrl: publicUrl,
+      filePath,
+      buffer: fs.readFileSync(filePath)
+    };
+  }
+
+  // 3. Fallback to Python edge-tts CLI (if installed on host)
   const edgeSuccess = await tryEdgeTtsToFile(voice, cleanedText, filePath);
   if (edgeSuccess && fs.existsSync(filePath)) {
     return {
@@ -220,7 +255,7 @@ export async function synthesizeTTSWithBuffer(params: {
     };
   }
 
-  // 3. Server-side Google Translate TTS download (works on any VPS without Python installed!)
+  // 4. Server-side Google Translate TTS download (works on any VPS without Python installed!)
   const lang = isKhmer ? 'km' : 'en';
   const googleSuccess = await fetchGoogleTranslateTtsToFile(lang, cleanedText, filePath);
   if (googleSuccess && fs.existsSync(filePath)) {
