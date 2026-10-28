@@ -1022,8 +1022,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 className="flex items-center gap-3.5 group cursor-pointer text-left focus:outline-none min-w-0"
                 title="Return to streambotkh.com"
               >
-                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center flex-shrink-0">
-                  <Bot className="text-cyan-400 w-5 h-5" />
+                <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+                  <img
+                    src="/images/logo-192.png"
+                    alt="streambotkh.com"
+                    className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
+                  />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center leading-tight">
@@ -1076,8 +1080,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             } group cursor-pointer text-left focus:outline-none transition-opacity hover:opacity-90`}
             title="Return to streambotkh.com"
           >
-            <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center flex-shrink-0">
-              <Bot className="text-cyan-400 w-5 h-5" />
+            <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+              <img
+                src="/images/logo-192.png"
+                alt="streambotkh.com"
+                className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
+              />
             </div>
             {!sidebarCollapsed && (
               <div className="flex flex-col min-w-0">

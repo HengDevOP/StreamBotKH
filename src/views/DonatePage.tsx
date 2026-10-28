@@ -343,8 +343,12 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             title="Powered by streambotkh.com"
             className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 group flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#0C101C]/95 hover:bg-[#111728] backdrop-blur-md border border-slate-800 hover:border-cyan-500/50 shadow-2xl shadow-black/60 transition-all duration-200 select-none"
           >
-            <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700/80 flex items-center justify-center group-hover:border-cyan-400 transition-colors">
-              <Bot className="text-cyan-400 w-4 h-4" />
+            <div className="w-7 h-7 flex items-center justify-center">
+              <img
+                src="/images/logo-64.png"
+                alt="streambotkh.com logo"
+                className="w-7 h-7 object-contain drop-shadow-[0_0_6px_rgba(0,240,255,0.4)]"
+              />
             </div>
             <div className="flex flex-col leading-none">
               <span className="text-[9px] font-mono uppercase tracking-wider text-slate-500 group-hover:text-slate-400 transition-colors">

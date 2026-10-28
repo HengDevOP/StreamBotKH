@@ -207,10 +207,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                   onNavigate('home');
                 }
               }}
-              className="flex items-center gap-3 cursor-pointer group select-none"
+              className="flex items-center gap-2.5 cursor-pointer group select-none"
             >
-              <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700/80 flex items-center justify-center group-hover:border-cyan-400 transition-colors">
-                <Bot className="text-cyan-400 w-5 h-5" />
+              <div className="relative w-9 h-9 flex items-center justify-center flex-shrink-0">
+                <img
+                  src="/images/logo-192.png"
+                  alt="streambotkh.com logo"
+                  className="w-9 h-9 object-contain drop-shadow-[0_0_10px_rgba(0,240,255,0.4)] group-hover:scale-105 group-hover:drop-shadow-[0_0_14px_rgba(0,240,255,0.6)] transition-all duration-200"
+                />
               </div>
 
               <div className="flex items-center">

@@ -219,8 +219,12 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       />
       <main className="flex-1">{children}</main>
       <footer className="border-t border-slate-800/80 bg-[#06080F] py-8 text-center text-xs text-slate-400 space-y-2 font-mono">
-        <div className="flex items-center justify-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+        <div className="flex items-center justify-center gap-2.5">
+          <img
+            src="/images/logo-64.png"
+            alt="streambotkh.com"
+            className="w-5 h-5 object-contain"
+          />
           <span className="font-bold text-slate-200">STREAMBOTKH.COM</span>
           <span>•</span>
           <span>ABA PAYWAY & BAKONG KHQR OVERLAY ENGINE</span>

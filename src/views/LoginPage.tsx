@@ -70,8 +70,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-md p-8 sm:p-10 space-y-7 text-center rounded-2xl border border-slate-800 bg-[#0B0F19] shadow-2xl">
         {/* Brand Logo */}
-        <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-700 mx-auto flex items-center justify-center">
-          <Bot size={28} className="text-cyan-400" />
+        <div className="w-16 h-16 mx-auto flex items-center justify-center">
+          <img
+            src="/images/logo-192.png"
+            alt="streambotkh.com logo"
+            className="w-16 h-16 object-contain drop-shadow-[0_0_15px_rgba(0,240,255,0.5)]"
+          />
         </div>
 
         <div className="space-y-1.5">
