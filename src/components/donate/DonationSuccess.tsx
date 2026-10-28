@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { ArrowLeft, Heart, Sparkles, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Heart, Sparkles, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import confetti from 'canvas-confetti';
@@ -13,6 +13,7 @@ interface DonationSuccessProps {
   currency: string;
   streamerName: string;
   customThanksMessage?: string;
+  isVerified?: boolean;
   onReset: () => void;
 }
 
@@ -23,6 +24,7 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
   currency,
   streamerName,
   customThanksMessage,
+  isVerified,
   onReset
 }) => {
   useEffect(() => {
@@ -127,6 +129,11 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
           <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-center gap-2 text-xs font-mono text-cyan-400">
             <Heart size={13} className="text-pink-500 fill-pink-500" />
             <span>from <b className="text-white">{streamerName}</b></span>
+            {isVerified && (
+              <span title="Verified Creator" className="inline-flex items-center text-cyan-400">
+                <BadgeCheck size={14} className="text-cyan-400 fill-cyan-400/20" />
+              </span>
+            )}
           </div>
         </div>
       </div>

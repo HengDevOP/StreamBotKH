@@ -53,6 +53,9 @@ try {
   db.exec('ALTER TABLE streamers ADD COLUMN custom_thanks_message TEXT');
 } catch (e) {}
 try {
+  db.exec('ALTER TABLE streamers ADD COLUMN is_verified INTEGER DEFAULT 0');
+} catch (e) {}
+try {
   db.exec('ALTER TABLE streamers ADD COLUMN plan_duration_days INTEGER DEFAULT 0');
 } catch (e) {}
 

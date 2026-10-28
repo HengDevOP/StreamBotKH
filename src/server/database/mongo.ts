@@ -13,6 +13,7 @@ export interface UserDoc {
   avatarUrl?: string;
   bio?: string;
   customThanksMessage?: string;
+  isVerified?: boolean;
   plan?: string;
   planStartedAt?: string | null;
   planExpiresAt?: string | null;

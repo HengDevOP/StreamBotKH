@@ -18,6 +18,7 @@ export interface PublicStreamerInfo {
   videoMinTipAmount?: number;
   videoMaxDurationSeconds?: number;
   customThanksMessage?: string;
+  isVerified?: boolean;
 }
 
 export const donationService = {

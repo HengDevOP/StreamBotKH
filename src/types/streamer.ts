@@ -14,6 +14,7 @@ export interface Streamer {
   telegramChatId?: string;
   telegramPairingCode?: string;
   customThanksMessage?: string;
+  isVerified?: boolean;
   createdAt?: string;
 }
 

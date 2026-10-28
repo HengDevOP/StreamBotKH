@@ -10,6 +10,7 @@ import {
   Clock,
   CheckCircle2,
   ShieldCheck,
+  BadgeCheck,
   Sparkles,
   Plus,
   ChevronLeft,
@@ -35,6 +36,7 @@ export interface AdminUserItem {
   planExpiresAt?: string | null;
   planDurationDays?: number;
   remainingDays: number;
+  isVerified: boolean;
   isAdmin: boolean;
   createdAt?: string;
 }
@@ -276,6 +278,52 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
     });
   };
 
+  const handleToggleVerified = (targetUser: AdminUserItem) => {
+    const nextVerified = !targetUser.isVerified;
+    const modalTitle = nextVerified
+      ? `Verify Creator @${targetUser.username}?`
+      : `Remove Verification from @${targetUser.username}?`;
+
+    const modalMessage = nextVerified
+      ? `Are you sure you want to grant the official Verified Creator Tick Badge to @${targetUser.username} (${targetUser.email})? This displays the verified tick label on their public donation page, profile, and receipts.`
+      : `Are you sure you want to revoke the Verified Creator Tick Badge from @${targetUser.username} (${targetUser.email})?`;
+
+    showConfirm({
+      title: modalTitle,
+      message: modalMessage,
+      type: nextVerified ? 'info' : 'danger',
+      confirmText: nextVerified ? 'Grant Verification' : 'Remove Verification',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          setUpdatingId(targetUser.id);
+          setErrorMsg(null);
+          const res = await request<{ success: boolean; message: string; user: AdminUserItem }>(
+            '/admin/users',
+            {
+              method: 'PUT',
+              body: JSON.stringify({ userId: targetUser.id, isVerified: nextVerified })
+            }
+          );
+
+          setToastMsg(res.message);
+          setTimeout(() => setToastMsg(null), 3500);
+
+          clientUsersPageCache.clear();
+          await loadUsersPage(currentPage, committedSearch, planFilter, { forceRefresh: true });
+
+          if (onCurrentUserPlanUpdated) {
+            onCurrentUserPlanUpdated();
+          }
+        } catch (err: any) {
+          setErrorMsg(err.message || 'Failed to update verification status');
+        } finally {
+          setUpdatingId(null);
+        }
+      }
+    });
+  };
+
   const formatDate = (iso?: string | null) => {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -452,6 +500,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
               <tr className="border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400 bg-slate-950/60">
                 <th className="py-3.5 px-4">Streamer / Account</th>
                 <th className="py-3.5 px-4">Email</th>
+                <th className="py-3.5 px-4">Verified Badge</th>
                 <th className="py-3.5 px-4">Current Plan</th>
                 <th className="py-3.5 px-4">Duration (31d Cycle)</th>
                 <th className="py-3.5 px-4 text-right">Manage Plan (31 Days)</th>
@@ -474,6 +523,9 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                       <div className="w-40 h-3 rounded bg-slate-800/70" />
                     </td>
                     <td className="py-3.5 px-4">
+                      <div className="w-20 h-7 rounded-xl bg-slate-800/70" />
+                    </td>
+                    <td className="py-3.5 px-4">
                       <div className="w-24 h-6 rounded-lg bg-slate-800/70" />
                     </td>
                     <td className="py-3.5 px-4">
@@ -486,7 +538,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                 ))
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400 font-mono">
+                  <td colSpan={6} className="py-12 text-center text-slate-400 font-mono">
                     No matching users found.
                   </td>
                 </tr>
@@ -508,6 +560,11 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                           <div>
                             <div className="font-bold text-white flex items-center gap-1.5">
                               <span>{u.displayName || u.username}</span>
+                              {u.isVerified && (
+                                <span title="Verified Creator" className="inline-flex items-center text-cyan-400 flex-shrink-0">
+                                  <BadgeCheck size={14} className="text-cyan-400 fill-cyan-400/20" />
+                                </span>
+                              )}
                               {u.isAdmin && (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[9px] font-mono uppercase">
                                   <ShieldCheck size={10} />
@@ -523,6 +580,27 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                       {/* Email */}
                       <td className="py-3.5 px-4 font-mono text-slate-300">
                         {u.email}
+                      </td>
+
+                      {/* Verified Creator Status & Action */}
+                      <td className="py-3.5 px-4">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleVerified(u)}
+                          disabled={isUpdating}
+                          title={u.isVerified ? 'Click to revoke verification' : 'Click to grant Verified Creator badge'}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                            u.isVerified
+                              ? 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/15'
+                              : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <BadgeCheck
+                            size={14}
+                            className={u.isVerified ? 'text-cyan-400 fill-cyan-400/20' : 'text-slate-500'}
+                          />
+                          <span>{u.isVerified ? 'Verified' : 'Verify'}</span>
+                        </button>
                       </td>
 
                       {/* Plan Badge */}

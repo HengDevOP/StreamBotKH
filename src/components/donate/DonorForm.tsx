@@ -15,6 +15,7 @@ import {
   Loader2,
   Tv,
   CheckCircle2,
+  BadgeCheck,
   Sliders,
   Landmark,
   Lock
@@ -341,9 +342,11 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
               <h1 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] truncate">
                 {streamer.displayName}
               </h1>
-              <span title="Verified Streamer" className="text-cyan-400 flex-shrink-0">
-                <CheckCircle2 size={15} />
-              </span>
+              {streamer.isVerified && (
+                <span title="Verified Streamer" className="inline-flex items-center text-cyan-400 flex-shrink-0">
+                  <BadgeCheck size={16} className="text-cyan-400 fill-cyan-400/20" />
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-cyan-400 font-mono">@{streamer.username}</p>
             {streamer.bio && (

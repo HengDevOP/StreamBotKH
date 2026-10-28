@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  BadgeCheck,
   Receipt,
   HelpCircle,
   TrendingUp,
@@ -1486,9 +1487,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                     <div className="flex-1 text-center sm:text-left space-y-2">
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        <h3 className="text-lg font-extrabold text-white font-['Chakra_Petch']">
-                          {user.displayName || user.username}
+                        <h3 className="text-lg font-extrabold text-white font-['Chakra_Petch'] flex items-center gap-1.5">
+                          <span>{user.displayName || user.username}</span>
+                          {user.isVerified && (
+                            <span title="Verified Creator Badge" className="inline-flex items-center text-cyan-400">
+                              <BadgeCheck size={18} className="text-cyan-400 fill-cyan-400/20" />
+                            </span>
+                          )}
                         </h3>
+                        {user.isVerified ? (
+                          <span className="text-[10px] font-mono text-cyan-300 px-2.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 font-bold flex items-center gap-1">
+                            <BadgeCheck size={11} className="text-cyan-400" />
+                            <span>Verified Creator</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-slate-500 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800">
+                            Unverified
+                          </span>
+                        )}
                         <span className="text-xs font-mono text-cyan-400 px-2.5 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-800/40 font-semibold">
                           @{user.username}
                         </span>

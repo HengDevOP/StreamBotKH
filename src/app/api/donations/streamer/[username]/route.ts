@@ -10,7 +10,7 @@ export async function GET(
     const cleanUsername = decodeURIComponent(rawUsername).replace(/^@/, '').toLowerCase();
 
     const streamer = db.prepare(`
-      SELECT s.id, s.username, s.display_name, s.avatar_url, s.bio, s.custom_thanks_message,
+      SELECT s.id, s.username, s.display_name, s.avatar_url, s.bio, s.custom_thanks_message, s.is_verified,
              s.plan, s.plan_expires_at,
              a.glow_color, a.template_style, a.min_amount_alert, a.tts_min_amount,
              p.bakong_account_name, p.is_sandbox,
@@ -50,6 +50,7 @@ export async function GET(
       avatarUrl: streamer.avatar_url,
       bio: streamer.bio,
       customThanksMessage: streamer.custom_thanks_message || undefined,
+      isVerified: streamer.is_verified === 1,
       plan: currentPlan,
       glowColor: streamer.glow_color || '#00F0FF',
       minAmountAlert: streamer.min_amount_alert || 1.0,
