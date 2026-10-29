@@ -44,14 +44,13 @@ export async function POST(req: NextRequest) {
     // 1. Check MongoDB temporary_donations listener queue for matching bank name (First/Last name, any case)
     let matchedTemp: any = null;
     try {
+      const seenIds = new Set<string>();
       const candidates: any[] = [];
       const tempCol = await getTemporaryDonationsCollection();
       const mongoDocs = await tempCol
         .find({
-          $or: [
-            { streamerId: streamer.id },
-            { streamerId: 'demo-streamer-id-1001' }
-          ]
+          streamerId: streamer.id,
+          createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
         })
         .sort({ createdAt: -1 })
         .limit(30)
@@ -59,40 +58,9 @@ export async function POST(req: NextRequest) {
 
       for (const doc of mongoDocs) {
         const docId = doc.id || (doc as any).donationId || String(doc._id);
-        candidates.push({
-          id: docId,
-          streamer_id: doc.streamerId,
-          donor_name: doc.donorName,
-          donor_message: doc.donorMessage,
-          amount: doc.amount,
-          currency: doc.currency,
-          banking_name: doc.bankingName,
-          video_url: doc.videoUrl,
-          video_title: doc.videoTitle,
-          video_start_time: doc.videoStartTime,
-          video_end_time: doc.videoEndTime,
-          created_at: doc.createdAt
-        });
-      }
-
-      matchedTemp = findMatchingTemporaryDonation(candidates, {
-        donorName: donorName.trim(),
-        bankingName,
-        rawText: `${bankingName} ${donorName}`,
-        senderName: donorName.trim(),
-        amount: numericAmount
-      });
-
-      if (!matchedTemp) {
-        const recentCandidates: any[] = [];
-        const allRecentMongo = await tempCol
-          .find({})
-          .sort({ createdAt: -1 })
-          .limit(30)
-          .toArray();
-        for (const doc of allRecentMongo) {
-          const docId = doc.id || (doc as any).donationId || String(doc._id);
-          recentCandidates.push({
+        if (docId && !seenIds.has(docId)) {
+          seenIds.add(docId);
+          candidates.push({
             id: docId,
             streamer_id: doc.streamerId,
             donor_name: doc.donorName,
@@ -107,15 +75,35 @@ export async function POST(req: NextRequest) {
             created_at: doc.createdAt
           });
         }
-
-        matchedTemp = findMatchingTemporaryDonation(recentCandidates, {
-          donorName: donorName.trim(),
-          bankingName,
-          rawText: `${bankingName} ${donorName}`,
-          senderName: donorName.trim(),
-          amount: numericAmount
-        });
       }
+
+      // Also check SQLite pending donations for this streamer
+      try {
+        const pendingSqlite = db.prepare(`
+          SELECT * FROM donations
+          WHERE streamer_id = ?
+            AND status = 'PENDING'
+            AND created_at > datetime('now', '-10 minutes')
+          ORDER BY created_at DESC
+          LIMIT 30
+        `).all(streamer.id) as any[];
+
+        for (const doc of pendingSqlite) {
+          if (doc && doc.id && !seenIds.has(doc.id)) {
+            seenIds.add(doc.id);
+            candidates.push(doc);
+          }
+        }
+      } catch (sqlErr) {}
+
+      matchedTemp = findMatchingTemporaryDonation(candidates, {
+        donorName: donorName.trim(),
+        payerName: (bankingName || donorName).trim(),
+        bankingName,
+        rawText: `${bankingName} ${donorName}`,
+        senderName: donorName.trim(),
+        amount: numericAmount
+      });
 
       if (matchedTemp) {
         console.log(`🎯 [Gateway Matched] Found active temporary donation session ${matchedTemp.id} in MongoDB (Bank Name: "${matchedTemp.banking_name}", Donor: "${matchedTemp.donor_name}").`);

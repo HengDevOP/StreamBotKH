@@ -471,11 +471,11 @@ export class PhraseCatcher {
       let clean = afterPhrase
         .replace(/^\s*\(\*[0-9]+\)\s*/i, '')
         .replace(/^\s*\([^\)]+\)\s*/i, '')
-        .replace(/\bto\s+(?!\bon\b|\bat\b|\bvia\b)[A-Za-z0-9_@\u1780-\u17FF]+(?:\s+(?!\bon\b|\bat\b|\bvia\b)[A-Za-z0-9_@\u1780-\u17FF]+)?/i, '')
-        .replace(/\bon\s+\d{1,2}[-/][A-Za-z0-9]+(?:[-/]\d{2,4})?/i, '')
-        .replace(/\bat\s+\d{1,2}:\d{2}(?:\s*(?:AM|PM))?/i, '')
-        .replace(/\bat\s+(?!\d{1,2}:\d{2})[A-Za-z0-9_@\u1780-\u17FF]+(?:\s+[A-Za-z0-9_@\u1780-\u17FF]+)?/i, '')
-        .replace(/\bvia\s+[A-Za-z0-9_\s]+/i, '')
+        .replace(/\bon\s+(?:[A-Za-z]+\s+\d{1,2}|\d{1,2}[-/][A-Za-z0-9]+(?:[-/]\d{2,4})?)(?:,?\s*\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)?/gi, '')
+        .replace(/\bat\s+\d{1,2}:\d{2}(?:\s*(?:AM|PM))?/gi, '')
+        .replace(/\bvia\s+[A-Za-z0-9_\s]+?(?=\s+at\b|\s+to\b|\s+on\b|\s+Trx|\s+Ref|\s+APV|[.:\n]|$)/gi, '')
+        .replace(/\bat\s+(?!\d{1,2}:\d{2})[A-Za-z0-9_@\s\u1780-\u17FF]+?(?=\s+on\b|\s+via\b|\s+to\b|\s+Trx|\s+Ref|\s+APV|[.:\n]|$)/gi, '')
+        .replace(/\bto\s+[A-Za-z0-9_@\s\u1780-\u17FF]+?(?=\s+on\b|\s+via\b|\s+at\b|\s+Trx|\s+Ref|\s+APV|[.:\n]|$)/gi, '')
         .replace(/(?:trx\.?\s*id|tran\s*id|trans\s*id|txid|ref(?:erence)?(?:\s*no|\s*id)?|hash)\s*[:\-–]?\s*[A-Za-z0-9_-]+/gi, '')
         .replace(/apv\s*[:\-–]?\s*[A-Za-z0-9_-]+/gi, '')
         .replace(/(?:remark|message|note|msg|memo|context)\s*[:\-–]?\s*/gi, '')
@@ -483,7 +483,7 @@ export class PhraseCatcher {
         .replace(/[.\s,–:;-]+$/, '')
         .trim();
 
-      if (clean && clean.length > 1 && !/^(trx|apv|ref|bank|\d{1,2}:\d{2})/i.test(clean)) {
+      if (clean && clean.length > 1 && !/^(trx|apv|ref|bank|\d{1,2}:\d{2}|via|aba|khqr)/i.test(clean)) {
         return clean;
       }
     }

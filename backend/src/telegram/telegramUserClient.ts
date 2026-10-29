@@ -651,6 +651,7 @@ class TelegramUserClientManager {
               const tempCol = await getTemporaryDonationsCollection();
               const mongoRecent = await tempCol
                 .find({
+                  streamerId: targetStreamer.id,
                   createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
                 })
                 .sort({ createdAt: -1 })
@@ -685,11 +686,12 @@ class TelegramUserClientManager {
             try {
               const pendingCandidates = db.prepare(`
                 SELECT * FROM donations
-                WHERE status = 'PENDING'
+                WHERE streamer_id = ?
+                  AND status = 'PENDING'
                   AND created_at > datetime('now', '-10 minutes')
                 ORDER BY created_at DESC
                 LIMIT 30
-              `).all() as any[];
+              `).all(targetStreamer.id) as any[];
               for (const c of pendingCandidates) {
                 if (c && c.id && !seenIds.has(c.id)) {
                   seenIds.add(c.id);
