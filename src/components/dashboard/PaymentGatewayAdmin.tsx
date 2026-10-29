@@ -825,8 +825,15 @@ export const PaymentGatewayAdmin: React.FC = () => {
           {/* Connected State View */}
           {userClientStatus.isConnected ? (
             <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
-              <div className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
-                {userClientStatus.userName || 'Connected Streamer'}
+              <div className="flex items-center gap-3">
+                <div className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 bg-white shadow-[0_0_15px_rgba(0,136,204,0.4)] ring-2 ring-[#0088cc]/30">
+                  <svg className="w-9 h-9 text-[#0088cc] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.536-.195 1.006.128.832.942z" />
+                  </svg>
+                </div>
+                <div className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
+                  {userClientStatus.userName || 'Connected Streamer'}
+                </div>
               </div>
 
               <div className="flex justify-end pt-4 border-t border-slate-800/80">
