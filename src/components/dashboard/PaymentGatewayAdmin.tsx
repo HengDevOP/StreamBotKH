@@ -1014,193 +1014,172 @@ export const PaymentGatewayAdmin: React.FC = () => {
       {/* ============================================================== */}
       {activeStep === 2 && (
         <Card glow="cyan" className="space-y-6 animate-fadeIn">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
-                <QrCode size={22} />
-              </div>
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 font-['Chakra_Petch']">
-                  STEP 2: Provide Master KHQR Payment QR Code
-                  {isStep2Done ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      ACTIVE
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono">
-                      IMAGE NEEDED
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Upload your official Bakong / ABA KHQR image. Viewers scan this code on all streamer donation pages (/@streamer) to pay.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="px-2.5 py-1 rounded bg-slate-900 text-slate-300 border border-slate-800">
-                Max Size: 5MB
-              </span>
-              <span className="px-2.5 py-1 rounded bg-slate-900 text-slate-300 border border-slate-800">
-                PNG / JPG
-              </span>
-            </div>
-          </div>
-
-          {step2Msg && (
-            <div
-              className={`p-3.5 rounded-xl border text-xs flex items-center justify-between animate-fadeIn ${
-                step2Msg.type === 'success'
-                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
-                  : 'bg-red-950/40 border-red-500/30 text-red-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {step2Msg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                <span>{step2Msg.text}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStep2Msg(null)}
-                className="text-slate-400 hover:text-white px-2 py-0.5"
-              >
-                ✕
-              </button>
+          {step2Msg && step2Msg.type === 'error' && (
+            <div className="p-3.5 rounded-xl border text-xs flex items-center gap-2 bg-red-950/40 border-red-500/30 text-red-300">
+              <AlertCircle size={16} />
+              <span>{step2Msg.text}</span>
             </div>
           )}
 
-          {/* Active KHQR Status Card */}
           {gatewayConfig?.khqrImageUrl ? (
-            <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 rounded-xl bg-white p-1.5 border border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-lg">
-                    <img
-                      src={gatewayConfig.khqrImageUrl}
-                      alt="Active Master KHQR"
-                      className="max-h-full max-w-full object-contain"
-                    />
+            /* Active KHQR View - Clean Centered Preview */
+            <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
+              <div className="flex flex-col items-center justify-center text-center gap-3 py-2">
+                <div className="w-36 h-36 rounded-2xl bg-white p-2.5 border-2 border-cyan-400/40 flex items-center justify-center overflow-hidden shadow-[0_0_25px_rgba(0,240,255,0.25)]">
+                  <img
+                    src={gatewayConfig.khqrImageUrl}
+                    alt="Active Master KHQR"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
+                    Master KHQR Active
                   </div>
-                  <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      ACTIVE ON YOUR DONATION PAGE (@{currentStreamerUsername})
-                    </div>
-                    <div className="text-sm font-bold text-white">
-                      {gatewayConfig.khqrFilename || 'master-khqr.png'}
-                    </div>
-                    <div className="text-xs font-mono text-slate-400">
-                      File Size: {formatFileSize(gatewayConfig.khqrFileSize)} • Scoped to Your Client Account
-                    </div>
+                  <div className="text-xs font-mono text-emerald-400 flex items-center justify-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span>Live on @{currentStreamerUsername} donation page</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <a
-                    href={`/@${currentStreamerUsername}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-200 border border-slate-800 flex items-center justify-center gap-1.5 transition-colors"
+                <div className="flex items-center justify-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-mono text-slate-400 hover:text-cyan-400 flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <ExternalLink size={13} />
-                    <span>View Donate Page</span>
-                  </a>
-
+                    <UploadCloud size={13} />
+                    <span>Replace Image</span>
+                  </button>
+                  <span className="text-slate-700">•</span>
                   <button
                     type="button"
                     onClick={handleDeleteKhqr}
-                    className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    title="Remove custom image"
+                    className="text-xs font-mono text-slate-500 hover:text-red-400 flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={13} />
+                    <span>Remove</span>
                   </button>
                 </div>
               </div>
+
+              {/* Hidden file input for replacing */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleKhqrFile(e.target.files[0]);
+                  }
+                }}
+                disabled={uploadingKhqr}
+              />
+
+              {/* Bottom Actions Row: Back to Step 1 (left) & Continue to Step 3 (right) */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  onClick={() => setActiveStep(1)}
+                  className="font-bold cursor-pointer"
+                >
+                  <ChevronLeft size={16} className="mr-1" />
+                  <span>Back to Step 1</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  onClick={() => setActiveStep(3)}
+                  className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
+                >
+                  <span>Continue to Step 3</span>
+                  <ArrowRight size={15} className="ml-1" />
+                </Button>
+              </div>
             </div>
           ) : (
-            <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
-              <AlertCircle size={16} className="text-amber-400 flex-shrink-0" />
-              <span>
-                No custom Master KHQR image uploaded for your account yet. Your donation page currently generates dynamic Bakong QR codes as a fallback.
-              </span>
+            /* Upload Dropzone - Clean Centered Box */
+            <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleKhqrFile(e.dataTransfer.files[0]);
+                  }
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`p-8 rounded-2xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center text-center gap-3 ${
+                  dragActive
+                    ? 'border-cyan-400 bg-cyan-950/20'
+                    : 'border-slate-800 hover:border-cyan-500/50 bg-slate-950/60 hover:bg-slate-950'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleKhqrFile(e.target.files[0]);
+                    }
+                  }}
+                  disabled={uploadingKhqr}
+                />
+
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  {uploadingKhqr ? (
+                    <RefreshCw size={22} className="animate-spin text-cyan-400" />
+                  ) : (
+                    <QrCode size={24} />
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-sm font-bold text-white font-['Chakra_Petch']">
+                    {uploadingKhqr ? 'Uploading KHQR Image...' : 'Upload Master KHQR Image'}
+                  </div>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Drop your official Bakong / ABA KHQR image (PNG or JPG up to 5MB)
+                  </p>
+                </div>
+              </div>
+
+              {/* Bottom Actions Row: Back to Step 1 (left) & Continue to Step 3 (right) */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  onClick={() => setActiveStep(1)}
+                  className="font-bold cursor-pointer"
+                >
+                  <ChevronLeft size={16} className="mr-1" />
+                  <span>Back to Step 1</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  onClick={() => setActiveStep(3)}
+                  className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
+                >
+                  <span>Continue to Step 3</span>
+                  <ArrowRight size={15} className="ml-1" />
+                </Button>
+              </div>
             </div>
           )}
-
-          {/* Upload Dropzone */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-            onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragActive(false);
-              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                handleKhqrFile(e.dataTransfer.files[0]);
-              }
-            }}
-            onClick={() => fileInputRef.current?.click()}
-            className={`p-8 rounded-2xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center text-center gap-3 ${
-              dragActive
-                ? 'border-cyan-400 bg-cyan-950/20'
-                : 'border-slate-800 hover:border-slate-700 bg-slate-900/40 hover:bg-slate-900/60'
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/jpg"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  handleKhqrFile(e.target.files[0]);
-                }
-              }}
-              disabled={uploadingKhqr}
-            />
-
-            <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-cyan-400">
-              {uploadingKhqr ? (
-                <RefreshCw size={22} className="animate-spin text-cyan-400" />
-              ) : (
-                <UploadCloud size={24} />
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <div className="text-sm font-semibold text-white">
-                {uploadingKhqr ? 'Saving KHQR image to database...' : 'Upload or Replace Master KHQR Image'}
-              </div>
-              <p className="text-xs text-slate-400">
-                Supports <strong className="text-slate-300">PNG</strong> or <strong className="text-slate-300">JPG</strong> up to <strong className="text-cyan-400">5MB</strong>.
-              </p>
-            </div>
-          </div>
-
-          {/* Stepper Navigation Buttons */}
-          <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              onClick={() => setActiveStep(1)}
-              className="font-bold"
-            >
-              <ChevronLeft size={16} className="mr-1" />
-              <span>Back to Step 1</span>
-            </Button>
-
-            <Button
-              type="button"
-              variant="primary"
-              size="md"
-              onClick={() => setActiveStep(3)}
-              className="font-bold shadow-lg shadow-cyan-400/20"
-            >
-              <span>Continue to Step 3: Group Listener</span>
-              <ChevronRight size={16} className="ml-1" />
-            </Button>
-          </div>
         </Card>
       )}
 
