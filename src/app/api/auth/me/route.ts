@@ -26,6 +26,18 @@ export async function GET(req: NextRequest) {
     `).get(user.email) as any;
   }
 
+  // If streamer has no avatar in SQLite, check MongoDB Atlas for saved custom avatar
+  if (streamer && (!streamer.avatar_url || !streamer.avatar_url.trim())) {
+    try {
+      const usersCol = await getUsersCollection();
+      const mongoUser = await usersCol.findOne({ userId: streamer.id });
+      if (mongoUser?.avatarUrl && mongoUser.avatarUrl.trim()) {
+        db.prepare('UPDATE streamers SET avatar_url = ? WHERE id = ?').run(mongoUser.avatarUrl.trim(), streamer.id);
+        streamer.avatar_url = mongoUser.avatarUrl.trim();
+      }
+    } catch (e) {}
+  }
+
   // Fallback: If not in SQLite (e.g. after container redeploy), restore from MongoDB Atlas
   if (!streamer) {
     try {
@@ -92,6 +104,7 @@ export async function GET(req: NextRequest) {
             email = excluded.email,
             username = excluded.username,
             display_name = excluded.display_name,
+            avatar_url = COALESCE(NULLIF(streamers.avatar_url, ''), excluded.avatar_url),
             overlay_token = COALESCE(streamers.overlay_token, excluded.overlay_token),
             telegram_pairing_code = COALESCE(streamers.telegram_pairing_code, excluded.telegram_pairing_code)
         `).run(

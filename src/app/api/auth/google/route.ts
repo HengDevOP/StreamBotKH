@@ -236,7 +236,11 @@ export async function upsertGoogleStreamer(profile: {
     streamerUsername = `${streamerUsername.slice(0, 16)}_${Math.floor(100 + Math.random() * 900)}`;
   }
 
-  const resolvedAvatar = avatarUrl || sqliteStreamer?.avatar_url || existingMongoUser?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamerUsername}`;
+  // Preserve custom uploaded avatar/logo across Google OAuth sign-in sessions!
+  // If user previously set a custom avatar in SQLite or MongoDB, ALWAYS KEEP IT.
+  // Only fall back to Google picture (or DiceBear) for brand new streamers without any avatar.
+  const existingAvatar = (sqliteStreamer?.avatar_url || existingMongoUser?.avatarUrl || '').trim();
+  const resolvedAvatar = existingAvatar || avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamerUsername}`;
 
   // 5. Upsert into SQLite streamers table
   db.prepare(`
@@ -248,7 +252,11 @@ export async function upsertGoogleStreamer(profile: {
       email = excluded.email,
       username = excluded.username,
       display_name = excluded.display_name,
-      avatar_url = COALESCE(excluded.avatar_url, streamers.avatar_url),
+      avatar_url = CASE
+        WHEN streamers.avatar_url IS NOT NULL AND streamers.avatar_url != '' THEN streamers.avatar_url
+        WHEN excluded.avatar_url IS NOT NULL AND excluded.avatar_url != '' THEN excluded.avatar_url
+        ELSE streamers.avatar_url
+      END,
       bio = COALESCE(excluded.bio, streamers.bio),
       plan = COALESCE(excluded.plan, streamers.plan),
       overlay_token = COALESCE(streamers.overlay_token, excluded.overlay_token),
@@ -294,16 +302,21 @@ export async function upsertGoogleStreamer(profile: {
   // 4. Synchronize user and assets to MongoDB Atlas
   try {
     const usersCol = await getUsersCollection();
+    const finalMongoAvatar = (streamer?.avatar_url || existingMongoUser?.avatarUrl || existingAvatar || resolvedAvatar).trim();
+    const mongoUpdate: any = {
+      username: streamerUsername,
+      displayName,
+      email,
+      updatedAt: new Date()
+    };
+    if (finalMongoAvatar) {
+      mongoUpdate.avatarUrl = finalMongoAvatar;
+    }
+
     await usersCol.updateOne(
       { userId: streamerId },
       {
-        $set: {
-          username: streamerUsername,
-          displayName,
-          email,
-          avatarUrl: resolvedAvatar,
-          updatedAt: new Date()
-        },
+        $set: mongoUpdate,
         $setOnInsert: {
           userId: streamerId,
           bio,
