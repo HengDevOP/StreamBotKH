@@ -24,7 +24,6 @@ import {
   ChevronLeft,
   ArrowRight,
   Users,
-  Link as LinkIcon,
   Plus,
   Layers,
   LogOut,
@@ -148,7 +147,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [targetGroups, setTargetGroups] = useState<TargetGroup[]>([]);
   const [availableDialogs, setAvailableDialogs] = useState<AvailableDialog[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
-  const [addingGroup, setAddingGroup] = useState(false);
   const [connectingGroupId, setConnectingGroupId] = useState<string | null>(null);
   const [step3Msg, setStep3Msg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -156,10 +154,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [groupSearch, setGroupSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState<'all' | 'connected' | 'available'>('all');
   const [copiedChatId, setCopiedChatId] = useState<string | null>(null);
-
-  // Group Link input form
-  const [groupLinkInput, setGroupLinkInput] = useState('');
-  const [groupTitleInput, setGroupTitleInput] = useState('');
 
   // ----------------------------------------------------------------
   // Authenticated Fetch Helper (Per Client Account Session)
@@ -507,46 +501,8 @@ export const PaymentGatewayAdmin: React.FC = () => {
   };
 
   // ----------------------------------------------------------------
-  // STEP 3 HANDLERS: Connect Telegram Group via Link / ID
+  // STEP 3 HANDLERS: Manage Telegram Target Groups & Listener Cards
   // ----------------------------------------------------------------
-  const handleConnectGroup = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setStep3Msg(null);
-
-    const link = groupLinkInput.trim();
-    if (!link) {
-      setStep3Msg({ type: 'error', text: 'Please enter a Telegram group link (e.g. https://t.me/yourgroup) or Chat ID.' });
-      return;
-    }
-
-    setAddingGroup(true);
-    try {
-      const res = await authFetch('/api/telegram/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          groupLink: link,
-          chatId: link,
-          title: groupTitleInput.trim() || undefined
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setStep3Msg({ type: 'success', text: data.message });
-        setGroupLinkInput('');
-        setGroupTitleInput('');
-        await fetchTargetGroups();
-      } else {
-        setStep3Msg({ type: 'error', text: data.error || 'Failed to connect Telegram group.' });
-      }
-    } catch (err: any) {
-      setStep3Msg({ type: 'error', text: err.message || 'Network error connecting group.' });
-    } finally {
-      setAddingGroup(false);
-    }
-  };
-
   const handleDeleteTargetGroup = (group: TargetGroup) => {
     showConfirm({
       title: 'Remove Monitored Group?',
@@ -572,10 +528,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
     });
   };
 
-  const handleQuickAddDialog = (d: AvailableDialog) => {
-    setGroupLinkInput(d.username ? `https://t.me/${d.username.replace(/^@/, '')}` : d.id);
-    setGroupTitleInput(d.title);
-  };
 
   const handleDirectToggleGroup = async (dialog: AvailableDialog) => {
     const existing = targetGroups.find((g) => g.chat_id === dialog.id);
@@ -1307,7 +1259,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   )}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Paste the Telegram link or Chat ID of your bank notifications group. GramJS will listen strictly to messages inside these groups and fire overlay alerts!
+                  Select and connect your Telegram bank notification groups or channels below. GramJS will monitor incoming messages in real-time and trigger OBS alerts.
                 </p>
               </div>
             </div>
@@ -1374,70 +1326,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* Quick Connect Form via Telegram Link */}
-              <form onSubmit={handleConnectGroup} className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-4 shadow-xl">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
-              <LinkIcon size={16} className="text-cyan-400" />
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                Connect New Telegram Group via Link
-              </h4>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-slate-300 font-bold block">
-                  Telegram Group Link or Chat ID <span className="text-cyan-400">*</span>
-                </label>
-                <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cyan-400 pointer-events-none">
-                    <LinkIcon size={14} />
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={groupLinkInput}
-                    onChange={(e) => setGroupLinkInput(e.target.value)}
-                    placeholder="https://t.me/your_bank_alerts, @your_bank_alerts, or -10012345678"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-sm text-cyan-300 font-mono placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition-colors"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Accepts full group links (e.g. <code className="text-slate-400">https://t.me/stream_alerts</code>), usernames (<code className="text-slate-400">@stream_alerts</code>), or numeric Chat IDs (<code className="text-slate-400">-100198822334</code>).
-                </p>
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-slate-300 font-bold block">
-                  Group Label / Title (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={groupTitleInput}
-                  onChange={(e) => setGroupTitleInput(e.target.value)}
-                  placeholder="e.g. ABA Bank SMS Push Notifications"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end">
-              <Button
-                type="submit"
-                variant="primary"
-                size="md"
-                loading={addingGroup}
-                className="font-bold shadow-lg shadow-cyan-400/20"
-              >
-                <Plus size={15} className="mr-1" />
-                <span>Connect Group to Listener</span>
-              </Button>
-            </div>
-          </form>
-
-          {/* ============================================================== */}
-          {/* TELEGRAM GROUPS DIRECTORY: LISTED AS INTERACTIVE CARDS         */}
-          {/* ============================================================== */}
-          <div className="space-y-4 pt-2">
+              {/* ============================================================== */}
+              {/* TELEGRAM GROUPS DIRECTORY: LISTED AS INTERACTIVE CARDS         */}
+              {/* ============================================================== */}
+              <div className="space-y-4 pt-1">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider font-['Chakra_Petch'] flex items-center gap-2">
@@ -1515,6 +1407,16 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
             {/* Groups Grid Rendered as High-Craft Cards (Active Groups Sorted First) */}
             {(() => {
+              if (loadingGroups && availableDialogs.length === 0) {
+                return (
+                  <div className="py-12 px-6 rounded-2xl bg-slate-950/60 border border-slate-800 text-center space-y-3 font-mono">
+                    <RefreshCw size={24} className="animate-spin text-cyan-400 mx-auto" />
+                    <div className="text-white text-xs font-bold">Scanning Telegram account groups & channels...</div>
+                    <p className="text-[11px] text-slate-500">Fetching dialogs from your connected GramJS session</p>
+                  </div>
+                );
+              }
+
               const filtered = availableDialogs.filter((d) => {
                 const matchesSearch =
                   !groupSearch.trim() ||
@@ -1540,7 +1442,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 return (
                   <div className="p-8 rounded-2xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400 space-y-1 font-mono">
                     <p className="text-white font-bold">No groups match your search or filter.</p>
-                    <p className="text-slate-500">Try clearing the search input or paste a custom link above.</p>
+                    <p className="text-slate-500">Try clearing the search input or switching filter tabs.</p>
                   </div>
                 );
               }
@@ -1552,12 +1454,19 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     const isConnecting = connectingGroupId === dialog.id;
                     const isCopied = copiedChatId === dialog.id;
 
+                    const titleLower = dialog.title.toLowerCase();
                     const isBankRelated =
-                      dialog.title.toLowerCase().includes('aba') ||
-                      dialog.title.toLowerCase().includes('bank') ||
-                      dialog.title.toLowerCase().includes('transaction') ||
-                      dialog.title.toLowerCase().includes('cam-tool') ||
-                      dialog.title.toLowerCase().includes('khmc');
+                      titleLower.includes('aba') ||
+                      titleLower.includes('bank') ||
+                      titleLower.includes('transaction') ||
+                      titleLower.includes('cam-tool') ||
+                      titleLower.includes('khmc') ||
+                      titleLower.includes('acleda') ||
+                      titleLower.includes('wing') ||
+                      titleLower.includes('canadia') ||
+                      titleLower.includes('bakong') ||
+                      titleLower.includes('alert') ||
+                      titleLower.includes('pay');
 
                     return (
                       <div
@@ -1603,7 +1512,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
                               <div className="min-w-0 flex-1">
                                 <h5
-                                  className="text-xs sm:text-sm font-bold text-white truncate font-sans tracking-tight"
+                                  className="text-xs sm:text-sm font-bold text-white line-clamp-2 font-sans tracking-tight leading-snug"
                                   title={dialog.title}
                                 >
                                   {dialog.title}

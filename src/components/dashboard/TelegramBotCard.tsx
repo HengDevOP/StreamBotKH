@@ -98,12 +98,6 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
   const [addingGroup, setAddingGroup] = useState(false);
   const [groupStatusMsg, setGroupStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Add Group Form inputs
-  const [newGroupChatId, setNewGroupChatId] = useState('');
-  const [newGroupTitle, setNewGroupTitle] = useState('');
-  const [newGroupUsername, setNewGroupUsername] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
-
   // Dormant bot state for backward compatibility
   const [botToken, setBotToken] = useState('');
   const [isBotRunning, setIsBotRunning] = useState(false);
@@ -162,48 +156,6 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
   };
 
   // ------------------------------------------
-  // Add Target Group
-  // ------------------------------------------
-  const handleAddTargetGroup = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setGroupStatusMsg(null);
-
-    const chatId = newGroupChatId.trim();
-    const title = newGroupTitle.trim() || `Telegram Group (${chatId})`;
-    const username = newGroupUsername.trim();
-
-    if (!chatId) {
-      setGroupStatusMsg({ type: 'error', text: 'Please enter a Group Chat ID (e.g. -1001234567890).' });
-      return;
-    }
-
-    setAddingGroup(true);
-    try {
-      const res = await fetch('/api/telegram/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId, title, username: username || undefined })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setGroupStatusMsg({ type: 'success', text: data.message });
-        setNewGroupChatId('');
-        setNewGroupTitle('');
-        setNewGroupUsername('');
-        setShowAddForm(false);
-        await fetchTargetGroups();
-        await fetchAllStatus();
-      } else {
-        setGroupStatusMsg({ type: 'error', text: data.error || 'Failed to add target group.' });
-      }
-    } catch (err: any) {
-      setGroupStatusMsg({ type: 'error', text: err.message || 'Network error adding group.' });
-    } finally {
-      setAddingGroup(false);
-    }
-  };
-
-  // ------------------------------------------
   // Delete Target Group
   // ------------------------------------------
   const handleDeleteTargetGroup = (group: { id: string; title: string; chat_id: string }) => {
@@ -232,11 +184,28 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
     });
   };
 
-  const handleQuickAddDialog = (d: { id: string; title: string; username?: string }) => {
-    setNewGroupChatId(d.id);
-    setNewGroupTitle(d.title);
-    setNewGroupUsername(d.username ? `@${d.username.replace(/^@/, '')}` : '');
-    setShowAddForm(true);
+  const handleQuickAddDialog = async (d: { id: string; title: string; username?: string }) => {
+    setGroupStatusMsg(null);
+    setAddingGroup(true);
+    try {
+      const res = await fetch('/api/telegram/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId: d.id, title: d.title, username: d.username || undefined })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGroupStatusMsg({ type: 'success', text: `Connected "${d.title}" to listener!` });
+        await fetchTargetGroups();
+        await fetchAllStatus();
+      } else {
+        setGroupStatusMsg({ type: 'error', text: data.error || 'Failed to add target group.' });
+      }
+    } catch (err: any) {
+      setGroupStatusMsg({ type: 'error', text: err.message || 'Network error adding group.' });
+    } finally {
+      setAddingGroup(false);
+    }
   };
 
   // ------------------------------------------
@@ -912,17 +881,6 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
                 <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md ${
-                  showAddForm
-                    ? 'bg-slate-800 text-white border border-slate-700'
-                    : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20'
-                }`}
-              >
-                <Plus size={14} className={showAddForm ? 'rotate-45 transition-transform' : ''} />
-                <span>{showAddForm ? 'Close Form' : 'Add Target Group'}</span>
-              </button>
             </div>
           </div>
 
@@ -967,9 +925,9 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
               <div className="flex items-center justify-between text-xs">
                 <span className="font-mono font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
                   <Sparkles size={13} className="text-cyan-400" />
-                  Quick-Add From Your Telegram Account ({availableDialogs.length} detected)
+                  Your Telegram Account Dialogs ({availableDialogs.length} detected)
                 </span>
-                <span className="text-[11px] text-slate-500">Click a group to pre-fill</span>
+                <span className="text-[11px] text-slate-500">Click a group to connect or disconnect</span>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 {availableDialogs.map((d) => {
@@ -978,11 +936,18 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
                     <button
                       key={d.id}
                       type="button"
-                      disabled={isAlreadyAdded}
-                      onClick={() => handleQuickAddDialog(d)}
+                      disabled={addingGroup}
+                      onClick={() => {
+                        const existing = targetGroups.find((g) => g.chat_id === d.id);
+                        if (existing) {
+                          handleDeleteTargetGroup(existing);
+                        } else {
+                          handleQuickAddDialog(d);
+                        }
+                      }}
                       className={`text-xs px-3 py-1.5 rounded-lg border font-mono flex items-center gap-1.5 transition-all ${
                         isAlreadyAdded
-                          ? 'bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed'
+                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:border-red-500/40 hover:text-red-300'
                           : 'bg-slate-900 border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 hover:border-cyan-400'
                       }`}
                     >
@@ -994,115 +959,6 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
                 })}
               </div>
             </div>
-          )}
-
-          {/* Add Group Form */}
-          {showAddForm && (
-            <form onSubmit={handleAddTargetGroup} className="p-5 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-4 animate-fadeIn shadow-2xl">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider flex items-center gap-2">
-                  <Plus size={15} className="text-cyan-400" />
-                  Add Target Group to GramJS Listener
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="text-xs text-slate-400 hover:text-white font-mono"
-                >
-                  Cancel
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs font-mono">
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-bold block">
-                    Group / Channel Title <span className="text-cyan-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. ABA Bank SMS Alerts"
-                    value={newGroupTitle}
-                    onChange={(e) => setNewGroupTitle(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-bold block">
-                    Telegram Chat ID <span className="text-cyan-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. -100198822334"
-                    value={newGroupChatId}
-                    onChange={(e) => setNewGroupChatId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-cyan-400 font-bold placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-bold block">
-                    Username / Handle (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. @ababank_alerts"
-                    value={newGroupUsername}
-                    onChange={(e) => setNewGroupUsername(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Sample presets */}
-              <div className="flex flex-wrap items-center gap-2 text-xs font-mono pt-1 text-slate-400">
-                <span className="text-[11px] text-slate-500 uppercase font-bold">Quick Presets:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewGroupTitle('ABA Bank SMS Alerts');
-                    setNewGroupChatId('-100198822334');
-                    setNewGroupUsername('@ababank_push');
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-cyan-300 hover:border-cyan-500/40 transition-colors"
-                >
-                  + ABA Bank SMS Alerts
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewGroupTitle('Stream Donors VIP');
-                    setNewGroupChatId('-100155667788');
-                    setNewGroupUsername('@stream_donors');
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-cyan-300 hover:border-cyan-500/40 transition-colors"
-                >
-                  + Stream Donors VIP
-                </button>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddForm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  loading={addingGroup}
-                  className="font-bold shadow-lg shadow-cyan-400/20"
-                >
-                  Save & Start Listening
-                </Button>
-              </div>
-            </form>
           )}
 
           {/* Group List */}
