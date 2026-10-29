@@ -906,56 +906,52 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 /* Verification Code Form: 5-Digit Block Boxes with Auto-Submit */
                 <form
                   onSubmit={(e) => handleVerifyCode(e, codeDigits.join(''))}
-                  className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-4 animate-fadeIn shadow-2xl"
+                  className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-5 animate-fadeIn shadow-2xl"
                 >
-                  <div className="space-y-1">
-                    <label className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  {/* Centered Code Input Label Section */}
+                  <div className="space-y-1.5 text-center flex flex-col items-center">
+                    <label className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center justify-center gap-2">
                       <KeyRound size={14} className="text-cyan-400" />
                       <span>Enter Your OTP Code</span>
                     </label>
-                    <p className="text-[11px] text-slate-500 font-mono">
+                    <p className="text-[11px] text-slate-500 font-mono text-center">
                       Enter the 5-digit verification code sent to your Telegram app for{' '}
                       <span className="text-cyan-400 font-semibold">{userPhone}</span>.
                     </p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    {/* 5-Digit Block Boxes */}
-                    <div className="flex items-center gap-2.5 sm:gap-3 justify-center w-full sm:w-auto">
-                      {codeDigits.map((digit, idx) => (
-                        <input
-                          key={idx}
-                          ref={(el) => (digitInputRefs.current[idx] = el)}
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(e) => handleDigitChange(idx, e.target.value)}
-                          onKeyDown={(e) => handleDigitKeyDown(idx, e)}
-                          onPaste={(e) => {
-                            e.preventDefault();
-                            handlePastedCode(e.clipboardData.getData('text'));
-                          }}
-                          className={`w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-bold font-mono rounded-xl bg-slate-950 border transition-all ${
-                            digit
-                              ? 'border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(0,240,255,0.25)] ring-1 ring-cyan-400/30'
-                              : 'border-slate-800 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20'
-                          } focus:outline-none`}
-                        />
-                      ))}
-                    </div>
-
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      loading={verifyingCode}
-                      className="font-bold py-3.5 px-8 w-full sm:w-auto whitespace-nowrap justify-center shadow-lg shadow-cyan-400/20"
-                    >
-                      Continue
-                    </Button>
+                  {/* Centered 5-Digit Block Boxes */}
+                  <div className="flex items-center justify-center gap-2.5 sm:gap-3 py-1">
+                    {codeDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => (digitInputRefs.current[idx] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleDigitChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleDigitKeyDown(idx, e)}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          handlePastedCode(e.clipboardData.getData('text'));
+                        }}
+                        className={`w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-bold font-mono rounded-xl bg-slate-950 border transition-all ${
+                          digit
+                            ? 'border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(0,240,255,0.25)] ring-1 ring-cyan-400/30'
+                            : 'border-slate-800 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20'
+                        } focus:outline-none`}
+                      />
+                    ))}
                   </div>
+
+                  {verifyingCode && (
+                    <div className="flex items-center justify-center gap-2 text-xs font-mono text-cyan-400 animate-pulse">
+                      <RefreshCw size={13} className="animate-spin" />
+                      <span>Verifying code...</span>
+                    </div>
+                  )}
 
                   {needPassword && (
                     <div className="space-y-1 pt-2 animate-fadeIn font-mono">
