@@ -69,7 +69,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
   const faqs = [
     {
       q: 'What are the differences between the Free and Pro plans?',
-      a: 'The Free plan ($0) includes 20MB media storage, Donations Alerts, and the Payment Gateway (ABA PayWay & Bakong KHQR) with a 10% platform fee on incoming tips. The Pro plan ($4.99/mo or $3.99/mo annual) eliminates the platform fee (0% fee - keep 100% of your earnings), removes the donation page watermark, expands storage to 100MB (supporting MP4, GIF, MP3, WAV & all formats), and unlocks all advanced stream assets: Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels.'
+      a: 'The Free plan ($0) includes 20MB media storage, Donations Alerts, and the Payment Gateway (ABA PayWay & Bakong KHQR). The Pro plan ($4.99/mo or $3.99/mo annual) removes the donation page watermark, expands storage to 100MB (supporting MP4, GIF, MP3, WAV & all formats), and unlocks all advanced stream assets: Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels.'
     },
     {
       q: 'Is the Payment Gateway available on both Free and Pro plans?',
@@ -105,7 +105,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
           Simple, transparent plans for Cambodian streamers
         </h1>
         <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed px-1">
-          Start free with Donations Alerts, Payment Gateway, and 20MB storage, or upgrade to Pro to unlock 100MB storage, Leaderboard, Goals, Timer, Soundboard, Video Alerts, Spinning Wheels, and 0% fee.
+          Start free with Donations Alerts, Payment Gateway, and 20MB storage, or upgrade to Pro to unlock 100MB storage, Leaderboard, Goals, Timer, Soundboard, Video Alerts, and Spinning Wheels.
         </p>
 
         {/* Currency & Billing Controls */}
@@ -185,10 +185,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <Check size={16} className="text-cyan-400 flex-shrink-0" />
                 <span>Telegram Bot Notification Integration</span>
               </li>
-              <li className="flex items-center gap-3 text-amber-300">
-                <span className="font-mono font-bold text-amber-400">10%</span>
-                <span>Platform fee cut on incoming tips</span>
-              </li>
               <li className="flex items-center gap-3 text-slate-600">
                 <span className="w-4 text-center">-</span>
                 <span>Removed Watermark on Donation Page</span>
@@ -225,7 +221,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
         {/* Plan 2: Pro Plan ($4.99/mo - 0% fee, 10GB storage, Payment Gateway) */}
         <div className="rounded-2xl border-2 border-purple-500/80 bg-[#120E22] p-5 xs:p-6 sm:p-8 flex flex-col h-full justify-between relative shadow-2xl shadow-purple-500/10">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[10px] font-extrabold uppercase tracking-widest shadow-lg shadow-purple-500/30 whitespace-nowrap">
-            RECOMMENDED • 0% FEE
+            RECOMMENDED
           </div>
 
           <div className="flex-1 flex flex-col">
@@ -260,10 +256,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               <li className="flex items-center gap-3 text-emerald-300 font-semibold">
                 <Check size={16} className="text-emerald-400 flex-shrink-0" />
                 <span>Unlock Soundboard, Video Alerts &amp; Spinning Wheels</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                <span className="font-semibold text-emerald-400">0% platform fee cut (Keep 100% of tips)</span>
               </li>
               <li className="flex items-center gap-3 text-emerald-300 font-semibold">
                 <Check size={16} className="text-emerald-400 flex-shrink-0" />
@@ -322,11 +314,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 font-medium text-white">Media Storage Limit (MP4, GIF, MP3, WAV, All Formats)</td>
                 <td className="py-3.5 px-6 text-center text-cyan-400 font-bold">20MB</td>
                 <td className="py-3.5 px-6 text-center text-purple-400 font-bold">100MB</td>
-              </tr>
-              <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Platform Commission Cut</td>
-                <td className="py-3.5 px-6 text-center text-amber-400 font-bold">10% Fee</td>
-                <td className="py-3.5 px-6 text-center text-emerald-400 font-bold">0% (Keep 100%)</td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Removed Watermark (Clean Donation Page)</td>

@@ -234,8 +234,8 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
     const modalMessage = isExtend
       ? `Are you sure you want to add +${durationDays} days to @${targetUser.username} (${targetUser.email})'s active Pro Plan subscription?`
       : isProUpgrade
-      ? `Are you sure you want to upgrade @${targetUser.username} (${targetUser.email}) to the Pro Plan (0% platform fee, 100MB storage, removed watermark) for ${durationDays} days?`
-      : `Are you sure you want to switch @${targetUser.username} (${targetUser.email}) back to the Free Plan (10% platform fee, 20MB storage)?`;
+      ? `Are you sure you want to upgrade @${targetUser.username} (${targetUser.email}) to the Pro Plan (100MB storage, removed watermark) for ${durationDays} days?`
+      : `Are you sure you want to switch @${targetUser.username} (${targetUser.email}) back to the Free Plan (20MB storage)?`;
 
     showConfirm({
       title: modalTitle,

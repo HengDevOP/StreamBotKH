@@ -522,7 +522,7 @@ export const AdminPromotionManager: React.FC = () => {
 
           <div className="rounded-2xl border-2 border-purple-500/80 bg-[#120E22] p-6 relative shadow-2xl shadow-purple-500/10 space-y-4">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[10px] font-extrabold uppercase tracking-widest shadow-lg whitespace-nowrap">
-              {isEnabled ? `${promoTitle || 'SPECIAL PROMOTION'} • ${previewDiscount}% OFF` : 'RECOMMENDED • 0% FEE'}
+              {isEnabled ? `${promoTitle || 'SPECIAL PROMOTION'} • ${previewDiscount}% OFF` : 'RECOMMENDED'}
             </div>
 
             <div className="space-y-2 pt-1">
@@ -590,10 +590,6 @@ export const AdminPromotionManager: React.FC = () => {
               <li className="flex items-center gap-2 text-purple-300 font-semibold">
                 <Check size={14} className="text-purple-400" />
                 <span>100MB Media Cloud Storage (MP4, GIF, MP3, WAV)</span>
-              </li>
-              <li className="flex items-center gap-2 text-emerald-300 font-semibold">
-                <Check size={14} className="text-emerald-400" />
-                <span>0% platform fee (Keep 100% of tips)</span>
               </li>
               <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                 <Check size={14} className="text-emerald-400" />

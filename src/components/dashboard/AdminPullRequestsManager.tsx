@@ -173,7 +173,7 @@ export const AdminPullRequestsManager: React.FC<AdminPullRequestsManagerProps> =
 
       showConfirm({
         title: `Upgrade ${targetUserLabel} to Pro Plan (31 Days)?`,
-        message: `Are you sure you want to resolve this pull request and upgrade ${targetUserLabel} to the Pro Plan (0% fee, 100MB storage, removed watermark) for 31 days?`,
+        message: `Are you sure you want to resolve this pull request and upgrade ${targetUserLabel} to the Pro Plan (100MB storage, removed watermark) for 31 days?`,
         type: 'info',
         confirmText: 'Confirm Pro (31d)',
         cancelText: 'Cancel',

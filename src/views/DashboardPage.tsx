@@ -1474,10 +1474,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   <div className="space-y-1">
                     <div className="text-xs font-bold text-amber-300 font-mono flex items-center gap-2">
                       <Sparkles size={14} />
-                      Current Plan: Free Plan (10% Platform Fee Cut Active)
+                      Current Plan: Free Plan
                     </div>
                     <p className="text-xs text-slate-400">
-                      Upgrade to Pro Plan ($4.99/mo) to unlock Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Spinning Wheels, 100MB storage, removed watermark, and 0% fee!
+                      Upgrade to Pro Plan ($4.99/mo) to unlock Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Spinning Wheels, 100MB storage, and removed watermark!
                     </p>
                   </div>
                   <button
@@ -1776,7 +1776,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   </h3>
                   <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
                     Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels are included in the{' '}
-                    <strong className="text-white">Pro Plan ($4.99/mo)</strong> along with 0% platform fee, 100MB storage, and removed donation page watermark.
+                    <strong className="text-white">Pro Plan ($4.99/mo)</strong> along with 100MB storage and removed donation page watermark.
                   </p>
                 </div>
 
@@ -2399,10 +2399,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-white font-['Chakra_Petch']">
-                  Plans & Platform Commission
+                  Plans &amp; Upgrades
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Switch your plan anytime. Pro ($4.99/mo) eliminates all commission cuts with 0% platform fee and unlocks the Payment Gateway.
+                  Switch your plan anytime. Pro ($4.99/mo) unlocks advanced interactive widgets, expanded 100MB media vault, and removes donation page watermark.
                 </p>
               </div>
 
@@ -2427,7 +2427,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
                     <div>
                       <div className="text-3xl font-extrabold text-white font-mono">$0</div>
-                      <div className="text-xs text-amber-400 font-mono font-bold pt-1">10% Platform Fee Cut</div>
                     </div>
                     <p className="text-xs text-slate-400">
                       Ideal for new streamers starting out. Includes Donations Alerts, Payment Gateway, and 20MB storage.
@@ -2444,10 +2443,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
                         <span>Donations Alerts &amp; OBS 60FPS Browser Overlay</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-amber-300 font-medium">
-                        <span className="font-mono font-bold text-amber-400">10%</span>
-                        <span>Fee cut deducted from incoming tips</span>
                       </li>
                       <li className="flex items-center gap-2 text-slate-500">
                         <span className="w-3.5 text-center font-mono">-</span>
@@ -2484,9 +2479,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   }`}
                 >
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[9px] font-bold uppercase tracking-widest shadow-md shadow-purple-500/20 whitespace-nowrap">
-                    {activePromo?.isActive
-                      ? `${activePromo.promoTitle} • ${activePromo.discountPercent}% OFF`
-                      : 'RECOMMENDED • 0% FEE'}
+                    RECOMMENDED
                   </div>
 
                   <div className="flex-1 flex flex-col space-y-4">
@@ -2514,14 +2507,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           $4.99 <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days (1 month)</span>
                         </div>
                       )}
-                      <div className="text-xs text-emerald-400 font-mono font-bold pt-1">
-                        0% Platform Fee (Keep 100% of your earnings)
-                      </div>
-                      {activePromo?.isActive && activePromo.endDate && (
-                        <div className="text-[11px] text-cyan-300 font-mono mt-1">
-                          Promo valid until {new Date(activePromo.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </div>
-                      )}
                       {currentPlan === 'pro' && user.planExpiresAt && (
                         <div className="text-[11px] text-purple-300 font-mono mt-1">
                           Expires: {new Date(user.planExpiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -2529,7 +2514,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Alerts, Wheels), and 0% fee.
+                      Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Alerts, Wheels), and removed watermark.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
                       <li className="flex items-center gap-2 text-purple-300 font-semibold">
@@ -2543,10 +2528,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
                         <span>Unlock Video Alerts (Media Share) &amp; Spinning Wheels</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-emerald-400 font-semibold">
-                        <Check size={14} className="flex-shrink-0" />
-                        <span>0% platform fee (Keep 100%)</span>
                       </li>
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
