@@ -12,7 +12,6 @@ import {
   Sparkles,
   Volume2,
   Tv,
-  CheckCircle2,
   QrCode,
   Check,
   ChevronDown,
@@ -202,29 +201,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             <span className="relative z-10">Get Started</span>
             <ArrowRight size={16} className="text-slate-950 group-hover:translate-x-1 transition-transform duration-300 flex-shrink-0" />
           </button>
-        </div>
-
-        {/* Micro Trust Badges */}
-        <div className="pt-2 flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-mono">
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
-            <CheckCircle2 size={13} className="text-emerald-400 flex-shrink-0" />
-            <span>0% Platform Fee on Pro</span>
-          </div>
-
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
-            <CheckCircle2 size={13} className="text-cyan-400 flex-shrink-0" />
-            <span>30+ Cambodian Banks via Bakong</span>
-          </div>
-
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
-            <CheckCircle2 size={13} className="text-pink-400 flex-shrink-0" />
-            <span>OBS Studio &amp; Streamlabs 60 FPS</span>
-          </div>
-
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 backdrop-blur-sm shadow-sm hover:border-slate-700 transition-colors">
-            <CheckCircle2 size={13} className="text-amber-400 flex-shrink-0" />
-            <span>Instant Telegram Bot Dispatch</span>
-          </div>
         </div>
       </section>
 
