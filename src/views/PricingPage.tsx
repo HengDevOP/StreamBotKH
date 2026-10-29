@@ -47,13 +47,15 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
 
   const getProPrice = () => {
     const isPromoActive = Boolean(promo?.isActive);
+    const annualDiscount = Math.max(0, Math.min(100, Number(promo?.annualDiscountPercent ?? 10)));
+    const annualMultiplier = (100 - annualDiscount) / 100;
     if (currency === 'KHR') {
       const baseKhr = isPromoActive ? promo!.promoPriceKhr : promo?.originalPriceKhr ?? 20000;
-      const finalKhr = annualBilling ? Math.round(baseKhr * 0.8) : baseKhr;
+      const finalKhr = annualBilling ? Math.round(baseKhr * annualMultiplier) : baseKhr;
       return `${finalKhr.toLocaleString()} ៛`;
     }
     const baseUsd = isPromoActive ? promo!.promoPriceUsd : promo?.originalPriceUsd ?? 4.99;
-    const finalUsd = annualBilling ? Number((baseUsd * 0.8).toFixed(2)) : baseUsd;
+    const finalUsd = annualBilling ? Number((baseUsd * annualMultiplier).toFixed(2)) : baseUsd;
     return `$${finalUsd.toFixed(2)}`;
   };
 
@@ -69,7 +71,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
   const faqs = [
     {
       q: 'What are the differences between the Free and Pro plans?',
-      a: 'The Free plan ($0) includes 20MB media storage, Donations Alerts, and the Payment Gateway (ABA PayWay & Bakong KHQR). The Pro plan ($4.99/mo or $3.99/mo annual) removes the donation page watermark, expands storage to 100MB (supporting MP4, GIF, MP3, WAV & all formats), and unlocks all advanced stream assets: Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels.'
+      a: 'The Free plan ($0) includes 20MB media storage, Donations Alerts, and the Payment Gateway (ABA PayWay & Bakong KHQR). The Pro plan ($4.99/mo with annual discount) removes the donation page watermark, expands storage to 100MB (supporting MP4, GIF, MP3, WAV & all formats), and unlocks all advanced stream assets: Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels.'
     },
     {
       q: 'Is the Payment Gateway available on both Free and Pro plans?',
@@ -127,7 +129,9 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               }`}
             >
               <span>Annual</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/20 font-bold">Save 20%</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/20 font-bold">
+                Save {promo?.annualDiscountPercent ?? 10}%
+              </span>
             </button>
           </div>
 
@@ -213,7 +217,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               onClick={() => onNavigate('dashboard')}
               className="w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer"
             >
-              Start Free (20MB Storage)
+              Start Free
             </button>
           </div>
         </div>
@@ -289,7 +293,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               onClick={() => onNavigate('dashboard')}
               className="w-full py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-slate-950 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:opacity-95 transition-all shadow-lg shadow-purple-500/25 cursor-pointer"
             >
-              Get Pro Plan ({getProPrice()}/mo)
+              Get Pro Plan
             </button>
           </div>
         </div>

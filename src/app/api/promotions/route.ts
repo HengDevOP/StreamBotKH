@@ -49,6 +49,8 @@ function formatPromotionRow(row: any) {
       ? Math.round(((originalPriceUsd - promoPriceUsd) / originalPriceUsd) * 100)
       : 0;
 
+  const annualDiscountPercent = Math.max(0, Math.min(100, Number(row?.annual_discount_percent ?? 10)));
+
   return {
     id: row?.id || 'pro_plan_promo',
     isEnabled,
@@ -60,6 +62,7 @@ function formatPromotionRow(row: any) {
     originalPriceUsd,
     originalPriceKhr,
     discountPercent,
+    annualDiscountPercent,
     startDate,
     endDate,
     updatedBy: row?.updated_by || null,
@@ -124,6 +127,10 @@ export async function PUT(req: NextRequest) {
       body.originalPriceKhr !== undefined
         ? Math.max(100, Math.round(Number(body.originalPriceKhr)))
         : Number(current?.original_price_khr ?? 20000);
+    const annualDiscountPercent =
+      body.annualDiscountPercent !== undefined
+        ? Math.max(0, Math.min(100, Math.round(Number(body.annualDiscountPercent))))
+        : Math.max(0, Math.min(100, Number(current?.annual_discount_percent ?? 10)));
     const startDate =
       body.startDate !== undefined ? body.startDate || null : current?.start_date || null;
     const endDate =
@@ -145,8 +152,8 @@ export async function PUT(req: NextRequest) {
     db.prepare(`
       INSERT INTO platform_promotions (
         id, is_enabled, promo_title, promo_price_usd, promo_price_khr,
-        original_price_usd, original_price_khr, start_date, end_date, updated_by, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        original_price_usd, original_price_khr, annual_discount_percent, start_date, end_date, updated_by, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         is_enabled = excluded.is_enabled,
         promo_title = excluded.promo_title,
@@ -154,6 +161,7 @@ export async function PUT(req: NextRequest) {
         promo_price_khr = excluded.promo_price_khr,
         original_price_usd = excluded.original_price_usd,
         original_price_khr = excluded.original_price_khr,
+        annual_discount_percent = excluded.annual_discount_percent,
         start_date = excluded.start_date,
         end_date = excluded.end_date,
         updated_by = excluded.updated_by,
@@ -166,6 +174,7 @@ export async function PUT(req: NextRequest) {
       promoPriceKhr,
       originalPriceUsd,
       originalPriceKhr,
+      annualDiscountPercent,
       startDate,
       endDate,
       admin.email,

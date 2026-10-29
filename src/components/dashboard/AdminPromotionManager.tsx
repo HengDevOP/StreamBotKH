@@ -28,6 +28,7 @@ export interface PromotionConfig {
   originalPriceUsd: number;
   originalPriceKhr: number;
   discountPercent: number;
+  annualDiscountPercent?: number;
   startDate: string | null;
   endDate: string | null;
   updatedBy?: string | null;
@@ -58,6 +59,7 @@ export const AdminPromotionManager: React.FC = () => {
   const [promoPriceKhr, setPromoPriceKhr] = useState('12000');
   const [originalPriceUsd, setOriginalPriceUsd] = useState('4.99');
   const [originalPriceKhr, setOriginalPriceKhr] = useState('20000');
+  const [annualDiscountPercent, setAnnualDiscountPercent] = useState('10');
   const [startDateInput, setStartDateInput] = useState('');
   const [endDateInput, setEndDateInput] = useState('');
   const [previewCurrency, setPreviewCurrency] = useState<'USD' | 'KHR'>('USD');
@@ -74,6 +76,7 @@ export const AdminPromotionManager: React.FC = () => {
       setPromoPriceKhr(String(data.promoPriceKhr ?? 12000));
       setOriginalPriceUsd(String(data.originalPriceUsd ?? 4.99));
       setOriginalPriceKhr(String(data.originalPriceKhr ?? 20000));
+      setAnnualDiscountPercent(String(data.annualDiscountPercent ?? 10));
       setStartDateInput(toDatetimeLocalValue(data.startDate));
       setEndDateInput(toDatetimeLocalValue(data.endDate));
     } catch (err: any) {
@@ -103,6 +106,7 @@ export const AdminPromotionManager: React.FC = () => {
           promoPriceKhr: parseInt(promoPriceKhr, 10) || 12000,
           originalPriceUsd: parseFloat(originalPriceUsd) || 4.99,
           originalPriceKhr: parseInt(originalPriceKhr, 10) || 20000,
+          annualDiscountPercent: Math.max(0, Math.min(100, parseInt(annualDiscountPercent, 10) || 10)),
           startDate: startDateInput ? new Date(startDateInput).toISOString() : null,
           endDate: endDateInput ? new Date(endDateInput).toISOString() : null
         })
@@ -145,6 +149,7 @@ export const AdminPromotionManager: React.FC = () => {
           promoPriceKhr: parseInt(promoPriceKhr, 10) || 12000,
           originalPriceUsd: parseFloat(originalPriceUsd) || 4.99,
           originalPriceKhr: parseInt(originalPriceKhr, 10) || 20000,
+          annualDiscountPercent: Math.max(0, Math.min(100, parseInt(annualDiscountPercent, 10) || 10)),
           startDate: startDateInput ? new Date(startDateInput).toISOString() : null,
           endDate: endDateInput ? new Date(endDateInput).toISOString() : null
         })
@@ -413,6 +418,37 @@ export const AdminPromotionManager: React.FC = () => {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* Annual Billing Discount */}
+          <div className="space-y-1.5 p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-mono uppercase text-cyan-400 font-semibold flex items-center gap-1.5">
+                <Percent size={14} />
+                <span>Annual Billing Discount (%)</span>
+              </label>
+              <span className="text-[11px] font-mono text-slate-400">
+                Shown as &quot;Save {annualDiscountPercent}%&quot; on Pricing Page
+              </span>
+            </div>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={annualDiscountPercent}
+                onChange={(e) => setAnnualDiscountPercent(e.target.value)}
+                placeholder="10"
+                className="w-full pl-3.5 pr-8 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-cyan-400 font-bold">
+                %
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              When streamers switch to Annual billing, this discount percentage will be automatically deducted from both regular and promotional prices.
+            </p>
           </div>
 
           {/* Start & End Period */}

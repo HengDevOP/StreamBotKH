@@ -96,12 +96,20 @@ try {
       promo_price_khr INTEGER DEFAULT 12000,
       original_price_usd REAL DEFAULT 4.99,
       original_price_khr INTEGER DEFAULT 20000,
+      annual_discount_percent INTEGER DEFAULT 10,
       start_date TEXT,
       end_date TEXT,
       updated_by TEXT,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+} catch (e) {}
+
+try {
+  db.exec('ALTER TABLE platform_promotions ADD COLUMN annual_discount_percent INTEGER DEFAULT 10');
+} catch (e) {}
+
+try {
   const existingPromo = db.prepare('SELECT id FROM platform_promotions WHERE id = ?').get('pro_plan_promo');
   if (!existingPromo) {
     const now = new Date();
