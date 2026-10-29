@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, CheckCircle2 } from 'lucide-react';
+import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { CreateDonationResponse } from '../../types/donation';
 import { donationService } from '../../services/donationService';
@@ -234,9 +234,15 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
                 Broadcasting alert on stream...
               </span>
             </div>
+          ) : (!donationData.qrImage && !masterKhqrImage) ? (
+            <div className="w-52 h-52 xs:w-60 xs:h-60 sm:w-64 sm:h-64 flex flex-col items-center justify-center p-4 text-center bg-[#090D18] rounded-xl border border-amber-500/30 text-amber-400">
+              <AlertCircle size={28} className="mb-2 text-amber-400" />
+              <span className="text-xs font-mono font-bold">No KHQR Image Found</span>
+              <span className="text-[10px] text-slate-400 mt-1">This streamer has not uploaded their Bakong Master KHQR code yet.</span>
+            </div>
           ) : (
             <img
-              src={donationData.qrImage || masterKhqrImage || '/uploads/payment/khqr-1793011590730-7bad271c.jpg'}
+              src={donationData.qrImage || masterKhqrImage || ''}
               alt="Scan To Pay"
               className="w-52 h-52 xs:w-60 xs:h-60 sm:w-64 sm:h-64 object-contain select-none max-w-full"
             />

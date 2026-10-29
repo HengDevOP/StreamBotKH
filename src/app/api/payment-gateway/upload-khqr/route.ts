@@ -178,7 +178,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Custom Master KHQR payment image removed from your account. Default dynamic QR fallback restored.'
+      message: 'Master KHQR payment image removed from your account.'
     });
   } catch (err: any) {
     console.error('API /api/payment-gateway/upload-khqr DELETE error:', err);

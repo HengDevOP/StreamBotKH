@@ -19,16 +19,27 @@ export interface DonationQRResult {
 export async function createBakongDonationQR(params: CreateDonationQRParams): Promise<DonationQRResult> {
   const { donationId, streamerId, amount, currency, donorName } = params;
 
-  // Use the official Payment Gateway image uploaded by the streamer/admin instead of generating synthetic dynamic QR
-  let gatewayImage = '/uploads/payment/khqr-1793011590730-7bad271c.jpg';
+  // Use the official Payment Gateway Master KHQR image uploaded by the streamer
+  let gatewayImage = '';
   try {
     const gatewayCol = await getGatewayConfigCollection();
-    const config = await gatewayCol.findOne({ _id: 'master_khqr_config' });
+    const config = await gatewayCol.findOne({
+      $or: [
+        { _id: `khqr_${streamerId}` },
+        { streamerId },
+        { _id: 'master_khqr_config' }
+      ]
+    });
     if (config?.khqrImageUrl) {
       gatewayImage = config.khqrImageUrl;
+    } else {
+      const sqliteSettings = db.prepare('SELECT master_khqr_image FROM streamers WHERE id = ?').get(streamerId) as any;
+      if (sqliteSettings?.master_khqr_image) {
+        gatewayImage = sqliteSettings.master_khqr_image;
+      }
     }
   } catch (e) {
-    console.warn('[Bakong Service] Could not fetch gateway image from MongoDB:', e);
+    console.warn('[Bakong Service] Could not fetch gateway image from database:', e);
   }
 
   return {
