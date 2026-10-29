@@ -116,8 +116,11 @@ export async function upsertGoogleStreamer(profile: {
     console.warn('[Auth] Mongo lookup warning in upsertGoogleStreamer:', err);
   }
 
-  // 2. Secondary lookup: Check local SQLite database by email
+  // 2. Secondary lookup: Check local SQLite database by email or userId
   let sqliteStreamer = db.prepare('SELECT * FROM streamers WHERE LOWER(email) = LOWER(?)').get(email) as any;
+  if (!sqliteStreamer && existingMongoUser?.userId) {
+    sqliteStreamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(existingMongoUser.userId) as any;
+  }
 
   let streamerId = '';
   let streamerUsername = '';
@@ -130,16 +133,16 @@ export async function upsertGoogleStreamer(profile: {
   let pairingCode = '';
   let socialLinks = '[]';
 
-  if (existingMongoUser) {
+  if (existingMongoUser?.userId) {
     // Preserve permanent Google user ID and customized username
     streamerId = existingMongoUser.userId;
-    streamerUsername = existingMongoUser.username || email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
-    displayName = existingMongoUser.displayName || name;
-    bio = existingMongoUser.bio || '';
-    customThanks = existingMongoUser.customThanksMessage || '';
-    isVerified = existingMongoUser.isVerified ? 1 : 0;
-    plan = existingMongoUser.plan || 'free';
-    socialLinks = JSON.stringify(existingMongoUser.socialLinks || []);
+    streamerUsername = existingMongoUser.username || sqliteStreamer?.username || email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
+    displayName = existingMongoUser.displayName || sqliteStreamer?.display_name || name;
+    bio = existingMongoUser.bio || sqliteStreamer?.bio || '';
+    customThanks = existingMongoUser.customThanksMessage || sqliteStreamer?.custom_thanks_message || '';
+    isVerified = existingMongoUser.isVerified ? 1 : (sqliteStreamer?.is_verified || 0);
+    plan = existingMongoUser.plan || sqliteStreamer?.plan || 'free';
+    socialLinks = JSON.stringify(existingMongoUser.socialLinks || (sqliteStreamer?.social_links ? JSON.parse(sqliteStreamer.social_links) : []));
   } else if (sqliteStreamer) {
     // Found in SQLite
     streamerId = sqliteStreamer.id;
@@ -168,12 +171,74 @@ export async function upsertGoogleStreamer(profile: {
     }
   }
 
-  // Preserve tokens
-  overlayToken = sqliteStreamer?.overlay_token || 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
-  pairingCode = sqliteStreamer?.telegram_pairing_code || ('NEON-' + Math.floor(1000 + Math.random() * 9000));
+  // 3. Reconcile any duplicate or conflicting rows in SQLite before inserting
+  try {
+    const conflictingSqlite = db.prepare(
+      'SELECT id FROM streamers WHERE (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)) AND id != ?'
+    ).all(email, streamerUsername, streamerId) as Array<{ id: string }>;
+
+    for (const conflict of conflictingSqlite) {
+      const oldId = conflict.id;
+      try {
+        db.prepare('UPDATE alert_settings SET streamer_id = ? WHERE streamer_id = ?').run(streamerId, oldId);
+      } catch (e) {
+        db.prepare('DELETE FROM alert_settings WHERE streamer_id = ?').run(oldId);
+      }
+      try {
+        db.prepare('UPDATE payment_settings SET streamer_id = ? WHERE streamer_id = ?').run(streamerId, oldId);
+      } catch (e) {
+        db.prepare('DELETE FROM payment_settings WHERE streamer_id = ?').run(oldId);
+      }
+      try {
+        db.prepare('UPDATE donations SET streamer_id = ? WHERE streamer_id = ?').run(streamerId, oldId);
+      } catch (e) {}
+      try {
+        db.prepare('UPDATE telegram_monitored_groups SET streamer_id = ? WHERE streamer_id = ?').run(streamerId, oldId);
+      } catch (e) {}
+      // Delete old conflicting row to free up UNIQUE constraints (telegram_pairing_code, email, username, overlay_token)
+      db.prepare('DELETE FROM streamers WHERE id = ?').run(oldId);
+    }
+  } catch (migErr) {
+    console.warn('[Auth] Error reconciling duplicate SQLite rows:', migErr);
+  }
+
+  // 4. Preserve or safely generate guaranteed-unique tokens
+  let candidateOverlay = sqliteStreamer?.overlay_token || existingMongoUser?.overlayToken;
+  if (candidateOverlay) {
+    const inUse = db.prepare('SELECT id FROM streamers WHERE overlay_token = ? AND id != ?').get(candidateOverlay, streamerId);
+    if (inUse) candidateOverlay = null;
+  }
+  overlayToken = candidateOverlay || ('ovl_' + uuidv4().replace(/-/g, '').slice(0, 24));
+
+  let candidatePairing = sqliteStreamer?.telegram_pairing_code || existingMongoUser?.telegramPairingCode;
+  if (candidatePairing) {
+    const inUse = db.prepare('SELECT id FROM streamers WHERE telegram_pairing_code = ? AND id != ?').get(candidatePairing, streamerId);
+    if (inUse) candidatePairing = null;
+  }
+  if (!candidatePairing) {
+    for (let i = 0; i < 100; i++) {
+      const candidate = 'NEON-' + Math.floor(100000 + Math.random() * 900000);
+      const existing = db.prepare('SELECT id FROM streamers WHERE telegram_pairing_code = ?').get(candidate);
+      if (!existing) {
+        candidatePairing = candidate;
+        break;
+      }
+    }
+    if (!candidatePairing) {
+      candidatePairing = 'NEON-' + uuidv4().replace(/-/g, '').slice(0, 8).toUpperCase();
+    }
+  }
+  pairingCode = candidatePairing;
+
+  // Verify username uniqueness in SQLite
+  const usernameConflict = db.prepare('SELECT id FROM streamers WHERE LOWER(username) = LOWER(?) AND id != ?').get(streamerUsername, streamerId);
+  if (usernameConflict) {
+    streamerUsername = `${streamerUsername.slice(0, 16)}_${Math.floor(100 + Math.random() * 900)}`;
+  }
+
   const resolvedAvatar = avatarUrl || sqliteStreamer?.avatar_url || existingMongoUser?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamerUsername}`;
 
-  // 3. Upsert into SQLite streamers table
+  // 5. Upsert into SQLite streamers table
   db.prepare(`
     INSERT INTO streamers (
       id, email, username, display_name, avatar_url, bio, custom_thanks_message,
@@ -185,7 +250,9 @@ export async function upsertGoogleStreamer(profile: {
       display_name = excluded.display_name,
       avatar_url = COALESCE(excluded.avatar_url, streamers.avatar_url),
       bio = COALESCE(excluded.bio, streamers.bio),
-      plan = COALESCE(excluded.plan, streamers.plan)
+      plan = COALESCE(excluded.plan, streamers.plan),
+      overlay_token = COALESCE(streamers.overlay_token, excluded.overlay_token),
+      telegram_pairing_code = COALESCE(streamers.telegram_pairing_code, excluded.telegram_pairing_code)
   `).run(
     streamerId,
     email,

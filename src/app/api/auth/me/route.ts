@@ -39,8 +39,51 @@ export async function GET(req: NextRequest) {
       });
 
       if (mongoUser) {
-        const overlayToken = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
-        const pairingCode = 'NEON-' + Math.floor(1000 + Math.random() * 9000);
+        // Clean up any row that had the same email or username with a different ID
+        const targetEmail = mongoUser.email || user.email || '';
+        const targetUsername = mongoUser.username || user.username || 'streamer';
+        if (targetEmail) {
+          try {
+            const conflicting = db.prepare('SELECT id FROM streamers WHERE (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)) AND id != ?').all(targetEmail, targetUsername, mongoUser.userId) as any[];
+            for (const c of conflicting) {
+              try {
+                db.prepare('UPDATE donations SET streamer_id = ? WHERE streamer_id = ?').run(mongoUser.userId, c.id);
+              } catch (e) {}
+              try {
+                db.prepare('DELETE FROM streamers WHERE id = ?').run(c.id);
+              } catch (e) {}
+            }
+          } catch (e) {}
+        }
+
+        let overlayToken = mongoUser.overlayToken || '';
+        if (overlayToken) {
+          const inUse = db.prepare('SELECT id FROM streamers WHERE overlay_token = ? AND id != ?').get(overlayToken, mongoUser.userId);
+          if (inUse) overlayToken = '';
+        }
+        if (!overlayToken) {
+          overlayToken = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+        }
+
+        let pairingCode = mongoUser.telegramPairingCode || '';
+        if (pairingCode) {
+          const inUse = db.prepare('SELECT id FROM streamers WHERE telegram_pairing_code = ? AND id != ?').get(pairingCode, mongoUser.userId);
+          if (inUse) pairingCode = '';
+        }
+        if (!pairingCode) {
+          for (let i = 0; i < 50; i++) {
+            const candidate = 'NEON-' + Math.floor(100000 + Math.random() * 900000);
+            const inUse = db.prepare('SELECT id FROM streamers WHERE telegram_pairing_code = ?').get(candidate);
+            if (!inUse) {
+              pairingCode = candidate;
+              break;
+            }
+          }
+          if (!pairingCode) {
+            pairingCode = 'NEON-' + uuidv4().replace(/-/g, '').slice(0, 8).toUpperCase();
+          }
+        }
+
         db.prepare(`
           INSERT INTO streamers (
             id, email, username, display_name, avatar_url, bio, custom_thanks_message, is_verified, plan, overlay_token, telegram_pairing_code
@@ -48,7 +91,9 @@ export async function GET(req: NextRequest) {
           ON CONFLICT(id) DO UPDATE SET
             email = excluded.email,
             username = excluded.username,
-            display_name = excluded.display_name
+            display_name = excluded.display_name,
+            overlay_token = COALESCE(streamers.overlay_token, excluded.overlay_token),
+            telegram_pairing_code = COALESCE(streamers.telegram_pairing_code, excluded.telegram_pairing_code)
         `).run(
           mongoUser.userId,
           mongoUser.email || user.email || '',

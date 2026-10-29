@@ -38,6 +38,34 @@ try {
 try {
   db.exec('ALTER TABLE streamers ADD COLUMN telegram_pending_session TEXT');
 } catch (e) {}
+
+// Ensure all existing streamers have unique, non-null telegram_pairing_code
+try {
+  const existingRows = db.prepare('SELECT id, telegram_pairing_code FROM streamers').all() as Array<{ id: string; telegram_pairing_code?: string | null }>;
+  const seenCodes = new Set<string>();
+  for (const s of existingRows) {
+    if (!s.telegram_pairing_code || seenCodes.has(s.telegram_pairing_code)) {
+      let freshCode = '';
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const candidate = 'NEON-' + Math.floor(100000 + Math.random() * 900000);
+        if (!seenCodes.has(candidate)) {
+          const dbCheck = db.prepare('SELECT id FROM streamers WHERE telegram_pairing_code = ?').get(candidate);
+          if (!dbCheck) {
+            freshCode = candidate;
+            break;
+          }
+        }
+      }
+      if (!freshCode) {
+        freshCode = 'NEON-' + uuidv4().replace(/-/g, '').slice(0, 8).toUpperCase();
+      }
+      db.prepare('UPDATE streamers SET telegram_pairing_code = ? WHERE id = ?').run(freshCode, s.id);
+      seenCodes.add(freshCode);
+    } else {
+      seenCodes.add(s.telegram_pairing_code);
+    }
+  }
+} catch (e) {}
 try {
   db.exec('ALTER TABLE donations ADD COLUMN banking_name TEXT');
 } catch (e) {}
