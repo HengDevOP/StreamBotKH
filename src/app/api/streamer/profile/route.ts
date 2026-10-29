@@ -11,6 +11,8 @@ const RESERVED_USERNAMES = new Set([
   'logout',
   'dashboard',
   'pricing',
+  'documents',
+  'docs',
   'resources',
   'discord',
   'donate',

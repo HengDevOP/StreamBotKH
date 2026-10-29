@@ -271,6 +271,8 @@ function AppRoutes() {
         {/* Core Web Pages */}
         <Route path="/" element={<HomePage onNavigate={handleNav} />} />
         <Route path="/pricing" element={<PricingPage onNavigate={handleNav} />} />
+        <Route path="/documents" element={<ResourcesPage onNavigate={handleNav} />} />
+        <Route path="/docs" element={<ResourcesPage onNavigate={handleNav} />} />
         <Route path="/resources" element={<ResourcesPage onNavigate={handleNav} />} />
         <Route path="/resources/:featureSlug" element={<ResourceFeaturePage onNavigate={handleNav} />} />
         <Route path="/discord" element={<DiscordPage onNavigate={handleNav} />} />

@@ -39,7 +39,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     pathname?.startsWith('/donate') ||
     (!!pathname &&
       pathname !== '/' &&
-      !['/login', '/pricing', '/discord', '/resources', '/dashboard', '/overlay'].some((p) =>
+      !['/login', '/pricing', '/documents', '/docs', '/discord', '/resources', '/dashboard', '/overlay'].some((p) =>
         pathname.startsWith(p)
       ));
 

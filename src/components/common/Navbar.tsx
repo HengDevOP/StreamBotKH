@@ -350,6 +350,24 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 Pricing
               </Link>
 
+              {/* 4. Documents Route (/documents) */}
+              <Link
+                to="/documents"
+                onClick={(e) => {
+                  if (onNavigate) {
+                    e.preventDefault();
+                    onNavigate('documents');
+                  }
+                }}
+                className={`px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+                  active('/documents', 'documents') || active('/resources', 'resources')
+                    ? 'text-white bg-white/[0.08] shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                }`}
+              >
+                Documents
+              </Link>
+
               {/* 4. Telegram Menu Link (t.me/streambotkh) */}
               <a
                 href="https://t.me/streambotkh"
@@ -518,6 +536,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             }`}
           >
             Pricing
+          </button>
+
+          <button
+            onClick={() => handleNav('/documents', 'documents')}
+            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold ${
+              active('/documents', 'documents') || active('/resources', 'resources')
+                ? 'text-white bg-white/[0.08]'
+                : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
+            }`}
+          >
+            Documents
           </button>
 
           <a
