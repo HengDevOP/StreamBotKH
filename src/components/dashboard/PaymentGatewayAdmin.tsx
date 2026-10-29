@@ -108,6 +108,8 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [codeRequested, setCodeRequested] = useState(false);
   const [phoneCodeHash, setPhoneCodeHash] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [codeDigits, setCodeDigits] = useState<string[]>(['', '', '', '', '']);
+  const digitInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [twoFaPassword, setTwoFaPassword] = useState('');
   const [needPassword, setNeedPassword] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
@@ -303,13 +305,19 @@ export const PaymentGatewayAdmin: React.FC = () => {
       const data = await res.json();
       if (res.ok && data.success) {
         setCodeRequested(true);
+        setCodeDigits(['', '', '', '', '']);
         if (data.phoneCodeHash) setPhoneCodeHash(data.phoneCodeHash);
         if (data.phoneNumber) setUserPhone(data.phoneNumber);
         setStep1Msg({ type: 'success', text: data.message });
         if (data.simulationCode) {
           setDemoCodeHint(data.simulationCode);
           setVerificationCode(data.simulationCode);
+          const digits = data.simulationCode.slice(0, 5).split('');
+          setCodeDigits(digits);
         }
+        setTimeout(() => {
+          digitInputRefs.current[0]?.focus();
+        }, 80);
       } else {
         setStep1Msg({ type: 'error', text: data.error || 'Failed to send verification code.' });
       }
@@ -320,11 +328,89 @@ export const PaymentGatewayAdmin: React.FC = () => {
     }
   };
 
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDigitChange = (index: number, val: string) => {
+    const clean = val.replace(/[^0-9]/g, '');
+    if (!clean) {
+      const next = [...codeDigits];
+      next[index] = '';
+      setCodeDigits(next);
+      setVerificationCode(next.join(''));
+      return;
+    }
+
+    // If multiple digits pasted/typed into this box
+    if (clean.length > 1) {
+      handlePastedCode(clean);
+      return;
+    }
+
+    const next = [...codeDigits];
+    next[index] = clean;
+    setCodeDigits(next);
+    const fullCode = next.join('');
+    setVerificationCode(fullCode);
+
+    // Focus next digit box
+    if (index < 4) {
+      digitInputRefs.current[index + 1]?.focus();
+    }
+
+    // Auto-trigger Continue when all 5 digits entered
+    if (fullCode.length === 5 && !next.some((d) => !d)) {
+      handleVerifyCode(undefined, fullCode);
+    }
+  };
+
+  const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (!codeDigits[index] && index > 0) {
+        e.preventDefault();
+        const next = [...codeDigits];
+        next[index - 1] = '';
+        setCodeDigits(next);
+        setVerificationCode(next.join(''));
+        digitInputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      e.preventDefault();
+      digitInputRefs.current[index - 1]?.focus();
+    } else if (e.key === 'ArrowRight' && index < 4) {
+      e.preventDefault();
+      digitInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePastedCode = (pasted: string) => {
+    const digits = pasted.replace(/[^0-9]/g, '').slice(0, 5).split('');
+    if (digits.length === 0) return;
+
+    const next = ['', '', '', '', ''];
+    digits.forEach((d, i) => {
+      if (i < 5) next[i] = d;
+    });
+    setCodeDigits(next);
+    const fullCode = next.join('');
+    setVerificationCode(fullCode);
+
+    const nextEmptyIndex = next.findIndex((d) => !d);
+    if (nextEmptyIndex !== -1) {
+      digitInputRefs.current[nextEmptyIndex]?.focus();
+    } else {
+      digitInputRefs.current[4]?.focus();
+    }
+
+    // Auto-trigger Continue if 5 digits are pasted
+    if (fullCode.length === 5) {
+      handleVerifyCode(undefined, fullCode);
+    }
+  };
+
+  const handleVerifyCode = async (e?: React.FormEvent, customCode?: string) => {
+    if (e) e.preventDefault();
     setStep1Msg(null);
 
-    if (!verificationCode.trim()) {
+    const codeToVerify = (customCode !== undefined ? customCode : verificationCode).trim();
+    if (!codeToVerify) {
       setStep1Msg({ type: 'error', text: 'Please enter the 5-digit verification code.' });
       return;
     }
@@ -335,7 +421,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phoneCode: verificationCode.trim(),
+          phoneCode: codeToVerify,
           phoneCodeHash: phoneCodeHash || undefined,
           phoneNumber: userPhone.trim() || undefined,
           password: twoFaPassword.trim() || undefined
@@ -346,6 +432,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
       if (res.ok && data.success) {
         setCodeRequested(false);
         setVerificationCode('');
+        setCodeDigits(['', '', '', '', '']);
         setPhoneCodeHash('');
         setTwoFaPassword('');
         setNeedPassword(false);
@@ -823,22 +910,36 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   </div>
                 </form>
               ) : (
-                /* Verification Code Form */
-                <form onSubmit={handleVerifyCode} className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-4 animate-fadeIn shadow-2xl">
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        required
-                        maxLength={8}
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="12345"
-                        className="w-full text-center tracking-[0.5em] text-2xl font-bold py-3 px-4 rounded-xl bg-slate-950 border border-slate-800 text-cyan-400 focus:outline-none focus:border-cyan-400 transition-colors font-mono"
-                        autoFocus
-                      />
+                /* Verification Code Form: 5-Digit Block Boxes with Auto-Submit */
+                <form
+                  onSubmit={(e) => handleVerifyCode(e, codeDigits.join(''))}
+                  className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-4 animate-fadeIn shadow-2xl"
+                >
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    {/* 5-Digit Block Boxes */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 justify-center w-full sm:w-auto">
+                      {codeDigits.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => (digitInputRefs.current[idx] = el)}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleDigitChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleDigitKeyDown(idx, e)}
+                          onPaste={(e) => {
+                            e.preventDefault();
+                            handlePastedCode(e.clipboardData.getData('text'));
+                          }}
+                          className={`w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-bold font-mono rounded-xl bg-slate-950 border transition-all ${
+                            digit
+                              ? 'border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(0,240,255,0.25)] ring-1 ring-cyan-400/30'
+                              : 'border-slate-800 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20'
+                          } focus:outline-none`}
+                        />
+                      ))}
                     </div>
 
                     <Button
@@ -846,7 +947,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                       variant="primary"
                       size="md"
                       loading={verifyingCode}
-                      className="font-bold py-3 px-8 whitespace-nowrap justify-center shadow-lg shadow-cyan-400/20"
+                      className="font-bold py-3.5 px-8 w-full sm:w-auto whitespace-nowrap justify-center shadow-lg shadow-cyan-400/20"
                     >
                       Continue
                     </Button>
