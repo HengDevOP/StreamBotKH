@@ -3,34 +3,7 @@
 import React from 'react';
 import {
   Timer,
-  Flame,
-  Sparkles,
-  Zap,
-  Shield,
-  Crown,
-  Terminal,
-  Compass,
-  Gamepad2,
-  Heart,
-  Sun,
-  Star,
-  Cpu,
-  Coins,
-  Moon,
-  Crosshair,
-  Radio,
-  Eye,
-  Check,
-  Activity,
-  Disc,
-  Skull,
-  Gauge,
-  Siren,
-  Tv,
-  Coffee,
-  Droplets,
-  Layers,
-  Palette
+  Sparkles
 } from 'lucide-react';
 
 export interface TimerTemplateMeta {
@@ -356,6 +329,9 @@ export interface TimerRenderProps {
   templateStyle?: string;
   showBackground?: boolean;
   showAnimation?: boolean;
+  showTitle?: boolean;
+  showDescription?: boolean;
+  description?: string;
   floatingBonuses?: Array<{ id: string; text: string }>;
 }
 
@@ -382,6 +358,9 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
   templateStyle = 'cyber-neon',
   showBackground = true,
   showAnimation = true,
+  showTitle = true,
+  showDescription = true,
+  description = '',
   floatingBonuses = []
 }) => {
   const time = formatTimerParts(remainingSeconds);
@@ -429,17 +408,9 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         0%, 49% { border-color: #3B82F6; box-shadow: 0 0 30px rgba(59,130,246,0.6); }
         50%, 100% { border-color: #EF4444; box-shadow: 0 0 30px rgba(239,68,68,0.6); }
       }
-      @keyframes timerVcrTrackingSweep {
-        0% { transform: translateY(-100%); }
-        100% { transform: translateY(1000%); }
-      }
       @keyframes timerQuantumPulse {
         0%, 100% { box-shadow: 0 0 25px rgba(37,99,235,0.4), inset 0 0 15px rgba(37,99,235,0.2); }
         50% { box-shadow: 0 0 45px rgba(37,99,235,0.8), inset 0 0 25px rgba(37,99,235,0.4); }
-      }
-      @keyframes timerCassetteSpool {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
       }
       @keyframes timerAuroraShimmer {
         0% { background-position: 0% 50%; }
@@ -471,11 +442,15 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
     </div>
   );
 
-  const subathonFootnote = (color = 'text-slate-400') => (
-    <div className={`text-[11px] font-mono ${color} font-semibold tracking-wide text-center pt-0.5 whitespace-nowrap select-none`}>
-      $1 = +{rateMinutesPerUsd}m • 4,000៛ = +{rateMinutesPerUsd}m
-    </div>
-  );
+  const renderDescription = (color = 'text-slate-400') => {
+    if (!showDescription) return null;
+    const descText = description && description.trim() !== '' ? description : `$1 = +${rateMinutesPerUsd}m • 4,000៛ = +${rateMinutesPerUsd}m`;
+    return (
+      <div className={`text-[11px] font-mono ${color} font-semibold tracking-wide text-center pt-0.5 whitespace-nowrap select-none`}>
+        {descText}
+      </div>
+    );
+  };
 
   // Common root width class that gives plenty of room and prevents text wrapping
   const baseCardWidth = 'w-full max-w-xl min-w-[340px] sm:min-w-[440px] p-4 sm:p-5 relative transition-all duration-300 flex flex-col items-center space-y-2.5';
@@ -497,10 +472,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-2 px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider">
-          <Zap size={13} style={{ color: glowColor }} />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="flex items-center justify-center px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-extrabold tracking-wider font-['Chakra_Petch'] drop-shadow-2xl select-none"
@@ -517,7 +493,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span style={{ color: glowColor }}>{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-cyan-400/80')}
+        {renderDescription('text-cyan-400/80')}
       </div>
     );
   }
@@ -534,10 +510,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-2 text-xs font-black font-['Chakra_Petch'] uppercase tracking-widest text-orange-400">
-          <Crosshair size={14} className="animate-spin text-orange-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-black font-['Chakra_Petch'] uppercase tracking-widest text-orange-400 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div className="relative w-full px-4 sm:px-6 py-2 bg-black/60 border border-orange-500/40 rounded-lg overflow-hidden flex items-center justify-center">
           {showAnimation && (
@@ -559,7 +536,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           </div>
         </div>
 
-        {subathonFootnote('text-orange-400/70')}
+        {renderDescription('text-orange-400/70')}
       </div>
     );
   }
@@ -577,10 +554,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-          <Terminal size={13} />
-          <span>&gt; {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold text-emerald-400 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider text-emerald-400 select-none"
@@ -594,9 +572,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span>{time.seconds}</span>
         </div>
 
-        <div className="text-[10px] text-emerald-600 font-bold whitespace-nowrap">
-          [EXTEND: $1 = +{rateMinutesPerUsd}m]
-        </div>
+        {renderDescription('text-emerald-500')}
       </div>
     );
   }
@@ -615,10 +591,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-sky-950/60 border border-sky-400/30 text-[10px] font-mono font-bold text-sky-300 uppercase">
-          <Eye size={12} className="text-sky-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-sky-950/60 border border-sky-400/30 text-[10px] font-mono font-bold text-sky-300 uppercase">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div className="flex items-center justify-center flex-nowrap whitespace-nowrap gap-1.5 sm:gap-2">
           {time.days > 0 && (
@@ -643,13 +620,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           ))}
         </div>
 
-        {subathonFootnote('text-sky-300/80')}
+        {renderDescription('text-sky-300/80')}
       </div>
     );
   }
 
   // =========================================================================
-  // 5. GLITCH OVERDRIVE CYBER (NEW #5)
+  // 5. GLITCH OVERDRIVE CYBER
   // =========================================================================
   if (templateStyle === 'glitch-cyber') {
     return (
@@ -665,10 +642,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded bg-fuchsia-950/80 border border-fuchsia-500/50 text-[11px] font-mono font-bold text-fuchsia-300 uppercase">
-          <Activity size={13} className="text-cyan-400 animate-pulse" />
-          <span>// {title} //</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded bg-fuchsia-950/80 border border-fuchsia-500/50 text-[11px] font-mono font-bold text-fuchsia-300 uppercase">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-mono text-white select-none"
@@ -684,13 +662,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-cyan-300">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-fuchsia-400')}
+        {renderDescription('text-fuchsia-400')}
       </div>
     );
   }
 
   // =========================================================================
-  // 6. QUANTUM REACTOR CORE (NEW #6)
+  // 6. QUANTUM REACTOR CORE
   // =========================================================================
   if (templateStyle === 'quantum-core') {
     return (
@@ -704,10 +682,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-2 px-3 py-0.5 rounded-full bg-blue-950/80 border border-blue-500/40 text-[11px] font-mono font-bold text-blue-300 uppercase">
-          <Cpu size={13} className="text-blue-400 animate-spin" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-blue-950/80 border border-blue-500/40 text-[11px] font-mono font-bold text-blue-300 uppercase">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-['Chakra_Petch'] text-white select-none"
@@ -721,13 +700,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-cyan-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-blue-400/80')}
+        {renderDescription('text-blue-400/80')}
       </div>
     );
   }
 
   // =========================================================================
-  // 7. CYBER SAMURAI RONIN (NEW #7)
+  // 7. CYBER SAMURAI RONIN
   // =========================================================================
   if (templateStyle === 'cyber-samurai') {
     return (
@@ -743,10 +722,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-rose-500 font-['Chakra_Petch']">
-          <Crosshair size={13} className="text-rose-500" />
-          <span>時間制限 • {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-black uppercase tracking-widest text-rose-500 font-['Chakra_Petch'] text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-['Chakra_Petch'] text-white select-none"
@@ -760,13 +740,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-rose-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-rose-400/80')}
+        {renderDescription('text-rose-400/80')}
       </div>
     );
   }
 
   // =========================================================================
-  // 8. PCB EMERALD CIRCUIT (NEW #8)
+  // 8. PCB EMERALD CIRCUIT
   // =========================================================================
   if (templateStyle === 'emerald-circuit') {
     return (
@@ -779,10 +759,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-[11px] font-mono font-bold text-emerald-400 uppercase">
-          <Cpu size={13} className="text-amber-400" />
-          <span>SYS.CLOCK // {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-[11px] font-mono font-bold text-emerald-400 uppercase">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-mono text-emerald-300 select-none"
@@ -796,7 +777,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-emerald-100">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-emerald-400')}
+        {renderDescription('text-emerald-400')}
       </div>
     );
   }
@@ -817,10 +798,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         {animationStyles}
         {bonusToasts}
         <div className={`w-full rounded-2xl p-4 sm:p-5 flex flex-col items-center space-y-2.5 ${showBackground ? 'bg-[#090D18]' : 'bg-transparent'}`}>
-          <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-white">
-            <Flame size={13} className="text-red-400 animate-pulse" />
-            <span>{title}</span>
-          </div>
+          {showTitle && title && (
+            <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-white">
+              <span>{title}</span>
+            </div>
+          )}
 
           <div
             className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-['Chakra_Petch'] text-white drop-shadow-2xl select-none"
@@ -834,7 +816,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
             <span className="text-purple-400">{time.seconds}</span>
           </div>
 
-          {subathonFootnote('text-emerald-400')}
+          {renderDescription('text-emerald-400')}
         </div>
       </div>
     );
@@ -855,10 +837,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold font-serif uppercase tracking-widest text-red-500">
-          <Moon size={14} className="text-red-500 fill-red-500" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold font-serif uppercase tracking-widest text-red-500 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-serif tracking-wider text-red-100 select-none"
@@ -872,7 +855,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-red-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-red-400/80')}
+        {renderDescription('text-red-400/80')}
       </div>
     );
   }
@@ -891,10 +874,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-2 px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-lime-400">
-          <Shield size={13} className="text-lime-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-lime-400">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-['Chakra_Petch'] tracking-wider text-white select-none"
@@ -908,7 +892,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-lime-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-lime-400/80')}
+        {renderDescription('text-lime-400/80')}
       </div>
     );
   }
@@ -927,9 +911,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="px-3 py-0.5 bg-amber-400 text-black text-xs font-black uppercase tracking-wider rounded-sm">
-          ⚔️ {title} ⚔️
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 bg-amber-400 text-black text-xs font-black uppercase tracking-wider rounded-sm">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black text-yellow-300 tracking-wider select-none"
@@ -943,13 +929,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span>{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-amber-400')}
+        {renderDescription('text-amber-400')}
       </div>
     );
   }
 
   // =========================================================================
-  // 13. NEED FOR SPEED TACHOMETER (NEW #13)
+  // 13. NEED FOR SPEED TACHOMETER
   // =========================================================================
   if (templateStyle === 'speedometer-tach') {
     return (
@@ -962,10 +948,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-900 border border-rose-500/40 text-xs font-mono font-bold text-rose-400 uppercase">
-          <Gauge size={13} className="text-rose-500" />
-          <span>RPM REDLINE • {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-rose-500/40 text-xs font-mono font-bold text-rose-400 uppercase">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-['Chakra_Petch'] tracking-wider text-white select-none"
@@ -979,13 +966,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-rose-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-rose-400')}
+        {renderDescription('text-rose-400')}
       </div>
     );
   }
 
   // =========================================================================
-  // 14. TOXIC BIOHAZARD BUNKER (NEW #14)
+  // 14. TOXIC BIOHAZARD BUNKER
   // =========================================================================
   if (templateStyle === 'radioactive-hazard') {
     return (
@@ -998,10 +985,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="px-3 py-0.5 bg-amber-500 text-black text-xs font-black uppercase tracking-wider rounded-sm flex items-center gap-1.5">
-          <Zap size={13} className="fill-black" />
-          <span>CAUTION // {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 bg-amber-500 text-black text-xs font-black uppercase tracking-wider rounded-sm">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-mono text-amber-400 tracking-wider select-none"
@@ -1015,13 +1003,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-amber-200">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-amber-400/90')}
+        {renderDescription('text-amber-400/90')}
       </div>
     );
   }
 
   // =========================================================================
-  // 15. NIGHT CITY ENFORCER (NEW #15)
+  // 15. NIGHT CITY ENFORCER
   // =========================================================================
   if (templateStyle === 'cyber-police') {
     return (
@@ -1035,10 +1023,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-white uppercase">
-          <Siren size={13} className="text-blue-400 animate-bounce" />
-          <span>TAC-ALERT // {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-white uppercase">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-mono text-white tracking-wider select-none"
@@ -1052,13 +1041,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-red-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-blue-400')}
+        {renderDescription('text-blue-400')}
       </div>
     );
   }
 
   // =========================================================================
-  // 16. CRIMSON BLOOD VIAL (NEW #16)
+  // 16. CRIMSON BLOOD VIAL
   // =========================================================================
   if (templateStyle === 'vampire-curse') {
     return (
@@ -1071,10 +1060,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold font-serif uppercase tracking-widest text-purple-400">
-          <Skull size={14} className="text-purple-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold font-serif uppercase tracking-widest text-purple-400 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-serif tracking-wider text-purple-100 select-none"
@@ -1088,7 +1078,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-red-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-purple-300')}
+        {renderDescription('text-purple-300')}
       </div>
     );
   }
@@ -1107,10 +1097,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-black text-yellow-400 uppercase tracking-widest">
-          <Gamepad2 size={15} />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-black text-yellow-400 uppercase tracking-widest text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black text-white tracking-wider select-none"
@@ -1124,7 +1115,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-yellow-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-yellow-400/80')}
+        {renderDescription('text-yellow-400/80')}
       </div>
     );
   }
@@ -1143,10 +1134,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-amber-300 font-['Chakra_Petch']">
-          <Sun size={14} className="text-amber-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-black uppercase tracking-widest text-amber-300 font-['Chakra_Petch'] text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black italic tracking-wider font-['Chakra_Petch'] bg-gradient-to-r from-fuchsia-400 via-pink-400 to-amber-300 bg-clip-text text-transparent select-none"
@@ -1160,7 +1152,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span>{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-fuchsia-400/80')}
+        {renderDescription('text-fuchsia-400/80')}
       </div>
     );
   }
@@ -1179,10 +1171,12 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="w-full bg-gradient-to-r from-blue-900 to-teal-700 text-white px-2.5 py-1 flex items-center justify-between text-xs font-bold select-none rounded-t-sm">
-          <span>💾 {title}</span>
-          <span className="text-[10px] font-mono">_ ▢ X</span>
-        </div>
+        {showTitle && title && (
+          <div className="w-full bg-gradient-to-r from-blue-900 to-teal-700 text-white px-2.5 py-1 flex items-center justify-between text-xs font-bold select-none rounded-t-sm">
+            <span>{title}</span>
+            <span className="text-[10px] font-mono">_ ▢ X</span>
+          </div>
+        )}
 
         <div className="p-3 w-full bg-black border-2 border-t-gray-700 border-l-gray-700 border-r-white border-b-white rounded-b-sm flex flex-col items-center space-y-1">
           <div
@@ -1196,7 +1190,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
             <span className="mx-1 sm:mx-1.5 inline-block" style={colonAnim}>:</span>
             <span>{time.seconds}</span>
           </div>
-          {subathonFootnote('text-teal-400/80')}
+          {renderDescription('text-teal-400/80')}
         </div>
       </div>
     );
@@ -1214,9 +1208,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400">
-          ✈️ {title}
-        </div>
+        {showTitle && title && (
+          <div className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div className="flex items-center justify-center flex-nowrap whitespace-nowrap gap-1.5 sm:gap-2">
           {time.days > 0 && (
@@ -1247,13 +1243,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           ))}
         </div>
 
-        {subathonFootnote('text-zinc-400')}
+        {renderDescription('text-zinc-400')}
       </div>
     );
   }
 
   // =========================================================================
-  // 21. LO-FI 80S CASSETTE TAPE (NEW #21)
+  // 21. LO-FI 80S CASSETTE TAPE
   // =========================================================================
   if (templateStyle === 'neon-cassette') {
     return (
@@ -1266,11 +1262,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-2 px-3 py-0.5 rounded-full bg-black/80 border border-orange-500/40 text-xs font-mono font-bold text-orange-400">
-          <Disc size={13} className="text-orange-400" style={showAnimation ? { animation: 'timerCassetteSpool 3s linear infinite' } : {}} />
-          <span>SIDE A • {title}</span>
-          <Disc size={13} className="text-orange-400" style={showAnimation ? { animation: 'timerCassetteSpool 3s linear infinite' } : {}} />
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-black/80 border border-orange-500/40 text-xs font-mono font-bold text-orange-400 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-mono text-orange-200 tracking-wider select-none"
@@ -1284,13 +1280,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-amber-300">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-orange-400/90')}
+        {renderDescription('text-orange-400/90')}
       </div>
     );
   }
 
   // =========================================================================
-  // 22. GAMEBOY DOT-MATRIX 1989 (NEW #22)
+  // 22. GAMEBOY DOT-MATRIX 1989
   // =========================================================================
   if (templateStyle === 'gameboy-classic') {
     return (
@@ -1303,9 +1299,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="text-[11px] font-mono font-black uppercase tracking-wider text-[#0F380F]">
-          DOT MATRIX LCD // {title}
-        </div>
+        {showTitle && title && (
+          <div className="text-[11px] font-mono font-black uppercase tracking-wider text-[#0F380F] text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-mono text-[#0F380F] tracking-wider select-none">
           {time.days > 0 && <span className="text-2xl sm:text-4xl mr-1.5">{time.days}d:</span>}
@@ -1316,15 +1314,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span>{time.seconds}</span>
         </div>
 
-        <div className="text-[10px] font-mono font-bold text-[#306230] whitespace-nowrap">
-          $1 = +{rateMinutesPerUsd}m • 4,000៛ = +{rateMinutesPerUsd}m
-        </div>
+        {renderDescription('text-[#306230]')}
       </div>
     );
   }
 
   // =========================================================================
-  // 23. VCR VHS PLAYBACK 1993 (NEW #23)
+  // 23. VCR VHS PLAYBACK 1993
   // =========================================================================
   if (templateStyle === 'vcr-glitch') {
     return (
@@ -1337,13 +1333,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center justify-between w-full px-2 text-[11px] font-mono font-bold text-cyan-400">
-          <div className="flex items-center gap-1">
-            <Tv size={13} />
-            <span className="animate-pulse">▶ PLAY SP</span>
+        {showTitle && title && (
+          <div className="px-2 text-[11px] font-mono font-bold text-cyan-400 text-center">
+            <span>{title}</span>
           </div>
-          <span>{title}</span>
-        </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-mono text-cyan-300 tracking-wider select-none"
@@ -1357,13 +1351,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span>{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-cyan-400/80')}
+        {renderDescription('text-cyan-400/80')}
       </div>
     );
   }
 
   // =========================================================================
-  // 24. ROUTE 66 NEON DINER (NEW #24)
+  // 24. ROUTE 66 NEON DINER
   // =========================================================================
   if (templateStyle === 'neon-diner') {
     return (
@@ -1376,10 +1370,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-900 border border-pink-400/50 text-xs font-mono font-bold text-pink-300">
-          <Coffee size={13} className="text-pink-400" />
-          <span>ROUTE 66 • {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-pink-400/50 text-xs font-mono font-bold text-pink-300 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-serif tracking-wider text-pink-200 select-none"
@@ -1393,7 +1388,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-cyan-300">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-pink-300')}
+        {renderDescription('text-pink-300')}
       </div>
     );
   }
@@ -1412,10 +1407,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-pink-950/60 border border-pink-300/30 text-xs font-bold text-pink-300">
-          <Heart size={13} className="text-pink-400 fill-pink-400" style={showAnimation ? { animation: 'timerHeartbeatBeat 1.5s infinite' } : {}} />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-pink-950/60 border border-pink-300/30 text-xs font-bold text-pink-300 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider text-pink-200 select-none"
@@ -1429,7 +1425,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-rose-300">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-pink-300/80')}
+        {renderDescription('text-pink-300/80')}
       </div>
     );
   }
@@ -1448,10 +1444,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold font-['Chakra_Petch'] uppercase tracking-widest text-purple-300">
-          <Star size={13} className="text-yellow-300 fill-yellow-300" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold font-['Chakra_Petch'] uppercase tracking-widest text-purple-300 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-['Chakra_Petch'] text-white select-none"
@@ -1465,7 +1462,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-pink-300">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-purple-300/80')}
+        {renderDescription('text-purple-300/80')}
       </div>
     );
   }
@@ -1484,10 +1481,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold font-['Chakra_Petch'] uppercase tracking-widest text-cyan-300">
-          <Compass size={14} className="text-cyan-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold font-['Chakra_Petch'] uppercase tracking-widest text-cyan-300 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-mono text-cyan-100 select-none"
@@ -1501,7 +1499,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-cyan-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-cyan-300/80')}
+        {renderDescription('text-cyan-300/80')}
       </div>
     );
   }
@@ -1520,9 +1518,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="px-3 py-0.5 bg-black text-yellow-300 text-xs font-black uppercase tracking-wider rounded-sm">
-          💥 {title}
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 bg-black text-yellow-300 text-xs font-black uppercase tracking-wider rounded-sm">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black text-black tracking-wider select-none"
@@ -1536,13 +1536,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-red-600">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-black font-black')}
+        {renderDescription('text-black font-black')}
       </div>
     );
   }
 
   // =========================================================================
-  // 29. SAKURA ZEN BLOSSOM (NEW #29)
+  // 29. SAKURA ZEN BLOSSOM
   // =========================================================================
   if (templateStyle === 'sakura-blossom') {
     return (
@@ -1555,10 +1555,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-950/50 border border-rose-300/40 text-xs font-serif font-bold text-rose-300">
-          <Heart size={13} className="text-rose-400 fill-rose-300/40" />
-          <span>桜 • {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-rose-950/50 border border-rose-300/40 text-xs font-serif font-bold text-rose-300 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-serif tracking-wider text-rose-100 select-none"
@@ -1572,13 +1573,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-rose-200">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-rose-300')}
+        {renderDescription('text-rose-300')}
       </div>
     );
   }
 
   // =========================================================================
-  // 30. NORDIC AURORA BOREALIS (NEW #30)
+  // 30. NORDIC AURORA BOREALIS
   // =========================================================================
   if (templateStyle === 'aurora-borealis') {
     return (
@@ -1592,10 +1593,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-widest text-emerald-300">
-          <Sparkles size={13} className="text-emerald-400 animate-spin" />
-          <span>AURORA • {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-300 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider text-white select-none"
@@ -1609,13 +1611,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-purple-300">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-emerald-300')}
+        {renderDescription('text-emerald-300')}
       </div>
     );
   }
 
   // =========================================================================
-  // 31. DEEP OCEANIC ABYSS (NEW #31)
+  // 31. DEEP OCEANIC ABYSS
   // =========================================================================
   if (templateStyle === 'deep-abyss') {
     return (
@@ -1628,10 +1630,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-sky-950/80 border border-sky-500/40 text-xs font-mono font-bold text-sky-300 uppercase">
-          <Compass size={13} className="text-sky-400" />
-          <span>SONAR • {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-sky-950/80 border border-sky-500/40 text-xs font-mono font-bold text-sky-300 uppercase">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-mono text-sky-100 tracking-wider select-none"
@@ -1645,13 +1648,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-cyan-400">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-sky-400/80')}
+        {renderDescription('text-sky-400/80')}
       </div>
     );
   }
 
   // =========================================================================
-  // 32. BUBBLE GUM POP (NEW #32)
+  // 32. BUBBLE GUM POP
   // =========================================================================
   if (templateStyle === 'bubble-gum') {
     return (
@@ -1664,10 +1667,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-900 border border-teal-400/50 text-xs font-bold text-teal-300">
-          <Sparkles size={13} className="text-pink-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-teal-400/50 text-xs font-bold text-teal-300">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider text-white select-none"
@@ -1681,7 +1685,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-rose-300">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-teal-300')}
+        {renderDescription('text-teal-300')}
       </div>
     );
   }
@@ -1698,9 +1702,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="text-xs font-mono font-bold uppercase tracking-widest text-slate-400">
-          {title}
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-mono font-bold uppercase tracking-widest text-slate-400 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-light font-mono text-white tracking-wider select-none">
           {time.days > 0 && <span className="text-2xl sm:text-4xl text-slate-400 mr-1.5">{time.days}d:</span>}
@@ -1711,7 +1717,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span>{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-slate-500')}
+        {renderDescription('text-slate-500')}
       </div>
     );
   }
@@ -1730,10 +1736,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/10 border border-white/20 text-xs font-semibold text-white">
-          <Sparkles size={13} className="text-purple-300" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="px-3 py-0.5 rounded-full bg-white/10 border border-white/20 text-xs font-semibold text-white">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-mono text-white select-none"
@@ -1747,13 +1754,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-purple-200">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-white/60')}
+        {renderDescription('text-white/60')}
       </div>
     );
   }
 
   // =========================================================================
-  // 35. SWISS EDITORIAL HELVETICA (NEW #35)
+  // 35. SWISS EDITORIAL HELVETICA
   // =========================================================================
   if (templateStyle === 'monochrome-swiss') {
     return (
@@ -1764,10 +1771,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-[11px] font-sans font-black uppercase tracking-widest border-b border-black/40 pb-1 w-full justify-center">
-          <Check size={13} />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-[11px] font-sans font-black uppercase tracking-widest border-b border-black/40 pb-1 w-full text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-sans tracking-tight select-none">
           {time.days > 0 && <span className="text-2xl sm:text-4xl mr-1.5">{time.days}D :</span>}
@@ -1778,15 +1786,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span>{time.seconds}</span>
         </div>
 
-        <div className="text-[10px] font-sans font-bold tracking-wider text-black/70 whitespace-nowrap">
-          $1.00 = +{rateMinutesPerUsd}m • 4,000៛ = +{rateMinutesPerUsd}m
-        </div>
+        {renderDescription('text-black/70')}
       </div>
     );
   }
 
   // =========================================================================
-  // 36. NORDIC SLATE & ASH (NEW #36)
+  // 36. NORDIC SLATE & ASH
   // =========================================================================
   if (templateStyle === 'nordic-slate') {
     return (
@@ -1797,10 +1803,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-widest">
-          <Shield size={13} className="text-slate-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-bold text-slate-100 tracking-wider select-none">
           {time.days > 0 && <span className="text-2xl sm:text-4xl text-slate-400 mr-1.5">{time.days}d :</span>}
@@ -1811,7 +1818,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-slate-200">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-slate-400')}
+        {renderDescription('text-slate-400')}
       </div>
     );
   }
@@ -1830,10 +1837,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold font-serif uppercase tracking-widest text-amber-300">
-          <Crown size={14} className="text-amber-400" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold font-serif uppercase tracking-widest text-amber-300 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-serif tracking-wider bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-400 bg-clip-text text-transparent select-none"
@@ -1847,7 +1855,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span>{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-amber-400/80')}
+        {renderDescription('text-amber-400/80')}
       </div>
     );
   }
@@ -1866,10 +1874,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-[#E5B869]">
-          <Coins size={14} className="text-[#E5B869]" />
-          <span>{title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold uppercase tracking-widest text-[#E5B869] text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black tracking-wider font-mono text-[#F3D79B] select-none"
@@ -1883,13 +1892,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-[#E5B869]">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-[#E5B869]/80')}
+        {renderDescription('text-[#E5B869]/80')}
       </div>
     );
   }
 
   // =========================================================================
-  // 39. SOLAR ECLIPSE CORONA (NEW #39)
+  // 39. SOLAR ECLIPSE CORONA
   // =========================================================================
   if (templateStyle === 'solar-flare') {
     return (
@@ -1903,10 +1912,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       >
         {animationStyles}
         {bonusToasts}
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-orange-400">
-          <Sun size={14} className="text-orange-400 animate-spin" />
-          <span>SOLAR • {title}</span>
-        </div>
+        {showTitle && title && (
+          <div className="text-xs font-bold uppercase tracking-widest text-orange-400 text-center">
+            <span>{title}</span>
+          </div>
+        )}
 
         <div
           className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-['Chakra_Petch'] tracking-wider text-orange-100 select-none"
@@ -1920,13 +1930,13 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
           <span className="text-amber-300">{time.seconds}</span>
         </div>
 
-        {subathonFootnote('text-orange-400/90')}
+        {renderDescription('text-orange-400/90')}
       </div>
     );
   }
 
   // =========================================================================
-  // 40. CELESTIAL SUPERNOVA VIP (NEW #40 / FALLBACK)
+  // 40. CELESTIAL SUPERNOVA VIP
   // =========================================================================
   return (
     <div
@@ -1938,10 +1948,11 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
     >
       {animationStyles}
       {bonusToasts}
-      <div className="flex items-center gap-1.5 text-xs font-bold font-serif uppercase tracking-widest text-yellow-300">
-        <Crown size={14} className="text-yellow-400" />
-        <span>SUPERNOVA • {title}</span>
-      </div>
+      {showTitle && title && (
+        <div className="text-xs font-bold font-serif uppercase tracking-widest text-yellow-300 text-center">
+          <span>{title}</span>
+        </div>
+      )}
 
       <div
         className="flex items-center justify-center flex-nowrap whitespace-nowrap tabular-nums text-4xl sm:text-6xl font-black font-serif tracking-wider bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-400 bg-clip-text text-transparent select-none"
@@ -1955,7 +1966,7 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         <span>{time.seconds}</span>
       </div>
 
-      {subathonFootnote('text-yellow-400/90')}
+      {renderDescription('text-yellow-400/90')}
     </div>
   );
 };

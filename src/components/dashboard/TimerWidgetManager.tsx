@@ -57,6 +57,9 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   const [templateStyle, setTemplateStyle] = useState<string>('cyber-neon');
   const [showBackground, setShowBackground] = useState<boolean>(true);
   const [showAnimation, setShowAnimation] = useState<boolean>(true);
+  const [showTitle, setShowTitle] = useState<boolean>(true);
+  const [showDescription, setShowDescription] = useState<boolean>(true);
+  const [description, setDescription] = useState<string>('');
   const [glowColor, setGlowColor] = useState('#00F0FF');
   const [fontFamily, setFontFamily] = useState('Chakra Petch');
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -95,6 +98,9 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
           setTemplateStyle(t.templateStyle || 'cyber-neon');
           setShowBackground(t.showBackground !== false);
           setShowAnimation(t.showAnimation !== false);
+          setShowTitle(t.showTitle !== false);
+          setShowDescription(t.showDescription !== false);
+          setDescription(t.description || '');
           setSoundEnabled(t.soundEnabled ?? true);
           if (t.maxCapSeconds) {
             setMaxCapHours(Math.round(t.maxCapSeconds / 3600));
@@ -219,6 +225,9 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
       templateStyle: activeTemplate,
       showBackground: activeBg,
       showAnimation: activeAnim,
+      showTitle,
+      showDescription,
+      description,
       soundEnabled,
       maxCapSeconds: hasCap ? maxCapHours * 3600 : 86400 * 365,
       addedSeconds: addedSec,
@@ -406,6 +415,9 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
               templateStyle={templateStyle}
               showBackground={showBackground}
               showAnimation={showAnimation}
+              showTitle={showTitle}
+              showDescription={showDescription}
+              description={description}
             />
           </div>
 
@@ -486,18 +498,58 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
             </div>
 
             <div className="space-y-4 text-xs font-mono">
-              {/* Timer Subathon Title */}
-              <div>
-                <label className="text-slate-300 font-semibold block mb-1.5">
-                  Timer Title / Subathon Goal
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="SUBATHON COUNTDOWN 🔥"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold focus:outline-none focus:border-cyan-400"
-                />
+              {/* Timer Subathon Title + Toggle */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-300 font-semibold block">
+                    Timer Title / Subathon Goal
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <span className="text-[11px] text-slate-400 font-normal">{showTitle ? 'Visible' : 'Hidden'}</span>
+                    <input
+                      type="checkbox"
+                      checked={showTitle}
+                      onChange={(e) => setShowTitle(e.target.checked)}
+                      className="w-4 h-4 accent-cyan-400 rounded"
+                    />
+                  </label>
+                </div>
+                {showTitle && (
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="SUBATHON COUNTDOWN"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold focus:outline-none focus:border-cyan-400"
+                  />
+                )}
+              </div>
+
+              {/* Description Below Timer + Toggle */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-300 font-semibold block">
+                    Timer Description (Below Timer)
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <span className="text-[11px] text-slate-400 font-normal">{showDescription ? 'Visible' : 'Hidden'}</span>
+                    <input
+                      type="checkbox"
+                      checked={showDescription}
+                      onChange={(e) => setShowDescription(e.target.checked)}
+                      className="w-4 h-4 accent-cyan-400 rounded"
+                    />
+                  </label>
+                </div>
+                {showDescription && (
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="$1 = +10m • 4,000៛ = +10m (leave empty for formula)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                  />
+                )}
               </div>
 
               {/* Time Added per $1.00 USD (Example: 1$ = 10mins) */}
@@ -597,7 +649,7 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
               onClick={handleSaveAllSettings}
               className="w-full font-bold"
             >
-              {savedSuccess ? 'Settings Saved & Broadcasted to OBS!' : 'Save Timer Settings'}
+              {savedSuccess ? 'Saved & Updated!' : 'Save & Update'}
             </Button>
           </Card>
         </div>
@@ -911,7 +963,7 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
                 <div className="p-3 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800/80 flex items-center justify-center min-h-[120px] overflow-hidden">
                   <div className="transform scale-[0.74] sm:scale-[0.80] origin-center w-full flex items-center justify-center pointer-events-none select-none">
                     <TimerTemplateRenderer
-                      title="SUBATHON GOAL"
+                      title={title || "SUBATHON"}
                       remainingSeconds={remainingSeconds}
                       isRunning={isRunning}
                       rateMinutesPerUsd={rateMinutesPerUsd}
@@ -919,6 +971,9 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
                       templateStyle={tpl.id}
                       showBackground={showBackground}
                       showAnimation={showAnimation}
+                      showTitle={showTitle}
+                      showDescription={showDescription}
+                      description={description}
                     />
                   </div>
                 </div>

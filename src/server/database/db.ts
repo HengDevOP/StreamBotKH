@@ -224,6 +224,15 @@ try {
 try {
   db.exec("ALTER TABLE stream_timers ADD COLUMN show_animation INTEGER DEFAULT 1");
 } catch (e) {}
+try {
+  db.exec("ALTER TABLE stream_timers ADD COLUMN show_title INTEGER DEFAULT 1");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE stream_timers ADD COLUMN show_description INTEGER DEFAULT 1");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE stream_timers ADD COLUMN description TEXT DEFAULT ''");
+} catch (e) {}
 
 // Stream donation goals table for multi-goal tracking & OBS overlay
 try {

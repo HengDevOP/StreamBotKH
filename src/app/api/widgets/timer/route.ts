@@ -74,6 +74,9 @@ export async function GET(req: NextRequest) {
         templateStyle: timer.template_style || timer.layout_mode || 'cyber-neon',
         showBackground: timer.show_background !== 0,
         showAnimation: timer.show_animation !== 0,
+        showTitle: timer.show_title !== 0,
+        showDescription: timer.show_description !== 0,
+        description: timer.description || '',
         soundEnabled: timer.sound_enabled === 1,
         maxCapSeconds: timer.max_cap_seconds || 86400
       }
@@ -104,6 +107,9 @@ export async function POST(req: NextRequest) {
     const templateStyle = body.templateStyle || body.layoutMode || timer?.template_style || timer?.layout_mode || 'cyber-neon';
     const showBackground = body.showBackground !== undefined ? (body.showBackground ? 1 : 0) : (timer?.show_background !== undefined ? timer.show_background : 1);
     const showAnimation = body.showAnimation !== undefined ? (body.showAnimation ? 1 : 0) : (timer?.show_animation !== undefined ? timer.show_animation : 1);
+    const showTitle = body.showTitle !== undefined ? (body.showTitle ? 1 : 0) : (timer?.show_title !== undefined ? timer.show_title : 1);
+    const showDescription = body.showDescription !== undefined ? (body.showDescription ? 1 : 0) : (timer?.show_description !== undefined ? timer.show_description : 1);
+    const description = body.description !== undefined ? String(body.description) : (timer?.description || '');
     const soundEnabled = body.soundEnabled !== undefined ? (body.soundEnabled ? 1 : 0) : (timer?.sound_enabled ?? 1);
     const maxCapSeconds = body.maxCapSeconds !== undefined ? Number(body.maxCapSeconds) : (timer?.max_cap_seconds ?? 86400);
 
@@ -122,6 +128,9 @@ export async function POST(req: NextRequest) {
           template_style = ?,
           show_background = ?,
           show_animation = ?,
+          show_title = ?,
+          show_description = ?,
+          description = ?,
           sound_enabled = ?,
           max_cap_seconds = ?,
           last_updated_at = datetime('now')
@@ -139,6 +148,9 @@ export async function POST(req: NextRequest) {
         templateStyle,
         showBackground,
         showAnimation,
+        showTitle,
+        showDescription,
+        description,
         soundEnabled,
         maxCapSeconds,
         token
@@ -149,8 +161,10 @@ export async function POST(req: NextRequest) {
         INSERT INTO stream_timers (
           id, streamer_token, title, remaining_seconds, initial_seconds,
           rate_minutes_per_usd, rate_minutes_per_khr, is_running, glow_color,
-          font_family, layout_mode, template_style, show_background, show_animation, sound_enabled, max_cap_seconds, last_updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          font_family, layout_mode, template_style, show_background, show_animation,
+          show_title, show_description, description,
+          sound_enabled, max_cap_seconds, last_updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `).run(
         newId,
         token,
@@ -166,6 +180,9 @@ export async function POST(req: NextRequest) {
         templateStyle,
         showBackground,
         showAnimation,
+        showTitle,
+        showDescription,
+        description,
         soundEnabled,
         maxCapSeconds
       );
@@ -185,6 +202,9 @@ export async function POST(req: NextRequest) {
       templateStyle,
       showBackground: showBackground === 1,
       showAnimation: showAnimation === 1,
+      showTitle: showTitle === 1,
+      showDescription: showDescription === 1,
+      description,
       soundEnabled: soundEnabled === 1,
       maxCapSeconds,
       addedSeconds: body.addedSeconds || 0,

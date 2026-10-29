@@ -27,6 +27,9 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
   const [templateStyle, setTemplateStyle] = useState('cyber-neon');
   const [showBackground, setShowBackground] = useState(true);
   const [showAnimation, setShowAnimation] = useState(true);
+  const [showTitle, setShowTitle] = useState(true);
+  const [showDescription, setShowDescription] = useState(true);
+  const [description, setDescription] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [maxCapSeconds, setMaxCapSeconds] = useState(86400);
 
@@ -49,6 +52,9 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
           setTemplateStyle(t.templateStyle || 'cyber-neon');
           setShowBackground(t.showBackground !== false);
           setShowAnimation(t.showAnimation !== false);
+          setShowTitle(t.showTitle !== false);
+          setShowDescription(t.showDescription !== false);
+          setDescription(t.description || '');
           setSoundEnabled(t.soundEnabled ?? true);
           setMaxCapSeconds(t.maxCapSeconds ?? 86400);
         }
@@ -130,6 +136,9 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
       if (payload.templateStyle) setTemplateStyle(payload.templateStyle);
       if (payload.showBackground !== undefined) setShowBackground(Boolean(payload.showBackground));
       if (payload.showAnimation !== undefined) setShowAnimation(Boolean(payload.showAnimation));
+      if (payload.showTitle !== undefined) setShowTitle(Boolean(payload.showTitle));
+      if (payload.showDescription !== undefined) setShowDescription(Boolean(payload.showDescription));
+      if (payload.description !== undefined) setDescription(String(payload.description));
       if (payload.soundEnabled !== undefined) setSoundEnabled(Boolean(payload.soundEnabled));
       if (payload.maxCapSeconds !== undefined) setMaxCapSeconds(Number(payload.maxCapSeconds));
 
@@ -181,6 +190,9 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
         templateStyle={templateStyle}
         showBackground={showBackground}
         showAnimation={showAnimation}
+        showTitle={showTitle}
+        showDescription={showDescription}
+        description={description}
         floatingBonuses={floatingBonuses}
       />
     </div>
