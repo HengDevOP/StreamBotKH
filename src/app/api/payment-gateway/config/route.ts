@@ -15,17 +15,46 @@ export async function GET(req: NextRequest) {
     if (paramStreamerId) {
       streamerId = paramStreamerId;
       try {
-        const row = db.prepare('SELECT username FROM streamers WHERE id = ?').get(paramStreamerId) as any;
+        const row = db.prepare('SELECT id, username FROM streamers WHERE id = ? OR LOWER(username) = LOWER(?)').get(paramStreamerId, paramStreamerId) as any;
         if (row?.username) streamerUsername = row.username;
+        if (row?.id) streamerId = row.id;
       } catch (e) {}
-    } else if (paramUsername) {
+
+      if (!streamerUsername) {
+        try {
+          const usersCol = await (await import('@/server/database/mongo')).getUsersCollection();
+          const mUser = await usersCol.findOne({
+            $or: [{ userId: paramStreamerId }, { username: { $regex: new RegExp(`^${paramStreamerId}$`, 'i') } }]
+          });
+          if (mUser?.username) streamerUsername = mUser.username;
+          if (mUser?.userId) streamerId = mUser.userId;
+        } catch (e) {}
+      }
+    }
+
+    if (paramUsername) {
+      const clean = paramUsername.replace(/^@/, '').trim();
       try {
-        const row = db.prepare('SELECT id, username FROM streamers WHERE username = ?').get(paramUsername) as any;
+        const row = db.prepare('SELECT id, username FROM streamers WHERE LOWER(username) = LOWER(?) OR id = ?').get(clean, clean) as any;
         if (row?.id) {
           streamerId = row.id;
           streamerUsername = row.username;
         }
       } catch (e) {}
+
+      if (!streamerId) {
+        try {
+          const usersCol = await (await import('@/server/database/mongo')).getUsersCollection();
+          const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const mUser = await usersCol.findOne({
+            $or: [{ username: { $regex: new RegExp(`^${escaped}$`, 'i') } }, { userId: clean }]
+          });
+          if (mUser?.userId) {
+            streamerId = mUser.userId;
+            streamerUsername = mUser.username;
+          }
+        } catch (e) {}
+      }
     }
 
     if (!streamerId) {
@@ -41,36 +70,55 @@ export async function GET(req: NextRequest) {
     // 1. Check SQLite payment_settings for this streamer
     let sqliteSettings: any = null;
     try {
-      // Ensure columns exist in SQLite
-      try {
-        db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_image TEXT');
-        db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_filename TEXT');
-        db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_filesize INTEGER');
-        db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_mimetype TEXT');
-        db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_updated_at DATETIME');
-      } catch (e) {}
-
-      sqliteSettings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(effectiveStreamerId) as any;
+      sqliteSettings = db.prepare(`
+        SELECT * FROM payment_settings 
+        WHERE streamer_id = ? 
+           OR streamer_id = ?
+      `).get(effectiveStreamerId, streamerId || '') as any;
     } catch (e) {}
 
     // 2. Check MongoDB for this streamer
     let mongoConfig: any = null;
     try {
       const gatewayCol = await getGatewayConfigCollection();
+      // Look for streamer-specific config with non-empty image first
       mongoConfig = await gatewayCol.findOne({
-        $or: [
-          { _id: `khqr_${effectiveStreamerId}` },
-          { streamerId: effectiveStreamerId }
+        $and: [
+          {
+            $or: [
+              { _id: `khqr_${effectiveStreamerId}` },
+              { streamerId: effectiveStreamerId },
+              ...(streamerUsername ? [{ _id: `khqr_${streamerUsername}` }, { streamerId: streamerUsername }] : [])
+            ]
+          },
+          { khqrImageUrl: { $exists: true, $ne: '' } }
         ]
       });
+
+      // If not found, find any existing document for this streamer
+      if (!mongoConfig) {
+        mongoConfig = await gatewayCol.findOne({
+          $or: [
+            { _id: `khqr_${effectiveStreamerId}` },
+            { streamerId: effectiveStreamerId },
+            ...(streamerUsername ? [{ _id: `khqr_${streamerUsername}` }, { streamerId: streamerUsername }] : [])
+          ]
+        });
+      }
     } catch (e) {}
 
     // Combine streamer-scoped settings: MongoDB is primary. If mongoConfig explicitly has khqrImageUrl, respect it (including empty string when removed)
     let khqrImageUrl = '';
-    if (mongoConfig && typeof mongoConfig.khqrImageUrl === 'string') {
-      khqrImageUrl = mongoConfig.khqrImageUrl;
-    } else if (sqliteSettings && typeof sqliteSettings.master_khqr_image === 'string') {
-      khqrImageUrl = sqliteSettings.master_khqr_image;
+    if (mongoConfig && typeof mongoConfig.khqrImageUrl === 'string' && mongoConfig.khqrImageUrl.trim() !== '') {
+      khqrImageUrl = mongoConfig.khqrImageUrl.trim();
+    } else if (sqliteSettings && typeof sqliteSettings.master_khqr_image === 'string' && sqliteSettings.master_khqr_image.trim() !== '') {
+      khqrImageUrl = sqliteSettings.master_khqr_image.trim();
+    } else if (effectiveStreamerId === 'demo-streamer-id-1001') {
+      try {
+        const gatewayCol = await getGatewayConfigCollection();
+        const globalConfig = await gatewayCol.findOne({ _id: 'master_khqr_config', khqrImageUrl: { $exists: true, $ne: '' } });
+        if (globalConfig?.khqrImageUrl) khqrImageUrl = globalConfig.khqrImageUrl;
+      } catch (e) {}
     }
 
     const khqrFilename = mongoConfig?.khqrFilename || sqliteSettings?.master_khqr_filename || '';

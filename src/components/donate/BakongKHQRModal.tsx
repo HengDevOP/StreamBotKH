@@ -68,6 +68,11 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
   // Load custom master KHQR if configured for this streamer
   useEffect(() => {
     if (isOpen) {
+      if (donationData?.qrImage) {
+        setMasterKhqrImage(donationData.qrImage);
+        return;
+      }
+
       const params = new URLSearchParams();
       if (streamerId) params.set('streamerId', streamerId);
       if (streamerUsername) params.set('username', streamerUsername);
@@ -86,7 +91,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
           setMasterKhqrImage(null);
         });
     }
-  }, [isOpen, streamerId, streamerUsername]);
+  }, [isOpen, streamerId, streamerUsername, donationData?.qrImage]);
 
   // Clean up temporary database helper
   const cleanupTemporaryDonation = async (donationId?: string) => {

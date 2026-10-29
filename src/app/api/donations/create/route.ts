@@ -38,27 +38,89 @@ export async function POST(req: NextRequest) {
     const cleanVideoStartTime = Number(videoStartTime) || 0;
     const cleanVideoEndTime = Number(videoEndTime) || 0;
 
+    // Resolve target streamer ID and username across SQLite & MongoDB
+    let resolvedStreamerId = streamerId;
+    let resolvedUsername = '';
+
+    try {
+      const row = db.prepare('SELECT id, username FROM streamers WHERE id = ? OR LOWER(username) = LOWER(?)').get(streamerId, streamerId) as any;
+      if (row?.id) {
+        resolvedStreamerId = row.id;
+        resolvedUsername = row.username || '';
+      } else {
+        const usersCol = await (await import('@/server/database/mongo')).getUsersCollection();
+        const escaped = String(streamerId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const mUser = await usersCol.findOne({
+          $or: [
+            { userId: streamerId },
+            { username: { $regex: new RegExp(`^${escaped}$`, 'i') } }
+          ]
+        });
+        if (mUser?.userId) {
+          resolvedStreamerId = mUser.userId;
+          resolvedUsername = mUser.username || '';
+        }
+      }
+    } catch (e) {}
+
     // Use the official Payment Gateway Master KHQR image uploaded by the streamer (no fallback)
     let khqrImage = '';
     try {
       const gatewayCol = await getGatewayConfigCollection();
-      const config = await gatewayCol.findOne({
-        $or: [
-          { _id: `khqr_${streamerId}` },
-          { streamerId },
-          { _id: 'master_khqr_config' }
+      
+      // 1. Look specifically for this streamer's uploaded KHQR image with non-empty URL
+      const streamerConfig = await gatewayCol.findOne({
+        $and: [
+          {
+            $or: [
+              { _id: `khqr_${resolvedStreamerId}` },
+              { streamerId: resolvedStreamerId },
+              { _id: `khqr_${streamerId}` },
+              { streamerId: streamerId },
+              ...(resolvedUsername ? [{ _id: `khqr_${resolvedUsername}` }, { streamerId: resolvedUsername }] : [])
+            ]
+          },
+          { khqrImageUrl: { $exists: true, $ne: '' } }
         ]
       });
-      if (config?.khqrImageUrl) {
-        khqrImage = config.khqrImageUrl;
-      } else {
-        const sqliteSettings = db.prepare('SELECT master_khqr_image FROM streamers WHERE id = ?').get(streamerId) as any;
+
+      if (streamerConfig?.khqrImageUrl) {
+        khqrImage = streamerConfig.khqrImageUrl;
+      }
+    } catch (gatewayErr) {
+      console.warn('[Donation] Could not fetch gateway KHQR image from MongoDB:', gatewayErr);
+    }
+
+    // 2. Check SQLite payment_settings table
+    if (!khqrImage) {
+      try {
+        const sqliteSettings = db.prepare(`
+          SELECT master_khqr_image FROM payment_settings 
+          WHERE (streamer_id = ? OR streamer_id = ?) 
+            AND master_khqr_image IS NOT NULL 
+            AND master_khqr_image != ''
+        `).get(resolvedStreamerId, streamerId) as any;
+
         if (sqliteSettings?.master_khqr_image) {
           khqrImage = sqliteSettings.master_khqr_image;
         }
+      } catch (sqlErr) {
+        console.warn('[Donation] Could not fetch KHQR from SQLite payment_settings:', sqlErr);
       }
-    } catch (gatewayErr) {
-      console.warn('[Donation] Could not fetch gateway KHQR image:', gatewayErr);
+    }
+
+    // 3. Optional fallback to global master_khqr_config if non-empty
+    if (!khqrImage) {
+      try {
+        const gatewayCol = await getGatewayConfigCollection();
+        const globalConfig = await gatewayCol.findOne({
+          _id: 'master_khqr_config',
+          khqrImageUrl: { $exists: true, $ne: '' }
+        });
+        if (globalConfig?.khqrImageUrl) {
+          khqrImage = globalConfig.khqrImageUrl;
+        }
+      } catch (e) {}
     }
 
     if (!khqrImage) {
@@ -77,7 +139,7 @@ export async function POST(req: NextRequest) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
     `).run(
       donationId,
-      streamerId,
+      resolvedStreamerId,
       donorName.slice(0, 50),
       (donorMessage || '').slice(0, 250),
       numAmount,
@@ -96,7 +158,8 @@ export async function POST(req: NextRequest) {
       const tempCol = await getTemporaryDonationsCollection();
       await tempCol.insertOne({
         id: donationId,
-        streamerId,
+        streamerId: resolvedStreamerId,
+        streamerUsername: resolvedUsername || undefined,
         donorName: donorName.slice(0, 50),
         donorMessage: (donorMessage || '').slice(0, 250),
         amount: numAmount,

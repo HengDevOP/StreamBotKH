@@ -19,6 +19,8 @@ export interface PublicStreamerInfo {
   videoMaxDurationSeconds?: number;
   customThanksMessage?: string;
   isVerified?: boolean;
+  hasMasterKhqr?: boolean;
+  khqrImageUrl?: string;
   socialLinks?: Array<{
     id: string;
     url: string;

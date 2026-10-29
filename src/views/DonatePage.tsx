@@ -103,9 +103,10 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
       setActiveDonation(res);
       setIsModalOpen(true);
     } catch (err: any) {
+      const errMsg = err.message || '';
       showAlert({
         title: 'Checkout Error',
-        message: 'Failed to generate Bakong KHQR: ' + err.message,
+        message: errMsg.includes('KHQR') || errMsg.includes('streamer') ? errMsg : `Failed to generate Bakong KHQR: ${errMsg}`,
         type: 'danger'
       });
     } finally {
