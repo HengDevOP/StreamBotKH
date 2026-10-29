@@ -16,10 +16,11 @@ import {
   Volume2,
   DollarSign,
   Palette,
-  X,
   Layers,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  Search,
+  ArrowDown
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
@@ -53,7 +54,7 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   const [maxCapHours, setMaxCapHours] = useState(24);
   const [hasCap, setHasCap] = useState(true);
 
-  // Visual Appearance Customization & 20 Templates
+  // Visual Appearance Customization & 40 Templates
   const [templateStyle, setTemplateStyle] = useState<string>('cyber-neon');
   const [showBackground, setShowBackground] = useState<boolean>(true);
   const [showAnimation, setShowAnimation] = useState<boolean>(true);
@@ -61,11 +62,11 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   const [fontFamily, setFontFamily] = useState('Chakra Petch');
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Template Modal & Category Filter State
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  // In-line Template Browser & Category Filter State
   const [templateFilter, setTemplateFilter] = useState<
     'All' | 'Cyber' | 'Gaming' | 'Retro' | 'Aesthetic' | 'Minimal' | 'Special'
   >('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Test simulation state
   const [customTestAmount, setCustomTestAmount] = useState<number>(2.0);
@@ -245,10 +246,9 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
     saveTimerState(remainingSeconds, isRunning, 0, undefined, undefined, undefined, undefined, undefined, nextVal);
   };
 
-  const handleSelectTemplateFromModal = (templateId: string, previewColor: string) => {
+  const handleSelectTemplate = (templateId: string, previewColor: string) => {
     setTemplateStyle(templateId);
     setGlowColor(previewColor);
-    setIsTemplateModalOpen(false);
     saveTimerState(
       remainingSeconds,
       isRunning,
@@ -258,6 +258,13 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
       templateId,
       previewColor
     );
+  };
+
+  const scrollToTemplateBrowser = () => {
+    const el = document.getElementById('timer-templates-browser');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const handleSaveAllSettings = () => {
@@ -277,10 +284,16 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   const currentTemplate =
     TIMER_TEMPLATES.find((t) => t.id === templateStyle) || TIMER_TEMPLATES[0];
 
-  const filteredTemplates =
-    templateFilter === 'All'
-      ? TIMER_TEMPLATES
-      : TIMER_TEMPLATES.filter((t) => t.category === templateFilter);
+  const filteredTemplates = TIMER_TEMPLATES.filter((tpl) => {
+    const matchesCategory = templateFilter === 'All' || tpl.category === templateFilter;
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      q === '' ||
+      tpl.name.toLowerCase().includes(q) ||
+      tpl.description.toLowerCase().includes(q) ||
+      tpl.category.toLowerCase().includes(q);
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
@@ -297,12 +310,40 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
               Timer (Subathon Countdown Overlay)
             </h2>
             <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold">
-              20 STYLES
+              40 STYLES
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Display a live stream countdown timer that automatically extends whenever viewers donate (e.g. $1 = +10 mins).
           </p>
+        </div>
+
+        {/* OBS URL Copy Pill */}
+        <div className="flex items-center gap-2 bg-slate-950/90 border border-slate-800 rounded-xl p-1.5 pl-3">
+          <span className="text-[11px] font-mono text-slate-400 truncate max-w-[200px] sm:max-w-[280px]">
+            {obsUrl}
+          </span>
+          <button
+            type="button"
+            onClick={copyObsUrl}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+              copiedUrl
+                ? 'bg-emerald-500 text-slate-950'
+                : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30'
+            }`}
+          >
+            {copiedUrl ? <Check size={13} /> : <Copy size={13} />}
+            <span>{copiedUrl ? 'Copied' : 'Copy OBS URL'}</span>
+          </button>
+          <a
+            href={obsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 text-slate-400 hover:text-white transition-colors"
+            title="Open overlay in new tab"
+          >
+            <ExternalLink size={14} />
+          </a>
         </div>
       </div>
 
@@ -366,21 +407,22 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
               <span>Animation: {showAnimation ? 'ON' : 'OFF'}</span>
             </button>
 
-            {/* Browse 20 Templates Modal Button */}
+            {/* Browse 40 Templates in Main Content (Smooth Scroll) */}
             <button
               type="button"
-              onClick={() => setIsTemplateModalOpen(true)}
+              onClick={scrollToTemplateBrowser}
               className="flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-400/50 text-cyan-300 text-xs font-mono font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.2)]"
             >
               <Palette size={13} />
-              <span>Browse 20 Templates</span>
+              <span>Browse 40 Templates</span>
+              <ArrowDown size={12} className="animate-bounce" />
             </button>
           </div>
         </div>
 
         {/* 1:1 Visual Preview Render */}
-        <div className="py-8 flex flex-col items-center justify-center relative z-10">
-          <div className="w-full flex items-center justify-center min-h-[140px]">
+        <div className="py-8 flex flex-col items-center justify-center relative z-10 w-full overflow-hidden">
+          <div className="w-full flex items-center justify-center min-h-[140px] px-2">
             <TimerTemplateRenderer
               title={title}
               remainingSeconds={remainingSeconds}
@@ -607,12 +649,12 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
               <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider flex items-center gap-2">
                 <Palette size={16} className="text-cyan-400" />
-                OBS Visual Theme (20 Designs)
+                OBS Visual Theme (40 Designs)
               </h3>
             </div>
 
             <div className="space-y-4 text-xs font-mono">
-              {/* Current Active Template Banner + Modal Open Button */}
+              {/* Current Active Template Banner */}
               <div>
                 <label className="text-slate-300 font-semibold block mb-2">Selected Timer Template</label>
                 <div className="p-4 rounded-2xl bg-slate-950 border border-cyan-500/30 flex items-center justify-between gap-3 shadow-lg">
@@ -632,11 +674,11 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
 
                   <button
                     type="button"
-                    onClick={() => setIsTemplateModalOpen(true)}
+                    onClick={scrollToTemplateBrowser}
                     className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)]"
                   >
                     <Palette size={14} />
-                    <span>Change</span>
+                    <span>Browse All</span>
                   </button>
                 </div>
               </div>
@@ -646,7 +688,7 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
                 {/* Background Container Toggle */}
                 <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer select-none">
                   <div className="space-y-0.5">
-                    <span className="text-xs font-mono text-slate-200 font-bold block flex items-center gap-1.5">
+                    <span className="text-xs font-mono text-slate-200 font-bold flex items-center gap-1.5">
                       <Layers size={13} className="text-cyan-400" />
                       <span>Show Container Background</span>
                     </span>
@@ -665,7 +707,7 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
                 {/* Animation Toggle */}
                 <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer select-none">
                   <div className="space-y-0.5">
-                    <span className="text-xs font-mono text-slate-200 font-bold block flex items-center gap-1.5">
+                    <span className="text-xs font-mono text-slate-200 font-bold flex items-center gap-1.5">
                       <Sparkles size={13} className="text-amber-400" />
                       <span>Enable Dynamic Visual Animations</span>
                     </span>
@@ -798,165 +840,175 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
       </div>
 
       {/* ============================================================== */}
-      {/* TEMPLATE PREVIEWS MODAL (ALL 20 UNIQUE DESIGNS)                */}
+      {/* IN-LINE TEMPLATE BROWSER (ALL 40 UNIQUE HANDCRAFTED DESIGNS)   */}
       {/* ============================================================== */}
-      {isTemplateModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn"
-          onClick={() => setIsTemplateModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-5xl max-h-[92vh] bg-[#080C16] border border-cyan-500/30 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="p-5 sm:p-6 border-b border-slate-800 flex items-start justify-between gap-4 bg-slate-950/70 flex-shrink-0">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                    <Palette size={18} />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-white font-['Chakra_Petch']">
-                    Timer Styling Templates (20 Unique Designs)
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-400">
-                  Click any template to select it for your stream overlay. Each template features custom countdown frames, digital typography, glowing accents, and dynamic animations.
-                </p>
+      <div id="timer-templates-browser" className="pt-4 space-y-4">
+        {/* Section Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-[#090D18] border border-cyan-500/30 shadow-xl">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                <Palette size={18} />
               </div>
-              <button
-                type="button"
-                onClick={() => setIsTemplateModalOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="px-5 sm:px-6 py-3 border-b border-slate-800/80 bg-slate-950/40 flex items-center gap-1.5 overflow-x-auto flex-shrink-0">
-              {(['All', 'Cyber', 'Gaming', 'Retro', 'Aesthetic', 'Minimal', 'Special'] as const).map(
-                (cat) => {
-                  const count =
-                    cat === 'All'
-                      ? TIMER_TEMPLATES.length
-                      : TIMER_TEMPLATES.filter((t) => t.category === cat).length;
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setTemplateFilter(cat)}
-                      className={`px-3 py-1 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap ${
-                        templateFilter === cat
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                          : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'
-                      }`}
-                    >
-                      {cat} ({count})
-                    </button>
-                  );
-                }
-              )}
-            </div>
-
-            {/* Template Preview Cards Grid */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {filteredTemplates.map((tpl) => {
-                  const isCurrentSelected = templateStyle === tpl.id;
-
-                  return (
-                    <div
-                      key={tpl.id}
-                      onClick={() => handleSelectTemplateFromModal(tpl.id, tpl.previewColor)}
-                      className={`p-4 rounded-2xl bg-[#090D18] border transition-all cursor-pointer flex flex-col justify-between space-y-3 group hover:border-cyan-400/60 hover:shadow-xl ${
-                        isCurrentSelected
-                          ? 'border-cyan-400 ring-2 ring-cyan-400/20 bg-cyan-950/15'
-                          : 'border-slate-800 hover:bg-slate-900/40'
-                      }`}
-                    >
-                      {/* Top Info Bar */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: tpl.previewColor }}
-                          />
-                          <span className="text-sm font-bold text-white font-['Chakra_Petch'] group-hover:text-cyan-300 transition-colors">
-                            {tpl.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-400">
-                            {tpl.category}
-                          </span>
-                          {isCurrentSelected && (
-                            <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold">
-                              <CheckCircle2 size={11} />
-                              Current
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Live Miniature Preview */}
-                      <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-center min-h-[105px] overflow-hidden">
-                        <div className="transform scale-[0.88] origin-center w-full flex items-center justify-center pointer-events-none">
-                          <TimerTemplateRenderer
-                            title="SUBATHON GOAL"
-                            remainingSeconds={remainingSeconds}
-                            isRunning={isRunning}
-                            rateMinutesPerUsd={rateMinutesPerUsd}
-                            glowColor={tpl.previewColor}
-                            templateStyle={tpl.id}
-                            showBackground={showBackground}
-                            showAnimation={showAnimation}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Description & Apply Button */}
-                      <div className="flex items-center justify-between gap-3 text-xs font-mono pt-1">
-                        <p className="text-[11px] text-slate-400 line-clamp-1 flex-1">
-                          {tpl.description}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectTemplateFromModal(tpl.id, tpl.previewColor);
-                          }}
-                          className={`px-3 py-1 rounded-xl text-[11px] font-mono font-bold transition-all flex-shrink-0 ${
-                            isCurrentSelected
-                              ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
-                              : 'bg-slate-900 group-hover:bg-cyan-500/20 text-slate-300 group-hover:text-cyan-300 border border-slate-800 group-hover:border-cyan-500/30'
-                          }`}
-                        >
-                          {isCurrentSelected ? 'Applied' : 'Select'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 sm:p-5 border-t border-slate-800 bg-slate-950/70 flex items-center justify-between flex-shrink-0">
-              <span className="text-xs font-mono text-slate-400">
-                20 handcrafted unique templates • Instant live sync with OBS Browser Source
+              <h3 className="text-lg sm:text-xl font-bold text-white font-['Chakra_Petch']">
+                Timer Styling Templates (40 Unique Designs)
+              </h3>
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold">
+                INSTANT LIVE OBS SYNC
               </span>
-              <button
-                type="button"
-                onClick={() => setIsTemplateModalOpen(false)}
-                className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-mono font-bold transition-colors"
-              >
-                Close
-              </button>
             </div>
+            <p className="text-xs text-slate-400">
+              Browse and click any template below to immediately apply it to your stream countdown overlay. No OBS reload needed.
+            </p>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative min-w-[240px]">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search 40 templates..."
+              className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+            />
           </div>
         </div>
-      )}
+
+        {/* Category Filter Pills */}
+        <div className="p-2 rounded-2xl bg-[#090D18] border border-slate-800 flex items-center gap-2 overflow-x-auto scrollbar-thin">
+          {(['All', 'Cyber', 'Gaming', 'Retro', 'Aesthetic', 'Minimal', 'Special'] as const).map((cat) => {
+            const count =
+              cat === 'All'
+                ? TIMER_TEMPLATES.length
+                : TIMER_TEMPLATES.filter((t) => t.category === cat).length;
+            const isSelected = templateFilter === cat;
+
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setTemplateFilter(cat)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                    : 'text-slate-400 hover:text-white bg-slate-950/80 hover:bg-slate-900 border border-slate-800/80'
+                }`}
+              >
+                <span>{cat}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                    isSelected ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 40 Template Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filteredTemplates.map((tpl) => {
+            const isCurrentSelected = templateStyle === tpl.id;
+
+            return (
+              <div
+                key={tpl.id}
+                onClick={() => handleSelectTemplate(tpl.id, tpl.previewColor)}
+                className={`p-4 rounded-2xl bg-[#090D18] border transition-all cursor-pointer flex flex-col justify-between space-y-3 group hover:border-cyan-400/60 hover:shadow-2xl ${
+                  isCurrentSelected
+                    ? 'border-cyan-400 ring-2 ring-cyan-400/30 bg-cyan-950/20 shadow-[0_0_25px_rgba(6,182,212,0.15)]'
+                    : 'border-slate-800 hover:bg-slate-900/40'
+                }`}
+              >
+                {/* Top Info Bar */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-3.5 h-3.5 rounded-full flex-shrink-0 shadow-md"
+                      style={{ backgroundColor: tpl.previewColor, boxShadow: `0 0 10px ${tpl.previewColor}80` }}
+                    />
+                    <span className="text-sm font-bold text-white font-['Chakra_Petch'] group-hover:text-cyan-300 transition-colors">
+                      {tpl.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-400">
+                      {tpl.category}
+                    </span>
+                    {isCurrentSelected && (
+                      <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 font-bold">
+                        <CheckCircle2 size={11} className="text-cyan-400" />
+                        Active on OBS
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Miniature Preview */}
+                <div className="p-3 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800/80 flex items-center justify-center min-h-[120px] overflow-hidden">
+                  <div className="transform scale-[0.74] sm:scale-[0.80] origin-center w-full flex items-center justify-center pointer-events-none select-none">
+                    <TimerTemplateRenderer
+                      title="SUBATHON GOAL"
+                      remainingSeconds={remainingSeconds}
+                      isRunning={isRunning}
+                      rateMinutesPerUsd={rateMinutesPerUsd}
+                      glowColor={tpl.previewColor}
+                      templateStyle={tpl.id}
+                      showBackground={showBackground}
+                      showAnimation={showAnimation}
+                    />
+                  </div>
+                </div>
+
+                {/* Description & Selection Button */}
+                <div className="flex items-center justify-between gap-3 text-xs font-mono pt-1">
+                  <p className="text-[11px] text-slate-400 line-clamp-1 flex-1">
+                    {tpl.description}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectTemplate(tpl.id, tpl.previewColor);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-xl text-[11px] font-mono font-bold transition-all flex-shrink-0 ${
+                      isCurrentSelected
+                        ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                        : 'bg-slate-900 group-hover:bg-cyan-500/20 text-slate-300 group-hover:text-cyan-300 border border-slate-800 group-hover:border-cyan-500/40'
+                    }`}
+                  >
+                    {isCurrentSelected ? 'Applied' : 'Select'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Empty Search Result Fallback */}
+        {filteredTemplates.length === 0 && (
+          <div className="p-12 text-center rounded-2xl bg-[#090D18] border border-slate-800 space-y-2">
+            <Palette size={28} className="mx-auto text-slate-600" />
+            <h4 className="text-sm font-bold text-white font-['Chakra_Petch']">No templates found</h4>
+            <p className="text-xs text-slate-400 font-mono">
+              No style matches "{searchQuery}". Try searching for Cyber, Retro, Neon, or clear the search.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setTemplateFilter('All');
+              }}
+              className="mt-2 px-4 py-1.5 rounded-xl bg-slate-800 text-white text-xs font-mono font-bold hover:bg-slate-700 transition-colors"
+            >
+              Reset Filters
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
