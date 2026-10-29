@@ -510,7 +510,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     if (typeof navigator !== 'undefined' && navigator.clipboard && currentObsConfig) {
       navigator.clipboard.writeText(currentObsConfig.url);
       setCopiedObsUrl(true);
-      playSynthNeonChime(0.6);
       setTimeout(() => setCopiedObsUrl(false), 2000);
     }
   };
