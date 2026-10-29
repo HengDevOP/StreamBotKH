@@ -15,9 +15,17 @@ interface FloatingBonus {
   donorName?: string;
 }
 
+const parseBool = (val: any, defaultVal = true): boolean => {
+  if (val === undefined || val === null) return defaultVal;
+  if (val === false || val === 0 || val === '0' || val === 'false') return false;
+  return true;
+};
+
 export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token }) => {
-  const { socket, joinOverlayRoom } = useSocket();
+  const { socket, connected, joinOverlayRoom } = useSocket();
   const { playSound } = useAudio();
+
+  const effectiveToken = token || 'demo-token';
 
   const [title, setTitle] = useState('SUBATHON COUNTDOWN 🔥');
   const [remainingSeconds, setRemainingSeconds] = useState(7200);
@@ -39,35 +47,39 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
 
   // 1. Initial fetch from API
   useEffect(() => {
-    fetch(`/api/widgets/timer?token=${token || 'demo-token'}`)
+    fetch(`/api/widgets/timer?token=${effectiveToken}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.timer) {
           const t = data.timer;
-          setTitle(t.title || 'SUBATHON COUNTDOWN 🔥');
-          setRemainingSeconds(t.remainingSeconds ?? 7200);
-          setIsRunning(t.isRunning ?? true);
-          setRateMinutesPerUsd(t.rateMinutesPerUsd ?? 10.0);
-          setGlowColor(t.glowColor || '#00F0FF');
-          setTemplateStyle(t.templateStyle || 'cyber-neon');
-          setShowBackground(t.showBackground !== false);
-          setShowAnimation(t.showAnimation !== false);
-          setShowTitle(t.showTitle !== false);
-          setShowDescription(t.showDescription !== false);
+          if (t.title !== undefined) setTitle(t.title || 'SUBATHON COUNTDOWN 🔥');
+          if (t.remainingSeconds !== undefined) setRemainingSeconds(t.remainingSeconds);
+          if (t.isRunning !== undefined) setIsRunning(t.isRunning);
+          if (t.rateMinutesPerUsd !== undefined) setRateMinutesPerUsd(t.rateMinutesPerUsd);
+          if (t.glowColor) setGlowColor(t.glowColor);
+          if (t.templateStyle) setTemplateStyle(t.templateStyle);
+          const rawBg = t.showBackground !== undefined ? t.showBackground : t.show_background;
+          setShowBackground(parseBool(rawBg, true));
+          const rawAnim = t.showAnimation !== undefined ? t.showAnimation : t.show_animation;
+          setShowAnimation(parseBool(rawAnim, true));
+          const rawShowTitle = t.showTitle !== undefined ? t.showTitle : t.show_title;
+          setShowTitle(parseBool(rawShowTitle, true));
+          const rawShowDesc = t.showDescription !== undefined ? t.showDescription : t.show_description;
+          setShowDescription(parseBool(rawShowDesc, true));
           setDescription(t.description || '');
-          setSoundEnabled(t.soundEnabled ?? true);
-          setMaxCapSeconds(t.maxCapSeconds ?? 86400);
+          if (t.soundEnabled !== undefined) setSoundEnabled(t.soundEnabled);
+          if (t.maxCapSeconds !== undefined) setMaxCapSeconds(t.maxCapSeconds);
         }
       })
       .catch((e) => console.error('[Timer Overlay] Error fetching timer state:', e));
-  }, [token]);
+  }, [effectiveToken]);
 
   // 2. Join overlay socket room
   useEffect(() => {
-    if (token) {
-      joinOverlayRoom(token);
+    if (effectiveToken) {
+      joinOverlayRoom(effectiveToken);
     }
-  }, [token, joinOverlayRoom]);
+  }, [effectiveToken, connected, joinOverlayRoom]);
 
   // 3. Countdown loop
   useEffect(() => {
@@ -128,16 +140,31 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
     // Handle manual timer updates from streamer dashboard
     const handleTimerUpdate = (payload: any) => {
       if (!payload) return;
+      // Only process updates destined for our token or demo-token
+      if (
+        payload.token &&
+        effectiveToken &&
+        payload.token !== effectiveToken &&
+        payload.token !== 'demo-token' &&
+        effectiveToken !== 'demo-token'
+      ) {
+        return;
+      }
+
       if (payload.title !== undefined) setTitle(payload.title);
       if (payload.remainingSeconds !== undefined) setRemainingSeconds(Number(payload.remainingSeconds));
       if (payload.isRunning !== undefined) setIsRunning(Boolean(payload.isRunning));
       if (payload.rateMinutesPerUsd !== undefined) setRateMinutesPerUsd(Number(payload.rateMinutesPerUsd));
       if (payload.glowColor) setGlowColor(payload.glowColor);
       if (payload.templateStyle) setTemplateStyle(payload.templateStyle);
-      if (payload.showBackground !== undefined) setShowBackground(Boolean(payload.showBackground));
-      if (payload.showAnimation !== undefined) setShowAnimation(Boolean(payload.showAnimation));
-      if (payload.showTitle !== undefined) setShowTitle(Boolean(payload.showTitle));
-      if (payload.showDescription !== undefined) setShowDescription(Boolean(payload.showDescription));
+      const rawBg = payload.showBackground !== undefined ? payload.showBackground : payload.show_background;
+      if (rawBg !== undefined) setShowBackground(parseBool(rawBg, true));
+      const rawAnim = payload.showAnimation !== undefined ? payload.showAnimation : payload.show_animation;
+      if (rawAnim !== undefined) setShowAnimation(parseBool(rawAnim, true));
+      const rawShowTitle = payload.showTitle !== undefined ? payload.showTitle : payload.show_title;
+      if (rawShowTitle !== undefined) setShowTitle(parseBool(rawShowTitle, true));
+      const rawShowDesc = payload.showDescription !== undefined ? payload.showDescription : payload.show_description;
+      if (rawShowDesc !== undefined) setShowDescription(parseBool(rawShowDesc, true));
       if (payload.description !== undefined) setDescription(String(payload.description));
       if (payload.soundEnabled !== undefined) setSoundEnabled(Boolean(payload.soundEnabled));
       if (payload.maxCapSeconds !== undefined) setMaxCapSeconds(Number(payload.maxCapSeconds));

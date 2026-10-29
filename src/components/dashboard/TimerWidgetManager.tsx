@@ -36,6 +36,12 @@ interface TimerWidgetManagerProps {
   streamerToken?: string;
 }
 
+const parseBool = (val: any, defaultVal = true): boolean => {
+  if (val === undefined || val === null) return defaultVal;
+  if (val === false || val === 0 || val === '0' || val === 'false') return false;
+  return true;
+};
+
 export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamerToken }) => {
   const { socket } = useSocket();
   const { playSynthNeonChime } = useAudio();
@@ -96,10 +102,10 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
           setGlowColor(t.glowColor || '#00F0FF');
           setFontFamily(t.fontFamily || 'Chakra Petch');
           setTemplateStyle(t.templateStyle || 'cyber-neon');
-          setShowBackground(t.showBackground !== false);
-          setShowAnimation(t.showAnimation !== false);
-          setShowTitle(t.showTitle !== false);
-          setShowDescription(t.showDescription !== false);
+          setShowBackground(parseBool(t.showBackground, true));
+          setShowAnimation(parseBool(t.showAnimation, true));
+          setShowTitle(parseBool(t.showTitle, true));
+          setShowDescription(parseBool(t.showDescription, true));
           setDescription(t.description || '');
           setSoundEnabled(t.soundEnabled ?? true);
           if (t.maxCapSeconds) {
@@ -175,7 +181,7 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
     }
 
     // Save and broadcast update
-    saveTimerState(newRemaining, isRunning, seconds, donorName, tipAmount);
+    saveTimerState(newRemaining, isRunning, { addedSec: seconds, donor: donorName, amount: tipAmount });
   };
 
   const subtractSeconds = (seconds: number) => {
@@ -196,25 +202,37 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
     saveTimerState(initialSec, isRunning);
   };
 
+  interface TimerStateOverrides {
+    addedSec?: number;
+    donor?: string;
+    amount?: number;
+    templateStyle?: string;
+    glowColor?: string;
+    showBackground?: boolean;
+    showAnimation?: boolean;
+    showTitle?: boolean;
+    showDescription?: boolean;
+    description?: string;
+    title?: string;
+  }
+
   const saveTimerState = (
     currentSec: number,
     running: boolean,
-    addedSec: number = 0,
-    donor?: string,
-    amount?: number,
-    overrideTemplate?: string,
-    overrideColor?: string,
-    overrideBg?: boolean,
-    overrideAnim?: boolean
+    overrides?: TimerStateOverrides
   ) => {
-    const activeTemplate = overrideTemplate !== undefined ? overrideTemplate : templateStyle;
-    const activeColor = overrideColor !== undefined ? overrideColor : glowColor;
-    const activeBg = overrideBg !== undefined ? overrideBg : showBackground;
-    const activeAnim = overrideAnim !== undefined ? overrideAnim : showAnimation;
+    const activeTemplate = overrides?.templateStyle !== undefined ? overrides.templateStyle : templateStyle;
+    const activeColor = overrides?.glowColor !== undefined ? overrides.glowColor : glowColor;
+    const activeBg = overrides?.showBackground !== undefined ? overrides.showBackground : showBackground;
+    const activeAnim = overrides?.showAnimation !== undefined ? overrides.showAnimation : showAnimation;
+    const activeShowTitle = overrides?.showTitle !== undefined ? overrides.showTitle : showTitle;
+    const activeShowDesc = overrides?.showDescription !== undefined ? overrides.showDescription : showDescription;
+    const activeDesc = overrides?.description !== undefined ? overrides.description : description;
+    const activeTitle = overrides?.title !== undefined ? overrides.title : title;
 
     const payload = {
       token: effectiveToken,
-      title,
+      title: activeTitle,
       remainingSeconds: currentSec,
       initialSeconds: initialHours * 3600 + initialMinutes * 60,
       rateMinutesPerUsd: Number(rateMinutesPerUsd),
@@ -225,14 +243,14 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
       templateStyle: activeTemplate,
       showBackground: activeBg,
       showAnimation: activeAnim,
-      showTitle,
-      showDescription,
-      description,
+      showTitle: activeShowTitle,
+      showDescription: activeShowDesc,
+      description: activeDesc,
       soundEnabled,
       maxCapSeconds: hasCap ? maxCapHours * 3600 : 86400 * 365,
-      addedSeconds: addedSec,
-      donorName: donor,
-      tipAmount: amount
+      addedSeconds: overrides?.addedSec || 0,
+      donorName: overrides?.donor,
+      tipAmount: overrides?.amount
     };
 
     fetch('/api/widgets/timer', {
@@ -245,27 +263,31 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   const handleToggleShowBackground = () => {
     const nextVal = !showBackground;
     setShowBackground(nextVal);
-    saveTimerState(remainingSeconds, isRunning, 0, undefined, undefined, undefined, undefined, nextVal, undefined);
+    saveTimerState(remainingSeconds, isRunning, { showBackground: nextVal });
   };
 
   const handleToggleShowAnimation = () => {
     const nextVal = !showAnimation;
     setShowAnimation(nextVal);
-    saveTimerState(remainingSeconds, isRunning, 0, undefined, undefined, undefined, undefined, undefined, nextVal);
+    saveTimerState(remainingSeconds, isRunning, { showAnimation: nextVal });
+  };
+
+  const handleToggleShowTitle = () => {
+    const nextVal = !showTitle;
+    setShowTitle(nextVal);
+    saveTimerState(remainingSeconds, isRunning, { showTitle: nextVal });
+  };
+
+  const handleToggleShowDescription = () => {
+    const nextVal = !showDescription;
+    setShowDescription(nextVal);
+    saveTimerState(remainingSeconds, isRunning, { showDescription: nextVal });
   };
 
   const handleSelectTemplate = (templateId: string, previewColor: string) => {
     setTemplateStyle(templateId);
     setGlowColor(previewColor);
-    saveTimerState(
-      remainingSeconds,
-      isRunning,
-      0,
-      undefined,
-      undefined,
-      templateId,
-      previewColor
-    );
+    saveTimerState(remainingSeconds, isRunning, { templateStyle: templateId, glowColor: previewColor });
   };
 
   const scrollToTemplateBrowser = () => {
@@ -276,7 +298,12 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   };
 
   const handleSaveAllSettings = () => {
-    saveTimerState(remainingSeconds, isRunning);
+    saveTimerState(remainingSeconds, isRunning, {
+      title,
+      description,
+      showTitle,
+      showDescription
+    });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
   };
@@ -388,6 +415,36 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
             >
               <Sparkles size={13} />
               <span>Animation: {showAnimation ? 'ON' : 'OFF'}</span>
+            </button>
+
+            {/* Quick Toggle: Title */}
+            <button
+              type="button"
+              onClick={handleToggleShowTitle}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all ${
+                showTitle
+                  ? 'bg-emerald-500/10 border-emerald-400/50 text-emerald-300'
+                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+              title="Toggle title visibility on OBS"
+            >
+              <Eye size={13} />
+              <span>Title: {showTitle ? 'ON' : 'OFF'}</span>
+            </button>
+
+            {/* Quick Toggle: Description */}
+            <button
+              type="button"
+              onClick={handleToggleShowDescription}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all ${
+                showDescription
+                  ? 'bg-purple-500/10 border-purple-400/50 text-purple-300'
+                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+              title="Toggle description visibility on OBS"
+            >
+              <Eye size={13} />
+              <span>Desc: {showDescription ? 'ON' : 'OFF'}</span>
             </button>
 
             {/* Browse 40 Templates in Main Content (Smooth Scroll) */}
@@ -509,8 +566,8 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
                     <input
                       type="checkbox"
                       checked={showTitle}
-                      onChange={(e) => setShowTitle(e.target.checked)}
-                      className="w-4 h-4 accent-cyan-400 rounded"
+                      onChange={handleToggleShowTitle}
+                      className="w-4 h-4 accent-cyan-400 rounded cursor-pointer"
                     />
                   </label>
                 </div>
@@ -536,8 +593,8 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
                     <input
                       type="checkbox"
                       checked={showDescription}
-                      onChange={(e) => setShowDescription(e.target.checked)}
-                      className="w-4 h-4 accent-cyan-400 rounded"
+                      onChange={handleToggleShowDescription}
+                      className="w-4 h-4 accent-cyan-400 rounded cursor-pointer"
                     />
                   </label>
                 </div>

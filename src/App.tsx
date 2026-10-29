@@ -173,7 +173,7 @@ function TimerOverlayRouteWrapper() {
           background-image: none !important;
         }
       `}</style>
-      <StreamTimerOverlay token={token || ''} />
+      <StreamTimerOverlay token={token || 'demo-token'} />
     </div>
   );
 }
@@ -291,6 +291,7 @@ function AppRoutes() {
         <Route path="/overlay/soundboard/:token" element={<SoundboardOverlayRouteWrapper />} />
         <Route path="/overlay/goal/:token" element={<GoalOverlayRouteWrapper />} />
         <Route path="/overlay/leaderboard/:token" element={<LeaderboardOverlayRouteWrapper />} />
+        <Route path="/overlay/timer" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/timer/:token" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
 
@@ -298,6 +299,7 @@ function AppRoutes() {
         <Route path="/widget/soundboard/:token" element={<SoundboardOverlayRouteWrapper />} />
         <Route path="/widget/goal/:token" element={<GoalOverlayRouteWrapper />} />
         <Route path="/widget/leaderboard/:token" element={<LeaderboardOverlayRouteWrapper />} />
+        <Route path="/widget/timer" element={<TimerOverlayRouteWrapper />} />
         <Route path="/widget/timer/:token" element={<TimerOverlayRouteWrapper />} />
         <Route path="/widget/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
       </Routes>

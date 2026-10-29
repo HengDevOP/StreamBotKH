@@ -5,6 +5,23 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const dynamic = 'force-dynamic';
 
+// Ensure table columns exist
+try {
+  db.exec("ALTER TABLE stream_timers ADD COLUMN show_title INTEGER DEFAULT 1");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE stream_timers ADD COLUMN show_description INTEGER DEFAULT 1");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE stream_timers ADD COLUMN description TEXT DEFAULT ''");
+} catch (e) {}
+
+const isBool = (val: any, defaultVal = true): boolean => {
+  if (val === undefined || val === null) return defaultVal;
+  if (val === false || val === 0 || val === '0' || val === 'false') return false;
+  return true;
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -72,10 +89,10 @@ export async function GET(req: NextRequest) {
         fontFamily: timer.font_family || 'Chakra Petch',
         layoutMode: timer.layout_mode || 'neon',
         templateStyle: timer.template_style || timer.layout_mode || 'cyber-neon',
-        showBackground: timer.show_background !== 0,
-        showAnimation: timer.show_animation !== 0,
-        showTitle: timer.show_title !== 0,
-        showDescription: timer.show_description !== 0,
+        showBackground: isBool(timer.show_background, true),
+        showAnimation: isBool(timer.show_animation, true),
+        showTitle: isBool(timer.show_title, true),
+        showDescription: isBool(timer.show_description, true),
         description: timer.description || '',
         soundEnabled: timer.sound_enabled === 1,
         maxCapSeconds: timer.max_cap_seconds || 86400
@@ -105,10 +122,10 @@ export async function POST(req: NextRequest) {
     const fontFamily = body.fontFamily || timer?.font_family || 'Chakra Petch';
     const layoutMode = body.layoutMode || timer?.layout_mode || 'neon';
     const templateStyle = body.templateStyle || body.layoutMode || timer?.template_style || timer?.layout_mode || 'cyber-neon';
-    const showBackground = body.showBackground !== undefined ? (body.showBackground ? 1 : 0) : (timer?.show_background !== undefined ? timer.show_background : 1);
-    const showAnimation = body.showAnimation !== undefined ? (body.showAnimation ? 1 : 0) : (timer?.show_animation !== undefined ? timer.show_animation : 1);
-    const showTitle = body.showTitle !== undefined ? (body.showTitle ? 1 : 0) : (timer?.show_title !== undefined ? timer.show_title : 1);
-    const showDescription = body.showDescription !== undefined ? (body.showDescription ? 1 : 0) : (timer?.show_description !== undefined ? timer.show_description : 1);
+    const showBackground = isBool(body.showBackground, isBool(timer?.show_background, true)) ? 1 : 0;
+    const showAnimation = isBool(body.showAnimation, isBool(timer?.show_animation, true)) ? 1 : 0;
+    const showTitle = isBool(body.showTitle, isBool(timer?.show_title, true)) ? 1 : 0;
+    const showDescription = isBool(body.showDescription, isBool(timer?.show_description, true)) ? 1 : 0;
     const description = body.description !== undefined ? String(body.description) : (timer?.description || '');
     const soundEnabled = body.soundEnabled !== undefined ? (body.soundEnabled ? 1 : 0) : (timer?.sound_enabled ?? 1);
     const maxCapSeconds = body.maxCapSeconds !== undefined ? Number(body.maxCapSeconds) : (timer?.max_cap_seconds ?? 86400);
@@ -219,6 +236,7 @@ export async function POST(req: NextRequest) {
       if (token !== 'demo-token') {
         io.to('overlay:demo-token').emit('timer:update', updated);
       }
+      io.emit('timer:update', updated);
     }
 
     return NextResponse.json({

@@ -42,9 +42,20 @@ app.use('/assets', express.static(path.join(publicDir, 'assets')));
 /**
  * Adapter bridging Express Request/Response to Next.js Web standard Request/Response handlers
  */
-function createRouteHandler(handler: Function) {
+function createRouteHandler(fullPath: string, method: string) {
   return async (req: express.Request, res: express.Response) => {
     try {
+      if (process.env.NODE_ENV !== 'production') {
+        try {
+          delete require.cache[require.resolve(fullPath)];
+        } catch (e) {}
+      }
+      const module = require(fullPath);
+      const handler = module[method];
+      if (typeof handler !== 'function') {
+        return res.status(405).json({ error: `Method ${method} not allowed on ${req.originalUrl}` });
+      }
+
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
       const host = req.get('host') || 'localhost';
       const url = `${protocol}://${host}${req.originalUrl}`;
@@ -155,7 +166,7 @@ function scanAndMountRoutes(dir: string, baseRoute = '/api') {
         for (const m of methods) {
           if (typeof module[m] === 'function') {
             const expressMethod = m.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
-            app[expressMethod](baseRoute, createRouteHandler(module[m]));
+            app[expressMethod](baseRoute, createRouteHandler(fullPath, m));
           }
         }
       } catch (err: any) {
