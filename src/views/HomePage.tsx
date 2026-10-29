@@ -137,17 +137,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     </div>
   );
 
-  // Fee Calculator State
-  const [monthlyTips, setMonthlyTips] = useState<number>(1000);
-
   // FAQ Accordion State
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
-
-  // Fee math
-  const twitchYoutubeFee = monthlyTips * 0.3; // 30% cut on Twitch/YT
-  const streambotStarterFee = monthlyTips * 0.1; // 10% fee on Starter
-  const streambotProCost = 1.99; // $1.99 flat, 0% cut
-  const savingsVsTwitch = Math.max(0, twitchYoutubeFee - streambotProCost);
 
   return (
     <div className="relative overflow-hidden space-y-28 pb-32">
@@ -458,75 +449,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             <p className="text-xs text-slate-400 leading-relaxed">
               Accept tips in both US Dollars and Khmer Riel with zero friction. Viewers choose their currency, and your dashboard reconciles your total revenue automatically.
             </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ===================== INTERACTIVE FEE SAVINGS CALCULATOR ===================== */}
-      <section className="max-w-4xl mx-auto px-4">
-        <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-b from-[#0C1222] to-[#080B14] border border-slate-800 space-y-8">
-          <div className="text-center space-y-2">
-            <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold">
-              STOP LOSING 30% ON TWITCH & YOUTUBE
-            </span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] uppercase">
-              INTERACTIVE EARNINGS CALCULATOR
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
-              See how much extra money you keep every month by switching to StreamBotKH Pro ($1.99/mo).
-            </p>
-          </div>
-
-          {/* Interactive Slider */}
-          <div className="space-y-4 max-w-lg mx-auto">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-400">Your Monthly Donations:</span>
-              <span className="text-2xl font-black text-cyan-400 font-mono">
-                ${monthlyTips.toLocaleString()}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={100}
-              max={5000}
-              step={100}
-              value={monthlyTips}
-              onChange={(e) => setMonthlyTips(parseInt(e.target.value, 10))}
-              className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-            />
-            <div className="flex justify-between text-[11px] font-mono text-slate-500">
-              <span>$100 / mo</span>
-              <span>$2,500 / mo</span>
-              <span>$5,000 / mo</span>
-            </div>
-          </div>
-
-          {/* Comparison Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            <div className="p-5 rounded-2xl bg-red-950/20 border border-red-500/30 space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-red-400 font-mono">
-                Twitch Bits / YouTube SuperChats
-              </div>
-              <div className="text-3xl font-extrabold text-red-400 font-mono">
-                -${twitchYoutubeFee.toFixed(0)} <span className="text-xs text-red-300 font-sans">lost to 30% cut</span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                You only receive ${(monthlyTips - twitchYoutubeFee).toFixed(0)} out of your ${monthlyTips} earned.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/40 space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono flex items-center justify-between">
-                <span>StreamBotKH Pro Plan</span>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-[10px]">0% FEE CUT</span>
-              </div>
-              <div className="text-3xl font-extrabold text-emerald-400 font-mono">
-                +${savingsVsTwitch.toFixed(2)} <span className="text-xs text-emerald-300 font-sans">extra in your bank</span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Flat $1.99/mo subscription. You keep 100% of your tips directly in your ABA or Bakong account!
-              </p>
-            </div>
           </div>
         </div>
       </section>
