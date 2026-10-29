@@ -19,7 +19,6 @@ import {
   Check,
   DollarSign,
   Send,
-  Sparkles,
   ChevronRight,
   ChevronLeft,
   ArrowRight,
@@ -572,51 +571,12 @@ export const PaymentGatewayAdmin: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* ============================================================== */}
-      {/* TOP HEADER: GATEWAY TITLE                                      */}
-      {/* ============================================================== */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
-        <div>
-          <h2 className="text-xl font-extrabold text-white font-['Chakra_Petch'] tracking-wide flex items-center gap-2.5">
-            <Radio className="text-cyan-400 animate-pulse" size={22} />
-            <span>PAYMENT GATEWAY</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Step-by-step setup for GramJS MTProto client, official Bakong Master KHQR code, and live Telegram bank listener.
-          </p>
-        </div>
-      </div>
-
-      {/* ============================================================== */}
       {/* 3-STEP ANIMATED LINE PROGRESS TASK BAR                         */}
       {/* ============================================================== */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-[#090D18] border border-slate-800/90 shadow-2xl relative overflow-hidden">
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#090D18] border border-slate-800/90 shadow-2xl relative overflow-hidden">
         {/* Subtle Ambient Background Gradient Glow */}
         <div className="absolute top-0 right-1/4 w-96 h-28 bg-cyan-500/5 blur-3xl pointer-events-none rounded-full" />
         <div className="absolute bottom-0 left-1/4 w-96 h-28 bg-emerald-500/5 blur-3xl pointer-events-none rounded-full" />
-
-        {/* Progress Header & Completion Metric */}
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800/60">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-cyan-400" />
-            <span className="text-xs font-mono uppercase font-bold text-slate-200 tracking-wider">
-              Setup Progress Tasks
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[11px] font-mono px-3 py-1 rounded-full font-bold border transition-colors ${
-                completedStepsCount === 3
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                  : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
-              }`}
-            >
-              {completedStepsCount === 3
-                ? 'All 3 Tasks Completed (100% Ready)'
-                : `${completedStepsCount} of 3 Tasks Done (${Math.round((completedStepsCount / 3) * 100)}%)`}
-            </span>
-          </div>
-        </div>
 
         {/* Stepper with Connecting Animated Line */}
         <div className="relative flex items-center justify-between px-2 sm:px-8">
