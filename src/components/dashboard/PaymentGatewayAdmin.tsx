@@ -100,6 +100,27 @@ const isChatIdMatch = (id1?: string, id2?: string) => {
   return Boolean(clean1 && clean1 === clean2);
 };
 
+const isGroupConnected = (dialog: AvailableDialog, groups: TargetGroup[]) => {
+  if (!groups || groups.length === 0) return false;
+  return groups.some((g) => {
+    // 1. Match by Chat ID (direct or stripped numeric id)
+    if (g.chat_id && isChatIdMatch(g.chat_id, dialog.id)) {
+      return true;
+    }
+    // 2. Match by exact Group Title (trimmed, case-insensitive)
+    if (g.title && dialog.title && g.title.trim().toLowerCase() === dialog.title.trim().toLowerCase()) {
+      return true;
+    }
+    // 3. Match by Telegram Username
+    if (g.username && dialog.username) {
+      const u1 = g.username.replace(/^@/, '').trim().toLowerCase();
+      const u2 = dialog.username.replace(/^@/, '').trim().toLowerCase();
+      if (u1 && u1 === u2) return true;
+    }
+    return false;
+  });
+};
+
 export const PaymentGatewayAdmin: React.FC = () => {
   const { showConfirm, showAlert } = useModal();
   const { user } = useAuth();
@@ -248,9 +269,9 @@ export const PaymentGatewayAdmin: React.FC = () => {
         setTargetGroups(serverGroups);
         const combined = [...apiDialogs];
 
-        // Ensure all connected groups in DB are present in availableDialogs list
+        // Ensure all connected groups in DB are present in availableDialogs list without duplicates
         for (const g of serverGroups) {
-          if (g.chat_id && !combined.some((c) => isChatIdMatch(c.id, g.chat_id))) {
+          if (g.chat_id && !combined.some((c) => isGroupConnected(c, [g]))) {
             combined.unshift({
               id: g.chat_id,
               title: g.title,
@@ -262,7 +283,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
         }
 
         for (const p of PRESET_GROUPS) {
-          if (!combined.some((c) => isChatIdMatch(c.id, p.id))) {
+          if (!combined.some((c) => isGroupConnected(c, [{ id: p.id, streamer_id: '', chat_id: p.id, title: p.title, username: p.username, created_at: '' }]))) {
             combined.push(p);
           }
         }
@@ -644,7 +665,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // STEP 3 HANDLERS: Manage Telegram Target Groups & Listener Cards
   // ----------------------------------------------------------------
   const handlePromptDisconnectGroup = (dialog: AvailableDialog) => {
-    const existing = targetGroups.find((g) => isChatIdMatch(g.chat_id, dialog.id));
+    const existing = targetGroups.find((g) => isGroupConnected(dialog, [g]));
     if (!existing) return;
 
     showConfirm({
@@ -680,6 +701,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           const data = await res.json();
           if (res.ok && data.success) {
             setStep3Msg({ type: 'success', text: `Disconnected "${dialog.title}" from listener.` });
+            setTargetGroups((prev) => prev.filter((g) => g.id !== existing.id && !isGroupConnected(dialog, [g])));
             await fetchTargetGroups();
           } else {
             setStep3Msg({ type: 'error', text: data.error || 'Failed to remove group.' });
@@ -733,6 +755,15 @@ export const PaymentGatewayAdmin: React.FC = () => {
           const data = await res.json();
           if (res.ok && data.success) {
             setStep3Msg({ type: 'success', text: `Connected "${dialog.title}" to GramJS listener!` });
+            const newGroup: TargetGroup = data.group || {
+              id: dialog.id,
+              streamer_id: '',
+              chat_id: dialog.id,
+              title: dialog.title,
+              username: dialog.username,
+              created_at: new Date().toISOString()
+            };
+            setTargetGroups((prev) => [newGroup, ...prev.filter((g) => !isGroupConnected(dialog, [g]))]);
             await fetchTargetGroups();
           } else {
             setStep3Msg({ type: 'error', text: data.error || 'Failed to connect group.' });
@@ -1417,8 +1448,8 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
                   // Sort active connected groups strictly to the top
                   const sorted = [...filtered].sort((a, b) => {
-                    const aActive = targetGroups.some((g) => isChatIdMatch(g.chat_id, a.id));
-                    const bActive = targetGroups.some((g) => isChatIdMatch(g.chat_id, b.id));
+                    const aActive = isGroupConnected(a, targetGroups);
+                    const bActive = isGroupConnected(b, targetGroups);
                     if (aActive && !bActive) return -1;
                     if (!aActive && bActive) return 1;
                     return 0;
@@ -1436,7 +1467,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   return (
                     <div className="grid grid-cols-1 gap-2.5">
                       {sorted.map((dialog) => {
-                        const isMonitored = targetGroups.some((g) => isChatIdMatch(g.chat_id, dialog.id));
+                        const isMonitored = isGroupConnected(dialog, targetGroups);
                         const isConnecting = connectingGroupId === dialog.id;
 
                         const titleLower = dialog.title.toLowerCase();
