@@ -104,7 +104,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [userPhone, setUserPhone] = useState('+855');
   const [userApiId, setUserApiId] = useState('');
   const [userApiHash, setUserApiHash] = useState('');
-  const [showApiCreds, setShowApiCreds] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const [codeRequested, setCodeRequested] = useState(false);
@@ -818,7 +817,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             /* Login Form */
             <div className="space-y-5">
               {!codeRequested ? (
-                <form onSubmit={handleSendCode} className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-5">
+                <form onSubmit={handleSendCode} className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4">
                   <div className="space-y-2">
                     <label className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                       <Phone size={14} className="text-cyan-400" />
@@ -847,7 +846,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                         loading={sendingCode}
                         className="font-bold py-3 px-6 whitespace-nowrap justify-center shadow-lg shadow-cyan-400/20"
                       >
-                        Connect &amp; Request Code
+                        Request Code
                       </Button>
                     </div>
 
@@ -855,53 +854,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
                       Enter your Telegram phone number. Telegram will send an official 5-digit verification code to your Telegram app.
                     </p>
                   </div>
-
-                  {/* Credentials Badge */}
-                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
-                    <div className="flex items-center gap-2">
-                      <Shield size={14} className="text-emerald-400" />
-                      <span className="text-slate-300 font-bold">App API:</span>
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
-                        #32427800 (Live MTProto)
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowApiCreds(!showApiCreds)}
-                      className="text-[11px] text-slate-400 hover:text-cyan-400 flex items-center gap-1 transition-colors"
-                    >
-                      <KeyRound size={12} />
-                      <span>{showApiCreds ? 'Hide API' : 'Custom App API'}</span>
-                    </button>
-                  </div>
-
-                  {showApiCreds && (
-                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3 text-xs font-mono animate-fadeIn">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-slate-400 block mb-1">Telegram App API ID</label>
-                          <input
-                            type="number"
-                            placeholder="32427800"
-                            value={userApiId}
-                            onChange={(e) => setUserApiId(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-400"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-400 block mb-1">Telegram App API Hash</label>
-                          <input
-                            type="text"
-                            placeholder="8f8e70605256a4e08a81bd5e45481ceb"
-                            value={userApiHash}
-                            onChange={(e) => setUserApiHash(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-400"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </form>
               ) : (
                 /* Verification Code Form */
