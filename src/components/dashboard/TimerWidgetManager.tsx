@@ -13,7 +13,6 @@ import {
   Sparkles,
   Sliders,
   Monitor,
-  Volume2,
   DollarSign,
   Palette,
   Layers,
@@ -298,56 +297,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   return (
     <div className="space-y-6">
       {/* ============================================================== */}
-      {/* HEADER WITH OBS BROWSER SOURCE URL                            */}
-      {/* ============================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#090D18] border border-slate-800">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-cyan-950/60 border border-cyan-800/40 flex items-center justify-center text-cyan-400">
-              <Timer size={18} />
-            </div>
-            <h2 className="text-xl font-bold text-white font-['Chakra_Petch']">
-              Timer (Subathon Countdown Overlay)
-            </h2>
-            <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold">
-              40 STYLES
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Display a live stream countdown timer that automatically extends whenever viewers donate (e.g. $1 = +10 mins).
-          </p>
-        </div>
-
-        {/* OBS URL Copy Pill */}
-        <div className="flex items-center gap-2 bg-slate-950/90 border border-slate-800 rounded-xl p-1.5 pl-3">
-          <span className="text-[11px] font-mono text-slate-400 truncate max-w-[200px] sm:max-w-[280px]">
-            {obsUrl}
-          </span>
-          <button
-            type="button"
-            onClick={copyObsUrl}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
-              copiedUrl
-                ? 'bg-emerald-500 text-slate-950'
-                : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30'
-            }`}
-          >
-            {copiedUrl ? <Check size={13} /> : <Copy size={13} />}
-            <span>{copiedUrl ? 'Copied' : 'Copy OBS URL'}</span>
-          </button>
-          <a
-            href={obsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 text-slate-400 hover:text-white transition-colors"
-            title="Open overlay in new tab"
-          >
-            <ExternalLink size={14} />
-          </a>
-        </div>
-      </div>
-
-      {/* ============================================================== */}
       {/* TOP LIVE COUNTDOWN PREVIEW & STREAMER CONTROLS                */}
       {/* ============================================================== */}
       <Card className="p-6 bg-gradient-to-br from-[#0B0F19] via-[#090D18] to-slate-950 border border-cyan-500/30 shadow-2xl relative overflow-hidden">
@@ -366,14 +315,39 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
 
         {/* Header Controls for Live Preview */}
         <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800/80 relative z-10">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
-              <Eye size={14} className="text-cyan-400" />
-              Live OBS Output Preview
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
+              <Eye size={16} className="text-cyan-400" />
+              Preview
             </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-300 font-bold">
-              {currentTemplate.name}
-            </span>
+
+            {/* OBS URL Copy Pill */}
+            <div className="flex items-center gap-1.5 bg-slate-950/90 border border-slate-800 rounded-xl p-1 pl-2.5">
+              <span className="text-[11px] font-mono text-slate-400 truncate max-w-[150px] sm:max-w-[240px]">
+                {obsUrl}
+              </span>
+              <button
+                type="button"
+                onClick={copyObsUrl}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all ${
+                  copiedUrl
+                    ? 'bg-emerald-500 text-slate-950'
+                    : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30'
+                }`}
+              >
+                {copiedUrl ? <Check size={12} /> : <Copy size={12} />}
+                <span>{copiedUrl ? 'Copied' : 'Copy OBS URL'}</span>
+              </button>
+              <a
+                href={obsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1 text-slate-400 hover:text-white transition-colors"
+                title="Open overlay in new tab"
+              >
+                <ExternalLink size={13} />
+              </a>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -614,20 +588,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
                     <span className="text-slate-400 text-xs">Hours max cap (prevents endless stream)</span>
                   </div>
                 )}
-              </div>
-
-              {/* Sound on Donation */}
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-                <span className="text-slate-200 font-semibold flex items-center gap-2">
-                  <Volume2 size={16} className="text-cyan-400" />
-                  Play Chime Sound when Time is Added
-                </span>
-                <input
-                  type="checkbox"
-                  checked={soundEnabled}
-                  onChange={(e) => setSoundEnabled(e.target.checked)}
-                  className="w-4 h-4 accent-cyan-400 rounded"
-                />
               </div>
             </div>
 
