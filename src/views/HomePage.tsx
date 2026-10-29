@@ -239,65 +239,130 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       )}
 
       {/* ===================== HOW IT WORKS PIPELINE ===================== */}
-      <section className="max-w-6xl mx-auto px-4 space-y-12">
-        <div className="text-center space-y-3">
-          <span className="text-xs font-mono uppercase tracking-widest text-cyan-400 font-bold">
-            ZERO CONFIGURATION SETUP
-          </span>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-white font-['Chakra_Petch'] uppercase">
+      <section className="max-w-6xl mx-auto px-4 space-y-10 sm:space-y-12 relative">
+        {/* Subtle Ambient Radial Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-cyan-500/5 blur-[120px] pointer-events-none rounded-full" />
+
+        <div className="text-center space-y-3 relative z-10">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-mono font-bold tracking-widest uppercase">
+            <Sparkles size={13} className="text-cyan-400" />
+            <span>ZERO CONFIGURATION SETUP</span>
+          </div>
+          <h2 className="text-3xl sm:text-5xl font-extrabold text-white font-['Chakra_Petch'] uppercase tracking-tight">
             HOW STREAMBOTKH WORKS
           </h2>
-          <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto">
+          <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto leading-relaxed">
             From zero to broadcasting in less than 2 minutes. No complicated banking merchant setup required.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+        {/* 3 Steps Pipeline Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
           {/* Step 1 */}
-          <div className="p-7 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4 relative group hover:border-slate-700 transition-colors">
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-mono font-bold text-lg">
-              01
+          <div className="p-7 rounded-2xl bg-[#090D18]/90 border border-slate-800/80 hover:border-cyan-500/40 backdrop-blur-sm transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1 shadow-lg hover:shadow-cyan-500/10 relative overflow-hidden">
+            {/* Top Accent Gradient Line */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-400/80 via-cyan-400/20 to-transparent group-hover:h-[3px] transition-all" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-mono font-bold text-lg group-hover:scale-105 transition-transform">
+                  01
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-cyan-400 transition-colors">
+                  <Tv size={16} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] group-hover:text-cyan-300 transition-colors">
+                  Add Browser Source to OBS
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Copy your private 60 FPS overlay link from your Streamer Deck and paste it directly into OBS Studio or Streamlabs as a transparent Browser Source.
+                </p>
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-white font-['Chakra_Petch']">
-              Add Browser Source to OBS
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Copy your private 60 FPS overlay link from your Streamer Deck and paste it directly into OBS Studio or Streamlabs as a transparent Browser Source.
-            </p>
-            <div className="pt-2 font-mono text-[11px] text-cyan-400 flex items-center gap-1">
-              <span>Token: ovl_token_****</span>
+
+            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-mono text-[11px]">
+              <span className="text-slate-400 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-cyan-300">ovl_token_••••••••</span>
+              </span>
+              <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-semibold">
+                60 FPS Overlay
+              </span>
             </div>
           </div>
 
           {/* Step 2 */}
-          <div className="p-7 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4 relative group hover:border-slate-700 transition-colors">
-            <div className="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-pink-400 font-mono font-bold text-lg">
-              02
+          <div className="p-7 rounded-2xl bg-[#090D18]/90 border border-slate-800/80 hover:border-pink-500/40 backdrop-blur-sm transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1 shadow-lg hover:shadow-pink-500/10 relative overflow-hidden">
+            {/* Top Accent Gradient Line */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-pink-400/80 via-pink-400/20 to-transparent group-hover:h-[3px] transition-all" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-pink-400 font-mono font-bold text-lg group-hover:scale-105 transition-transform">
+                  02
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-pink-400 transition-colors">
+                  <Send size={16} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] group-hover:text-pink-300 transition-colors">
+                  Share Your Tip Page Link
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Pin your custom URL (<code className="text-white font-semibold">streambotkh.com/@username</code>) in your chat or bio. Viewers select their bank and enter their cheer message.
+                </p>
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-white font-['Chakra_Petch']">
-              Share Your Tip Page Link
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Pin your custom URL (<code className="text-white">streambotkh.com/@username</code>) in your chat or bio. Viewers select their bank and enter their cheer message.
-            </p>
-            <div className="pt-2 font-mono text-[11px] text-pink-400 flex items-center gap-1">
-              <span>streambotkh.com/@username</span>
+
+            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-mono text-[11px]">
+              <span className="text-slate-400 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
+                <span className="text-pink-300">/@username</span>
+              </span>
+              <span className="px-2 py-0.5 rounded bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[10px] font-semibold">
+                Bakong KHQR
+              </span>
             </div>
           </div>
 
           {/* Step 3 */}
-          <div className="p-7 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4 relative group hover:border-slate-700 transition-colors">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-mono font-bold text-lg">
-              03
+          <div className="p-7 rounded-2xl bg-[#090D18]/90 border border-slate-800/80 hover:border-emerald-500/40 backdrop-blur-sm transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1 shadow-lg hover:shadow-emerald-500/10 relative overflow-hidden">
+            {/* Top Accent Gradient Line */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-400/80 via-emerald-400/20 to-transparent group-hover:h-[3px] transition-all" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-mono font-bold text-lg group-hover:scale-105 transition-transform">
+                  03
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-emerald-400 transition-colors">
+                  <Zap size={16} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] group-hover:text-emerald-300 transition-colors">
+                  Instant Alerts &amp; Direct Deposit
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  When viewers scan the Bakong KHQR code with ABA Mobile, alerts instantly flash on your stream screen, TTS reads the message, and money deposits directly to your bank.
+                </p>
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-white font-['Chakra_Petch']">
-              Instant Alerts & 100% Payout
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              When viewers scan the Bakong KHQR code with ABA Mobile, alerts instantly flash on your stream screen, TTS reads the message, and money deposits directly to your bank.
-            </p>
-            <div className="pt-2 font-mono text-[11px] text-emerald-400 flex items-center gap-1">
-              <span>0% Platform Cut on Pro</span>
+
+            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-mono text-[11px]">
+              <span className="text-slate-400 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-300">Direct to Bank</span>
+              </span>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
+                Live TTS &amp; Audio SFX
+              </span>
             </div>
           </div>
         </div>
