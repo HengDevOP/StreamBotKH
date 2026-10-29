@@ -115,6 +115,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [demoCodeHint, setDemoCodeHint] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const [userClientStatus, setUserClientStatus] = useState<{
     isConnected: boolean;
@@ -276,11 +277,31 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
   const completedStepsCount = (isStep1Done ? 1 : 0) + (isStep2Done ? 1 : 0) + (isStep3Done ? 1 : 0);
 
+  // 2-minute (120s) cooldown timer for resending verification code
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
   // ----------------------------------------------------------------
   // STEP 1 HANDLERS: GramJS Phone Authentication
   // ----------------------------------------------------------------
-  const handleSendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleChangePhone = () => {
+    setCodeRequested(false);
+    setVerificationCode('');
+    setCodeDigits(['', '', '', '', '']);
+    setPhoneCodeHash('');
+    setTwoFaPassword('');
+    setNeedPassword(false);
+    setStep1Msg(null);
+    setDemoCodeHint(null);
+  };
+
+  const handleSendCode = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setStep1Msg(null);
     setDemoCodeHint(null);
 
@@ -306,6 +327,8 @@ export const PaymentGatewayAdmin: React.FC = () => {
       if (res.ok && data.success) {
         setCodeRequested(true);
         setCodeDigits(['', '', '', '', '']);
+        setVerificationCode('');
+        setResendCooldown(120);
         if (data.phoneCodeHash) setPhoneCodeHash(data.phoneCodeHash);
         if (data.phoneNumber) setUserPhone(data.phoneNumber);
         setStep1Msg({ type: 'success', text: data.message });
@@ -969,6 +992,35 @@ export const PaymentGatewayAdmin: React.FC = () => {
                       />
                     </div>
                   )}
+
+                  {/* Actions: Change Phone Number & Request A New Code (2-minute cooldown) */}
+                  <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
+                    <button
+                      type="button"
+                      onClick={handleChangePhone}
+                      className="text-slate-400 hover:text-cyan-400 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>&larr; Change Phone Number</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={resendCooldown > 0 || sendingCode}
+                      onClick={() => handleSendCode()}
+                      className={`flex items-center gap-1.5 transition-colors font-semibold ${
+                        resendCooldown > 0 || sendingCode
+                          ? 'text-slate-600 cursor-not-allowed'
+                          : 'text-cyan-400 hover:text-cyan-300 cursor-pointer'
+                      }`}
+                    >
+                      <RefreshCw size={12} className={sendingCode ? 'animate-spin' : ''} />
+                      <span>
+                        {resendCooldown > 0
+                          ? `Request A New Code (${Math.floor(resendCooldown / 60)}:${(resendCooldown % 60) < 10 ? '0' : ''}${resendCooldown % 60})`
+                          : 'Request A New Code'}
+                      </span>
+                    </button>
+                  </div>
                 </form>
               )}
             </div>
