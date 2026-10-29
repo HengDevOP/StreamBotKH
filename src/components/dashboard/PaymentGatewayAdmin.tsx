@@ -13,7 +13,6 @@ import {
   Phone,
   KeyRound,
   HelpCircle,
-  Copy,
   Check,
   Send,
   ChevronRight,
@@ -91,6 +90,16 @@ const TelegramIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' 
   </svg>
 );
 
+const isChatIdMatch = (id1?: string, id2?: string) => {
+  if (!id1 || !id2) return false;
+  const s1 = String(id1).trim();
+  const s2 = String(id2).trim();
+  if (s1 === s2) return true;
+  const clean1 = s1.replace(/^-100/, '').replace(/^-/, '');
+  const clean2 = s2.replace(/^-100/, '').replace(/^-/, '');
+  return Boolean(clean1 && clean1 === clean2);
+};
+
 export const PaymentGatewayAdmin: React.FC = () => {
   const { showConfirm, showAlert } = useModal();
   const { user } = useAuth();
@@ -159,10 +168,8 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [connectingGroupId, setConnectingGroupId] = useState<string | null>(null);
   const [step3Msg, setStep3Msg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Group directory search, filter & copy ID states
+  // Group directory search state
   const [groupSearch, setGroupSearch] = useState('');
-  const [groupFilter, setGroupFilter] = useState<'all' | 'connected' | 'available'>('all');
-  const [copiedChatId, setCopiedChatId] = useState<string | null>(null);
 
   // ----------------------------------------------------------------
   // Authenticated Fetch Helper (Per Client Account Session)
@@ -240,8 +247,22 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
         setTargetGroups(serverGroups);
         const combined = [...apiDialogs];
+
+        // Ensure all connected groups in DB are present in availableDialogs list
+        for (const g of serverGroups) {
+          if (g.chat_id && !combined.some((c) => isChatIdMatch(c.id, g.chat_id))) {
+            combined.unshift({
+              id: g.chat_id,
+              title: g.title,
+              username: g.username,
+              isGroup: true,
+              isChannel: false
+            });
+          }
+        }
+
         for (const p of PRESET_GROUPS) {
-          if (!combined.some((c) => c.id === p.id)) {
+          if (!combined.some((c) => isChatIdMatch(c.id, p.id))) {
             combined.push(p);
           }
         }
@@ -623,7 +644,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // STEP 3 HANDLERS: Manage Telegram Target Groups & Listener Cards
   // ----------------------------------------------------------------
   const handlePromptDisconnectGroup = (dialog: AvailableDialog) => {
-    const existing = targetGroups.find((g) => g.chat_id === dialog.id);
+    const existing = targetGroups.find((g) => isChatIdMatch(g.chat_id, dialog.id));
     if (!existing) return;
 
     showConfirm({
@@ -723,13 +744,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
         }
       }
     });
-  };
-
-  const handleCopyChatId = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedChatId(id);
-    setTimeout(() => setCopiedChatId(null), 2000);
   };
 
   return (
@@ -1343,42 +1357,28 @@ export const PaymentGatewayAdmin: React.FC = () => {
               </div>
             ) : (
               <div className="p-5 sm:p-7 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-4 shadow-lg shadow-cyan-500/5">
-                {/* Top Row: Filter Pills (Left) & Refresh Button Icon (Top Right) */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono">
-                    <button
-                      type="button"
-                      onClick={() => setGroupFilter('all')}
-                      className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
-                        groupFilter === 'all'
-                          ? 'bg-slate-800 text-white'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      All ({availableDialogs.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setGroupFilter('connected')}
-                      className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
-                        groupFilter === 'connected'
-                          ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Active ({targetGroups.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setGroupFilter('available')}
-                      className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
-                        groupFilter === 'available'
-                          ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-500/30'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Available ({Math.max(0, availableDialogs.length - targetGroups.length)})
-                    </button>
+                {/* Top Row: Prominent Search Bar & Top-Right Refresh Icon Button */}
+                <div className="flex items-center gap-2.5">
+                  <div className="relative flex-1 group">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 pointer-events-none transition-colors">
+                      <Search size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      value={groupSearch}
+                      onChange={(e) => setGroupSearch(e.target.value)}
+                      placeholder="Search groups by name or chat ID (e.g. ABA, Bakong, Hayday, Transaction)..."
+                      className="w-full pl-10 pr-9 py-2.5 sm:py-3 rounded-xl bg-slate-950/90 hover:bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono"
+                    />
+                    {groupSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setGroupSearch('')}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-white cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
 
                   {/* Refresh Button with Icon Only at Top Right */}
@@ -1387,34 +1387,11 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     onClick={fetchTargetGroups}
                     disabled={loadingGroups}
                     title="Refresh Groups"
-                    className="w-9 h-9 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition-colors flex items-center justify-center cursor-pointer flex-shrink-0"
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/40 text-slate-400 hover:text-cyan-400 transition-colors flex items-center justify-center cursor-pointer flex-shrink-0 shadow-sm"
                   >
-                    <RefreshCw size={14} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
+                    <RefreshCw size={15} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
                   </button>
                 </div>
-
-                {/* Search Input Bar */}
-                  <div className="relative">
-                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
-                      <Search size={15} />
-                    </div>
-                    <input
-                      type="text"
-                      value={groupSearch}
-                      onChange={(e) => setGroupSearch(e.target.value)}
-                      placeholder="Search groups by name or chat ID (e.g. ABA, Hayday, បេឡា, -100...)..."
-                      className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono"
-                    />
-                    {groupSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setGroupSearch('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-white cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
 
                 {/* 1 GRID ONLY: CLEAN LIST OF TELEGRAM GROUPS */}
                 {(() => {
@@ -1429,21 +1406,19 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   }
 
                   const filtered = availableDialogs.filter((d) => {
-                    const matchesSearch =
-                      !groupSearch.trim() ||
-                      d.title.toLowerCase().includes(groupSearch.toLowerCase()) ||
-                      d.id.includes(groupSearch);
-
-                    const isAdded = targetGroups.some((g) => g.chat_id === d.id);
-                    if (groupFilter === 'connected') return matchesSearch && isAdded;
-                    if (groupFilter === 'available') return matchesSearch && !isAdded;
-                    return matchesSearch;
+                    if (!groupSearch.trim()) return true;
+                    const q = groupSearch.toLowerCase().trim();
+                    return (
+                      d.title.toLowerCase().includes(q) ||
+                      d.id.includes(q) ||
+                      (d.username && d.username.toLowerCase().includes(q))
+                    );
                   });
 
-                  // Sort active listening groups to the top
+                  // Sort active connected groups strictly to the top
                   const sorted = [...filtered].sort((a, b) => {
-                    const aActive = targetGroups.some((g) => g.chat_id === a.id);
-                    const bActive = targetGroups.some((g) => g.chat_id === b.id);
+                    const aActive = targetGroups.some((g) => isChatIdMatch(g.chat_id, a.id));
+                    const bActive = targetGroups.some((g) => isChatIdMatch(g.chat_id, b.id));
                     if (aActive && !bActive) return -1;
                     if (!aActive && bActive) return 1;
                     return 0;
@@ -1452,8 +1427,8 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   if (sorted.length === 0) {
                     return (
                       <div className="p-8 rounded-2xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400 space-y-1 font-mono">
-                        <p className="text-white font-bold">No groups match your search or filter.</p>
-                        <p className="text-slate-500">Try clearing the search input or switching filter tabs.</p>
+                        <p className="text-white font-bold">No groups match your search.</p>
+                        <p className="text-slate-500">Try typing a different name or clearing the search input.</p>
                       </div>
                     );
                   }
@@ -1461,9 +1436,8 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   return (
                     <div className="grid grid-cols-1 gap-2.5">
                       {sorted.map((dialog) => {
-                        const isMonitored = targetGroups.some((g) => g.chat_id === dialog.id);
+                        const isMonitored = targetGroups.some((g) => isChatIdMatch(g.chat_id, dialog.id));
                         const isConnecting = connectingGroupId === dialog.id;
-                        const isCopied = copiedChatId === dialog.id;
 
                         const titleLower = dialog.title.toLowerCase();
                         const isBankRelated =
@@ -1498,7 +1472,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                               <div className="absolute left-0 top-3 bottom-3 w-1 bg-gradient-to-b from-emerald-400 to-teal-400 rounded-r" />
                             )}
 
-                            {/* Left Side: Telegram Logo Avatar & Group Info */}
+                            {/* Left Side: Telegram Logo Avatar & Group Title */}
                             <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
                               {/* Telegram Logo Icon as Avatar */}
                               <div
@@ -1516,11 +1490,11 @@ export const PaymentGatewayAdmin: React.FC = () => {
                                 )}
                               </div>
 
-                              {/* Title & Metadata Pills */}
-                              <div className="min-w-0 flex-1 space-y-1">
+                              {/* Title & Bank Badge only (Cleaned of description & chat ID) */}
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <h5
-                                    className="text-xs sm:text-sm font-bold text-white truncate max-w-[200px] sm:max-w-md md:max-w-xl font-sans tracking-tight"
+                                    className="text-xs sm:text-sm font-bold text-white truncate max-w-[280px] sm:max-w-md md:max-w-xl font-sans tracking-tight"
                                     title={dialog.title}
                                   >
                                     {dialog.title}
@@ -1529,30 +1503,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
                                     <span className="px-1.5 py-0.5 text-[9px] rounded bg-cyan-950 text-cyan-400 font-bold border border-cyan-800/40 uppercase tracking-wider font-mono">
                                       BANK
                                     </span>
-                                  )}
-                                </div>
-
-                                <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono flex-wrap">
-                                  <span className="text-slate-500">
-                                    {dialog.isChannel ? 'Telegram Channel' : 'Telegram Group'}
-                                  </span>
-                                  <span className="text-slate-700">•</span>
-                                  {/* Chat ID Copy Button */}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleCopyChatId(dialog.id, e)}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-cyan-400 font-semibold cursor-pointer transition-colors"
-                                    title="Click to copy Chat ID"
-                                  >
-                                    <span>{dialog.id}</span>
-                                    {isCopied ? (
-                                      <Check size={10} className="text-emerald-400 flex-shrink-0" />
-                                    ) : (
-                                      <Copy size={10} className="text-slate-500 hover:text-cyan-400 flex-shrink-0" />
-                                    )}
-                                  </button>
-                                  {isCopied && (
-                                    <span className="text-emerald-400 font-bold">Copied!</span>
                                   )}
                                 </div>
                               </div>

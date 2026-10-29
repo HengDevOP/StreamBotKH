@@ -26,19 +26,35 @@ export async function GET(req: NextRequest) {
     try {
       const mongoGroups = await getMongoMonitoredGroups(streamerId);
       if (mongoGroups && mongoGroups.length > 0) {
-        groups = mongoGroups.map(g => ({
+        groups = mongoGroups.map((g: any) => ({
           id: g.id,
-          streamer_id: g.streamerId,
-          chat_id: g.chatId,
+          streamer_id: g.streamer_id || g.streamerId || streamerId,
+          chat_id: String(g.chat_id || g.chatId || '').trim(),
           title: g.title,
           username: g.username,
-          created_at: g.createdAt ? g.createdAt.toISOString() : new Date().toISOString()
+          created_at: g.created_at || (g.createdAt ? new Date(g.createdAt).toISOString() : new Date().toISOString())
         }));
       } else {
-        groups = getMonitoredGroups(streamerId);
+        const sqlGroups = getMonitoredGroups(streamerId);
+        groups = (sqlGroups || []).map((g: any) => ({
+          id: g.id,
+          streamer_id: g.streamer_id || streamerId,
+          chat_id: String(g.chat_id || '').trim(),
+          title: g.title,
+          username: g.username,
+          created_at: g.created_at || new Date().toISOString()
+        }));
       }
     } catch (e) {
-      groups = getMonitoredGroups(streamerId);
+      const sqlGroups = getMonitoredGroups(streamerId);
+      groups = (sqlGroups || []).map((g: any) => ({
+        id: g.id,
+        streamer_id: g.streamer_id || streamerId,
+        chat_id: String(g.chat_id || '').trim(),
+        title: g.title,
+        username: g.username,
+        created_at: g.created_at || new Date().toISOString()
+      }));
     }
     let availableDialogs: any[] = [];
     try {
