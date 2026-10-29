@@ -24,7 +24,6 @@ import {
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useSocket } from '../../context/SocketContext';
-import { useAudio } from '../../hooks/useAudio';
 import {
   TIMER_TEMPLATES,
   TimerTemplateRenderer,
@@ -44,7 +43,6 @@ const parseBool = (val: any, defaultVal = true): boolean => {
 
 export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamerToken }) => {
   const { socket } = useSocket();
-  const { playSynthNeonChime } = useAudio();
 
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [title, setTitle] = useState('SUBATHON COUNTDOWN 🔥');
@@ -68,7 +66,7 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   const [description, setDescription] = useState<string>('');
   const [glowColor, setGlowColor] = useState('#00F0FF');
   const [fontFamily, setFontFamily] = useState('Chakra Petch');
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   // In-line Template Browser & Category Filter State
   const [templateFilter, setTemplateFilter] = useState<
@@ -79,7 +77,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   // Test simulation state
   const [customTestAmount, setCustomTestAmount] = useState<number>(2.0);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [recentBonusToast, setRecentBonusToast] = useState<string | null>(null);
 
   const effectiveToken = streamerToken || 'demo-token';
   const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/timer/${effectiveToken}`;
@@ -168,17 +165,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
     const maxSec = hasCap ? maxCapHours * 3600 : 86400 * 365;
     const newRemaining = Math.min(maxSec, remainingSeconds + seconds);
     setRemainingSeconds(newRemaining);
-
-    const minutesFormatted = Math.round(seconds / 60);
-    const toastText = donorName
-      ? `+${minutesFormatted}m from ${donorName} ($${tipAmount || 0})`
-      : `+${minutesFormatted}m added`;
-    setRecentBonusToast(toastText);
-    setTimeout(() => setRecentBonusToast(null), 3500);
-
-    if (soundEnabled) {
-      playSynthNeonChime(0.8);
-    }
 
     // Save and broadcast update
     saveTimerState(newRemaining, isRunning, { addedSec: seconds, donor: donorName, amount: tipAmount });
@@ -337,17 +323,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
       {/* ============================================================== */}
       <Card className="p-6 bg-gradient-to-br from-[#0B0F19] via-[#090D18] to-slate-950 border border-cyan-500/30 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Floating Toast Notification when time is added */}
-        {recentBonusToast && (
-          <div
-            className="absolute top-4 right-4 z-20 animate-bounce flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900 border text-xs font-bold font-mono shadow-2xl"
-            style={{ borderColor: glowColor, color: glowColor }}
-          >
-            <Sparkles size={14} />
-            <span>{recentBonusToast}</span>
-          </div>
-        )}
 
         {/* Header Controls for Live Preview */}
         <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800/80 relative z-10">

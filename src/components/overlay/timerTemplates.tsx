@@ -1,10 +1,6 @@
 'use client';
 
 import React from 'react';
-import {
-  Timer,
-  Sparkles
-} from 'lucide-react';
 
 export interface TimerTemplateMeta {
   id: string;
@@ -426,21 +422,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
 
   const colonAnim = showAnimation && isRunning ? { animation: 'timerPulseColon 1s ease-in-out infinite' } : {};
 
-  // Floating bonus tip popup
-  const bonusToasts = floatingBonuses.length > 0 && (
-    <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-none z-30">
-      {floatingBonuses.map((b) => (
-        <div
-          key={b.id}
-          className="animate-bounce flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-900/95 border text-xs font-mono font-bold shadow-2xl backdrop-blur-md"
-          style={{ borderColor: glowColor, color: glowColor, boxShadow: `0 0 20px ${glowColor}66` }}
-        >
-          <Sparkles size={13} className="animate-spin" />
-          <span>{b.text}</span>
-        </div>
-      ))}
-    </div>
-  );
 
   const isTitleVisible =
     showTitle !== false &&
@@ -484,7 +465,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="flex items-center justify-center px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider">
             <span>{title}</span>
@@ -522,7 +502,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-black font-['Chakra_Petch'] uppercase tracking-widest text-orange-400 text-center">
             <span>{title}</span>
@@ -566,7 +545,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         style={showAnimation ? { animation: 'timerCrtFlicker 3s infinite' } : {}}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold text-emerald-400 text-center">
             <span>{title}</span>
@@ -603,7 +581,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-sky-950/60 border border-sky-400/30 text-[10px] font-mono font-bold text-sky-300 uppercase">
             <span>{title}</span>
@@ -654,7 +631,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded bg-fuchsia-950/80 border border-fuchsia-500/50 text-[11px] font-mono font-bold text-fuchsia-300 uppercase">
             <span>{title}</span>
@@ -694,7 +670,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         style={showAnimation ? { animation: 'timerQuantumPulse 3s infinite' } : {}}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-blue-950/80 border border-blue-500/40 text-[11px] font-mono font-bold text-blue-300 uppercase">
             <span>{title}</span>
@@ -734,7 +709,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-black uppercase tracking-widest text-rose-500 font-['Chakra_Petch'] text-center">
             <span>{title}</span>
@@ -771,7 +745,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-[11px] font-mono font-bold text-emerald-400 uppercase">
             <span>{title}</span>
@@ -809,7 +782,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         style={showAnimation ? { animation: 'timerChromaHue 4s linear infinite' } : {}}
       >
         {animationStyles}
-        {bonusToasts}
         <div className={`w-full rounded-2xl p-4 sm:p-5 flex flex-col items-center space-y-2.5 ${showBackground ? 'bg-[#090D18]' : 'bg-transparent'}`}>
           {isTitleVisible && (
             <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-white">
@@ -849,7 +821,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         style={showAnimation ? { animation: 'timerBloodFlame 2s ease-in-out infinite' } : {}}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold font-serif uppercase tracking-widest text-red-500 text-center">
             <span>{title}</span>
@@ -886,7 +857,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-lime-400">
             <span>{title}</span>
@@ -923,7 +893,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 bg-amber-400 text-black text-xs font-black uppercase tracking-wider rounded-sm">
             <span>{title}</span>
@@ -960,7 +929,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-rose-500/40 text-xs font-mono font-bold text-rose-400 uppercase">
             <span>{title}</span>
@@ -997,7 +965,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 bg-amber-500 text-black text-xs font-black uppercase tracking-wider rounded-sm">
             <span>{title}</span>
@@ -1035,7 +1002,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         style={showAnimation ? { animation: 'timerPoliceStrobe 1.5s infinite' } : {}}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-white uppercase">
             <span>{title}</span>
@@ -1072,7 +1038,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold font-serif uppercase tracking-widest text-purple-400 text-center">
             <span>{title}</span>
@@ -1109,7 +1074,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-black text-yellow-400 uppercase tracking-widest text-center">
             <span>{title}</span>
@@ -1146,7 +1110,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-black uppercase tracking-widest text-amber-300 font-['Chakra_Petch'] text-center">
             <span>{title}</span>
@@ -1183,7 +1146,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="w-full bg-gradient-to-r from-blue-900 to-teal-700 text-white px-2.5 py-1 flex items-center justify-between text-xs font-bold select-none rounded-t-sm">
             <span>{title}</span>
@@ -1220,7 +1182,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 text-center">
             <span>{title}</span>
@@ -1274,7 +1235,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-black/80 border border-orange-500/40 text-xs font-mono font-bold text-orange-400 text-center">
             <span>{title}</span>
@@ -1311,7 +1271,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-[11px] font-mono font-black uppercase tracking-wider text-[#0F380F] text-center">
             <span>{title}</span>
@@ -1345,7 +1304,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-2 text-[11px] font-mono font-bold text-cyan-400 text-center">
             <span>{title}</span>
@@ -1382,7 +1340,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-pink-400/50 text-xs font-mono font-bold text-pink-300 text-center">
             <span>{title}</span>
@@ -1419,7 +1376,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-pink-950/60 border border-pink-300/30 text-xs font-bold text-pink-300 text-center">
             <span>{title}</span>
@@ -1456,7 +1412,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold font-['Chakra_Petch'] uppercase tracking-widest text-purple-300 text-center">
             <span>{title}</span>
@@ -1493,7 +1448,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold font-['Chakra_Petch'] uppercase tracking-widest text-cyan-300 text-center">
             <span>{title}</span>
@@ -1530,7 +1484,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 bg-black text-yellow-300 text-xs font-black uppercase tracking-wider rounded-sm">
             <span>{title}</span>
@@ -1567,7 +1520,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-rose-950/50 border border-rose-300/40 text-xs font-serif font-bold text-rose-300 text-center">
             <span>{title}</span>
@@ -1605,7 +1557,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         style={showAnimation ? { animation: 'timerAuroraShimmer 6s ease infinite' } : {}}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-mono font-bold uppercase tracking-widest text-emerald-300 text-center">
             <span>{title}</span>
@@ -1642,7 +1593,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-sky-950/80 border border-sky-500/40 text-xs font-mono font-bold text-sky-300 uppercase">
             <span>{title}</span>
@@ -1679,7 +1629,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-teal-400/50 text-xs font-bold text-teal-300">
             <span>{title}</span>
@@ -1714,7 +1663,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-mono font-bold uppercase tracking-widest text-slate-400 text-center">
             <span>{title}</span>
@@ -1748,7 +1696,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="px-3 py-0.5 rounded-full bg-white/10 border border-white/20 text-xs font-semibold text-white">
             <span>{title}</span>
@@ -1783,7 +1730,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-[11px] font-sans font-black uppercase tracking-widest border-b border-black/40 pb-1 w-full text-center">
             <span>{title}</span>
@@ -1815,7 +1761,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
             <span>{title}</span>
@@ -1849,7 +1794,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold font-serif uppercase tracking-widest text-amber-300 text-center">
             <span>{title}</span>
@@ -1886,7 +1830,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         }`}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold uppercase tracking-widest text-[#E5B869] text-center">
             <span>{title}</span>
@@ -1924,7 +1867,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
         style={showAnimation ? { animation: 'timerSolarCorona 3s ease-in-out infinite' } : {}}
       >
         {animationStyles}
-        {bonusToasts}
         {isTitleVisible && (
           <div className="text-xs font-bold uppercase tracking-widest text-orange-400 text-center">
             <span>{title}</span>
@@ -1960,7 +1902,6 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
       }`}
     >
       {animationStyles}
-      {bonusToasts}
       {isTitleVisible && (
         <div className="text-xs font-bold font-serif uppercase tracking-widest text-yellow-300 text-center">
           <span>{title}</span>

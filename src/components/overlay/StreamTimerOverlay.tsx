@@ -2,17 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../../context/SocketContext';
-import { useAudio } from '../../hooks/useAudio';
 import { TimerTemplateRenderer } from './timerTemplates';
 
 interface StreamTimerOverlayProps {
   token: string;
-}
-
-interface FloatingBonus {
-  id: string;
-  text: string;
-  donorName?: string;
 }
 
 const parseBool = (val: any, defaultVal = true): boolean => {
@@ -23,7 +16,6 @@ const parseBool = (val: any, defaultVal = true): boolean => {
 
 export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token }) => {
   const { socket, connected, joinOverlayRoom } = useSocket();
-  const { playSound } = useAudio();
 
   const effectiveToken = token || 'demo-token';
 
@@ -38,11 +30,8 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
   const [showTitle, setShowTitle] = useState(true);
   const [showDescription, setShowDescription] = useState(true);
   const [description, setDescription] = useState('');
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [maxCapSeconds, setMaxCapSeconds] = useState(86400);
 
-  // Floating bonus popup queue
-  const [floatingBonuses, setFloatingBonuses] = useState<FloatingBonus[]>([]);
   const processedAlertIdsRef = useRef<Set<string>>(new Set());
 
   // 1. Initial fetch from API
@@ -67,7 +56,6 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
           const rawShowDesc = t.showDescription !== undefined ? t.showDescription : t.show_description;
           setShowDescription(parseBool(rawShowDesc, true));
           setDescription(t.description || '');
-          if (t.soundEnabled !== undefined) setSoundEnabled(t.soundEnabled);
           if (t.maxCapSeconds !== undefined) setMaxCapSeconds(t.maxCapSeconds);
         }
       })
@@ -118,22 +106,6 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
           const next = Math.min(maxCapSeconds || 86400, prev + secondsToAdd);
           return next;
         });
-
-        // Trigger floating banner
-        const bonusFormatted = formatAddedTime(secondsToAdd);
-        const donor = payload.donorName || 'Supporter';
-        const formattedAmount = currency === 'KHR' ? `${tipAmount.toLocaleString()} ៛` : `$${tipAmount.toFixed(2)}`;
-        const bonusText = `+${bonusFormatted} (${formattedAmount} from ${donor})`;
-
-        const bonusId = `bonus-${Date.now()}`;
-        setFloatingBonuses((prev) => [...prev, { id: bonusId, text: bonusText, donorName: donor }]);
-        setTimeout(() => {
-          setFloatingBonuses((prev) => prev.filter((b) => b.id !== bonusId));
-        }, 4500);
-
-        if (soundEnabled) {
-          playSound('/sounds/neon-chime.mp3', 0.85);
-        }
       }
     };
 
@@ -166,24 +138,7 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
       const rawShowDesc = payload.showDescription !== undefined ? payload.showDescription : payload.show_description;
       if (rawShowDesc !== undefined) setShowDescription(parseBool(rawShowDesc, true));
       if (payload.description !== undefined) setDescription(String(payload.description));
-      if (payload.soundEnabled !== undefined) setSoundEnabled(Boolean(payload.soundEnabled));
       if (payload.maxCapSeconds !== undefined) setMaxCapSeconds(Number(payload.maxCapSeconds));
-
-      if (payload.addedSeconds && payload.addedSeconds > 0) {
-        const bonusFormatted = formatAddedTime(payload.addedSeconds);
-        const bonusText = payload.donorName
-          ? `+${bonusFormatted} (${payload.tipAmount ? `$${payload.tipAmount}` : ''} from ${payload.donorName})`
-          : `+${bonusFormatted}`;
-        const bonusId = `bonus-${Date.now()}`;
-        setFloatingBonuses((prev) => [...prev, { id: bonusId, text: bonusText, donorName: payload.donorName }]);
-        setTimeout(() => {
-          setFloatingBonuses((prev) => prev.filter((b) => b.id !== bonusId));
-        }, 4500);
-
-        if (soundEnabled) {
-          playSound('/sounds/neon-chime.mp3', 0.85);
-        }
-      }
     };
 
     socket.on('donation:alert', handleDonationAlert);
@@ -195,16 +150,7 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
       socket.off('donation:paid', handleDonationAlert);
       socket.off('timer:update', handleTimerUpdate);
     };
-  }, [socket, rateMinutesPerUsd, maxCapSeconds, soundEnabled, playSound]);
-
-  const formatAddedTime = (totalSec: number) => {
-    const hours = Math.floor(totalSec / 3600);
-    const minutes = Math.floor((totalSec % 3600) / 60);
-    const seconds = totalSec % 60;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    if (minutes > 0) return `${minutes}m ${seconds > 0 ? `${seconds}s` : ''}`;
-    return `${seconds}s`;
-  };
+  }, [socket, rateMinutesPerUsd, maxCapSeconds]);
 
   return (
     <div className="w-full h-full min-h-screen bg-transparent flex flex-col items-center justify-center p-4 relative select-none">
@@ -220,7 +166,6 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
         showTitle={showTitle}
         showDescription={showDescription}
         description={description}
-        floatingBonuses={floatingBonuses}
       />
     </div>
   );
