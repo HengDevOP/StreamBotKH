@@ -9,21 +9,18 @@ import {
   RefreshCw,
   ExternalLink,
   Trash2,
-  Radio,
   Zap,
   Phone,
   KeyRound,
   HelpCircle,
   Copy,
   Check,
-  DollarSign,
   Send,
   ChevronRight,
   ChevronLeft,
   ArrowRight,
   Users,
   Plus,
-  Layers,
   LogOut,
   ChevronUp,
   ChevronDown,
@@ -88,6 +85,12 @@ const PRESET_GROUPS: AvailableDialog[] = [
   { id: '-1001627391402', title: 'HayDay Cambodia 🇰🇭', isGroup: true, isChannel: false },
   { id: '-1004477067848', title: 'Jxncii Channel', isGroup: false, isChannel: true }
 ];
+
+const TelegramIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.536-.195 1.006.128.832.942z" />
+  </svg>
+);
 
 export const PaymentGatewayAdmin: React.FC = () => {
   const { showConfirm, showAlert } = useModal();
@@ -620,20 +623,43 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // ----------------------------------------------------------------
   // STEP 3 HANDLERS: Manage Telegram Target Groups & Listener Cards
   // ----------------------------------------------------------------
-  const handleDeleteTargetGroup = (group: TargetGroup) => {
+  const handlePromptDisconnectGroup = (dialog: AvailableDialog) => {
+    const existing = targetGroups.find((g) => g.chat_id === dialog.id);
+    if (!existing) return;
+
     showConfirm({
-      title: 'Remove Monitored Group?',
-      message: `Are you sure you want to remove "${group.title}" (${group.chat_id})? GramJS will stop listening for messages from this group.`,
+      title: 'Disconnect Monitored Group?',
+      message: (
+        <div className="space-y-2.5">
+          <p className="text-xs sm:text-sm text-slate-300">
+            Are you sure you want to disconnect <strong className="text-white font-bold">{dialog.title}</strong>?
+          </p>
+          <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-400 space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Chat ID:</span>
+              <span className="text-red-400 font-bold">{dialog.id}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Type:</span>
+              <span className="text-white">{dialog.isChannel ? 'Telegram Channel' : 'Telegram Group'}</span>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400 leading-relaxed font-mono">
+            GramJS will stop listening for messages from this group. Incoming bank transfers will no longer trigger donation alerts.
+          </p>
+        </div>
+      ),
       type: 'danger',
-      confirmText: 'Remove Group',
+      confirmText: 'Disconnect',
+      cancelText: 'Keep Connected',
       onConfirm: async () => {
         try {
-          const res = await authFetch(`/api/telegram/groups?id=${encodeURIComponent(group.id)}`, {
+          const res = await authFetch(`/api/telegram/groups?id=${encodeURIComponent(existing.id)}`, {
             method: 'DELETE'
           });
           const data = await res.json();
           if (res.ok && data.success) {
-            setStep3Msg({ type: 'success', text: `Removed "${group.title}" from listener.` });
+            setStep3Msg({ type: 'success', text: `Disconnected "${dialog.title}" from listener.` });
             await fetchTargetGroups();
           } else {
             setStep3Msg({ type: 'error', text: data.error || 'Failed to remove group.' });
@@ -645,38 +671,59 @@ export const PaymentGatewayAdmin: React.FC = () => {
     });
   };
 
-
-  const handleDirectToggleGroup = async (dialog: AvailableDialog) => {
-    const existing = targetGroups.find((g) => g.chat_id === dialog.id);
-    if (existing) {
-      handleDeleteTargetGroup(existing);
-      return;
-    }
-
-    setConnectingGroupId(dialog.id);
-    setStep3Msg(null);
-    try {
-      const res = await authFetch('/api/telegram/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chatId: dialog.id,
-          title: dialog.title,
-          username: dialog.username
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setStep3Msg({ type: 'success', text: `Connected "${dialog.title}" to GramJS listener!` });
-        await fetchTargetGroups();
-      } else {
-        setStep3Msg({ type: 'error', text: data.error || 'Failed to connect group.' });
+  const handlePromptConnectGroup = (dialog: AvailableDialog) => {
+    showConfirm({
+      title: 'Connect Telegram Group?',
+      message: (
+        <div className="space-y-2.5">
+          <p className="text-xs sm:text-sm text-slate-300">
+            Do you want to connect <strong className="text-white font-bold">{dialog.title}</strong> to GramJS listener?
+          </p>
+          <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-400 space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Chat ID:</span>
+              <span className="text-cyan-400 font-bold">{dialog.id}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500">Type:</span>
+              <span className="text-white">{dialog.isChannel ? 'Telegram Channel' : 'Telegram Group'}</span>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400 leading-relaxed font-mono">
+            GramJS will monitor incoming messages in real-time and trigger OBS donation alerts for your stream.
+          </p>
+        </div>
+      ),
+      type: 'info',
+      confirmText: 'Connect Group',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        setConnectingGroupId(dialog.id);
+        setStep3Msg(null);
+        try {
+          const res = await authFetch('/api/telegram/groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chatId: dialog.id,
+              title: dialog.title,
+              username: dialog.username
+            })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            setStep3Msg({ type: 'success', text: `Connected "${dialog.title}" to GramJS listener!` });
+            await fetchTargetGroups();
+          } else {
+            setStep3Msg({ type: 'error', text: data.error || 'Failed to connect group.' });
+          }
+        } catch (err: any) {
+          setStep3Msg({ type: 'error', text: err.message || 'Error connecting group.' });
+        } finally {
+          setConnectingGroupId(null);
+        }
       }
-    } catch (err: any) {
-      setStep3Msg({ type: 'error', text: err.message || 'Error connecting group.' });
-    } finally {
-      setConnectingGroupId(null);
-    }
+    });
   };
 
   const handleCopyChatId = (id: string, e: React.MouseEvent) => {
@@ -846,9 +893,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
               {/* Centered Telegram Logo & Username */}
               <div className="flex items-center justify-center gap-3 py-2">
                 <div className="relative w-10 h-10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 bg-white shadow-[0_0_15px_rgba(0,136,204,0.4)] ring-2 ring-[#0088cc]/30">
-                  <svg className="w-10 h-10 text-[#0088cc] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.536-.195 1.006.128.832.942z" />
-                  </svg>
+                  <TelegramIcon className="w-10 h-10 text-[#0088cc] flex-shrink-0" />
                 </div>
                 <div className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
                   {userClientStatus.userName || 'Connected Streamer'}
@@ -1250,397 +1295,370 @@ export const PaymentGatewayAdmin: React.FC = () => {
         {/* ============================================================== */}
         {activeStep === 3 && (
           <Card glow="cyan" className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
-                <Users size={22} className={isStep3Done ? 'text-cyan-400' : 'text-slate-400'} />
-              </div>
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 font-['Chakra_Petch']">
-                  STEP 3: Connect Telegram Group for Listener
-                  {isStep3Done ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      {targetGroups.length} GROUPS ACTIVE
-                    </span>
-                  ) : !userClientStatus.isConnected ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-950/60 text-red-400 border border-red-500/30 font-mono">
-                      DISCONNECTED
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono">
-                      NO GROUPS YET
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Select and connect your Telegram bank notification groups or channels below. GramJS will monitor incoming messages in real-time and trigger OBS alerts.
-                </p>
-              </div>
-            </div>
-
-            {userClientStatus.isConnected && (
-              <button
-                type="button"
-                onClick={fetchTargetGroups}
-                disabled={loadingGroups}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5 cursor-pointer"
+            {step3Msg && (
+              <div
+                className={`p-3.5 rounded-xl border text-xs flex items-center justify-between animate-fadeIn ${
+                  step3Msg.type === 'success'
+                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+                    : 'bg-red-950/40 border-red-500/30 text-red-300'
+                }`}
               >
-                <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
-                <span>Refresh Groups</span>
-              </button>
-            )}
-          </div>
-
-          {step3Msg && (
-            <div
-              className={`p-3.5 rounded-xl border text-xs flex items-center justify-between animate-fadeIn ${
-                step3Msg.type === 'success'
-                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
-                  : 'bg-red-950/40 border-red-500/30 text-red-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {step3Msg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                <span>{step3Msg.text}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStep3Msg(null)}
-                className="text-xs opacity-60 hover:opacity-100"
-              >
-                ×
-              </button>
-            </div>
-          )}
-
-          {!userClientStatus.isConnected ? (
-            <div className="py-12 px-6 text-center space-y-5 rounded-2xl bg-[#090D18] border border-amber-500/30">
-              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
-                <AlertCircle size={32} />
-              </div>
-              <div className="max-w-md mx-auto space-y-2">
-                <h4 className="text-lg font-bold text-white font-['Chakra_Petch']">
-                  GramJS Client Disconnected
-                </h4>
-                <p className="text-xs text-slate-400 leading-relaxed font-mono">
-                  Telegram bank notification groups cannot be loaded or monitored while GramJS is disconnected. Please connect your Telegram account in Step 1 first.
-                </p>
-              </div>
-              <div className="pt-2">
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => goToStep(1)}
-                  className="font-bold shadow-lg shadow-cyan-400/20"
-                >
-                  <ArrowRight size={14} className="mr-2" />
-                  Go to Step 1: Connect GramJS
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* ============================================================== */}
-              {/* TELEGRAM GROUPS DIRECTORY: LISTED AS INTERACTIVE CARDS         */}
-              {/* ============================================================== */}
-              <div className="space-y-4 pt-1">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider font-['Chakra_Petch'] flex items-center gap-2">
-                  <Layers size={16} className="text-cyan-400" />
-                  <span>Telegram Groups Directory</span>
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-800/50">
-                    {availableDialogs.length} Groups
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Click <strong className="text-cyan-300">&ldquo;Connect Listener&rdquo;</strong> on any card to begin auto-detecting bank notifications.
-                </p>
-              </div>
-
-              {/* Filter Pills */}
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  {step3Msg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                  <span>{step3Msg.text}</span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setGroupFilter('all')}
-                  className={`px-2.5 py-1 rounded-lg transition-colors font-semibold ${
-                    groupFilter === 'all'
-                      ? 'bg-slate-800 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  All ({availableDialogs.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setGroupFilter('connected')}
-                  className={`px-2.5 py-1 rounded-lg transition-colors font-semibold ${
-                    groupFilter === 'connected'
-                      ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Active ({targetGroups.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setGroupFilter('available')}
-                  className={`px-2.5 py-1 rounded-lg transition-colors font-semibold ${
-                    groupFilter === 'available'
-                      ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-500/30'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Available ({Math.max(0, availableDialogs.length - targetGroups.length)})
-                </button>
-              </div>
-            </div>
-
-            {/* Search Input Bar */}
-            <div className="relative">
-              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
-                <Search size={15} />
-              </div>
-              <input
-                type="text"
-                value={groupSearch}
-                onChange={(e) => setGroupSearch(e.target.value)}
-                placeholder="Search groups by name or chat ID (e.g. ABA, Hayday, បេឡា, -100...)..."
-                className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono"
-              />
-              {groupSearch && (
-                <button
-                  type="button"
-                  onClick={() => setGroupSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-white"
+                  onClick={() => setStep3Msg(null)}
+                  className="text-xs opacity-60 hover:opacity-100 cursor-pointer"
                 >
                   ✕
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Groups Grid Rendered as High-Craft Cards (Active Groups Sorted First) */}
-            {(() => {
-              if (loadingGroups && availableDialogs.length === 0) {
-                return (
-                  <div className="py-12 px-6 rounded-2xl bg-slate-950/60 border border-slate-800 text-center space-y-3 font-mono">
-                    <RefreshCw size={24} className="animate-spin text-cyan-400 mx-auto" />
-                    <div className="text-white text-xs font-bold">Scanning Telegram account groups & channels...</div>
-                    <p className="text-[11px] text-slate-500">Fetching dialogs from your connected GramJS session</p>
+            {!userClientStatus.isConnected ? (
+              <div className="py-12 px-6 text-center space-y-5 rounded-2xl bg-[#090D18] border border-amber-500/30">
+                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
+                  <AlertCircle size={32} />
+                </div>
+                <div className="max-w-md mx-auto space-y-2">
+                  <h4 className="text-lg font-bold text-white font-['Chakra_Petch']">
+                    GramJS Client Disconnected
+                  </h4>
+                  <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                    Telegram bank notification groups cannot be loaded or monitored while GramJS is disconnected. Please connect your Telegram account in Step 1 first.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => goToStep(1)}
+                    className="font-bold shadow-lg shadow-cyan-400/20"
+                  >
+                    <ArrowRight size={14} className="mr-2" />
+                    Go to Step 1: Connect GramJS
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 sm:p-7 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-5 shadow-lg shadow-cyan-500/5">
+                {/* Clean Header Bar */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
+                      <Users size={22} className={isStep3Done ? 'text-cyan-400' : 'text-slate-400'} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
+                          STEP 3: Connect Telegram Group for Listener
+                        </h3>
+                        {isStep3Done ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                            {targetGroups.length} GROUPS ACTIVE
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono">
+                            NO GROUPS YET
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Select and connect your Telegram bank notification groups or channels below. GramJS will monitor incoming messages in real-time and trigger OBS alerts.
+                      </p>
+                    </div>
                   </div>
-                );
-              }
 
-              const filtered = availableDialogs.filter((d) => {
-                const matchesSearch =
-                  !groupSearch.trim() ||
-                  d.title.toLowerCase().includes(groupSearch.toLowerCase()) ||
-                  d.id.includes(groupSearch);
+                  <button
+                    type="button"
+                    onClick={fetchTargetGroups}
+                    disabled={loadingGroups}
+                    className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5 cursor-pointer flex-shrink-0"
+                  >
+                    <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
+                    <span>Refresh Groups</span>
+                  </button>
+                </div>
 
-                const isAdded = targetGroups.some((g) => g.chat_id === d.id);
-                if (groupFilter === 'connected') return matchesSearch && isAdded;
-                if (groupFilter === 'available') return matchesSearch && !isAdded;
-                return matchesSearch;
-              });
-
-              // Sort active listening groups to the top
-              const sorted = [...filtered].sort((a, b) => {
-                const aActive = targetGroups.some((g) => g.chat_id === a.id);
-                const bActive = targetGroups.some((g) => g.chat_id === b.id);
-                if (aActive && !bActive) return -1;
-                if (!aActive && bActive) return 1;
-                return 0;
-              });
-
-              if (sorted.length === 0) {
-                return (
-                  <div className="p-8 rounded-2xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400 space-y-1 font-mono">
-                    <p className="text-white font-bold">No groups match your search or filter.</p>
-                    <p className="text-slate-500">Try clearing the search input or switching filter tabs.</p>
-                  </div>
-                );
-              }
-
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                  {sorted.map((dialog) => {
-                    const isMonitored = targetGroups.some((g) => g.chat_id === dialog.id);
-                    const isConnecting = connectingGroupId === dialog.id;
-                    const isCopied = copiedChatId === dialog.id;
-
-                    const titleLower = dialog.title.toLowerCase();
-                    const isBankRelated =
-                      titleLower.includes('aba') ||
-                      titleLower.includes('bank') ||
-                      titleLower.includes('transaction') ||
-                      titleLower.includes('cam-tool') ||
-                      titleLower.includes('khmc') ||
-                      titleLower.includes('acleda') ||
-                      titleLower.includes('wing') ||
-                      titleLower.includes('canadia') ||
-                      titleLower.includes('bakong') ||
-                      titleLower.includes('alert') ||
-                      titleLower.includes('pay');
-
-                    return (
-                      <div
-                        key={dialog.id}
-                        className={`rounded-2xl border transition-all duration-200 p-4 flex flex-col justify-between gap-3 relative group overflow-hidden ${
-                          isMonitored
-                            ? 'bg-[#0B1422] border-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                            : 'bg-[#090D18] border-slate-800/90 hover:border-cyan-500/40 hover:bg-[#0c1220]'
+                {/* Filter Pills & Search Input */}
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono">
+                      <button
+                        type="button"
+                        onClick={() => setGroupFilter('all')}
+                        className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
+                          groupFilter === 'all'
+                            ? 'bg-slate-800 text-white'
+                            : 'text-slate-400 hover:text-white'
                         }`}
                       >
-                        {/* Top Accent Line */}
-                        <div
-                          className={`absolute top-0 left-0 right-0 h-0.5 ${
-                            isMonitored
-                              ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400'
-                              : isBankRelated
-                              ? 'bg-gradient-to-r from-cyan-500 to-blue-500 opacity-60'
-                              : 'bg-transparent'
-                          }`}
-                        />
+                        All ({availableDialogs.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGroupFilter('connected')}
+                        className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
+                          groupFilter === 'connected'
+                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Active ({targetGroups.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGroupFilter('available')}
+                        className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
+                          groupFilter === 'available'
+                            ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-500/30'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Available ({Math.max(0, availableDialogs.length - targetGroups.length)})
+                      </button>
+                    </div>
 
-                        {/* Card Header & Title */}
-                        <div className="space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="text-[11px] font-mono text-slate-500 self-center sm:self-auto">
+                      Click any group to connect or disconnect the listener.
+                    </div>
+                  </div>
+
+                  {/* Search Input Bar */}
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
+                      <Search size={15} />
+                    </div>
+                    <input
+                      type="text"
+                      value={groupSearch}
+                      onChange={(e) => setGroupSearch(e.target.value)}
+                      placeholder="Search groups by name or chat ID (e.g. ABA, Hayday, បេឡា, -100...)..."
+                      className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono"
+                    />
+                    {groupSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setGroupSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-white cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 1 GRID ONLY: CLEAN LIST OF TELEGRAM GROUPS */}
+                {(() => {
+                  if (loadingGroups && availableDialogs.length === 0) {
+                    return (
+                      <div className="py-12 px-6 rounded-2xl bg-slate-950/60 border border-slate-800 text-center space-y-3 font-mono">
+                        <RefreshCw size={24} className="animate-spin text-cyan-400 mx-auto" />
+                        <div className="text-white text-xs font-bold">Scanning Telegram account groups & channels...</div>
+                        <p className="text-[11px] text-slate-500">Fetching dialogs from your connected GramJS session</p>
+                      </div>
+                    );
+                  }
+
+                  const filtered = availableDialogs.filter((d) => {
+                    const matchesSearch =
+                      !groupSearch.trim() ||
+                      d.title.toLowerCase().includes(groupSearch.toLowerCase()) ||
+                      d.id.includes(groupSearch);
+
+                    const isAdded = targetGroups.some((g) => g.chat_id === d.id);
+                    if (groupFilter === 'connected') return matchesSearch && isAdded;
+                    if (groupFilter === 'available') return matchesSearch && !isAdded;
+                    return matchesSearch;
+                  });
+
+                  // Sort active listening groups to the top
+                  const sorted = [...filtered].sort((a, b) => {
+                    const aActive = targetGroups.some((g) => g.chat_id === a.id);
+                    const bActive = targetGroups.some((g) => g.chat_id === b.id);
+                    if (aActive && !bActive) return -1;
+                    if (!aActive && bActive) return 1;
+                    return 0;
+                  });
+
+                  if (sorted.length === 0) {
+                    return (
+                      <div className="p-8 rounded-2xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400 space-y-1 font-mono">
+                        <p className="text-white font-bold">No groups match your search or filter.</p>
+                        <p className="text-slate-500">Try clearing the search input or switching filter tabs.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {sorted.map((dialog) => {
+                        const isMonitored = targetGroups.some((g) => g.chat_id === dialog.id);
+                        const isConnecting = connectingGroupId === dialog.id;
+                        const isCopied = copiedChatId === dialog.id;
+
+                        const titleLower = dialog.title.toLowerCase();
+                        const isBankRelated =
+                          titleLower.includes('aba') ||
+                          titleLower.includes('bank') ||
+                          titleLower.includes('transaction') ||
+                          titleLower.includes('cam-tool') ||
+                          titleLower.includes('khmc') ||
+                          titleLower.includes('acleda') ||
+                          titleLower.includes('wing') ||
+                          titleLower.includes('canadia') ||
+                          titleLower.includes('bakong') ||
+                          titleLower.includes('alert') ||
+                          titleLower.includes('pay');
+
+                        return (
+                          <div
+                            key={dialog.id}
+                            onClick={() =>
+                              isMonitored
+                                ? handlePromptDisconnectGroup(dialog)
+                                : handlePromptConnectGroup(dialog)
+                            }
+                            className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3 sm:gap-4 relative group cursor-pointer ${
+                              isMonitored
+                                ? 'bg-[#0B1524] border-emerald-500/40 shadow-sm shadow-emerald-500/5 hover:border-emerald-500/60'
+                                : 'bg-slate-950/60 border-slate-800/90 hover:border-cyan-500/40 hover:bg-[#0c1220]'
+                            }`}
+                          >
+                            {/* Left Accent indicator for active monitored group */}
+                            {isMonitored && (
+                              <div className="absolute left-0 top-3 bottom-3 w-1 bg-gradient-to-b from-emerald-400 to-teal-400 rounded-r" />
+                            )}
+
+                            {/* Left Side: Telegram Logo Avatar & Group Info */}
+                            <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                              {/* Telegram Logo Icon as Avatar */}
                               <div
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold font-mono transition-colors ${
+                                className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm ${
                                   isMonitored
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                    : isBankRelated
-                                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                                    : 'bg-slate-900 text-slate-300 border border-slate-800'
+                                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+                                    : 'bg-[#0088cc]/10 border border-[#0088cc]/30 text-[#0088cc]'
                                 }`}
                               >
-                                {isBankRelated ? (
-                                  <DollarSign size={16} />
-                                ) : dialog.isChannel ? (
-                                  <Radio size={15} />
-                                ) : (
-                                  <Users size={15} />
+                                <TelegramIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                {isMonitored && (
+                                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#090D18] flex items-center justify-center">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
+                                  </span>
                                 )}
                               </div>
 
-                              <div className="min-w-0 flex-1">
-                                <h5
-                                  className="text-xs sm:text-sm font-bold text-white line-clamp-2 font-sans tracking-tight leading-snug"
-                                  title={dialog.title}
-                                >
-                                  {dialog.title}
-                                </h5>
-                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                                  <span>{dialog.isChannel ? 'Telegram Channel' : 'Telegram Group'}</span>
+                              {/* Title & Metadata Pills */}
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h5
+                                    className="text-xs sm:text-sm font-bold text-white truncate max-w-[200px] sm:max-w-md md:max-w-xl font-sans tracking-tight"
+                                    title={dialog.title}
+                                  >
+                                    {dialog.title}
+                                  </h5>
                                   {isBankRelated && (
-                                    <span className="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 font-bold border border-cyan-800/40">
+                                    <span className="px-1.5 py-0.5 text-[9px] rounded bg-cyan-950 text-cyan-400 font-bold border border-cyan-800/40 uppercase tracking-wider font-mono">
                                       BANK
                                     </span>
                                   )}
                                 </div>
+
+                                <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono flex-wrap">
+                                  <span className="text-slate-500">
+                                    {dialog.isChannel ? 'Telegram Channel' : 'Telegram Group'}
+                                  </span>
+                                  <span className="text-slate-700">•</span>
+                                  {/* Chat ID Copy Button */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleCopyChatId(dialog.id, e)}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-cyan-400 font-semibold cursor-pointer transition-colors"
+                                    title="Click to copy Chat ID"
+                                  >
+                                    <span>{dialog.id}</span>
+                                    {isCopied ? (
+                                      <Check size={10} className="text-emerald-400 flex-shrink-0" />
+                                    ) : (
+                                      <Copy size={10} className="text-slate-500 hover:text-cyan-400 flex-shrink-0" />
+                                    )}
+                                  </button>
+                                  {isCopied && (
+                                    <span className="text-emerald-400 font-bold">Copied!</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Chat ID & Copy Pill */}
-                          <div className="flex items-center justify-between gap-2 pt-1">
-                            <div
-                              onClick={(e) => handleCopyChatId(dialog.id, e)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-900 border border-slate-800/90 text-cyan-400 font-mono text-[11px] font-semibold cursor-pointer transition-colors max-w-full"
-                              title="Click to copy Chat ID"
-                            >
-                              <span className="truncate">{dialog.id}</span>
-                              {isCopied ? (
-                                <Check size={11} className="text-emerald-400 flex-shrink-0" />
+                            {/* Right Side: Action Button */}
+                            <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                              {isMonitored ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePromptDisconnectGroup(dialog)}
+                                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold font-mono text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                                  title="Connected to listener (Click to disconnect)"
+                                >
+                                  <Check size={14} className="stroke-[3]" />
+                                  <span>Connected</span>
+                                </button>
                               ) : (
-                                <Copy size={11} className="text-slate-500 group-hover:text-cyan-400 flex-shrink-0" />
+                                <button
+                                  type="button"
+                                  disabled={isConnecting}
+                                  onClick={() => handlePromptConnectGroup(dialog)}
+                                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm hover:shadow-cyan-500/10 cursor-pointer disabled:opacity-50"
+                                >
+                                  {isConnecting ? (
+                                    <>
+                                      <RefreshCw size={12} className="animate-spin text-cyan-400" />
+                                      <span>Connecting...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus size={13} />
+                                      <span>Connect Listener</span>
+                                    </>
+                                  )}
+                                </button>
                               )}
                             </div>
-
-                            {isCopied && (
-                              <span className="text-[10px] font-mono text-emerald-400 font-bold">
-                                Copied!
-                              </span>
-                            )}
                           </div>
-                        </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
-                        {/* Card Footer: Status & Action Button */}
-                        <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                          {isMonitored ? (
-                            <>
-                              <div className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-400">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                                <span>LISTENING ACTIVE</span>
-                              </div>
+            {/* Stepper Navigation Buttons */}
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={() => goToStep(2)}
+                className="font-bold cursor-pointer"
+              >
+                <ChevronLeft size={16} className="mr-1" />
+                <span>Back to Step 2</span>
+              </Button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleDirectToggleGroup(dialog)}
-                                className="px-2.5 py-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-950/40 border border-slate-800 hover:border-red-500/30 text-xs font-mono font-semibold transition-colors"
-                              >
-                                Disconnect
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-[10px] font-mono text-slate-500">
-                                Ready to connect
-                              </span>
-
-                              <button
-                                type="button"
-                                disabled={isConnecting}
-                                onClick={() => handleDirectToggleGroup(dialog)}
-                                className="px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-mono font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm hover:shadow-cyan-500/20 cursor-pointer"
-                              >
-                                {isConnecting ? (
-                                  <>
-                                    <RefreshCw size={12} className="animate-spin text-cyan-400" />
-                                    <span>Connecting...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Plus size={13} />
-                                    <span>Connect Listener</span>
-                                  </>
-                                )}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </div>
-        </>
-      )}
-
-          {/* Stepper Navigation Buttons */}
-          <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              onClick={() => goToStep(2)}
-              className="font-bold"
-            >
-              <ChevronLeft size={16} className="mr-1" />
-              <span>Back to Step 2</span>
-            </Button>
-
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold shadow-md">
-              <CheckCircle2 size={16} className="text-emerald-400" />
-              <span>Step 3 Configured • Listener Active</span>
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold shadow-md">
+                <CheckCircle2 size={16} className="text-emerald-400" />
+                <span>
+                  {targetGroups.length > 0
+                    ? `Step 3 Configured • ${targetGroups.length} Active`
+                    : 'Step 3: Connect Group'}
+                </span>
+              </div>
             </div>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )}
       </div>
     </div>
   );
