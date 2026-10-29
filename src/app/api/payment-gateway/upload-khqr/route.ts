@@ -6,7 +6,7 @@ import { getGatewayConfigCollection } from '@/server/database/mongo';
 import { db } from '@/server/database/db';
 import { getAuthenticatedUser } from '@/server/auth';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
 const ALLOWED_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
 
@@ -25,11 +25,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Validate file size (max 5MB)
+    // 1. Validate file size (max 2MB)
     if (file.size > MAX_FILE_SIZE) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
       return NextResponse.json(
-        { error: `File size exceeds the 5MB limit (your file is ${sizeMb} MB). Please choose a file under 5MB.` },
+        { error: `File size exceeds the 2MB limit (your file is ${sizeMb} MB). Please choose a file under 2MB.` },
         { status: 400 }
       );
     }

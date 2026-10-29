@@ -138,7 +138,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [step2Msg, setStep2Msg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
   const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
 
   // ================================================================
@@ -527,7 +527,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
       setStep2Msg({
         type: 'error',
-        text: `File exceeds 5MB limit (${sizeMb} MB). Please choose a PNG or JPG under 5MB.`
+        text: `File exceeds 2MB limit (${sizeMb} MB). Please choose a PNG or JPG under 2MB.`
       });
       return;
     }
@@ -559,6 +559,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           text: 'Official Master KHQR payment image uploaded successfully and activated!'
         });
         await fetchGatewayConfig();
+        setActiveStep(3); // Automate the client into step 3!
       } else {
         setStep2Msg({
           type: 'error',
@@ -1022,13 +1023,22 @@ export const PaymentGatewayAdmin: React.FC = () => {
             /* Active KHQR View - Clean Centered Preview */
             <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
               <div className="flex flex-col items-center justify-center text-center gap-3 py-2">
-                <div className="w-36 h-36 rounded-2xl bg-white p-2.5 border-2 border-cyan-400/40 flex items-center justify-center overflow-hidden shadow-[0_0_25px_rgba(0,240,255,0.25)]">
-                  <img
-                    src={gatewayConfig.khqrImageUrl}
-                    alt="Active Master KHQR"
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
+                {uploadingKhqr ? (
+                  <div className="w-36 h-36 rounded-2xl bg-cyan-950/30 border-2 border-cyan-400/40 flex flex-col items-center justify-center gap-2 p-2 shadow-[0_0_25px_rgba(0,240,255,0.25)]">
+                    <RefreshCw size={24} className="animate-spin text-cyan-400" />
+                    <span className="text-[11px] font-bold text-cyan-300 font-mono animate-pulse text-center">
+                      Uploading Into Cloud...
+                    </span>
+                  </div>
+                ) : (
+                  <div className="w-36 h-36 rounded-2xl bg-white p-2.5 border-2 border-cyan-400/40 flex items-center justify-center overflow-hidden shadow-[0_0_25px_rgba(0,240,255,0.25)]">
+                    <img
+                      src={gatewayConfig.khqrImageUrl}
+                      alt="Active Master KHQR"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <div className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
@@ -1102,7 +1112,20 @@ export const PaymentGatewayAdmin: React.FC = () => {
             </div>
           ) : (
             /* Upload Dropzone - Clean Centered Box */
-            <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
+            <div className="p-6 sm:p-8 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleKhqrFile(e.target.files[0]);
+                  }
+                }}
+                disabled={uploadingKhqr}
+              />
+
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
                 onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
@@ -1113,42 +1136,68 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     handleKhqrFile(e.dataTransfer.files[0]);
                   }
                 }}
-                onClick={() => fileInputRef.current?.click()}
-                className={`p-8 rounded-2xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center text-center gap-3 ${
+                onClick={() => !uploadingKhqr && fileInputRef.current?.click()}
+                className={`p-8 sm:p-10 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center text-center gap-4 cursor-pointer ${
                   dragActive
-                    ? 'border-cyan-400 bg-cyan-950/20'
+                    ? 'border-cyan-400 bg-cyan-950/25 scale-[1.01]'
                     : 'border-slate-800 hover:border-cyan-500/50 bg-slate-950/60 hover:bg-slate-950'
                 }`}
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleKhqrFile(e.target.files[0]);
-                    }
-                  }}
-                  disabled={uploadingKhqr}
-                />
-
-                <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                  {uploadingKhqr ? (
-                    <RefreshCw size={22} className="animate-spin text-cyan-400" />
-                  ) : (
-                    <QrCode size={24} />
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <div className="text-sm font-bold text-white font-['Chakra_Petch']">
-                    {uploadingKhqr ? 'Uploading KHQR Image...' : 'Upload Master KHQR Image'}
+                {uploadingKhqr ? (
+                  /* Animated Uploading State */
+                  <div className="py-6 flex flex-col items-center justify-center space-y-3">
+                    <div className="relative w-14 h-14 rounded-2xl bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.3)]">
+                      <RefreshCw size={26} className="animate-spin text-cyan-400" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-base font-bold text-cyan-300 font-['Chakra_Petch'] tracking-wide animate-pulse">
+                        Uploading Into Cloud...
+                      </div>
+                      <p className="text-xs text-slate-500 font-mono">
+                        Validating KHQR and activating payment listener
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-400 font-mono">
-                    Drop your official Bakong / ABA KHQR image (PNG or JPG up to 5MB)
-                  </p>
-                </div>
+                ) : (
+                  /* Normal Upload State */
+                  <>
+                    <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)]">
+                      <QrCode size={28} />
+                    </div>
+
+                    <div className="space-y-2 max-w-md">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="md"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          fileInputRef.current?.click();
+                        }}
+                        className="font-bold py-2.5 px-6 shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer mx-auto"
+                      >
+                        <UploadCloud size={16} className="mr-1.5" />
+                        <span>Click To Upload</span>
+                      </Button>
+
+                      <p className="text-xs text-slate-400 font-mono pt-1">
+                        or drag and drop your official Bakong KHQR image here
+                      </p>
+                    </div>
+
+                    {/* Guidelines and Recommended Scale / Size Box */}
+                    <div className="pt-3 border-t border-slate-800/80 w-full max-w-md grid grid-cols-2 gap-2 text-[11px] font-mono">
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 text-left">
+                        <span className="text-slate-500 block uppercase font-bold text-[9px]">RECOMMENDED SCALE</span>
+                        <span className="text-cyan-400 font-semibold">1024 × 1024 (1:1)</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 text-left">
+                        <span className="text-slate-500 block uppercase font-bold text-[9px]">MAX FILE SIZE</span>
+                        <span className="text-cyan-400 font-semibold">2 MB (PNG / JPG)</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Bottom Actions Row: Back to Step 1 (left) & Continue to Step 3 (right) */}
