@@ -825,9 +825,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
           {/* Connected State View */}
           {userClientStatus.isConnected ? (
             <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
-              <div className="flex items-center gap-3">
-                <div className="relative w-9 h-9 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 bg-white shadow-[0_0_15px_rgba(0,136,204,0.4)] ring-2 ring-[#0088cc]/30">
-                  <svg className="w-9 h-9 text-[#0088cc] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              {/* Centered Telegram Logo & Username */}
+              <div className="flex items-center justify-center gap-3 py-2">
+                <div className="relative w-10 h-10 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 bg-white shadow-[0_0_15px_rgba(0,136,204,0.4)] ring-2 ring-[#0088cc]/30">
+                  <svg className="w-10 h-10 text-[#0088cc] flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.536-.195 1.006.128.832.942z" />
                   </svg>
                 </div>
@@ -836,7 +837,17 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-4 border-t border-slate-800/80">
+              {/* Bottom Actions: Disconnect (left) & Continue (right) */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={handleDisconnectUserClient}
+                  className="px-3.5 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 flex items-center gap-1.5 transition-colors whitespace-nowrap font-mono cursor-pointer"
+                >
+                  <LogOut size={13} />
+                  <span>Disconnect</span>
+                </button>
+
                 <Button
                   type="button"
                   variant="primary"
@@ -1228,26 +1239,15 @@ export const PaymentGatewayAdmin: React.FC = () => {
             </div>
 
             {userClientStatus.isConnected && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={fetchTargetGroups}
-                  disabled={loadingGroups}
-                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
-                  <span>Refresh Groups</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDisconnectUserClient}
-                  className="px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 flex items-center gap-1.5 transition-colors whitespace-nowrap font-mono cursor-pointer"
-                >
-                  <LogOut size={13} />
-                  <span>Disconnect</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={fetchTargetGroups}
+                disabled={loadingGroups}
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
+                <span>Refresh Groups</span>
+              </button>
             )}
           </div>
 
@@ -1593,22 +1593,9 @@ export const PaymentGatewayAdmin: React.FC = () => {
               <span>Back to Step 2</span>
             </Button>
 
-            <div className="flex items-center gap-3">
-              {userClientStatus.isConnected && (
-                <button
-                  type="button"
-                  onClick={handleDisconnectUserClient}
-                  className="px-3.5 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 flex items-center gap-1.5 transition-colors whitespace-nowrap font-mono cursor-pointer"
-                >
-                  <LogOut size={13} />
-                  <span>Disconnect</span>
-                </button>
-              )}
-
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold shadow-md">
-                <CheckCircle2 size={16} className="text-emerald-400" />
-                <span>Step 3 Configured • Listener Active</span>
-              </div>
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold shadow-md">
+              <CheckCircle2 size={16} className="text-emerald-400" />
+              <span>Step 3 Configured • Listener Active</span>
             </div>
           </div>
         </Card>
