@@ -13,7 +13,6 @@ import {
   Zap,
   Phone,
   KeyRound,
-  Shield,
   HelpCircle,
   Copy,
   Check,
@@ -714,15 +713,9 @@ export const PaymentGatewayAdmin: React.FC = () => {
       {/* ============================================================== */}
       {activeStep === 1 && (
         <Card glow="cyan" className="space-y-6 animate-fadeIn">
-          {step1Msg && (
-            <div
-              className={`p-3.5 rounded-xl border text-xs flex items-center gap-2 ${
-                step1Msg.type === 'success'
-                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
-                  : 'bg-red-950/40 border-red-500/30 text-red-300'
-              }`}
-            >
-              {step1Msg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          {step1Msg && step1Msg.type === 'error' && (
+            <div className="p-3.5 rounded-xl border text-xs flex items-center gap-2 bg-red-950/40 border-red-500/30 text-red-300">
+              <AlertCircle size={16} />
               <span>{step1Msg.text}</span>
             </div>
           )}
@@ -831,89 +824,50 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 </form>
               ) : (
                 /* Verification Code Form */
-                <form onSubmit={handleVerifyCode} className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-5 animate-fadeIn shadow-2xl">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <Shield size={18} className="text-cyan-400" />
-                      <span className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                        Enter Telegram Verification Code
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCodeRequested(false);
-                        setPhoneCodeHash('');
-                        setVerificationCode('');
-                      }}
-                      className="text-xs text-slate-400 hover:text-white transition-colors font-mono"
-                    >
-                      Change Phone
-                    </button>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 space-y-1">
-                    <p className="text-xs text-slate-300">
-                      Telegram sent an official verification code to your Telegram app for <strong className="text-cyan-400 font-mono">{userPhone}</strong>. Please check your Telegram Service Notifications chat.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3 font-mono">
-                    <div>
-                      <label className="text-xs text-slate-400 block mb-1 font-semibold uppercase tracking-wider">
-                        5-Digit Verification Code
-                      </label>
+                <form onSubmit={handleVerifyCode} className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/40 space-y-4 animate-fadeIn shadow-2xl">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="relative flex-1">
                       <input
                         type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         required
                         maxLength={8}
                         value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value)}
+                        onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
                         placeholder="12345"
-                        className="w-full text-center tracking-[0.5em] text-2xl font-bold py-3 px-4 rounded-xl bg-slate-950 border border-slate-800 text-cyan-400 focus:outline-none focus:border-cyan-400 transition-colors"
+                        className="w-full text-center tracking-[0.5em] text-2xl font-bold py-3 px-4 rounded-xl bg-slate-950 border border-slate-800 text-cyan-400 focus:outline-none focus:border-cyan-400 transition-colors font-mono"
                         autoFocus
                       />
                     </div>
-
-                    {needPassword && (
-                      <div className="space-y-1 pt-2 animate-fadeIn">
-                        <label className="text-xs text-amber-400 block font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                          <KeyRound size={13} />
-                          <span>Two-Step Verification (2FA) Password</span>
-                        </label>
-                        <input
-                          type="password"
-                          required
-                          value={twoFaPassword}
-                          onChange={(e) => setTwoFaPassword(e.target.value)}
-                          placeholder="Enter your 2FA password"
-                          className="w-full py-2.5 px-3.5 rounded-xl bg-slate-950 border border-amber-500/40 text-white focus:outline-none focus:border-amber-400"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={handleSendCode}
-                      disabled={sendingCode}
-                      className="text-xs text-slate-400 hover:text-cyan-400 flex items-center gap-1 font-mono transition-colors"
-                    >
-                      <RefreshCw size={13} className={sendingCode ? 'animate-spin' : ''} />
-                      <span>Resend Verification Code</span>
-                    </button>
 
                     <Button
                       type="submit"
                       variant="primary"
                       size="md"
                       loading={verifyingCode}
-                      className="font-bold whitespace-nowrap justify-center shadow-lg shadow-cyan-400/20"
+                      className="font-bold py-3 px-8 whitespace-nowrap justify-center shadow-lg shadow-cyan-400/20"
                     >
-                      Verify &amp; Connect GramJS
+                      Continue
                     </Button>
                   </div>
+
+                  {needPassword && (
+                    <div className="space-y-1 pt-2 animate-fadeIn font-mono">
+                      <label className="text-xs text-amber-400 block font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                        <KeyRound size={13} />
+                        <span>Two-Step Verification (2FA) Password</span>
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={twoFaPassword}
+                        onChange={(e) => setTwoFaPassword(e.target.value)}
+                        placeholder="Enter your 2FA password"
+                        className="w-full py-2.5 px-3.5 rounded-xl bg-slate-950 border border-amber-500/40 text-white focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  )}
                 </form>
               )}
             </div>
