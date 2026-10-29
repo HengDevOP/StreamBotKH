@@ -19,9 +19,7 @@ import {
   Trophy,
   Target,
   Timer,
-  Bot,
-  Tag,
-  Clock
+  Bot
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { request } from '../services/api';
@@ -155,48 +153,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Active Promotion Hero Banner */}
-      {promo?.isActive && (
-        <div className="max-w-5xl mx-auto p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-950/80 via-[#151029] to-cyan-950/60 border border-purple-500/50 shadow-xl shadow-purple-500/10 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeIn">
-          <div className="flex items-center gap-3.5 text-center sm:text-left">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-cyan-400 flex-shrink-0 mx-auto sm:mx-0">
-              <Tag size={18} />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <span className="text-xs font-mono font-extrabold uppercase tracking-wider text-cyan-400">
-                  {promo.promoTitle}
-                </span>
-                {promo.discountPercent > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold">
-                    SAVE {promo.discountPercent}%
-                  </span>
-                )}
-              </div>
-              <p className="text-xs sm:text-sm text-slate-200 font-medium mt-0.5">
-                Upgrade to Pro Plan for just <span className="text-emerald-400 font-bold font-mono">{getProPrice()}/mo</span>{' '}
-                <span className="text-slate-500 line-through font-mono text-xs">{getOriginalProPrice()}</span> during our promotional period!
-              </p>
-            </div>
-          </div>
-
-          {(promo.startDate || promo.endDate) && (
-            <div className="px-3.5 py-2 rounded-xl bg-slate-950/70 border border-purple-500/30 text-[11px] font-mono text-purple-200 flex items-center gap-2 flex-shrink-0">
-              <Clock size={13} className="text-cyan-400" />
-              <span>
-                {promo.startDate
-                  ? new Date(promo.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  : 'Now'}{' '}
-                &rarr;{' '}
-                {promo.endDate
-                  ? new Date(promo.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                  : 'Limited Time'}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* 2 Plans Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto items-stretch">
         {/* Plan 1: Free Plan */}
@@ -208,8 +164,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 {currency === 'KHR' ? '0 ៛' : '$0'}
                 <span className="text-sm font-normal text-slate-400 ml-1">/ month</span>
               </div>
-              <p className="text-xs text-amber-400 font-mono font-medium">10% platform fee per donation</p>
-              <p className="text-xs text-slate-400">Everything you need to start accepting donations with Payment Gateway &amp; live OBS alerts.</p>
             </div>
 
             <div className="h-px bg-slate-800 my-6" />
@@ -271,20 +225,13 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
         {/* Plan 2: Pro Plan ($4.99/mo - 0% fee, 10GB storage, Payment Gateway) */}
         <div className="rounded-2xl border-2 border-purple-500/80 bg-[#120E22] p-5 xs:p-6 sm:p-8 flex flex-col h-full justify-between relative shadow-2xl shadow-purple-500/10">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[10px] font-extrabold uppercase tracking-widest shadow-lg shadow-purple-500/30 whitespace-nowrap">
-            {promo?.isActive
-              ? `${promo.promoTitle} • ${promo.discountPercent}% OFF`
-              : 'RECOMMENDED • 0% FEE'}
+            RECOMMENDED • 0% FEE
           </div>
 
           <div className="flex-1 flex flex-col">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold">PRO PLAN</span>
-                {promo?.isActive && promo.discountPercent > 0 && (
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold">
-                    PROMO -{promo.discountPercent}%
-                  </span>
-                )}
               </div>
               <div className="flex items-baseline gap-2.5">
                 <span className="text-3xl font-extrabold text-white">
@@ -297,16 +244,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 )}
                 <span className="text-sm font-normal text-slate-400">/ month</span>
               </div>
-              <p className="text-xs text-emerald-400 font-mono font-semibold">0% platform fee (Keep 100% of tips)</p>
-              {promo?.isActive && promo.endDate && (
-                <p className="text-[11px] text-cyan-300 font-mono flex items-center gap-1.5">
-                  <Clock size={12} className="text-cyan-400" />
-                  <span>
-                    Promo ends {new Date(promo.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
-                </p>
-              )}
-              <p className="text-xs text-slate-400">Unlocks 100MB storage, Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Spinning Wheels.</p>
             </div>
 
             <div className="h-px bg-purple-500/20 my-6" />
