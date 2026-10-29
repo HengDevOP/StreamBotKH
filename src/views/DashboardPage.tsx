@@ -474,6 +474,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           bgGlow: 'hover:border-emerald-500/50',
           copyMessage: 'Copied 2D Pokémon OBS URL!'
         };
+      case 'payments':
+      case 'telegram':
+      case 'account':
+      case 'billing':
+      case 'security':
+      case 'admin-promotion':
+      case 'admin-users':
+      case 'admin-requests':
+      case 'report-issue':
+        return null;
       default:
         return {
           featureKey: 'default',
@@ -490,7 +500,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
   const [copiedObsUrl, setCopiedObsUrl] = useState(false);
   const handleCopyCurrentObsUrl = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && currentObsConfig) {
       navigator.clipboard.writeText(currentObsConfig.url);
       setCopiedObsUrl(true);
       playSynthNeonChime(0.6);
@@ -1315,77 +1325,81 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           </div>
 
           {/* DYNAMIC OBS BROWSER SOURCE BAR (Dynamic Target Feature Overlay Deck) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 max-w-xs sm:max-w-md lg:max-w-xl mx-1.5 sm:mx-4 min-w-0 justify-center">
-            <div
-              className={`w-full flex items-center justify-between gap-1.5 sm:gap-2.5 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-slate-950/90 border border-slate-800 shadow-inner transition-all ${currentObsConfig.bgGlow}`}
-            >
-              {/* Feature Icon + Badge & URL */}
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform"
-                  style={{
-                    backgroundColor: `${currentObsConfig.color}20`,
-                    color: currentObsConfig.color
-                  }}
-                  title={currentObsConfig.label}
-                >
-                  {React.createElement(currentObsConfig.icon, { size: 14, className: 'sm:w-4 sm:h-4' })}
+          {currentObsConfig ? (
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-1 max-w-xs sm:max-w-md lg:max-w-xl mx-1.5 sm:mx-4 min-w-0 justify-center">
+              <div
+                className={`w-full flex items-center justify-between gap-1.5 sm:gap-2.5 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-slate-950/90 border border-slate-800 shadow-inner transition-all ${currentObsConfig.bgGlow}`}
+              >
+                {/* Feature Icon + Badge & URL */}
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div
+                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform"
+                    style={{
+                      backgroundColor: `${currentObsConfig.color}20`,
+                      color: currentObsConfig.color
+                    }}
+                    title={currentObsConfig.label}
+                  >
+                    {React.createElement(currentObsConfig.icon, { size: 14, className: 'sm:w-4 sm:h-4' })}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span
+                      className="hidden xl:inline text-[11px] font-mono font-bold uppercase tracking-wider shrink-0"
+                      style={{ color: currentObsConfig.color }}
+                    >
+                      {currentObsConfig.shortLabel}:
+                    </span>
+                    <span
+                      onClick={handleCopyCurrentObsUrl}
+                      className="text-[11px] font-mono text-slate-300 hover:text-white truncate cursor-pointer select-all"
+                      title={`Click to copy: ${currentObsConfig.url}`}
+                    >
+                      {currentObsConfig.url}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <span
-                    className="hidden xl:inline text-[11px] font-mono font-bold uppercase tracking-wider shrink-0"
-                    style={{ color: currentObsConfig.color }}
-                  >
-                    {currentObsConfig.shortLabel}:
-                  </span>
-                  <span
+                {/* Action Buttons: Copy Icon Button + External Link */}
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
                     onClick={handleCopyCurrentObsUrl}
-                    className="text-[11px] font-mono text-slate-300 hover:text-white truncate cursor-pointer select-all"
-                    title={`Click to copy: ${currentObsConfig.url}`}
+                    className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl font-mono text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                      copiedObsUrl
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750 hover:border-slate-600'
+                    }`}
+                    title={copiedObsUrl ? 'Copied to Clipboard!' : `Copy ${currentObsConfig.label} URL`}
                   >
-                    {currentObsConfig.url}
-                  </span>
+                    {copiedObsUrl ? (
+                      <>
+                        <Check size={13} className="text-emerald-400 flex-shrink-0" />
+                        <span className="hidden xs:inline text-[11px] text-emerald-400">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={13} className="text-slate-400 hover:text-cyan-400 flex-shrink-0" />
+                        <span className="hidden md:inline text-[11px]">Copy URL</span>
+                      </>
+                    )}
+                  </button>
+
+                  <a
+                    href={currentObsConfig.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-400 hover:text-white transition-colors flex-shrink-0"
+                    title="Open OBS Overlay in new tab"
+                  >
+                    <ExternalLink size={13} className="sm:w-3.5 sm:h-3.5" />
+                  </a>
                 </div>
-              </div>
-
-              {/* Action Buttons: Copy Icon Button + External Link */}
-              <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={handleCopyCurrentObsUrl}
-                  className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl font-mono text-xs font-bold transition-all cursor-pointer shadow-sm ${
-                    copiedObsUrl
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750 hover:border-slate-600'
-                  }`}
-                  title={copiedObsUrl ? 'Copied to Clipboard!' : `Copy ${currentObsConfig.label} URL`}
-                >
-                  {copiedObsUrl ? (
-                    <>
-                      <Check size={13} className="text-emerald-400 flex-shrink-0" />
-                      <span className="hidden xs:inline text-[11px] text-emerald-400">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={13} className="text-slate-400 hover:text-cyan-400 flex-shrink-0" />
-                      <span className="hidden md:inline text-[11px]">Copy URL</span>
-                    </>
-                  )}
-                </button>
-
-                <a
-                  href={currentObsConfig.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-400 hover:text-white transition-colors flex-shrink-0"
-                  title="Open OBS Overlay in new tab"
-                >
-                  <ExternalLink size={13} className="sm:w-3.5 sm:h-3.5" />
-                </a>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex-1" />
+          )}
 
           {/* Quick Action Command Deck: Upgrade / Pro Status */}
           <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
