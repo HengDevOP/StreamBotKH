@@ -45,6 +45,16 @@ export interface IssueReport {
   updatedAt: string;
 }
 
+export interface TimeframeMetrics {
+  usd: number;
+  khr: number;
+  count: number;
+  avgPerDayUsd: number;
+  avgPerDayKhr: number;
+  potentialMonthlyUsd: number;
+  potentialMonthlyKhr: number;
+}
+
 export interface StreamerDashboardStats {
   summary: {
     totalRevenueUsd: number;
@@ -53,6 +63,13 @@ export interface StreamerDashboardStats {
     todayRevenueUsd: number;
     todayRevenueKhr: number;
     todayDonationsCount: number;
+  };
+  timeframeAnalytics?: {
+    today: TimeframeMetrics;
+    '1d': TimeframeMetrics;
+    '3d': TimeframeMetrics;
+    'last_week': TimeframeMetrics;
+    'last_month': TimeframeMetrics;
   };
   topDonors: Array<{
     donor_name: string;

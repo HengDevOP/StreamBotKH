@@ -11,7 +11,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { NextRequest } from 'next/server';
-import { initDatabase, cleanupExpiredPendingDonations } from '../src/server/database/db';
+import { initDatabase, cleanupExpiredPendingDonations, cleanupOlderDonations } from '../src/server/database/db';
 import { initMongo } from '../src/server/database/mongo';
 import { initSocketServer } from '../src/server/services/socketService';
 
@@ -176,10 +176,12 @@ initSocketServer(server);
 const apiDirectory = path.resolve(process.cwd(), 'src/app/api');
 scanAndMountRoutes(apiDirectory, '/api');
 
-// 4. Background Expired Pending Donations Cleanup (runs every 30s)
+// 4. Background Expired Pending Donations Cleanup (runs every 30s) & 6-month Retention Cleanup
 cleanupExpiredPendingDonations();
+cleanupOlderDonations(6);
 setInterval(() => {
   cleanupExpiredPendingDonations();
+  cleanupOlderDonations(6);
 }, 30 * 1000);
 
 // Health check endpoint

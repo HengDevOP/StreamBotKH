@@ -491,6 +491,43 @@ export function cleanupExpiredPendingDonations(): { expiredDonations: number; cl
 }
 
 /**
+ * 6-Month Transaction Donation Retention Policy:
+ * Automatically cleans up transaction donations older than 6 months (180 days)
+ * to maintain ledger performance and enforce data retention limits.
+ */
+export function cleanupOlderDonations(months = 6): { deletedDonations: number } {
+  try {
+    const deletedDonations = db.prepare(`
+      DELETE FROM donations
+      WHERE datetime(created_at) <= datetime('now', '-' || ? || ' months')
+    `).run(months).changes;
+
+    // Auto-clean expired records from MongoDB temporary_donations and donations if older than 6 months
+    try {
+      const { getMongoDb } = require('./mongo');
+      getMongoDb().then((mongoDb: any) => {
+        const cutoffDate = new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000);
+        mongoDb.collection('donations').deleteMany({
+          createdAt: { $lt: cutoffDate }
+        }).catch(() => {});
+        mongoDb.collection('temporary_donations').deleteMany({
+          createdAt: { $lt: cutoffDate }
+        }).catch(() => {});
+      }).catch(() => {});
+    } catch (e) {}
+
+    if (deletedDonations > 0) {
+      console.log(`🧹 [Retention Policy] Auto-deleted ${deletedDonations} donations older than ${months} months.`);
+    }
+
+    return { deletedDonations };
+  } catch (e) {
+    console.warn('[Retention Policy] Error in cleanupOlderDonations:', e);
+    return { deletedDonations: 0 };
+  }
+}
+
+/**
  * Telegram Monitored Groups Helpers
  */
 export function getMonitoredGroups(streamerId: string) {

@@ -394,9 +394,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const publicDonateUrl = `${origin}/@${user?.username || 'neonstreamer'}`;
   const overlayUrl = `${origin}/overlay/${user?.overlayToken || ''}`;
 
-  // Dynamic OBS Browser Source Configuration for the Dashboard Navbar
+  // Dynamic OBS Browser Source Configuration - displayed ONLY for ASSETS category tabs
   const currentObsConfig = useMemo(() => {
     const effectiveToken = user?.overlayToken || 'demo_token';
+    const isAssetCategory = ([
+      'donation',
+      'leaderboard',
+      'goal',
+      'timer',
+      'soundboard',
+      'video-alerts',
+      'wheel',
+      'pokemon'
+    ] as DashboardTab[]).includes(activeTab);
+
+    if (!isAssetCategory) return null;
 
     switch (activeTab) {
       case 'goal':
@@ -412,7 +424,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         };
       case 'donation':
       case 'alerts':
-      case 'donations':
         return {
           featureKey: 'donation',
           label: 'Donation Alerts OBS',
@@ -489,27 +500,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           bgGlow: 'hover:border-emerald-500/50',
           copyMessage: 'Copied 2D Pokémon OBS URL!'
         };
-      case 'payments':
-      case 'telegram':
-      case 'account':
-      case 'billing':
-      case 'security':
-      case 'admin-promotion':
-      case 'admin-users':
-      case 'admin-requests':
-      case 'report-issue':
-        return null;
       default:
-        return {
-          featureKey: 'default',
-          label: 'OBS Browser Source',
-          shortLabel: 'OBS',
-          url: `${origin}/overlay/${effectiveToken}`,
-          icon: Monitor,
-          color: '#00F0FF', // Cyan
-          bgGlow: 'hover:border-cyan-500/50',
-          copyMessage: 'Copied OBS Browser Source URL!'
-        };
+        return null;
     }
   }, [activeTab, user?.overlayToken, origin]);
 
@@ -1356,89 +1348,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             </div>
           </div>
 
-          {/* DYNAMIC OBS BROWSER SOURCE BAR (Dynamic Target Feature Overlay Deck) */}
-          {currentObsConfig ? (
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-1 max-w-xs sm:max-w-md lg:max-w-xl mx-1.5 sm:mx-4 min-w-0 justify-center">
-              <div
-                className={`w-full flex items-center justify-between gap-1.5 sm:gap-2.5 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-slate-950/90 border border-slate-800 shadow-inner transition-all ${currentObsConfig.bgGlow}`}
+          <div className="flex-1" />
+
+          {/* Quick Action Command Deck: Overlay Copy Icon (Assets category only) & Streamer Mailbox Icon */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Copy Overlay URL Icon Button (display only from the assets category) */}
+            {currentObsConfig && (
+              <button
+                type="button"
+                onClick={handleCopyCurrentObsUrl}
+                className={`relative p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm ${
+                  copiedObsUrl
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-750 hover:border-cyan-500/50'
+                }`}
+                title={copiedObsUrl ? 'Copied to Clipboard!' : `Copy ${currentObsConfig.label} URL`}
               >
-                {/* Feature Icon + Badge & URL */}
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div
-                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform"
-                    style={{
-                      backgroundColor: `${currentObsConfig.color}20`,
-                      color: currentObsConfig.color
-                    }}
-                    title={currentObsConfig.label}
-                  >
-                    {React.createElement(currentObsConfig.icon, { size: 14, className: 'sm:w-4 sm:h-4' })}
-                  </div>
+                {copiedObsUrl ? (
+                  <Check size={16} className="text-emerald-400" />
+                ) : (
+                  <Copy size={16} className="text-slate-400 hover:text-cyan-400 transition-colors" />
+                )}
+              </button>
+            )}
 
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <span
-                      className="hidden xl:inline text-[11px] font-mono font-bold uppercase tracking-wider shrink-0"
-                      style={{ color: currentObsConfig.color }}
-                    >
-                      {currentObsConfig.shortLabel}:
-                    </span>
-                    <span
-                      onClick={handleCopyCurrentObsUrl}
-                      className="text-[11px] font-mono text-slate-300 hover:text-white truncate cursor-pointer select-all"
-                      title={`Click to copy: ${currentObsConfig.url}`}
-                    >
-                      {currentObsConfig.url}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Action Buttons: Copy Icon Button + External Link */}
-                <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleCopyCurrentObsUrl}
-                    className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl font-mono text-xs font-bold transition-all cursor-pointer shadow-sm ${
-                      copiedObsUrl
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750 hover:border-slate-600'
-                    }`}
-                    title={copiedObsUrl ? 'Copied to Clipboard!' : `Copy ${currentObsConfig.label} URL`}
-                  >
-                    {copiedObsUrl ? (
-                      <>
-                        <Check size={13} className="text-emerald-400 flex-shrink-0" />
-                        <span className="hidden xs:inline text-[11px] text-emerald-400">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={13} className="text-slate-400 hover:text-cyan-400 flex-shrink-0" />
-                        <span className="hidden md:inline text-[11px]">Copy URL</span>
-                      </>
-                    )}
-                  </button>
-
-                  <a
-                    href={currentObsConfig.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-400 hover:text-white transition-colors flex-shrink-0"
-                    title="Open OBS Overlay in new tab"
-                  >
-                    <ExternalLink size={13} className="sm:w-3.5 sm:h-3.5" />
-                  </a>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1" />
-          )}
-
-          {/* Quick Action Command Deck: Streamer Mailbox Feature */}
-          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+            {/* Streamer Mailbox: Icon only, no text */}
             <button
               type="button"
               onClick={() => setIsMailboxOpen(true)}
-              className="relative flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-750 hover:border-cyan-500/50 text-slate-200 hover:text-white font-bold text-xs sm:text-sm font-['Chakra_Petch'] transition-all shadow-sm cursor-pointer group"
+              className="relative p-2 sm:p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-750 hover:border-cyan-500/50 text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer group"
               title="Open Streamer Mailbox & Notifications"
             >
               <div className="relative flex items-center justify-center">
@@ -1449,7 +1387,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   </span>
                 )}
               </div>
-              <span className="hidden xxs:inline">Mailbox</span>
             </button>
           </div>
         </header>
@@ -1465,161 +1402,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* ============================================================== */}
           {activeTab === 'overview' && (
             <div className="space-y-8">
-              {/* Summary Stats Grid */}
-              <OverviewStats stats={stats?.summary} />
-
-              {/* Free Plan Upgrade Prompt */}
-              {currentPlan === 'free' && (
-                <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="text-xs font-bold text-amber-300 font-mono flex items-center gap-2">
-                      <Sparkles size={14} />
-                      Current Plan: Free Plan
-                    </div>
-                    <p className="text-xs text-slate-400">
-                      Upgrade to Pro Plan ($4.99/mo) to unlock Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Spinning Wheels, 100MB storage, and removed watermark!
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('billing')}
-                    className="px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs whitespace-nowrap transition-colors"
-                  >
-                    Upgrade to Pro ($4.99/mo)
-                  </button>
-                </div>
-              )}
-
-              {/* Streamer Quick Access Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                <div
-                  onClick={() => {
-                    setActiveTab('donation');
-                    if (typeof window !== 'undefined') {
-                      window.history.pushState(null, '', '/dashboard?tab=donation');
-                    }
-                  }}
-                  className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 hover:border-cyan-500/50 cursor-pointer transition-colors space-y-2 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 font-mono">OBS ALERTS</span>
-                    <Bell size={16} className="text-cyan-400 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="text-sm font-bold text-white">Donations Alerts</div>
-                  <p className="text-xs text-slate-400">Copy OBS URL, configure neon styling, audio chimes, and TTS.</p>
-                </div>
-
-                <div
-                  onClick={() => {
-                    if (currentPlan === 'free' && !isAdmin) {
-                      setUpgradeFeatureName('Soundboard');
-                      setIsVideoUpgradeModalOpen(true);
-                      return;
-                    }
-                    setActiveTab('soundboard');
-                    if (typeof window !== 'undefined') {
-                      window.history.pushState(null, '', '/dashboard?tab=soundboard');
-                    }
-                  }}
-                  className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 hover:border-cyan-400/50 cursor-pointer transition-colors space-y-2 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 font-mono">PC HOTKEYS</span>
-                    <Volume2 size={16} className="text-cyan-400 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                    <span>Stream Soundboard</span>
-                    {currentPlan === 'free' && !isAdmin && <Lock size={13} className="text-amber-400" />}
-                  </div>
-                  <p className="text-xs text-slate-400">Listen to PC keyboard hotkeys &amp; trigger stream SFX with OBS broadcast.</p>
-                </div>
-
-                <div
-                  onClick={() => {
-                    if (currentPlan === 'free' && !isAdmin) {
-                      setUpgradeFeatureName('Leaderboard');
-                      setIsVideoUpgradeModalOpen(true);
-                      return;
-                    }
-                    setActiveTab('leaderboard');
-                    if (typeof window !== 'undefined') {
-                      window.history.pushState(null, '', '/dashboard?tab=leaderboard');
-                    }
-                  }}
-                  className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 hover:border-amber-500/50 cursor-pointer transition-colors space-y-2 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 font-mono">LIVE RANKING</span>
-                    <Trophy size={16} className="text-amber-400 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                    <span>Donor Leaderboard</span>
-                    {currentPlan === 'free' && !isAdmin && <Lock size={13} className="text-amber-400" />}
-                  </div>
-                  <p className="text-xs text-slate-400">Top supporters ranking widget with medals and crowns for stream.</p>
-                </div>
-
-                <div
-                  onClick={() => {
-                    if (currentPlan === 'free' && !isAdmin) {
-                      setUpgradeFeatureName('Wheels');
-                      setIsVideoUpgradeModalOpen(true);
-                      return;
-                    }
-                    setActiveTab('wheel');
-                    if (typeof window !== 'undefined') {
-                      window.history.pushState(null, '', '/dashboard?tab=wheel');
-                    }
-                  }}
-                  className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 hover:border-purple-500/50 cursor-pointer transition-colors space-y-2 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 font-mono">INTERACTIVE</span>
-                    <Disc size={16} className="text-purple-400 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                    <span>Spinning Wheels</span>
-                    {currentPlan === 'free' && !isAdmin ? (
-                      <Lock size={13} className="text-amber-400" />
-                    ) : (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold">
-                        PRO
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400">Interactive stream wheel simulator and giveaway rewards for donors.</p>
-                </div>
-
-                <div
-                  onClick={() => {
-                    if (currentPlan === 'free' && !isAdmin) {
-                      setUpgradeFeatureName('2D Pokémon');
-                      setIsVideoUpgradeModalOpen(true);
-                      return;
-                    }
-                    setActiveTab('pokemon');
-                    if (typeof window !== 'undefined') {
-                      window.history.pushState(null, '', '/dashboard?tab=pokemon');
-                    }
-                  }}
-                  className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 hover:border-emerald-500/50 cursor-pointer transition-colors space-y-2 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 font-mono">2D CHAT AVATARS</span>
-                    <Gamepad2 size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                    <span>2D Pokémon Pets</span>
-                    {currentPlan === 'free' && !isAdmin ? (
-                      <Lock size={13} className="text-amber-400" />
-                    ) : (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
-                        PRO
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400">Bulbasaur &amp; popular Pokémon roam screen on YouTube live comments.</p>
-                </div>
-              </div>
+              {/* Summary Stats Grid & Analytics Timeframe Filter */}
+              <OverviewStats stats={stats?.summary} timeframeAnalytics={stats?.timeframeAnalytics} />
 
               {/* Recent Donations Table Preview */}
               <RecentDonationsTable

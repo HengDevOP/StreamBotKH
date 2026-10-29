@@ -29,6 +29,11 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
   onDeleteDonation,
   deletingId
 }) => {
+  // Recent donation only gets the paid status only (unpaid/pending will not be displayed)
+  const paidDonations = (donations || []).filter(
+    (d) => (d.status || '').toUpperCase() === 'PAID'
+  );
+
   return (
     <Card className="p-0 overflow-hidden">
       <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -37,21 +42,21 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
             <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
             Recent Donations
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">Live incoming tips from ABA Bank & Bakong KHQR</p>
+          <p className="text-xs text-slate-400 mt-0.5">Live incoming tips from ABA Bank & Bakong KHQR (Paid Only)</p>
         </div>
         <div className="px-3 py-1 rounded-full bg-slate-800 text-xs font-mono text-cyan-400 border border-slate-700">
-          {donations.length} records
+          {paidDonations.length} records
         </div>
       </div>
 
       {/* Mobile Card List View (< 640px) */}
       <div className="block sm:hidden divide-y divide-slate-800/60">
-        {donations.length === 0 ? (
+        {paidDonations.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-500 font-mono px-4">
             No donations received yet. Share your stream link to start receiving tips!
           </div>
         ) : (
-          donations.map((d) => (
+          paidDonations.map((d) => (
             <div key={d.id} className="p-3.5 space-y-2 hover:bg-slate-900/40 transition-colors">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -142,14 +147,14 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 text-sm">
-            {donations.length === 0 ? (
+            {paidDonations.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-slate-500">
                   No donations received yet. Share your stream link to start receiving tips!
                 </td>
               </tr>
             ) : (
-              donations.map((d) => (
+              paidDonations.map((d) => (
                 <tr key={d.id} className="hover:bg-slate-800/30 transition-colors group">
                   <td className="py-3.5 px-5 font-semibold text-slate-100 flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-cyan-600 to-pink-600 flex items-center justify-center text-xs font-bold text-white uppercase">
