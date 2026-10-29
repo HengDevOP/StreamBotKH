@@ -57,10 +57,13 @@ export async function GET(req: NextRequest) {
     const userId = authUser?.id || 'demo-streamer-id-1001';
 
     const mediaCol = await getMediaCollection();
-    const mediaList = await mediaCol.find({ userId }).sort({ createdAt: -1 }).toArray();
+    const filter = authUser?.email
+      ? { $or: [{ userId }, { userEmail: authUser.email }] }
+      : { userId };
+    const mediaList = await mediaCol.find(filter).sort({ createdAt: -1 }).toArray();
 
     // Get user plan
-    const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ?').get(userId) as any;
+    const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ? OR LOWER(email) = LOWER(?)').get(userId, authUser?.email || '') as any;
     const userPlan = (streamerRow?.plan || 'free').toLowerCase();
     const quota = PLAN_STORAGE_LIMITS[userPlan] || PLAN_STORAGE_LIMITS.free;
 
@@ -115,10 +118,13 @@ export async function POST(req: NextRequest) {
 
     // 2. Check User's Plan Storage Quota in MongoDB
     const mediaCol = await getMediaCollection();
-    const existingMedia = await mediaCol.find({ userId }).toArray();
+    const quotaFilter = authUser?.email
+      ? { $or: [{ userId }, { userEmail: authUser.email }] }
+      : { userId };
+    const existingMedia = await mediaCol.find(quotaFilter).toArray();
     const usedBytes = existingMedia.reduce((acc, item) => acc + (item.fileSize || 0), 0);
 
-    const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ?').get(userId) as any;
+    const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ? OR LOWER(email) = LOWER(?)').get(userId, authUser?.email || '') as any;
     const userPlan = (streamerRow?.plan || 'free').toLowerCase();
     const quota = PLAN_STORAGE_LIMITS[userPlan] || PLAN_STORAGE_LIMITS.free;
 
@@ -171,6 +177,7 @@ export async function POST(req: NextRequest) {
     // 6. Save media document to MongoDB
     const mediaDoc: MediaDoc = {
       userId,
+      userEmail: authUser?.email || '',
       filename: originalName,
       storedFilename,
       url: publicUrl,

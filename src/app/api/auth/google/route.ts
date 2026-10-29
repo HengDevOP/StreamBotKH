@@ -78,57 +78,171 @@ export async function upsertGoogleStreamer(profile: {
   const name = (profile.name || email.split('@')[0] || 'Streamer').trim();
   const avatarUrl = profile.picture || '';
 
-  let streamer = db.prepare('SELECT * FROM streamers WHERE LOWER(email) = LOWER(?)').get(email) as any;
+  // 1. Primary lookup: Check MongoDB Atlas users collection by verified Google email
+  let existingMongoUser: any = null;
+  try {
+    const usersCol = await getUsersCollection();
+    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matches = await usersCol.find({
+      email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') }
+    }).toArray();
 
-  if (!streamer) {
-    const id = uuidv4();
-    const baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
-    let username = baseUsername;
-    const existingUsername = db.prepare('SELECT id FROM streamers WHERE LOWER(username) = LOWER(?)').get(username);
-    if (existingUsername) {
-      username = `${baseUsername}${Math.floor(100 + Math.random() * 900)}`;
+    if (matches.length > 0) {
+      existingMongoUser = matches[0];
+      // If multiple accounts were created by past transient UUID generations, pick the one with media or custom username
+      if (matches.length > 1) {
+        try {
+          const { getMediaCollection } = await import('@/server/database/mongo');
+          const mediaCol = await getMediaCollection();
+          for (const m of matches) {
+            const count = await mediaCol.countDocuments({ userId: m.userId });
+            if (count > 0 || (m.username && !m.username.startsWith('streamer_'))) {
+              existingMongoUser = m;
+              break;
+            }
+          }
+          // Consolidate any duplicate userId records to the primary userId
+          for (const other of matches) {
+            if (other.userId !== existingMongoUser.userId) {
+              await mediaCol.updateMany({ userId: other.userId }, { $set: { userId: existingMongoUser.userId, userEmail: email } });
+              const overlaysCol = await getOverlaysCollection();
+              await overlaysCol.updateMany({ userId: other.userId }, { $set: { userId: existingMongoUser.userId } });
+            }
+          }
+        } catch (e) {}
+      }
     }
-
-    const overlayToken = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
-    const pairingCode = 'NEON-' + Math.floor(1000 + Math.random() * 9000);
-    const resolvedAvatar = avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
-
-    db.prepare(`
-      INSERT INTO streamers (id, email, username, display_name, avatar_url, overlay_token, telegram_pairing_code, plan)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'free')
-    `).run(id, email, username, name, resolvedAvatar, overlayToken, pairingCode);
-
-    db.prepare(`
-      INSERT INTO alert_settings (streamer_id, glow_color, sound_url)
-      VALUES (?, '#00F0FF', '/sounds/neon-chime.mp3')
-    `).run(id);
-
-    db.prepare(`
-      INSERT INTO payment_settings (streamer_id, bakong_account_id, bakong_account_name)
-      VALUES (?, ?, ?)
-    `).run(id, `${username}@abaa`, name.toUpperCase());
-
-    streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(id) as any;
-  } else if (avatarUrl && streamer.avatar_url !== avatarUrl) {
-    db.prepare('UPDATE streamers SET avatar_url = ? WHERE id = ?').run(avatarUrl, streamer.id);
-    streamer.avatar_url = avatarUrl;
+  } catch (err) {
+    console.warn('[Auth] Mongo lookup warning in upsertGoogleStreamer:', err);
   }
 
-  // Sync authenticated Google user to MongoDB Atlas
+  // 2. Secondary lookup: Check local SQLite database by email
+  let sqliteStreamer = db.prepare('SELECT * FROM streamers WHERE LOWER(email) = LOWER(?)').get(email) as any;
+
+  let streamerId = '';
+  let streamerUsername = '';
+  let displayName = name;
+  let bio = '';
+  let customThanks = '';
+  let isVerified = 0;
+  let plan = 'free';
+  let overlayToken = '';
+  let pairingCode = '';
+  let socialLinks = '[]';
+
+  if (existingMongoUser) {
+    // Preserve permanent Google user ID and customized username
+    streamerId = existingMongoUser.userId;
+    streamerUsername = existingMongoUser.username || email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
+    displayName = existingMongoUser.displayName || name;
+    bio = existingMongoUser.bio || '';
+    customThanks = existingMongoUser.customThanksMessage || '';
+    isVerified = existingMongoUser.isVerified ? 1 : 0;
+    plan = existingMongoUser.plan || 'free';
+    socialLinks = JSON.stringify(existingMongoUser.socialLinks || []);
+  } else if (sqliteStreamer) {
+    // Found in SQLite
+    streamerId = sqliteStreamer.id;
+    streamerUsername = sqliteStreamer.username;
+    displayName = sqliteStreamer.display_name || name;
+    bio = sqliteStreamer.bio || '';
+    customThanks = sqliteStreamer.custom_thanks_message || '';
+    isVerified = sqliteStreamer.is_verified || 0;
+    plan = sqliteStreamer.plan || 'free';
+    socialLinks = sqliteStreamer.social_links || '[]';
+  } else {
+    // Brand new user: anchor to Google account with a persistent ID
+    streamerId = 'streamer_' + uuidv4().replace(/-/g, '').slice(0, 16);
+    const baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
+    streamerUsername = baseUsername;
+
+    const existingSqlite = db.prepare('SELECT id FROM streamers WHERE LOWER(username) = LOWER(?)').get(streamerUsername);
+    let existingMongo: any = null;
+    try {
+      const usersCol = await getUsersCollection();
+      existingMongo = await usersCol.findOne({ username: { $regex: new RegExp(`^${streamerUsername}$`, 'i') } });
+    } catch (e) {}
+
+    if (existingSqlite || existingMongo) {
+      streamerUsername = `${baseUsername}${Math.floor(100 + Math.random() * 900)}`;
+    }
+  }
+
+  // Preserve tokens
+  overlayToken = sqliteStreamer?.overlay_token || 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+  pairingCode = sqliteStreamer?.telegram_pairing_code || ('NEON-' + Math.floor(1000 + Math.random() * 9000));
+  const resolvedAvatar = avatarUrl || sqliteStreamer?.avatar_url || existingMongoUser?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamerUsername}`;
+
+  // 3. Upsert into SQLite streamers table
+  db.prepare(`
+    INSERT INTO streamers (
+      id, email, username, display_name, avatar_url, bio, custom_thanks_message,
+      is_verified, plan, overlay_token, telegram_pairing_code, social_links
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      email = excluded.email,
+      username = excluded.username,
+      display_name = excluded.display_name,
+      avatar_url = COALESCE(excluded.avatar_url, streamers.avatar_url),
+      bio = COALESCE(excluded.bio, streamers.bio),
+      plan = COALESCE(excluded.plan, streamers.plan)
+  `).run(
+    streamerId,
+    email,
+    streamerUsername,
+    displayName,
+    resolvedAvatar,
+    bio,
+    customThanks,
+    isVerified,
+    plan,
+    overlayToken,
+    pairingCode,
+    socialLinks
+  );
+
+  // Ensure default alert & payment settings in SQLite
+  try {
+    const existingAlert = db.prepare('SELECT streamer_id FROM alert_settings WHERE streamer_id = ?').get(streamerId);
+    if (!existingAlert) {
+      db.prepare(`
+        INSERT INTO alert_settings (streamer_id, glow_color, sound_url)
+        VALUES (?, '#00F0FF', '/sounds/neon-chime.mp3')
+      `).run(streamerId);
+    }
+  } catch (e) {}
+
+  try {
+    const existingPay = db.prepare('SELECT streamer_id FROM payment_settings WHERE streamer_id = ?').get(streamerId);
+    if (!existingPay) {
+      db.prepare(`
+        INSERT INTO payment_settings (streamer_id, bakong_account_id, bakong_account_name)
+        VALUES (?, ?, ?)
+      `).run(streamerId, `${streamerUsername}@abaa`, displayName.toUpperCase());
+    }
+  } catch (e) {}
+
+  let streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(streamerId) as any;
+
+  // 4. Synchronize user and assets to MongoDB Atlas
   try {
     const usersCol = await getUsersCollection();
     await usersCol.updateOne(
-      { userId: streamer.id },
+      { userId: streamerId },
       {
         $set: {
-          username: streamer.username,
-          displayName: streamer.display_name,
-          email: streamer.email,
-          avatarUrl: streamer.avatar_url,
+          username: streamerUsername,
+          displayName,
+          email,
+          avatarUrl: resolvedAvatar,
           updatedAt: new Date()
         },
         $setOnInsert: {
-          userId: streamer.id,
+          userId: streamerId,
+          bio,
+          customThanksMessage: customThanks,
+          isVerified: isVerified === 1,
+          plan,
           createdAt: new Date()
         }
       },
@@ -136,12 +250,12 @@ export async function upsertGoogleStreamer(profile: {
     );
 
     const overlaysCol = await getOverlaysCollection();
-    const existingOverlay = await overlaysCol.findOne({ userId: streamer.id });
-    if (!existingOverlay && streamer.overlay_token) {
+    const existingOverlay = await overlaysCol.findOne({ userId: streamerId });
+    if (!existingOverlay && overlayToken) {
       await overlaysCol.insertOne({
-        userId: streamer.id,
+        userId: streamerId,
         name: 'Default Neon Alert Overlay',
-        overlayToken: streamer.overlay_token,
+        overlayToken,
         mediaUrl: 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
         soundUrl: '/sounds/neon-chime.mp3',
         soundVolume: 0.85,
@@ -155,6 +269,16 @@ export async function upsertGoogleStreamer(profile: {
         updatedAt: new Date()
       });
     }
+
+    // Auto-rescue any media files uploaded under this Google email
+    try {
+      const { getMediaCollection } = await import('@/server/database/mongo');
+      const mediaCol = await getMediaCollection();
+      await mediaCol.updateMany(
+        { userEmail: email, userId: { $ne: streamerId } },
+        { $set: { userId: streamerId } }
+      );
+    } catch (e) {}
   } catch (mongoErr) {
     console.warn('[Auth] Non-fatal MongoDB user sync warning:', mongoErr);
   }

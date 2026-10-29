@@ -58,8 +58,8 @@ export const streamerService = {
     plan?: string;
     socialLinks?: any[];
     links?: any[];
-  }): Promise<{ success: boolean; user: any }> {
-    return request<{ success: boolean; user: any }>('/streamer/profile', {
+  }): Promise<{ success: boolean; user: any; token?: string }> {
+    return request<{ success: boolean; user: any; token?: string }>('/streamer/profile', {
       method: 'PUT',
       body: JSON.stringify(profile)
     });

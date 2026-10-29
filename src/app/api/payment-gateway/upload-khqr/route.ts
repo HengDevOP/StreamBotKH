@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
+    const streamerUsername = authUser?.username || '';
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
       {
         $set: {
           streamerId,
+          streamerUsername,
           khqrImageUrl: publicUrl,
           khqrFilename: originalName,
           khqrFileSize: file.size,
@@ -126,6 +128,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
+    const streamerUsername = authUser?.username || '';
 
     const gatewayCol = await getGatewayConfigCollection();
     const config = await gatewayCol.findOne({

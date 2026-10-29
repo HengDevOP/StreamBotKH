@@ -680,7 +680,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         return;
       }
 
-      await streamerService.updateProfile({ username: cleanUsername });
+      const res = await streamerService.updateProfile({ username: cleanUsername });
+      if (res?.token && typeof window !== 'undefined') {
+        localStorage.setItem('streamneon_auth_token', res.token);
+      }
       await refreshUser();
       setUsernameStatus('available');
       setUsernameStatusMsg(`Username updated to @${cleanUsername}!`);
@@ -749,7 +752,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         return;
       }
 
-      await streamerService.updateProfile({
+      const res = await streamerService.updateProfile({
         username: cleanUsername,
         displayName: profileName.trim(),
         bio: profileBio.trim(),
@@ -758,6 +761,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         avatarUrl: profileAvatar.trim(),
         socialLinks: profileLinks
       });
+      if (res?.token && typeof window !== 'undefined') {
+        localStorage.setItem('streamneon_auth_token', res.token);
+      }
       await refreshUser();
       setProfileSavedMsg(true);
       setTimeout(() => setProfileSavedMsg(false), 3000);

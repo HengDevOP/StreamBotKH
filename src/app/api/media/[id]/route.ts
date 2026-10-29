@@ -22,10 +22,10 @@ export async function DELETE(
     }
 
     const mediaCol = await getMediaCollection();
-    const media = await mediaCol.findOne({
-      _id: new ObjectId(mediaId),
-      userId
-    });
+    const filter = authUser?.email
+      ? { _id: new ObjectId(mediaId), $or: [{ userId }, { userEmail: authUser.email }] }
+      : { _id: new ObjectId(mediaId), userId };
+    const media = await mediaCol.findOne(filter);
 
     if (!media) {
       return NextResponse.json(
@@ -45,7 +45,7 @@ export async function DELETE(
     }
 
     // 2. Delete document from MongoDB
-    await mediaCol.deleteOne({ _id: new ObjectId(mediaId), userId });
+    await mediaCol.deleteOne({ _id: new ObjectId(mediaId) });
 
     return NextResponse.json({
       success: true,

@@ -50,6 +50,7 @@ export interface IssueReportDoc {
 export interface MediaDoc {
   _id?: ObjectId;
   userId: string; // Login ID owner
+  userEmail?: string; // Verified Google Email anchor
   filename: string;
   storedFilename: string;
   url: string; // e.g. /uploads/media/xxx.gif
@@ -589,7 +590,9 @@ export async function initMongo() {
     
     // Create unique indices
     await db.collection('users').createIndex({ userId: 1 }, { unique: true });
+    await db.collection('users').createIndex({ email: 1 });
     await db.collection('media').createIndex({ userId: 1, createdAt: -1 });
+    await db.collection('media').createIndex({ userEmail: 1, createdAt: -1 });
     await db.collection('overlays').createIndex({ overlayToken: 1 }, { unique: true });
     await db.collection('overlays').createIndex({ userId: 1, createdAt: -1 });
     await db.collection('temporary_donations').createIndex({ id: 1 }, { unique: true });

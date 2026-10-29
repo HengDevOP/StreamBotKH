@@ -232,11 +232,43 @@ export async function PUT(req: NextRequest) {
       console.error('[MongoDB] Failed updating user profile in Mongo:', mongoErr);
     }
 
+    // 6. Cascade username changes to related collections (gateway_settings & temporary_donations)
+    if (newUsername !== current.username) {
+      try {
+        const { getGatewayConfigCollection, getTemporaryDonationsCollection } = await import('@/server/database/mongo');
+        const gatewayCol = await getGatewayConfigCollection();
+        await gatewayCol.updateMany(
+          { $or: [{ streamerId: authUser.id }, { _id: `khqr_${authUser.id}` }] },
+          { $set: { streamerUsername: newUsername, updatedAt: new Date() } }
+        );
+
+        const tempCol = await getTemporaryDonationsCollection();
+        await tempCol.updateMany(
+          { streamerId: authUser.id },
+          { $set: { streamerUsername: newUsername } }
+        );
+      } catch (cascadeErr) {
+        console.warn('[Profile PUT] Cascade username update warning:', cascadeErr);
+      }
+    }
+
     const updated = db.prepare('SELECT * FROM streamers WHERE id = ?').get(authUser.id) as any;
+
+    // 7. Issue refreshed JWT token with the new username
+    let newToken: string | undefined;
+    try {
+      const { generateToken } = await import('@/app/api/auth/google/route');
+      newToken = generateToken({
+        id: updated.id,
+        username: updated.username,
+        email: updated.email
+      });
+    } catch (e) {}
 
     return NextResponse.json({
       success: true,
       message: 'Account profile updated successfully!',
+      token: newToken,
       user: {
         id: updated.id,
         email: updated.email,
