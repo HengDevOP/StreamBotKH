@@ -249,3 +249,34 @@ body:has(.obs-overlay) {
     animation: cancelToastSlidePopLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }
+
+/* Step Transition Swipe Animations (Forward = Swipe Left, Backward = Swipe Right) */
+@keyframes slideInFromRight {
+  0% {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-left {
+  animation: slideInFromRight 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-right {
+  animation: slideInFromLeft 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

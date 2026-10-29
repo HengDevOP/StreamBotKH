@@ -96,6 +96,13 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
   // Active Wizard Step: 1 = Connect (GramJS), 2 = Provide Master KHQR, 3 = Connect Group Listener
   const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+  const [stepDirection, setStepDirection] = useState<'forward' | 'backward'>('forward');
+
+  const goToStep = (nextStep: 1 | 2 | 3) => {
+    if (nextStep === activeStep) return;
+    setStepDirection(nextStep > activeStep ? 'forward' : 'backward');
+    setActiveStep(nextStep);
+  };
 
   // ================================================================
   // STEP 1 STATE: GramJS MTProto User Client Connection
@@ -460,7 +467,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
         setTwoFaPassword('');
         setNeedPassword(false);
         setStep1Msg({ type: 'success', text: data.message || 'GramJS connected successfully!' });
-        setActiveStep(2);
+        goToStep(2);
         await fetchUserClientStatus();
         await fetchTargetGroups();
       } else if (data.needPassword) {
@@ -494,7 +501,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             setUserClientStatus({ isConnected: false, monitoredChats: [] });
             setTargetGroups([]);
             setAvailableDialogs([]);
-            setActiveStep(1);
+            goToStep(1);
             await fetchUserClientStatus();
             await fetchTargetGroups();
             showAlert({
@@ -559,7 +566,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           text: 'Official Master KHQR payment image uploaded successfully and activated!'
         });
         await fetchGatewayConfig();
-        setActiveStep(3); // Automate the client into step 3!
+        goToStep(3); // Automate the client into step 3!
       } else {
         setStep2Msg({
           type: 'error',
@@ -714,7 +721,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           {/* STEP 1: Connect Node */}
           <button
             type="button"
-            onClick={() => setActiveStep(1)}
+            onClick={() => goToStep(1)}
             className="group relative z-10 flex flex-col items-center text-center cursor-pointer focus:outline-none"
           >
             <div
@@ -747,7 +754,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           {/* STEP 2: KHQR Node */}
           <button
             type="button"
-            onClick={() => setActiveStep(2)}
+            onClick={() => goToStep(2)}
             className="group relative z-10 flex flex-col items-center text-center cursor-pointer focus:outline-none"
           >
             <div
@@ -780,7 +787,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           {/* STEP 3: GROUP Node */}
           <button
             type="button"
-            onClick={() => setActiveStep(3)}
+            onClick={() => goToStep(3)}
             className="group relative z-10 flex flex-col items-center text-center cursor-pointer focus:outline-none"
           >
             <div
@@ -813,10 +820,19 @@ export const PaymentGatewayAdmin: React.FC = () => {
       </div>
 
       {/* ============================================================== */}
-      {/* STEP 1 CONTENT: "Connect" (GramJS Client Connection)           */}
+      {/* DIRECTIONAL STEP TRANSITION SWIPE WRAPPER                      */}
       {/* ============================================================== */}
-      {activeStep === 1 && (
-        <Card glow="cyan" className="space-y-6 animate-fadeIn">
+      <div
+        key={activeStep}
+        className={`overflow-hidden transition-all ${
+          stepDirection === 'forward' ? 'animate-slide-left' : 'animate-slide-right'
+        }`}
+      >
+        {/* ============================================================== */}
+        {/* STEP 1 CONTENT: "Connect" (GramJS Client Connection)           */}
+        {/* ============================================================== */}
+        {activeStep === 1 && (
+          <Card glow="cyan" className="space-y-6">
           {step1Msg && step1Msg.type === 'error' && (
             <div className="p-3.5 rounded-xl border text-xs flex items-center gap-2 bg-red-950/40 border-red-500/30 text-red-300">
               <AlertCircle size={16} />
@@ -854,7 +870,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   type="button"
                   variant="primary"
                   size="md"
-                  onClick={() => setActiveStep(2)}
+                  onClick={() => goToStep(2)}
                   className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap"
                 >
                   <span>Continue to Step 2</span>
@@ -1007,11 +1023,11 @@ export const PaymentGatewayAdmin: React.FC = () => {
         </Card>
       )}
 
-      {/* ============================================================== */}
-      {/* STEP 2 CONTENT: "Provide Master KHQR Image"                    */}
-      {/* ============================================================== */}
-      {activeStep === 2 && (
-        <Card glow="cyan" className="space-y-6 animate-fadeIn">
+        {/* ============================================================== */}
+        {/* STEP 2 CONTENT: "Provide Master KHQR Image"                    */}
+        {/* ============================================================== */}
+        {activeStep === 2 && (
+          <Card glow="cyan" className="space-y-6">
           {step2Msg && step2Msg.type === 'error' && (
             <div className="p-3.5 rounded-xl border text-xs flex items-center gap-2 bg-red-950/40 border-red-500/30 text-red-300">
               <AlertCircle size={16} />
@@ -1091,7 +1107,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   type="button"
                   variant="outline"
                   size="md"
-                  onClick={() => setActiveStep(1)}
+                  onClick={() => goToStep(1)}
                   className="font-bold cursor-pointer"
                 >
                   <ChevronLeft size={16} className="mr-1" />
@@ -1102,7 +1118,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   type="button"
                   variant="primary"
                   size="md"
-                  onClick={() => setActiveStep(3)}
+                  onClick={() => goToStep(3)}
                   className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
                 >
                   <span>Continue to Step 3</span>
@@ -1206,7 +1222,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   type="button"
                   variant="outline"
                   size="md"
-                  onClick={() => setActiveStep(1)}
+                  onClick={() => goToStep(1)}
                   className="font-bold cursor-pointer"
                 >
                   <ChevronLeft size={16} className="mr-1" />
@@ -1217,7 +1233,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   type="button"
                   variant="primary"
                   size="md"
-                  onClick={() => setActiveStep(3)}
+                  onClick={() => goToStep(3)}
                   className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
                 >
                   <span>Continue to Step 3</span>
@@ -1229,11 +1245,11 @@ export const PaymentGatewayAdmin: React.FC = () => {
         </Card>
       )}
 
-      {/* ============================================================== */}
-      {/* STEP 3 CONTENT: "Connect to Group via Link Telegram"           */}
-      {/* ============================================================== */}
-      {activeStep === 3 && (
-        <Card glow="cyan" className="space-y-6 animate-fadeIn">
+        {/* ============================================================== */}
+        {/* STEP 3 CONTENT: "Connect to Group via Link Telegram"           */}
+        {/* ============================================================== */}
+        {activeStep === 3 && (
+          <Card glow="cyan" className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
@@ -1315,7 +1331,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 <Button
                   variant="primary"
                   size="md"
-                  onClick={() => setActiveStep(1)}
+                  onClick={() => goToStep(1)}
                   className="font-bold shadow-lg shadow-cyan-400/20"
                 >
                   <ArrowRight size={14} className="mr-2" />
@@ -1611,7 +1627,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
               type="button"
               variant="outline"
               size="md"
-              onClick={() => setActiveStep(2)}
+              onClick={() => goToStep(2)}
               className="font-bold"
             >
               <ChevronLeft size={16} className="mr-1" />
@@ -1625,6 +1641,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           </div>
         </Card>
       )}
+      </div>
     </div>
   );
 };
