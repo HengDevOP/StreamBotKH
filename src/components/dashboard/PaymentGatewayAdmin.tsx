@@ -24,7 +24,8 @@ import {
   ChevronDown,
   CheckCheck,
   Bot,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
@@ -175,6 +176,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [uploadingKhqr, setUploadingKhqr] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [step2Msg, setStep2Msg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [uploadSuccessToast, setUploadSuccessToast] = useState<{ show: boolean; message: string }>({
+    show: false,
+    message: ''
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -610,6 +615,16 @@ export const PaymentGatewayAdmin: React.FC = () => {
           text: 'Official Master KHQR payment image uploaded successfully and activated!'
         });
         await fetchGatewayConfig();
+
+        // Slide in bottom-right success toast, then slide back after 4.5s
+        setUploadSuccessToast({
+          show: true,
+          message: 'Official Master KHQR uploaded successfully! Live on your donation page.'
+        });
+        setTimeout(() => {
+          setUploadSuccessToast((prev) => ({ ...prev, show: false }));
+        }, 4500);
+
         goToStep(3); // Automate the client into step 3!
       } else {
         setStep2Msg({
@@ -638,6 +653,9 @@ export const PaymentGatewayAdmin: React.FC = () => {
       confirmText: 'Remove Image',
       onConfirm: async () => {
         try {
+          // Immediately reset config in state so page returns to upload design styling
+          setGatewayConfig((prev: any) => (prev ? { ...prev, khqrImageUrl: '' } : null));
+
           const res = await authFetch('/api/payment-gateway/upload-khqr', { method: 'DELETE' });
           const data = await res.json();
           if (res.ok && data.success) {
@@ -649,6 +667,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
               message: data.error || 'Failed to remove image',
               type: 'danger'
             });
+            await fetchGatewayConfig();
           }
         } catch (e: any) {
           showAlert({
@@ -656,6 +675,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             message: 'Error removing image',
             type: 'danger'
           });
+          await fetchGatewayConfig();
         }
       }
     });
@@ -960,9 +980,9 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   variant="primary"
                   size="md"
                   onClick={() => goToStep(2)}
-                  className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap"
+                  className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
                 >
-                  <span>Continue to Step 2</span>
+                  <span>Continue</span>
                   <ArrowRight size={15} className="ml-1" />
                 </Button>
               </div>
@@ -1145,14 +1165,25 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   </div>
                 )}
 
-                <div className="space-y-1">
+                <div className="space-y-1.5 max-w-sm">
                   <div className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
                     Master KHQR Active
                   </div>
-                  <div className="text-xs font-mono text-emerald-400 flex items-center justify-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span>Live on @{currentStreamerUsername} donation page</span>
-                  </div>
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                    This KHQR image is displayed on your public donation page for your viewers to scan and tip you directly.
+                  </p>
+                </div>
+
+                {/* View Donation / Tip Page Button */}
+                <div className="pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => window.open(`/@${currentStreamerUsername}`, '_blank', 'noopener,noreferrer')}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-cyan-200 text-xs font-mono font-bold transition-all shadow-[0_0_15px_rgba(0,240,255,0.15)] cursor-pointer"
+                  >
+                    <span>View Donation Page</span>
+                    <ExternalLink size={13} />
+                  </button>
                 </div>
 
                 <div className="flex items-center justify-center gap-3 pt-1">
@@ -1210,7 +1241,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   onClick={() => goToStep(3)}
                   className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
                 >
-                  <span>Continue to Step 3</span>
+                  <span>Continue</span>
                   <ArrowRight size={15} className="ml-1" />
                 </Button>
               </div>
@@ -1325,7 +1356,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   onClick={() => goToStep(3)}
                   className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
                 >
-                  <span>Continue to Step 3</span>
+                  <span>Continue</span>
                   <ArrowRight size={15} className="ml-1" />
                 </Button>
               </div>
@@ -1593,18 +1624,40 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 <ChevronLeft size={16} className="mr-1" />
                 <span>Back to Step 2</span>
               </Button>
-
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold shadow-md">
-                <CheckCircle2 size={16} className="text-emerald-400" />
-                <span>
-                  {targetGroups.length > 0
-                    ? `Step 3 Configured • ${targetGroups.length} Active`
-                    : 'Step 3: Connect Group'}
-                </span>
-              </div>
             </div>
           </Card>
         )}
+      </div>
+
+      {/* Upload Succeeded Animated Slide Toast (Slides in from bottom right to left, then slides back) */}
+      <div
+        className={`fixed bottom-6 right-6 z-50 max-w-sm sm:max-w-md transition-all duration-500 ease-out transform pointer-events-auto ${
+          uploadSuccessToast.show
+            ? 'translate-x-0 opacity-100 shadow-[0_0_30px_rgba(16,185,129,0.35)]'
+            : 'translate-x-[120%] opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="p-4 rounded-2xl bg-[#090D18]/95 border border-emerald-500/50 backdrop-blur-xl shadow-2xl flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+            <CheckCircle2 size={20} />
+          </div>
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <div className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              Upload Succeeded
+            </div>
+            <p className="text-xs text-white font-medium leading-relaxed">
+              {uploadSuccessToast.message}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUploadSuccessToast((prev) => ({ ...prev, show: false }))}
+            className="text-slate-500 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+          >
+            <X size={15} />
+          </button>
+        </div>
       </div>
     </div>
   );

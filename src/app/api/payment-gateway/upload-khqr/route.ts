@@ -91,27 +91,17 @@ export async function POST(req: NextRequest) {
       { upsert: true }
     );
 
-    // 7. Safe SQLite migration & client-scoped update
-    try {
-      db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_image TEXT');
-      db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_filename TEXT');
-      db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_filesize INTEGER');
-      db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_mimetype TEXT');
-      db.exec('ALTER TABLE payment_settings ADD COLUMN master_khqr_updated_at DATETIME');
-    } catch (e) {}
-
+    // 7. Safe SQLite update
     try {
       db.prepare(`
-        INSERT INTO payment_settings (streamer_id, master_khqr_image, master_khqr_filename, master_khqr_filesize, master_khqr_mimetype, master_khqr_updated_at)
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO payment_settings (streamer_id, master_khqr_image)
+        VALUES (?, ?)
         ON CONFLICT(streamer_id) DO UPDATE SET
-          master_khqr_image = excluded.master_khqr_image,
-          master_khqr_filename = excluded.master_khqr_filename,
-          master_khqr_filesize = excluded.master_khqr_filesize,
-          master_khqr_mimetype = excluded.master_khqr_mimetype,
-          master_khqr_updated_at = excluded.master_khqr_updated_at
-      `).run(streamerId, publicUrl, originalName, file.size, mimeType || 'image/png');
-    } catch (e) {}
+          master_khqr_image = excluded.master_khqr_image
+      `).run(streamerId, publicUrl);
+    } catch (e) {
+      console.warn('[upload-khqr POST] SQLite update error:', e);
+    }
 
     console.log(`✅ [Payment Gateway] Master KHQR image uploaded for client [${streamerId}]: ${publicUrl} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
 
@@ -149,11 +139,16 @@ export async function DELETE(req: NextRequest) {
       } catch (e) {}
     }
 
-    await gatewayCol.updateOne(
-      { _id: `khqr_${streamerId}` },
+    await gatewayCol.updateMany(
+      {
+        $or: [
+          { _id: `khqr_${streamerId}` },
+          { streamerId },
+          { _id: 'master_khqr_config' }
+        ]
+      },
       {
         $set: {
-          streamerId,
           khqrImageUrl: '',
           khqrFilename: '',
           khqrFileSize: 0,
@@ -167,13 +162,21 @@ export async function DELETE(req: NextRequest) {
     try {
       db.prepare(`
         UPDATE payment_settings
-        SET master_khqr_image = NULL,
-            master_khqr_filename = NULL,
-            master_khqr_filesize = NULL,
-            master_khqr_mimetype = NULL,
-            master_khqr_updated_at = CURRENT_TIMESTAMP
+        SET master_khqr_image = ''
         WHERE streamer_id = ?
       `).run(streamerId);
+    } catch (e) {
+      console.warn('[upload-khqr DELETE] SQLite update error:', e);
+    }
+
+    // Clean up demo-streamer-id-1001 if removing for demo or admin
+    try {
+      if (streamerId === 'demo-streamer-id-1001') {
+        db.prepare(`
+          UPDATE payment_settings
+          SET master_khqr_image = ''
+        `).run();
+      }
     } catch (e) {}
 
     return NextResponse.json({

@@ -65,8 +65,14 @@ export async function GET(req: NextRequest) {
       });
     } catch (e) {}
 
-    // Combine streamer-scoped settings
-    const khqrImageUrl = mongoConfig?.khqrImageUrl || sqliteSettings?.master_khqr_image || '';
+    // Combine streamer-scoped settings: MongoDB is primary. If mongoConfig explicitly has khqrImageUrl, respect it (including empty string when removed)
+    let khqrImageUrl = '';
+    if (mongoConfig && typeof mongoConfig.khqrImageUrl === 'string') {
+      khqrImageUrl = mongoConfig.khqrImageUrl;
+    } else if (sqliteSettings && typeof sqliteSettings.master_khqr_image === 'string') {
+      khqrImageUrl = sqliteSettings.master_khqr_image;
+    }
+
     const khqrFilename = mongoConfig?.khqrFilename || sqliteSettings?.master_khqr_filename || '';
     const khqrFileSize = mongoConfig?.khqrFileSize || sqliteSettings?.master_khqr_filesize || 0;
     const khqrMimeType = mongoConfig?.khqrMimeType || sqliteSettings?.master_khqr_mimetype || '';
