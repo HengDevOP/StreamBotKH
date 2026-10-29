@@ -349,66 +349,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
               description={description}
             />
           </div>
-
-          <div className="text-xs font-mono text-slate-400 mt-4 text-center">
-            Subathon Formula: <span className="text-cyan-400 font-bold">$1.00 = +{rateMinutesPerUsd}m</span> •{' '}
-            <span className="text-emerald-400 font-bold">4,000៛ = +{rateMinutesPerKhr}m</span>
-          </div>
-
-          {/* Quick Manual Streamer Control Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-4">
-            <button
-              onClick={toggleRunning}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold font-mono text-xs shadow-lg transition-all active:scale-[0.98] ${
-                isRunning
-                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20'
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow-emerald-500/20'
-              }`}
-            >
-              {isRunning ? <Pause size={15} /> : <Play size={15} />}
-              <span>{isRunning ? 'Pause Timer' : 'Resume Timer'}</span>
-            </button>
-
-            <button
-              onClick={() => addSeconds(300)}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors"
-            >
-              +5m
-            </button>
-            <button
-              onClick={() => addSeconds(600)}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors"
-            >
-              +10m
-            </button>
-            <button
-              onClick={() => addSeconds(1800)}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors"
-            >
-              +30m
-            </button>
-            <button
-              onClick={() => addSeconds(3600)}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors"
-            >
-              +1h
-            </button>
-            <button
-              onClick={() => subtractSeconds(300)}
-              className="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-red-400 text-xs font-mono transition-colors"
-              title="Subtract 5 minutes"
-            >
-              -5m
-            </button>
-            <button
-              onClick={resetToInitial}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white text-xs font-mono transition-colors"
-              title="Reset to initial duration"
-            >
-              <RotateCcw size={13} />
-              <span>Reset</span>
-            </button>
-          </div>
         </div>
       </Card>
 
@@ -705,6 +645,58 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
                   <option value="Bebas Neue">Bebas Neue (Bold Tall)</option>
                   <option value="Press Start 2P">Press Start 2P (Retro 8-Bit)</option>
                 </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Live Manual Streamer Controls Card */}
+          <Card className="p-5 sm:p-6 bg-[#090D18] border-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider flex items-center gap-2">
+                <Sliders size={16} className="text-cyan-400" />
+                Live Timer Controls
+              </h3>
+              <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold ${
+                isRunning ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+              }`}>
+                {isRunning ? 'COUNTDOWN RUNNING' : 'PAUSED'}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleRunning}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold font-mono text-xs shadow-lg transition-all active:scale-[0.98] ${
+                  isRunning
+                    ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20'
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow-emerald-500/20'
+                }`}
+              >
+                {isRunning ? <Pause size={15} /> : <Play size={15} />}
+                <span>{isRunning ? 'Pause Timer' : 'Resume Timer'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={resetToInitial}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-mono font-bold transition-colors"
+                title="Reset to initial duration"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            </div>
+
+            <div>
+              <span className="text-slate-400 text-[11px] font-mono block mb-2 font-semibold">Quick Adjust Remaining Time:</span>
+              <div className="grid grid-cols-6 gap-2">
+                <button type="button" onClick={() => addSeconds(300)} className="py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors">+5m</button>
+                <button type="button" onClick={() => addSeconds(600)} className="py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors">+10m</button>
+                <button type="button" onClick={() => addSeconds(1800)} className="py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors">+30m</button>
+                <button type="button" onClick={() => addSeconds(3600)} className="py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors">+1h</button>
+                <button type="button" onClick={() => subtractSeconds(300)} className="py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 text-xs font-mono font-bold transition-colors" title="Subtract 5 minutes">-5m</button>
+                <button type="button" onClick={() => subtractSeconds(600)} className="py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 text-xs font-mono font-bold transition-colors" title="Subtract 10 minutes">-10m</button>
               </div>
             </div>
           </Card>
