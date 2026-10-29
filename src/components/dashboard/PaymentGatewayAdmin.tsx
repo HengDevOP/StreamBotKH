@@ -493,6 +493,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             setUserClientStatus({ isConnected: false, monitoredChats: [] });
             setTargetGroups([]);
             setAvailableDialogs([]);
+            setActiveStep(1);
             await fetchUserClientStatus();
             await fetchTargetGroups();
             showAlert({
@@ -823,62 +824,22 @@ export const PaymentGatewayAdmin: React.FC = () => {
 
           {/* Connected State View */}
           {userClientStatus.isConnected ? (
-            <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-5 shadow-lg shadow-cyan-500/5">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400 font-black text-2xl">
-                    🇰🇭
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="text-base font-bold text-white font-['Chakra_Petch']">
-                      {userClientStatus.userName || 'Connected Streamer'}
-                    </div>
-                    <div className="text-xs font-mono text-cyan-400 font-bold">
-                      {userClientStatus.phoneNumber}
-                    </div>
-                    <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 font-mono">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                      GramJS MTProto Session Active &amp; Ready
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={handleDisconnectUserClient}
-                    className="px-3.5 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 flex items-center gap-1.5 transition-colors whitespace-nowrap"
-                  >
-                    <LogOut size={13} />
-                    <span>Disconnect</span>
-                  </button>
-
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="md"
-                    onClick={() => setActiveStep(2)}
-                    className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap"
-                  >
-                    <span>Continue to Step 2: Master KHQR</span>
-                    <ArrowRight size={15} className="ml-1" />
-                  </Button>
-                </div>
+            <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
+              <div className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
+                {userClientStatus.userName || 'Connected Streamer'}
               </div>
 
-              <div className="pt-4 border-t border-slate-800/80 text-xs font-mono grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-slate-500 text-[10px] block font-bold uppercase">CLIENT ENGINE</span>
-                  <span className="text-emerald-400 font-bold flex items-center gap-1.5 mt-0.5">
-                    <CheckCheck size={14} /> TelegramJS MTProto Background Worker
-                  </span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-slate-500 text-[10px] block font-bold uppercase">NEXT ACTION</span>
-                  <span className="text-cyan-300 font-bold mt-0.5 block">
-                    Upload official Bakong KHQR image for viewer checkout
-                  </span>
-                </div>
+              <div className="flex justify-end pt-4 border-t border-slate-800/80">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  onClick={() => setActiveStep(2)}
+                  className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap"
+                >
+                  <span>Continue to Step 2</span>
+                  <ArrowRight size={15} className="ml-1" />
+                </Button>
               </div>
             </div>
           ) : (
@@ -1260,15 +1221,26 @@ export const PaymentGatewayAdmin: React.FC = () => {
             </div>
 
             {userClientStatus.isConnected && (
-              <button
-                type="button"
-                onClick={fetchTargetGroups}
-                disabled={loadingGroups}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5"
-              >
-                <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
-                <span>Refresh Groups</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={fetchTargetGroups}
+                  disabled={loadingGroups}
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
+                  <span>Refresh Groups</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDisconnectUserClient}
+                  className="px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 flex items-center gap-1.5 transition-colors whitespace-nowrap font-mono cursor-pointer"
+                >
+                  <LogOut size={13} />
+                  <span>Disconnect</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -1614,9 +1586,22 @@ export const PaymentGatewayAdmin: React.FC = () => {
               <span>Back to Step 2</span>
             </Button>
 
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold shadow-md">
-              <CheckCircle2 size={16} className="text-emerald-400" />
-              <span>Step 3 Configured • Listener Active</span>
+            <div className="flex items-center gap-3">
+              {userClientStatus.isConnected && (
+                <button
+                  type="button"
+                  onClick={handleDisconnectUserClient}
+                  className="px-3.5 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 flex items-center gap-1.5 transition-colors whitespace-nowrap font-mono cursor-pointer"
+                >
+                  <LogOut size={13} />
+                  <span>Disconnect</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold shadow-md">
+                <CheckCircle2 size={16} className="text-emerald-400" />
+                <span>Step 3 Configured • Listener Active</span>
+              </div>
             </div>
           </div>
         </Card>
