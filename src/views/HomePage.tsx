@@ -162,20 +162,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
       {/* ===================== HERO SECTION ===================== */}
       <section className="relative pt-8 sm:pt-20 text-center space-y-6 sm:space-y-9 max-w-5xl mx-auto px-3 sm:px-4">
-        {/* Holographic Live Status Pill */}
-        <div className="inline-flex items-center justify-center flex-wrap gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/30 text-xs font-mono text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)] backdrop-blur-md transition-all hover:border-cyan-400/50 max-w-full">
-          <span className="flex h-2 w-2 relative flex-shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
-          </span>
-          <span className="tracking-widest uppercase font-semibold text-[10px] sm:text-[11px] text-slate-200">
-            LIVE IN CAMBODIA: ABA PAYWAY &amp; BAKONG KHQR 2.0
-          </span>
-          <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 text-[9px] sm:text-[10px] font-bold border border-pink-500/40 uppercase tracking-wider flex-shrink-0">
-            0% FEE ON PRO
-          </span>
-        </div>
-
         {/* Hero Headline */}
         <div className="space-y-4 sm:space-y-5">
           <h1 className="text-3xl xs:text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white uppercase leading-[1.08] font-['Chakra_Petch']">
