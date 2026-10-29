@@ -19,7 +19,6 @@ import {
   ChevronRight,
   ChevronLeft,
   ArrowRight,
-  Users,
   Plus,
   LogOut,
   ChevronUp,
@@ -1343,91 +1342,58 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-5 sm:p-7 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-5 shadow-lg shadow-cyan-500/5">
-                {/* Clean Header Bar */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
-                      <Users size={22} className={isStep3Done ? 'text-cyan-400' : 'text-slate-400'} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
-                          STEP 3: Connect Telegram Group for Listener
-                        </h3>
-                        {isStep3Done ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                            {targetGroups.length} GROUPS ACTIVE
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono">
-                            NO GROUPS YET
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Select and connect your Telegram bank notification groups or channels below. GramJS will monitor incoming messages in real-time and trigger OBS alerts.
-                      </p>
-                    </div>
+              <div className="p-5 sm:p-7 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-4 shadow-lg shadow-cyan-500/5">
+                {/* Top Row: Filter Pills (Left) & Refresh Button Icon (Top Right) */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setGroupFilter('all')}
+                      className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
+                        groupFilter === 'all'
+                          ? 'bg-slate-800 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      All ({availableDialogs.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGroupFilter('connected')}
+                      className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
+                        groupFilter === 'connected'
+                          ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Active ({targetGroups.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGroupFilter('available')}
+                      className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
+                        groupFilter === 'available'
+                          ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-500/30'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Available ({Math.max(0, availableDialogs.length - targetGroups.length)})
+                    </button>
                   </div>
 
+                  {/* Refresh Button with Icon Only at Top Right */}
                   <button
                     type="button"
                     onClick={fetchTargetGroups}
                     disabled={loadingGroups}
-                    className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors text-xs font-mono flex items-center gap-1.5 cursor-pointer flex-shrink-0"
+                    title="Refresh Groups"
+                    className="w-9 h-9 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-cyan-400 transition-colors flex items-center justify-center cursor-pointer flex-shrink-0"
                   >
-                    <RefreshCw size={13} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
-                    <span>Refresh Groups</span>
+                    <RefreshCw size={14} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
                   </button>
                 </div>
 
-                {/* Filter Pills & Search Input */}
-                <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono">
-                      <button
-                        type="button"
-                        onClick={() => setGroupFilter('all')}
-                        className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
-                          groupFilter === 'all'
-                            ? 'bg-slate-800 text-white'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        All ({availableDialogs.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setGroupFilter('connected')}
-                        className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
-                          groupFilter === 'connected'
-                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/30'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Active ({targetGroups.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setGroupFilter('available')}
-                        className={`px-3 py-1 rounded-lg transition-colors font-semibold cursor-pointer ${
-                          groupFilter === 'available'
-                            ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-500/30'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Available ({Math.max(0, availableDialogs.length - targetGroups.length)})
-                      </button>
-                    </div>
-
-                    <div className="text-[11px] font-mono text-slate-500 self-center sm:self-auto">
-                      Click any group to connect or disconnect the listener.
-                    </div>
-                  </div>
-
-                  {/* Search Input Bar */}
+                {/* Search Input Bar */}
                   <div className="relative">
                     <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
                       <Search size={15} />
@@ -1449,7 +1415,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
                       </button>
                     )}
                   </div>
-                </div>
 
                 {/* 1 GRID ONLY: CLEAN LIST OF TELEGRAM GROUPS */}
                 {(() => {
