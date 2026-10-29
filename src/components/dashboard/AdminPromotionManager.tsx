@@ -587,6 +587,10 @@ export const AdminPromotionManager: React.FC = () => {
             <div className="h-px bg-purple-500/20" />
 
             <ul className="space-y-2 text-xs text-slate-200">
+              <li className="flex items-center gap-2 text-purple-300 font-semibold">
+                <Check size={14} className="text-purple-400" />
+                <span>100MB Media Cloud Storage (MP4, GIF, MP3, WAV)</span>
+              </li>
               <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                 <Check size={14} className="text-emerald-400" />
                 <span>0% platform fee (Keep 100% of tips)</span>
@@ -594,10 +598,6 @@ export const AdminPromotionManager: React.FC = () => {
               <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                 <Check size={14} className="text-emerald-400" />
                 <span>Removed Watermark (Clean Donation Page)</span>
-              </li>
-              <li className="flex items-center gap-2 text-purple-300 font-semibold">
-                <Check size={14} className="text-purple-400" />
-                <span>500MB Media Cloud Storage (MP4, GIF, MP3, WAV)</span>
               </li>
             </ul>
           </div>

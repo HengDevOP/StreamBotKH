@@ -128,7 +128,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // Up to 100MB per file (bounded by plan quota: 20MB Free / 500MB Pro)
+  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // Up to 100MB per file (bounded by plan quota: 20MB Free / 100MB Pro)
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;

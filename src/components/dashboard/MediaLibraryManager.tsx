@@ -176,7 +176,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // Up to 100MB per file (bounded by plan quota: 20MB Free / 500MB Pro)
+  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // Up to 100MB per file (bounded by plan quota: 20MB Free / 100MB Pro)
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
@@ -454,7 +454,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
               </div>
 
               <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
-                <span>Free: 20MB • Pro: 500MB</span>
+                <span>Free: 20MB • Pro: 100MB</span>
                 <span>{formatFileSize(storageInfo.remainingBytes)} available</span>
               </div>
             </div>
@@ -494,7 +494,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                 {uploading ? 'Uploading media to MongoDB...' : 'Click to upload or drag and drop'}
               </div>
               <p className="text-xs text-slate-400">
-                Supports <strong className="text-slate-300">MP4</strong>, <strong className="text-slate-300">GIF</strong>, <strong className="text-slate-300">MP3</strong>, <strong className="text-slate-300">WAV</strong>, <strong className="text-slate-300">PNG</strong>, <strong className="text-slate-300">JPG</strong>, <strong className="text-slate-300">WEBP</strong> &amp; all formatted files (Free: <strong className="text-cyan-400">20MB</strong> • Pro: <strong className="text-purple-400">500MB</strong>).
+                Supports <strong className="text-slate-300">MP4</strong>, <strong className="text-slate-300">GIF</strong>, <strong className="text-slate-300">MP3</strong>, <strong className="text-slate-300">WAV</strong>, <strong className="text-slate-300">PNG</strong>, <strong className="text-slate-300">JPG</strong>, <strong className="text-slate-300">WEBP</strong> &amp; all formatted files (Free: <strong className="text-cyan-400">20MB</strong> • Pro: <strong className="text-purple-400">100MB</strong>).
               </p>
             </div>
           </div>

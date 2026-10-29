@@ -1477,7 +1477,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       Current Plan: Free Plan (10% Platform Fee Cut Active)
                     </div>
                     <p className="text-xs text-slate-400">
-                      Upgrade to Pro Plan ($4.99/mo) to unlock Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Spinning Wheels, 500MB storage, removed watermark, and 0% fee!
+                      Upgrade to Pro Plan ($4.99/mo) to unlock Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Spinning Wheels, 100MB storage, removed watermark, and 0% fee!
                     </p>
                   </div>
                   <button
@@ -1776,7 +1776,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   </h3>
                   <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
                     Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels are included in the{' '}
-                    <strong className="text-white">Pro Plan ($4.99/mo)</strong> along with 0% platform fee, 500MB storage, and removed donation page watermark.
+                    <strong className="text-white">Pro Plan ($4.99/mo)</strong> along with 0% platform fee, 100MB storage, and removed donation page watermark.
                   </p>
                 </div>
 
@@ -2296,7 +2296,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         }`}
                       >
-                        {currentPlan === 'pro' ? 'Pro (500MB)' : 'Free (20MB)'}
+                        {currentPlan === 'pro' ? 'Pro (100MB)' : 'Free (20MB)'}
                       </span>
                     </div>
 
@@ -2310,10 +2310,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         <span className="font-mono text-white font-bold">
                           {storageInfo
                             ? `${(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB / ${
-                                currentPlan === 'pro' ? '500MB' : '20MB'
+                                currentPlan === 'pro' ? '100MB' : '20MB'
                               }`
                             : currentPlan === 'pro'
-                            ? '0 MB / 500MB'
+                            ? '0 MB / 100MB'
                             : '0 MB / 20MB'}
                         </span>
                       </div>
@@ -2529,9 +2529,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       )}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Alerts, Wheels), 0% fee, and 500MB storage.
+                      Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Alerts, Wheels), and 0% fee.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
+                      <li className="flex items-center gap-2 text-purple-300 font-semibold">
+                        <Check size={14} className="text-purple-400 flex-shrink-0" />
+                        <span>100MB Media Cloud Storage (MP4, GIF, MP3, WAV, All Formats)</span>
+                      </li>
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
                         <span>Unlock Leaderboard, Goals, Timer &amp; Soundboard</span>
@@ -2547,10 +2551,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
                         <span>Removed Watermark (Clean Donation Page)</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-purple-300 font-semibold">
-                        <Check size={14} className="text-purple-400 flex-shrink-0" />
-                        <span>500MB Media Cloud Storage (MP4, GIF, MP3, WAV, All Formats)</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />

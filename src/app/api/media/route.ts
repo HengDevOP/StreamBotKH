@@ -11,9 +11,9 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // Up to 100MB per individual file (bou
 // Media storage limits per user plan
 const PLAN_STORAGE_LIMITS: Record<string, { label: string; limitBytes: number }> = {
   free: { label: 'Free (20MB)', limitBytes: 20 * 1024 * 1024 }, // 20MB
-  starter: { label: 'Starter (250MB)', limitBytes: 250 * 1024 * 1024 }, // 250MB
-  pro: { label: 'Pro (500MB)', limitBytes: 500 * 1024 * 1024 }, // 500MB
-  studio: { label: 'Pro (500MB)', limitBytes: 500 * 1024 * 1024 } // backwards compatibility
+  starter: { label: 'Starter (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
+  pro: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
+  studio: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 } // backwards compatibility
 };
 
 function detectMimeType(mimeType: string, ext: string): string {
@@ -130,10 +130,10 @@ export async function POST(req: NextRequest) {
 
     if (usedBytes + file.size > quota.limitBytes) {
       const usedMb = (usedBytes / (1024 * 1024)).toFixed(1);
-      const limitDisplay = userPlan === 'free' ? '20MB' : '500MB';
+      const limitDisplay = userPlan === 'free' ? '20MB' : '100MB';
       return NextResponse.json(
         {
-          error: `Storage quota exceeded for your ${userPlan.toUpperCase()} plan (${usedMb}MB used of ${limitDisplay} limit). Upgrade to Pro ($4.99/mo for 500MB) or delete older files.`
+          error: `Storage quota exceeded for your ${userPlan.toUpperCase()} plan (${usedMb}MB used of ${limitDisplay} limit). Upgrade to Pro ($4.99/mo for 100MB) or delete older files.`
         },
         { status: 400 }
       );

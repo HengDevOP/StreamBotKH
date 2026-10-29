@@ -485,7 +485,7 @@ export async function seedDefaultMailboxMessages(streamerId: string) {
         senderName: 'StreamBotKH Platform',
         senderAvatar: '',
         category: 'announcement',
-        content: `Looking to level up your broadcast? Pro Plan gives you access to:\n• Leaderboard widget for top donor recognition\n• Dynamic Stream Goals & Subathon Timer\n• Custom Soundboard & Video Media Share\n• 2D Pokémon companion and Spinning Wheel\n• 500MB Media Storage and 0% commission\n\nCheck out Plans & Commission anytime in your dashboard!`,
+        content: `Looking to level up your broadcast? Pro Plan gives you access to:\n• 100MB Media Storage and 0% commission\n• Leaderboard widget for top donor recognition\n• Dynamic Stream Goals & Subathon Timer\n• Custom Soundboard & Video Media Share\n• 2D Pokémon companion and Spinning Wheel\n\nCheck out Plans & Commission anytime in your dashboard!`,
         preview: 'Looking to level up your broadcast? Unlock Leaderboards, Goals, Timer, Soundboard, and more...',
         isRead: false,
         actionUrl: '/dashboard?tab=billing',

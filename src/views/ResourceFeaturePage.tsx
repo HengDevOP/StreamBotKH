@@ -97,7 +97,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     planBadge: 'ALL PLANS',
     shortSub: 'Viewer audio & visual stream sync',
     description:
-      'Upload, preview, and manage all your custom stream assets in one centralized vault. Supports MP4, GIF, MP3, WAV, WEBM, OGG, MOV, PNG, JPG, and WEBP with up to 500MB of high-speed cloud storage on the Pro Plan.',
+      'Upload, preview, and manage all your custom stream assets in one centralized vault. Supports MP4, GIF, MP3, WAV, WEBM, OGG, MOV, PNG, JPG, and WEBP with up to 100MB of high-speed cloud storage on the Pro Plan.',
     dashboardTab: 'media',
     color: '#3B82F6',
     icon: Layers,
@@ -109,8 +109,8 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
         desc: 'Upload video clips (MP4, WEBM, MOV), animated stickers (GIF, WEBP, PNG), and high-fidelity audio tracks (MP3, WAV, OGG, M4A).'
       },
       {
-        title: 'Up to 500MB Pro Cloud Storage',
-        desc: 'Free plan includes 20MB starter storage, while Pro Plan unlocks 500MB of dedicated cloud asset storage.'
+        title: 'Up to 100MB Pro Cloud Storage',
+        desc: 'Free plan includes 20MB starter storage, while Pro Plan unlocks 100MB of dedicated cloud asset storage.'
       },
       {
         title: 'Instant Studio Integration',
@@ -235,7 +235,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
       },
       {
         title: 'Direct Media Library Sync',
-        desc: 'Import any MP3 or WAV file from your 500MB Cloud Media Library in seconds.'
+        desc: 'Import any MP3 or WAV file from your 100MB Cloud Media Library in seconds.'
       }
     ],
     steps: [
@@ -588,7 +588,7 @@ export const ResourceFeaturePage: React.FC<ResourceFeaturePageProps> = ({ onNavi
 
                 {feature.slug === 'media-share' && (
                   <div className="space-y-2">
-                    <div className="text-xs font-mono font-bold text-blue-400">500MB CLOUD ASSET VAULT</div>
+                    <div className="text-xs font-mono font-bold text-blue-400">100MB CLOUD ASSET VAULT</div>
                     <div className="flex items-center justify-center gap-1.5 flex-wrap">
                       {['MP4', 'GIF', 'MP3', 'WAV', 'WEBM', 'PNG'].map((ext) => (
                         <span key={ext} className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono text-white font-bold">
