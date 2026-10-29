@@ -173,6 +173,24 @@ export interface TelegramMonitoredGroupDoc {
   updatedAt: Date;
 }
 
+export interface MailboxMessageDoc {
+  _id?: ObjectId;
+  id: string; // unique uuid string
+  streamerId: string; // target user ID or 'all' for platform announcements
+  title: string;
+  senderName: string;
+  senderAvatar?: string;
+  category: 'system' | 'donation' | 'security' | 'announcement';
+  content: string;
+  preview?: string;
+  isRead: boolean;
+  actionUrl?: string;
+  actionLabel?: string;
+  priority?: 'normal' | 'high' | 'urgent';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /**
  * Safely extract MONGODB_URI directly from process.env with fallback
  */
@@ -322,6 +340,167 @@ export async function getTelegramMonitoredGroupsCollection(): Promise<Collection
   return db.collection<TelegramMonitoredGroupDoc>('telegram_monitored_groups');
 }
 
+export async function getMailboxMessagesCollection(): Promise<Collection<MailboxMessageDoc>> {
+  const db = await getMongoDb();
+  return db.collection<MailboxMessageDoc>('mailbox_messages');
+}
+
+export async function getMongoMailboxMessages(streamerId: string) {
+  try {
+    const col = await getMailboxMessagesCollection();
+    const docs = await col
+      .find({ streamerId: { $in: [streamerId, 'all'] } })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .toArray();
+
+    return docs.map((d) => ({
+      id: d.id,
+      streamerId: d.streamerId,
+      title: d.title,
+      senderName: d.senderName || 'StreamBotKH System',
+      senderAvatar: d.senderAvatar || '',
+      category: d.category || 'system',
+      content: d.content,
+      preview: d.preview || d.content.slice(0, 100),
+      isRead: !!d.isRead,
+      actionUrl: d.actionUrl,
+      actionLabel: d.actionLabel,
+      priority: d.priority || 'normal',
+      createdAt: d.createdAt ? d.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: d.updatedAt ? d.updatedAt.toISOString() : new Date().toISOString()
+    }));
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function addMongoMailboxMessage(data: {
+  streamerId: string;
+  title: string;
+  senderName?: string;
+  senderAvatar?: string;
+  category?: 'system' | 'donation' | 'security' | 'announcement';
+  content: string;
+  preview?: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  priority?: 'normal' | 'high' | 'urgent';
+}) {
+  const col = await getMailboxMessagesCollection();
+  const id = uuidv4();
+  const now = new Date();
+  const doc: MailboxMessageDoc = {
+    id,
+    streamerId: data.streamerId,
+    title: data.title.trim(),
+    senderName: data.senderName?.trim() || 'StreamBotKH System',
+    senderAvatar: data.senderAvatar?.trim(),
+    category: data.category || 'system',
+    content: data.content.trim(),
+    preview: data.preview?.trim() || data.content.trim().slice(0, 100),
+    isRead: false,
+    actionUrl: data.actionUrl,
+    actionLabel: data.actionLabel,
+    priority: data.priority || 'normal',
+    createdAt: now,
+    updatedAt: now
+  };
+  await col.insertOne(doc);
+  return {
+    ...doc,
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString()
+  };
+}
+
+export async function markMongoMailboxRead(streamerId: string, messageId?: string, all?: boolean) {
+  const col = await getMailboxMessagesCollection();
+  if (all) {
+    await col.updateMany(
+      { streamerId: { $in: [streamerId, 'all'] }, isRead: false },
+      { $set: { isRead: true, updatedAt: new Date() } }
+    );
+  } else if (messageId) {
+    await col.updateOne(
+      { id: messageId },
+      { $set: { isRead: true, updatedAt: new Date() } }
+    );
+  }
+}
+
+export async function deleteMongoMailboxMessage(streamerId: string, messageId?: string, allRead?: boolean) {
+  const col = await getMailboxMessagesCollection();
+  if (allRead) {
+    await col.deleteMany({ streamerId: { $in: [streamerId, 'all'] }, isRead: true });
+  } else if (messageId) {
+    await col.deleteOne({ id: messageId, streamerId: { $in: [streamerId, 'all'] } });
+  }
+}
+
+export async function seedDefaultMailboxMessages(streamerId: string) {
+  try {
+    const col = await getMailboxMessagesCollection();
+    const count = await col.countDocuments({ streamerId: { $in: [streamerId, 'all'] } });
+    if (count > 0) return;
+
+    const initialMessages: Array<Omit<MailboxMessageDoc, '_id'>> = [
+      {
+        id: uuidv4(),
+        streamerId,
+        title: 'Welcome to StreamBotKH! 🎉',
+        senderName: 'StreamBotKH Team',
+        senderAvatar: '',
+        category: 'system',
+        content: `Welcome to StreamBotKH! We are thrilled to empower your live streaming journey across Cambodia and beyond.\n\nHere are a few quick tips to get set up:\n1. Payment Gateway: Connect your Telegram bank notification group to receive instant Bakong KHQR alerts with 0% platform fee.\n2. Overlays: Copy your donation alert or goal overlay URL and paste it as a Browser Source in OBS Studio.\n3. Interactive Widgets: Engage your audience with the Subathon Timer, Spinning Wheel, and 2D Pokémon overlays.\n\nIf you ever need help or encounter an issue, visit the Report Issue tab. Happy Streaming!`,
+        preview: 'Welcome to StreamBotKH! We are thrilled to empower your live streaming journey...',
+        isRead: false,
+        actionUrl: '/dashboard?tab=overview',
+        actionLabel: 'Explore Dashboard',
+        priority: 'high',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: uuidv4(),
+        streamerId,
+        title: 'Payment Gateway Ready for Setup 💳',
+        senderName: 'Payment Gateway Bot',
+        senderAvatar: '',
+        category: 'security',
+        content: `Your automated KHQR payment listener is waiting for activation.\n\nGo to the Payment Gateway tab:\n• Step 1: Input your authentication code.\n• Step 2: Upload your official Bakong KHQR image.\n• Step 3: Connect your Telegram bank notification group.\n\nOnce active, incoming bank transfers will automatically be detected and projected on your OBS overlay within seconds!`,
+        preview: 'Your automated KHQR payment listener is waiting for activation. Complete setup in 3 easy steps...',
+        isRead: false,
+        actionUrl: '/dashboard?tab=payments',
+        actionLabel: 'Configure Gateway',
+        priority: 'normal',
+        createdAt: new Date(Date.now() - 3600000), // 1 hr ago
+        updatedAt: new Date(Date.now() - 3600000)
+      },
+      {
+        id: uuidv4(),
+        streamerId,
+        title: 'Pro Streamer Features Available ⚡',
+        senderName: 'StreamBotKH Platform',
+        senderAvatar: '',
+        category: 'announcement',
+        content: `Looking to level up your broadcast? Pro Plan gives you access to:\n• Leaderboard widget for top donor recognition\n• Dynamic Stream Goals & Subathon Timer\n• Custom Soundboard & Video Media Share\n• 2D Pokémon companion and Spinning Wheel\n• 500MB Media Storage and 0% commission\n\nCheck out Plans & Commission anytime in your dashboard!`,
+        preview: 'Looking to level up your broadcast? Unlock Leaderboards, Goals, Timer, Soundboard, and more...',
+        isRead: false,
+        actionUrl: '/dashboard?tab=billing',
+        actionLabel: 'View Plans',
+        priority: 'normal',
+        createdAt: new Date(Date.now() - 86400000), // 1 day ago
+        updatedAt: new Date(Date.now() - 86400000)
+      }
+    ];
+
+    await col.insertMany(initialMessages);
+  } catch (e) {
+    console.warn('[MongoDB] Failed seeding default mailbox messages:', e);
+  }
+}
+
 export async function getMongoMonitoredGroups(streamerId: string) {
   try {
     const col = await getTelegramMonitoredGroupsCollection();
@@ -417,6 +596,8 @@ export async function initMongo() {
     await db.collection('temporary_donations').createIndex({ streamerId: 1, createdAt: -1 });
     await db.collection('telegram_sessions').createIndex({ streamerId: 1 }, { unique: true });
     await db.collection('telegram_monitored_groups').createIndex({ streamerId: 1, chatId: 1 }, { unique: true });
+    await db.collection('mailbox_messages').createIndex({ id: 1 }, { unique: true });
+    await db.collection('mailbox_messages').createIndex({ streamerId: 1, createdAt: -1 });
 
     // Seed default user if not exists
     const usersCol = await getUsersCollection();

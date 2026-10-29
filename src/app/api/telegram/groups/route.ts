@@ -145,6 +145,21 @@ export async function POST(req: NextRequest) {
       if (!group) group = sqlGroup;
     } catch (e) {}
 
+    // Send instant notification to streamer Mailbox
+    try {
+      const { addMongoMailboxMessage } = await import('@/server/database/mongo');
+      await addMongoMailboxMessage({
+        streamerId,
+        title: `Connected "${finalTitle}" to Bank Listener! ⚡`,
+        senderName: 'GramJS Telegram Listener',
+        category: 'security',
+        content: `Your Telegram bank notification group "${finalTitle}" (${finalChatId}) was successfully connected. GramJS is now actively monitoring incoming transaction receipts in real time to trigger live OBS alerts.`,
+        actionUrl: '/dashboard?tab=payments',
+        actionLabel: 'Payment Gateway',
+        priority: 'high'
+      });
+    } catch (mailErr) {}
+
     return NextResponse.json({
       success: true,
       message: `Group "${finalTitle}" successfully connected to GramJS target listener.`,

@@ -56,7 +56,8 @@ import {
   Link as LinkIcon,
   Plus,
   Globe,
-  Gamepad2
+  Gamepad2,
+  Mail
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -92,6 +93,7 @@ import { AdminUsersManager } from '../components/dashboard/AdminUsersManager';
 import { AdminPullRequestsManager } from '../components/dashboard/AdminPullRequestsManager';
 import { AdminPromotionManager, PromotionConfig } from '../components/dashboard/AdminPromotionManager';
 import { MediaPickerModal } from '../components/dashboard/MediaPickerModal';
+import { MailboxDrawer } from '../components/dashboard/MailboxDrawer';
 import { request } from '../services/api';
 import { useModal } from '../context/ModalContext';
 import { useAudio } from '../hooks/useAudio';
@@ -139,6 +141,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   useEffect(() => {
     request<PromotionConfig>('/promotions')
       .then((data) => setActivePromo(data))
+      .catch(() => {});
+  }, [activeTab]);
+
+  // Load Mailbox Unread Count on mount & tab switches
+  useEffect(() => {
+    request<{ unreadCount: number }>('/mailbox')
+      .then((res) => {
+        if (res && typeof res.unreadCount === 'number') {
+          setUnreadMailCount(res.unreadCount);
+        }
+      })
       .catch(() => {});
   }, [activeTab]);
 
@@ -207,6 +220,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
   // UI / Action Modals
   const [isOverlayModalOpen, setIsOverlayModalOpen] = useState(false);
+  const [isMailboxOpen, setIsMailboxOpen] = useState(false);
+  const [unreadMailCount, setUnreadMailCount] = useState(0);
   const [isVideoUpgradeModalOpen, setIsVideoUpgradeModalOpen] = useState(false);
   const [upgradeFeatureName, setUpgradeFeatureName] = useState<string | undefined>(undefined);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
@@ -979,6 +994,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       category: 'ACCOUNT & SETTINGS',
       items: [
         {
+          id: 'mailbox' as any,
+          label: 'Mailbox',
+          icon: Mail,
+          badge: unreadMailCount > 0 ? `${unreadMailCount}` : null
+        },
+        {
           id: 'billing' as DashboardTab,
           label: 'Plans & Commission',
           icon: Sparkles,
@@ -1037,6 +1058,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     if ((item as any).isLocked) {
                       setUpgradeFeatureName(item.label);
                       setIsVideoUpgradeModalOpen(true);
+                      return;
+                    }
+                    if (item.id === ('mailbox' as any)) {
+                      setIsMailboxOpen(true);
+                      setMobileDrawerOpen(false);
                       return;
                     }
                     setActiveTab(item.id);
@@ -1401,32 +1427,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <div className="flex-1" />
           )}
 
-          {/* Quick Action Command Deck: Upgrade / Pro Status */}
+          {/* Quick Action Command Deck: Streamer Mailbox Feature */}
           <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-            {currentPlan === 'free' ? (
-              <button
-                onClick={() => {
-                  setUpgradeFeatureName(undefined);
-                  setIsVideoUpgradeModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-black text-xs sm:text-sm font-['Chakra_Petch'] transition-all shadow-[0_0_20px_rgba(0,240,255,0.35)] hover:shadow-[0_0_28px_rgba(0,240,255,0.6)] cursor-pointer"
-                title="Upgrade to Pro Plan"
-              >
-                <Sparkles size={14} className="text-slate-950 flex-shrink-0" />
-                <span className="hidden xxs:inline">Upgrade</span>
-                <span className="xxs:hidden">Pro</span>
-              </button>
-            ) : (
-              <div
-                className="flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-bold text-xs sm:text-sm font-['Chakra_Petch'] shadow-[0_0_15px_rgba(16,185,129,0.15)] select-none"
-                title="Pro Streamer Plan Active"
-              >
-                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
-                <span className="hidden sm:inline">You are on Pro Plan</span>
-                <span className="hidden xxs:inline sm:hidden">Pro Plan</span>
-                <span className="xxs:hidden">Pro</span>
+            <button
+              type="button"
+              onClick={() => setIsMailboxOpen(true)}
+              className="relative flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-750 hover:border-cyan-500/50 text-slate-200 hover:text-white font-bold text-xs sm:text-sm font-['Chakra_Petch'] transition-all shadow-sm cursor-pointer group"
+              title="Open Streamer Mailbox & Notifications"
+            >
+              <div className="relative flex items-center justify-center">
+                <Mail size={16} className="text-cyan-400 group-hover:scale-110 transition-transform" />
+                {unreadMailCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 px-1.5 py-0.2 min-w-[17px] h-[17px] flex items-center justify-center rounded-full text-[10px] font-mono font-black bg-cyan-400 text-slate-950 shadow-[0_0_8px_rgba(0,240,255,0.7)] animate-pulse">
+                    {unreadMailCount > 99 ? '99+' : unreadMailCount}
+                  </span>
+                )}
               </div>
-            )}
+              <span className="hidden xxs:inline">Mailbox</span>
+            </button>
           </div>
         </header>
 
@@ -2714,6 +2732,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             setSavingProfile(false);
           }
         }}
+      />
+
+      {/* Streamer Mailbox Drawer */}
+      <MailboxDrawer
+        isOpen={isMailboxOpen}
+        onClose={() => setIsMailboxOpen(false)}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab as DashboardTab);
+          if (typeof window !== 'undefined') {
+            window.history.pushState(null, '', `/dashboard?tab=${tab}`);
+          }
+        }}
+        onUnreadCountChange={(count) => setUnreadMailCount(count)}
       />
     </div>
   );

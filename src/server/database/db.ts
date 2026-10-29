@@ -319,6 +319,27 @@ try {
   `);
 } catch (e) {}
 
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mailbox_messages (
+      id TEXT PRIMARY KEY,
+      streamer_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      sender_name TEXT DEFAULT 'StreamBotKH System',
+      sender_avatar TEXT,
+      category TEXT DEFAULT 'system',
+      content TEXT NOT NULL,
+      preview TEXT,
+      is_read INTEGER DEFAULT 0,
+      action_url TEXT,
+      action_label TEXT,
+      priority TEXT DEFAULT 'normal',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+} catch (e) {}
+
 
 
 
