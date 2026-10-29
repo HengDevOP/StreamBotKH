@@ -6,9 +6,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Copy,
-  Check,
-  ExternalLink,
   Flame,
   Sparkles,
   Sliders,
@@ -44,7 +41,6 @@ const parseBool = (val: any, defaultVal = true): boolean => {
 export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamerToken }) => {
   const { socket } = useSocket();
 
-  const [copiedUrl, setCopiedUrl] = useState(false);
   const [title, setTitle] = useState('SUBATHON COUNTDOWN 🔥');
   const [remainingSeconds, setRemainingSeconds] = useState(7200); // 2 hours
   const [initialHours, setInitialHours] = useState(2);
@@ -79,7 +75,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const effectiveToken = streamerToken || 'demo-token';
-  const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/timer/${effectiveToken}`;
 
   // 1. Fetch initial configuration from database
   useEffect(() => {
@@ -154,12 +149,6 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
       socket.off('donation:paid', handleDonationAlert);
     };
   }, [socket, rateMinutesPerUsd]);
-
-  const copyObsUrl = () => {
-    navigator.clipboard.writeText(obsUrl);
-    setCopiedUrl(true);
-    setTimeout(() => setCopiedUrl(false), 2000);
-  };
 
   const addSeconds = (seconds: number, donorName?: string, tipAmount?: number) => {
     const maxSec = hasCap ? maxCapHours * 3600 : 86400 * 365;
@@ -325,114 +314,22 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header Controls for Live Preview */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800/80 relative z-10">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
-              <Eye size={16} className="text-cyan-400" />
-              Preview
-            </span>
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800/80 relative z-10">
+          <span className="text-sm font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
+            <Eye size={16} className="text-cyan-400" />
+            Preview
+          </span>
 
-            {/* OBS URL Copy Pill */}
-            <div className="flex items-center gap-1.5 bg-slate-950/90 border border-slate-800 rounded-xl p-1 pl-2.5">
-              <span className="text-[11px] font-mono text-slate-400 truncate max-w-[150px] sm:max-w-[240px]">
-                {obsUrl}
-              </span>
-              <button
-                type="button"
-                onClick={copyObsUrl}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition-all ${
-                  copiedUrl
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30'
-                }`}
-              >
-                {copiedUrl ? <Check size={12} /> : <Copy size={12} />}
-                <span>{copiedUrl ? 'Copied' : 'Copy OBS URL'}</span>
-              </button>
-              <a
-                href={obsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1 text-slate-400 hover:text-white transition-colors"
-                title="Open overlay in new tab"
-              >
-                <ExternalLink size={13} />
-              </a>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Quick Toggle: Background */}
-            <button
-              type="button"
-              onClick={handleToggleShowBackground}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all ${
-                showBackground
-                  ? 'bg-cyan-500/10 border-cyan-400/50 text-cyan-300'
-                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-              title="Toggle background card on OBS"
-            >
-              <Layers size={13} />
-              <span>Background: {showBackground ? 'ON' : 'OFF'}</span>
-            </button>
-
-            {/* Quick Toggle: Animation */}
-            <button
-              type="button"
-              onClick={handleToggleShowAnimation}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all ${
-                showAnimation
-                  ? 'bg-amber-500/10 border-amber-400/50 text-amber-300'
-                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-              title="Toggle animations on OBS"
-            >
-              <Sparkles size={13} />
-              <span>Animation: {showAnimation ? 'ON' : 'OFF'}</span>
-            </button>
-
-            {/* Quick Toggle: Title */}
-            <button
-              type="button"
-              onClick={handleToggleShowTitle}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all ${
-                showTitle
-                  ? 'bg-emerald-500/10 border-emerald-400/50 text-emerald-300'
-                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-              title="Toggle title visibility on OBS"
-            >
-              <Eye size={13} />
-              <span>Title: {showTitle ? 'ON' : 'OFF'}</span>
-            </button>
-
-            {/* Quick Toggle: Description */}
-            <button
-              type="button"
-              onClick={handleToggleShowDescription}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-mono font-bold border transition-all ${
-                showDescription
-                  ? 'bg-purple-500/10 border-purple-400/50 text-purple-300'
-                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
-              }`}
-              title="Toggle description visibility on OBS"
-            >
-              <Eye size={13} />
-              <span>Desc: {showDescription ? 'ON' : 'OFF'}</span>
-            </button>
-
-            {/* Browse 40 Templates in Main Content (Smooth Scroll) */}
-            <button
-              type="button"
-              onClick={scrollToTemplateBrowser}
-              className="flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-400/50 text-cyan-300 text-xs font-mono font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-            >
-              <Palette size={13} />
-              <span>Browse 40 Templates</span>
-              <ArrowDown size={12} className="animate-bounce" />
-            </button>
-          </div>
+          {/* Browse 40 Templates in Main Content (Smooth Scroll) */}
+          <button
+            type="button"
+            onClick={scrollToTemplateBrowser}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-400/50 text-cyan-300 text-xs font-mono font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+          >
+            <Palette size={13} />
+            <span>Browse 40 Templates</span>
+            <ArrowDown size={12} className="animate-bounce" />
+          </button>
         </div>
 
         {/* 1:1 Visual Preview Render */}
