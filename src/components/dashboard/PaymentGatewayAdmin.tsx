@@ -726,7 +726,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
               {isStep1Done ? <Check size={18} className="stroke-[3]" /> : '1'}
             </div>
 
-            <div className="mt-2.5 space-y-0.5">
+            <div className="mt-2.5">
               <span
                 className={`text-xs font-bold font-['Chakra_Petch'] tracking-wide block uppercase ${
                   activeStep === 1
@@ -738,13 +738,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
               >
                 Connect
               </span>
-              <span className="text-[10px] font-mono text-slate-500 hidden sm:block">
-                {isStep1Done ? 'GramJS Active' : 'Connect GramJS'}
-              </span>
             </div>
           </button>
 
-          {/* STEP 2: Provide Master KHQR Node */}
+          {/* STEP 2: KHQR Node */}
           <button
             type="button"
             onClick={() => setActiveStep(2)}
@@ -762,7 +759,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
               {isStep2Done ? <Check size={18} className="stroke-[3]" /> : '2'}
             </div>
 
-            <div className="mt-2.5 space-y-0.5">
+            <div className="mt-2.5">
               <span
                 className={`text-xs font-bold font-['Chakra_Petch'] tracking-wide block uppercase ${
                   activeStep === 2
@@ -772,15 +769,12 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     : 'text-slate-400'
                 }`}
               >
-                Provide Master KHQR
-              </span>
-              <span className="text-[10px] font-mono text-slate-500 hidden sm:block">
-                {isStep2Done ? 'KHQR Uploaded' : 'Upload QR Image'}
+                KHQR
               </span>
             </div>
           </button>
 
-          {/* STEP 3: Connect Group Listener Node */}
+          {/* STEP 3: GROUP Node */}
           <button
             type="button"
             onClick={() => setActiveStep(3)}
@@ -798,7 +792,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
               {isStep3Done ? <Check size={18} className="stroke-[3]" /> : '3'}
             </div>
 
-            <div className="mt-2.5 space-y-0.5">
+            <div className="mt-2.5">
               <span
                 className={`text-xs font-bold font-['Chakra_Petch'] tracking-wide block uppercase ${
                   activeStep === 3
@@ -808,10 +802,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     : 'text-slate-400'
                 }`}
               >
-                Connect Group Listener
-              </span>
-              <span className="text-[10px] font-mono text-slate-500 hidden sm:block">
-                {isStep3Done ? `${targetGroups.length} Groups Active` : 'Link Telegram Group'}
+                GROUP
               </span>
             </div>
           </button>
