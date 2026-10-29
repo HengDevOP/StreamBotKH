@@ -714,43 +714,6 @@ export const PaymentGatewayAdmin: React.FC = () => {
       {/* ============================================================== */}
       {activeStep === 1 && (
         <Card glow="cyan" className="space-y-6 animate-fadeIn">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
-                <Phone size={22} className={userClientStatus.isConnected ? 'animate-pulse' : ''} />
-              </div>
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 font-['Chakra_Petch']">
-                  STEP 1: Connect GramJS Client
-                  {userClientStatus.isConnected ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      CONNECTED
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono">
-                      PENDING LOGIN
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Connect your Telegram account to allow GramJS MTProto to listen for bank SMS notifications and trigger instant donation alerts.
-                </p>
-              </div>
-            </div>
-
-            {userClientStatus.isConnected && (
-              <button
-                type="button"
-                onClick={handleDisconnectUserClient}
-                className="px-3.5 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 flex items-center gap-1.5 transition-colors whitespace-nowrap"
-              >
-                <LogOut size={13} />
-                <span>Disconnect</span>
-              </button>
-            )}
-          </div>
-
           {step1Msg && (
             <div
               className={`p-3.5 rounded-xl border text-xs flex items-center gap-2 ${
@@ -786,16 +749,27 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   </div>
                 </div>
 
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="md"
-                  onClick={() => setActiveStep(2)}
-                  className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap"
-                >
-                  <span>Continue to Step 2: Master KHQR</span>
-                  <ArrowRight size={15} className="ml-1" />
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleDisconnectUserClient}
+                    className="px-3.5 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 flex items-center gap-1.5 transition-colors whitespace-nowrap"
+                  >
+                    <LogOut size={13} />
+                    <span>Disconnect</span>
+                  </button>
+
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="md"
+                    onClick={() => setActiveStep(2)}
+                    className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap"
+                  >
+                    <span>Continue to Step 2: Master KHQR</span>
+                    <ArrowRight size={15} className="ml-1" />
+                  </Button>
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-800/80 text-xs font-mono grid grid-cols-1 sm:grid-cols-2 gap-3">
