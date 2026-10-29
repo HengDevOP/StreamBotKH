@@ -460,6 +460,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
         setTwoFaPassword('');
         setNeedPassword(false);
         setStep1Msg({ type: 'success', text: data.message || 'GramJS connected successfully!' });
+        setActiveStep(2);
         await fetchUserClientStatus();
         await fetchTargetGroups();
       } else if (data.needPassword) {
