@@ -278,11 +278,9 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
     const cleanBanking = bankingName.trim();
     if (!cleanDonor && !cleanBanking) return;
 
-    // Use full Payer Name (Bank Account) so both first name & surname are preserved throughout alerts and TTS
-    const primaryName = cleanBanking || cleanDonor;
-
+    // Show donor username on alerts and TTS, and pass bankingName for bank payment matching
     await onSubmit({
-      donorName: primaryName,
+      donorName: cleanDonor || cleanBanking || 'Supporter',
       bankingName: cleanBanking || cleanDonor,
       donorMessage: donorMessage.trim(),
       amount: amount || 0,

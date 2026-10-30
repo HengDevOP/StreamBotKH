@@ -121,13 +121,16 @@ export async function POST(req: NextRequest) {
     // Preserve active session ID so frontend modal poller immediately sees PAID
     const activeDonationId = matchedTemp ? matchedTemp.id : uuidv4();
 
-    // Ensure donor matches the full Payer Name (Bank Account) with both first name & surname (e.g. "HO CHENHENG")
+    // Prioritize donor name from username entered on the donation form (fallback to payer bank name)
+    const sessionDonorName = ((matchedTemp && matchedTemp.donor_name) || donorName || '').trim();
     const payerBankName = (matchedTemp?.banking_name || bankingName || '').trim();
     let effectiveDonorName = '';
-    if (payerBankName && !isGenericBankKeyword(payerBankName)) {
+    if (sessionDonorName && !isGenericBankKeyword(sessionDonorName)) {
+      effectiveDonorName = sessionDonorName;
+    } else if (payerBankName && !isGenericBankKeyword(payerBankName)) {
       effectiveDonorName = payerBankName;
     } else {
-      effectiveDonorName = (matchedTemp && matchedTemp.donor_name) ? matchedTemp.donor_name : donorName.trim();
+      effectiveDonorName = 'Generous Supporter';
     }
 
     const effectiveDonorMessage =
