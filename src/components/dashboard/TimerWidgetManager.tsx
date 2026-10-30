@@ -371,39 +371,93 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Pause / Resume & Reset Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
               onClick={toggleRunning}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold font-mono text-xs shadow-lg transition-all active:scale-[0.98] ${
+              className={`font-mono font-bold text-xs shadow-lg transition-all active:scale-[0.98] ${
                 isRunning
-                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20'
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950 shadow-emerald-500/20'
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
               }`}
+              icon={isRunning ? <Pause size={14} /> : <Play size={14} />}
             >
-              {isRunning ? <Pause size={15} /> : <Play size={15} />}
-              <span>{isRunning ? 'Pause Timer' : 'Resume Timer'}</span>
-            </button>
+              {isRunning ? 'Pause Timer' : 'Resume Timer'}
+            </Button>
 
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={resetToInitial}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-mono font-bold transition-colors"
+              className="font-mono font-bold text-xs text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors"
+              icon={<RotateCcw size={13} />}
               title="Reset to initial duration"
             >
-              <RotateCcw size={13} />
-              <span>Reset</span>
-            </button>
+              Reset
+            </Button>
           </div>
 
           {/* Quick Adjust Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-slate-400 text-xs font-mono font-semibold mr-1">Quick Adjust:</span>
-            <button type="button" onClick={() => addSeconds(300)} className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors">+5m</button>
-            <button type="button" onClick={() => addSeconds(600)} className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors">+10m</button>
-            <button type="button" onClick={() => addSeconds(1800)} className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors">+30m</button>
-            <button type="button" onClick={() => addSeconds(3600)} className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono font-bold transition-colors">+1h</button>
-            <button type="button" onClick={() => subtractSeconds(300)} className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 text-xs font-mono font-bold transition-colors" title="Subtract 5 minutes">-5m</button>
-            <button type="button" onClick={() => subtractSeconds(600)} className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 text-xs font-mono font-bold transition-colors" title="Subtract 10 minutes">-10m</button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => addSeconds(300)}
+              className="font-mono font-bold text-xs bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/60 shadow-sm transition-all active:scale-95"
+            >
+              +5m
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => addSeconds(600)}
+              className="font-mono font-bold text-xs bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/60 shadow-sm transition-all active:scale-95"
+            >
+              +10m
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => addSeconds(1800)}
+              className="font-mono font-bold text-xs bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/60 shadow-sm transition-all active:scale-95"
+            >
+              +30m
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => addSeconds(3600)}
+              className="font-mono font-bold text-xs bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/60 shadow-sm transition-all active:scale-95"
+            >
+              +1h
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              onClick={() => subtractSeconds(300)}
+              className="font-mono font-bold text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-400/60 shadow-sm transition-all active:scale-95"
+              title="Subtract 5 minutes"
+            >
+              -5m
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              onClick={() => subtractSeconds(600)}
+              className="font-mono font-bold text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-400/60 shadow-sm transition-all active:scale-95"
+              title="Subtract 10 minutes"
+            >
+              -10m
+            </Button>
           </div>
         </div>
       </Card>
