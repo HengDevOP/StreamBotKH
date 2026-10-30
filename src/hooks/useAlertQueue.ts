@@ -41,10 +41,15 @@ export function useAlertQueue() {
 
     // 2. Set auto-dismiss timer matching alert duration
     const isVideo = Boolean(nextAlert.isSecondStageVideo || nextAlert.videoUrl);
-    // For video alerts, provide a 10s buffer so YouTube finishes naturally first and calls onEnded
+    const hasTts = Boolean(nextAlert.ttsEnabled);
+
+    // If alert has TTS or is a video clip, dismissal is driven by TTS completion / video onEnded.
+    // We provide a generous safety fallback timer so it never hangs indefinitely if network fails.
     const durationMs = isVideo
-      ? Math.max(10, (Number(nextAlert.durationSeconds) || 30) + 10) * 1000
-      : Math.max(3, Number(nextAlert.durationSeconds) || 8) * 1000;
+      ? Math.max(15, (Number(nextAlert.durationSeconds) || 30) + 15) * 1000
+      : (hasTts
+          ? Math.max(50, (Number(nextAlert.durationSeconds) || 8) + 40) * 1000
+          : Math.max(3, Number(nextAlert.durationSeconds) || 8) * 1000);
 
     if (dismissTimerRef.current) {
       clearTimeout(dismissTimerRef.current);

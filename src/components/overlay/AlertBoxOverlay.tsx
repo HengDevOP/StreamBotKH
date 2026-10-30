@@ -22,6 +22,16 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
   const [urlBoxId, setUrlBoxId] = useState<string | null>(null);
 
   const videoWaitingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isTtsSpeakingRef = useRef<boolean>(false);
+  const minDurationElapsedRef = useRef<boolean>(false);
+  const minDurationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const checkAndDismissAlert = useCallback(() => {
+    if (minDurationElapsedRef.current && !isTtsSpeakingRef.current) {
+      console.log('✅ [AlertBox] Both minimum display duration AND TTS speech have completed! Dismissing donation card...');
+      dismissCurrentAlert();
+    }
+  }, [dismissCurrentAlert]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -106,8 +116,17 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     msg: string | undefined,
     type: string,
     clonedUrl?: string,
-    volume?: number
+    volume?: number,
+    onTtsFinished?: () => void
   ) => {
+    let finishedFired = false;
+    const notifyFinished = () => {
+      if (!finishedFired) {
+        finishedFired = true;
+        if (onTtsFinished) onTtsFinished();
+      }
+    };
+
     try {
       const template = headlineTemplate || '{donator} donated {amount} through superchat!';
       const isKhmer =
@@ -162,7 +181,10 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
 
       // 4. If there is no message value, speak ONLY the headline title!
       const speechText = normalizedMsg ? `${headline}. ${normalizedMsg}` : headline;
-      if (!speechText) return;
+      if (!speechText) {
+        notifyFinished();
+        return;
+      }
 
       let audioUrl = '';
       if (type === 'cloned' && clonedUrl) {
@@ -189,11 +211,28 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
           const audio = new Audio(audioUrl);
           currentTtsAudioRef.current = audio;
           audio.volume = Math.min(1, Math.max(0, volume ?? 0.85));
-          audio.play().catch((err) => console.warn('[Overlay TTS] Play error:', err));
+
+          audio.onended = () => {
+            console.log('🗣️ [Overlay TTS] Audio playback finished completely!');
+            notifyFinished();
+          };
+
+          audio.onerror = (e) => {
+            console.warn('[Overlay TTS] Audio error or format failure:', e);
+            notifyFinished();
+          };
+
+          audio.play().catch((err) => {
+            console.warn('[Overlay TTS] Play error (autoplay blocked or network):', err);
+            notifyFinished();
+          });
         }, 700);
+      } else {
+        notifyFinished();
       }
     } catch (e) {
       console.error('Error in speakAlertTTS:', e);
+      notifyFinished();
     }
   };
 
@@ -214,11 +253,18 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     }
   }, [overlayToken, connected]);
 
-  // Synchronized Voice TTS: Speaks headline & donor message exactly once when alert card appears
+  // Synchronized Voice TTS & Card Lifecycle:
+  // Ensures the donation card stays on screen AND does NOT dismiss until TTS speech finishes 100%!
   useEffect(() => {
     if (!currentAlert) {
       activeAlertIdRef.current = null;
-      // When alert card disappears, stop any ongoing TTS speech so it never overlaps into next alert
+      isTtsSpeakingRef.current = false;
+      minDurationElapsedRef.current = false;
+      if (minDurationTimerRef.current) {
+        clearTimeout(minDurationTimerRef.current);
+        minDurationTimerRef.current = null;
+      }
+      // When alert card disappears, stop any lingering TTS audio
       if (currentTtsAudioRef.current) {
         try {
           currentTtsAudioRef.current.pause();
@@ -233,7 +279,28 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     if (activeAlertIdRef.current === alertId) return;
     activeAlertIdRef.current = alertId;
 
+    // Second stage video alerts handle their own onEnded dismissal via VideoPlayerWithProgressBar
+    if (currentAlert.isSecondStageVideo) {
+      return;
+    }
+
+    // Standard donation alert card:
+    // Requires BOTH minimum display duration AND complete TTS speech before dismissing!
+    const alertDurationSec = Math.max(5, Number(currentAlert.durationSeconds) || 8);
+    minDurationElapsedRef.current = false;
+    isTtsSpeakingRef.current = Boolean(currentAlert.ttsEnabled);
+
+    if (minDurationTimerRef.current) {
+      clearTimeout(minDurationTimerRef.current);
+    }
+    minDurationTimerRef.current = setTimeout(() => {
+      console.log(`⏱️ [AlertBox] Minimum display duration (${alertDurationSec}s) elapsed for "${alertId}".`);
+      minDurationElapsedRef.current = true;
+      checkAndDismissAlert();
+    }, alertDurationSec * 1000);
+
     if (currentAlert.ttsEnabled) {
+      console.log(`🗣️ [AlertBox] Starting TTS speech for "${alertId}". Video and next alerts will wait until TTS finishes.`);
       speakAlertTTS(
         currentAlert.textTemplate,
         currentAlert.donorName || 'Supporter',
@@ -242,10 +309,17 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         currentAlert.donorMessage,
         currentAlert.ttsType || 'google',
         (currentAlert as any).clonedVoiceSampleUrl,
-        currentAlert.soundVolume
+        currentAlert.soundVolume,
+        () => {
+          console.log(`🗣️ [AlertBox] TTS speech completed 100% for "${alertId}".`);
+          isTtsSpeakingRef.current = false;
+          checkAndDismissAlert();
+        }
       );
+    } else {
+      isTtsSpeakingRef.current = false;
     }
-  }, [currentAlert]);
+  }, [currentAlert, checkAndDismissAlert]);
 
   // Cross-overlay synchronization: broadcast finished signals and coordinate queue waiting
   const prevAlertRef = useRef<any>(null);
