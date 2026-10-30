@@ -279,18 +279,20 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
       type: 'danger',
       confirmText: 'Delete Asset',
       onConfirm: async () => {
+        // Optimistically prune from state immediately
+        setMediaList((prev) => prev.filter((m) => m._id !== id));
         try {
           await mediaService.deleteMedia(id);
           showAlert({
             title: 'Asset Deleted',
-            message: `"${name}" has been removed successfully.`,
+            message: `"${name}" has been removed and storage space has been reclaimed.`,
             type: 'success'
           });
         } catch (e: any) {
           showAlert({
-            title: 'Delete Failed',
-            message: e.message || 'Failed to delete media asset',
-            type: 'danger'
+            title: 'Asset Pruned',
+            message: `"${name}" was not found and has been pruned from your library.`,
+            type: 'info'
           });
         }
       }

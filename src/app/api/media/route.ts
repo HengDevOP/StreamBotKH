@@ -5,7 +5,20 @@ import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
 import { getMediaCollection, MediaDoc, restoreMediaFile } from '@/server/database/mongo';
 import { db } from '@/server/database/db';
-import { broadcastMediaUpdate } from '@/server/services/socketService';
+
+function safeBroadcastMediaUpdate(userId: string, data: { media: any[]; storage: any }) {
+  try {
+    const io = (global as any).socketIO;
+    if (io) {
+      console.log(`⚡ [Socket] Broadcasting media:updated for user [${userId}] (${data?.media?.length || 0} items)`);
+      io.to(`dashboard:${userId}`).emit('media:updated', data);
+      io.emit(`media:${userId}:updated`, data);
+      io.emit('media:updated', { ...data, userId });
+    }
+  } catch (e) {
+    console.warn('Socket broadcast update failed:', e);
+  }
+}
 
 // Media storage limits per user plan (no per-upload limit, only bounded by total remaining plan quota)
 export const PLAN_STORAGE_LIMITS: Record<string, { label: string; limitBytes: number }> = {
@@ -107,15 +120,33 @@ export async function fetchUserMediaData(userId: string, email?: string): Promis
     : { userId };
   const mediaList = await mediaCol.find(filter).sort({ createdAt: -1 }).toArray();
 
-  // Ensure all media files for this user exist on disk or are restored from Cloud backup
-  // Optimize: skip file check if already verified on disk in this process
+  const validMediaList: MediaDoc[] = [];
+  let prunedCount = 0;
+
+  // Ensure all media files for this user exist on disk or are restored from Cloud backup.
+  // If a media file cannot be restored and is missing from disk, automatically prune it
+  // to keep storage clean and free up storage space.
   for (const item of mediaList) {
     if (item.storedFilename && !verifiedFilesOnDisk.has(item.storedFilename)) {
       const ok = await restoreMediaFile(item);
       if (ok) {
         verifiedFilesOnDisk.add(item.storedFilename);
+        validMediaList.push(item);
+      } else {
+        // Record is broken or points to non-existent file with no backup -> auto-prune from database
+        console.warn(`🧹 [Media Storage] Auto-pruning unrecoverable media record: ${item.filename} (ID: ${item._id})`);
+        try {
+          await mediaCol.deleteOne({ _id: item._id });
+          prunedCount++;
+        } catch (e) {}
       }
+    } else {
+      validMediaList.push(item);
     }
+  }
+
+  if (prunedCount > 0) {
+    console.log(`🧹 [Media Storage] Auto-pruned ${prunedCount} ghost/unrecoverable media items to free storage space.`);
   }
 
   // Get user plan
@@ -123,7 +154,7 @@ export async function fetchUserMediaData(userId: string, email?: string): Promis
   const userPlan = (streamerRow?.plan || 'free').toLowerCase();
   const quota = PLAN_STORAGE_LIMITS[userPlan] || PLAN_STORAGE_LIMITS.free;
 
-  const usedBytes = mediaList.reduce((acc, item) => acc + (item.fileSize || 0), 0);
+  const usedBytes = validMediaList.reduce((acc, item) => acc + (item.fileSize || 0), 0);
   const storage = {
     plan: userPlan,
     planLabel: quota.label,
@@ -133,10 +164,10 @@ export async function fetchUserMediaData(userId: string, email?: string): Promis
     percentUsed: Math.min(100, parseFloat(((usedBytes / quota.limitBytes) * 100).toFixed(1)))
   };
 
-  const latestTime = mediaList[0]?.createdAt ? new Date(mediaList[0].createdAt).getTime() : 0;
-  const etag = `W/"media-${userId}-${mediaList.length}-${usedBytes}-${latestTime}"`;
+  const latestTime = validMediaList[0]?.createdAt ? new Date(validMediaList[0].createdAt).getTime() : 0;
+  const etag = `W/"media-${userId}-${validMediaList.length}-${usedBytes}-${latestTime}"`;
 
-  return { media: mediaList, storage, etag };
+  return { media: validMediaList, storage, etag };
 }
 
 export async function GET(req: NextRequest) {
@@ -341,7 +372,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 7. Broadcast real-time WebSocket update to all open dashboards and overlays
-    broadcastMediaUpdate(userId, {
+    safeBroadcastMediaUpdate(userId, {
       media: freshData.media,
       storage: freshData.storage
     });

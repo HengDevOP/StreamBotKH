@@ -262,31 +262,51 @@ export const mediaService = {
   },
 
   /**
-   * Delete media asset
+   * Delete or prune media asset
    */
   async deleteMedia(id: string): Promise<boolean> {
-    const res = await fetch(`/api/media/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    });
+    try {
+      const res = await fetch(`/api/media/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
+      const data = await res.json().catch(() => ({}));
+
+      // If 200 OK or 404 Not Found (already removed or ghost item), prune it from client cache!
+      if (res.ok || res.status === 404 || data?.pruned) {
+        if (memoryCache) {
+          const updatedMedia = memoryCache.media.filter((m) => m._id !== id);
+          memoryCache = {
+            ...memoryCache,
+            media: updatedMedia,
+            storage: data.storage || memoryCache.storage,
+            timestamp: Date.now()
+          };
+          saveSessionCache(updatedMedia, memoryCache.storage, memoryCache.etag);
+          notifyListeners({ media: updatedMedia, storage: memoryCache.storage });
+        }
+        return true;
+      }
+
       throw new Error(data.error || 'Delete failed');
+    } catch (err: any) {
+      // If error indicates not found or 404, gracefully prune from local cache
+      if (err?.message?.includes('not found') || err?.message?.includes('404')) {
+        if (memoryCache) {
+          const updatedMedia = memoryCache.media.filter((m) => m._id !== id);
+          memoryCache = {
+            ...memoryCache,
+            media: updatedMedia,
+            timestamp: Date.now()
+          };
+          saveSessionCache(updatedMedia, memoryCache.storage, memoryCache.etag);
+          notifyListeners({ media: updatedMedia, storage: memoryCache.storage });
+        }
+        return true;
+      }
+      throw err;
     }
-
-    if (memoryCache) {
-      const updatedMedia = memoryCache.media.filter((m) => m._id !== id);
-      memoryCache = {
-        ...memoryCache,
-        media: updatedMedia,
-        timestamp: Date.now()
-      };
-      saveSessionCache(updatedMedia, memoryCache.storage, memoryCache.etag);
-      notifyListeners({ media: updatedMedia, storage: memoryCache.storage });
-    }
-
-    return true;
   },
 
   /**
