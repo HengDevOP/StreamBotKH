@@ -4,7 +4,6 @@ import { randomUUID } from 'crypto';
 import { getUsersCollection, getOverlayTokenHistoryCollection, getMongoDb } from '../database/mongo';
 
 let io: SocketIOServer | null = null;
-const recentOverlayAlerts = new Map<string, { payload: AlertPayload; timestamp: number }>();
 
 // ---------------------------------------------------------------------------
 // Cross-instance alert relay (MongoDB `alert_events`)
@@ -277,13 +276,6 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
         joinStreamerRooms(socket, data.overlayToken);
 
         socket.emit('overlay:connected', { status: 'ready', message: 'StreamNeon overlay connected successfully' });
-
-        // If an alert was fired within the last 25 seconds, replay it to the newly connected overlay!
-        const recent = recentOverlayAlerts.get(data.overlayToken) || recentOverlayAlerts.get('demo-token');
-        if (recent && (Date.now() - recent.timestamp) < 25000) {
-          console.log(`⚡ [Socket] Replaying recent alert to newly connected overlay (${data.overlayToken.slice(0, 10)}...)`);
-          socket.emit('donation:alert', recent.payload);
-        }
       }
     });
 
@@ -398,8 +390,6 @@ export function broadcastAlertToOverlay(overlayToken: string, payload: AlertPayl
 function emitAlertLocally(overlayToken: string, payload: AlertPayload) {
   const activeIo = getIO();
   if (!activeIo) return;
-  recentOverlayAlerts.set(overlayToken, { payload, timestamp: Date.now() });
-  recentOverlayAlerts.set('demo-token', { payload, timestamp: Date.now() });
 
   activeIo.to(`overlay:${overlayToken}`).emit('donation:alert', payload);
 

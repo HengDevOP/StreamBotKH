@@ -145,25 +145,48 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         type.includes('sreymom');
 
       const hasCurrencyTag = template.toLowerCase().includes('{currency}');
-      const formattedAmount = currency === 'KHR'
-        ? (isKhmer
-            ? (hasCurrencyTag ? khmerNumberToWords(amount) : `${khmerNumberToWords(amount)} រៀល`)
-            : `${Number(amount).toLocaleString()} riel`)
-        : (isKhmer
-            ? (hasCurrencyTag ? khmerNumberToWords(amount) : `${khmerNumberToWords(amount)} ដុល្លារ`)
-            : `${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${Number(amount) === 1 ? 'dollar' : 'dollars'}`);
+      const numAmount = Number(amount) || 0;
+      let formattedAmount = '';
+      let currencyWord = '';
+
+      if (currency === 'KHR') {
+        formattedAmount = isKhmer
+          ? (hasCurrencyTag ? khmerNumberToWords(numAmount) : `${khmerNumberToWords(numAmount)} រៀល`)
+          : `${numAmount.toLocaleString()} riel`;
+        currencyWord = isKhmer ? 'រៀល' : 'riel';
+      } else {
+        if (Math.abs(numAmount - 0.01) < 0.0001) {
+          formattedAmount = isKhmer ? '1 សេន' : '1 cent';
+          currencyWord = isKhmer ? 'សេន' : 'cent';
+        } else if (numAmount > 0 && numAmount < 1) {
+          const cents = Math.round(numAmount * 100);
+          formattedAmount = isKhmer
+            ? `${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន`
+            : `${cents} cents`;
+          currencyWord = isKhmer ? 'សេន' : 'cents';
+        } else {
+          const dollars = Math.floor(numAmount);
+          const cents = Math.round((numAmount - dollars) * 100);
+          if (cents > 0) {
+            formattedAmount = isKhmer
+              ? `${khmerNumberToWords(dollars)} ដុល្លារ ${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន`
+              : `${dollars === 1 ? '1 dollar' : `${dollars} dollars`} and ${cents === 1 ? '1 cent' : `${cents} cents`}`;
+            currencyWord = isKhmer ? 'ដុល្លារ' : 'dollars';
+          } else {
+            formattedAmount = isKhmer
+              ? (hasCurrencyTag ? khmerNumberToWords(dollars) : `${khmerNumberToWords(dollars)} ដុល្លារ`)
+              : `${dollars} ${dollars === 1 ? 'dollar' : 'dollars'}`;
+            currencyWord = isKhmer ? 'ដុល្លារ' : (dollars === 1 ? 'dollar' : 'dollars');
+          }
+        }
+      }
 
       // 1. Format the headline announcement text
       let headline = template
         .replace(/\{donator\}/gi, donor)
         .replace(/\{name\}/gi, donor)
         .replace(/\{amount\}/gi, formattedAmount)
-        .replace(
-          /\{currency\}/gi,
-          isKhmer
-            ? (currency === 'KHR' ? 'រៀល' : 'ដុល្លារ')
-            : (currency === 'KHR' ? 'riel' : (Number(amount) === 1 ? 'dollar' : 'dollars'))
-        )
+        .replace(/\{currency\}/gi, currencyWord)
         .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
         .trim();
 

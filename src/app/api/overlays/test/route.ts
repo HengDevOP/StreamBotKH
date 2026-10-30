@@ -9,9 +9,9 @@ export async function POST(req: NextRequest) {
     const testPayload = {
       donationId: 'test-' + Date.now(),
       boxId: body.boxId,
-      donorName: body.donorName || 'CyberValkyrie',
-      donorMessage: body.donorMessage || 'Awesome stream! Keep up the insane gameplay 🔥',
-      amount: Number(body.amount) || 5.0,
+      donorName: body.donorName || 'Supporter',
+      donorMessage: body.donorMessage || '',
+      amount: Number(body.amount) || 1.0,
       currency: 'USD',
       bankingName: body.bankingName || 'ABA Bank',
       templateStyle: body.templateStyle || 'neon-box',

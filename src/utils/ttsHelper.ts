@@ -151,17 +151,59 @@ export function normalizeCurrencyAndSymbols(text: string, isKhmer?: boolean): st
     // 5. Dollar with amount (prefix): $5, $ 5.50, $៥, $0.01, $1,000
     result = result.replace(
       /\$\s*([0-9\u17E0-\u17E9]+(?:,[0-9\u17E0-\u17E9]+)*(?:\.[0-9\u17E0-\u17E9]+)?)/g,
-      (_match, num) => `${khmerNumberToWords(num)} ដុល្លារ `
+      (_match, num) => {
+        const val = parseFloat(normalizeKhmerDigits(num).replace(/,/g, ''));
+        if (isNaN(val)) return `${num} ដុល្លារ `;
+        if (Math.abs(val - 0.01) < 0.0001) return '1 សេន ';
+        if (val > 0 && val < 1) {
+          const cents = Math.round(val * 100);
+          return `${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន `;
+        }
+        const dollars = Math.floor(val);
+        const cents = Math.round((val - dollars) * 100);
+        if (cents > 0) {
+          return `${khmerNumberToWords(dollars)} ដុល្លារ ${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន `;
+        }
+        return `${khmerNumberToWords(dollars)} ដុល្លារ `;
+      }
     );
 
-    // 6. Dollar with amount (suffix): 5$, 5 $, ៥$, 5 ដុល្លារ, 5 USD
+    // 6. Dollar with amount (suffix): 5$, 5 $, ៥$, 0.01$, 5 ដុល្លារ, 5 USD
     result = result.replace(
       /([0-9\u17E0-\u17E9]+(?:,[0-9\u17E0-\u17E9]+)*(?:\.[0-9\u17E0-\u17E9]+)?)\s*(?:\$|USD\b|ដុល្លារ)/gi,
-      (_match, num) => `${khmerNumberToWords(num)} ដុល្លារ `
+      (_match, num) => {
+        const val = parseFloat(normalizeKhmerDigits(num).replace(/,/g, ''));
+        if (isNaN(val)) return `${num} ដុល្លារ `;
+        if (Math.abs(val - 0.01) < 0.0001) return '1 សេន ';
+        if (val > 0 && val < 1) {
+          const cents = Math.round(val * 100);
+          return `${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន `;
+        }
+        const dollars = Math.floor(val);
+        const cents = Math.round((val - dollars) * 100);
+        if (cents > 0) {
+          return `${khmerNumberToWords(dollars)} ដុល្លារ ${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន `;
+        }
+        return `${khmerNumberToWords(dollars)} ដុល្លារ `;
+      }
     );
     result = result.replace(
       /\bUSD\s*([0-9\u17E0-\u17E9]+(?:,[0-9\u17E0-\u17E9]+)*(?:\.[0-9\u17E0-\u17E9]+)?)\b/gi,
-      (_match, num) => `${khmerNumberToWords(num)} ដុល្លារ `
+      (_match, num) => {
+        const val = parseFloat(normalizeKhmerDigits(num).replace(/,/g, ''));
+        if (isNaN(val)) return `${num} ដុល្លារ `;
+        if (Math.abs(val - 0.01) < 0.0001) return '1 សេន ';
+        if (val > 0 && val < 1) {
+          const cents = Math.round(val * 100);
+          return `${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន `;
+        }
+        const dollars = Math.floor(val);
+        const cents = Math.round((val - dollars) * 100);
+        if (cents > 0) {
+          return `${khmerNumberToWords(dollars)} ដុល្លារ ${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន `;
+        }
+        return `${khmerNumberToWords(dollars)} ដុល្លារ `;
+      }
     );
 
     // 7. Standalone Dollar symbol $ or USD
@@ -198,16 +240,38 @@ export function normalizeCurrencyAndSymbols(text: string, isKhmer?: boolean): st
     // 3. Standalone Riel symbol ៛
     result = result.replace(/៛/g, ' riel ');
 
-    // 4. Dollar with amount (prefix): $1 -> 1 dollar, $5 -> 5 dollars, $0.01 -> 0.01 dollars
+    // 4. Dollar with amount (prefix): $1 -> 1 dollar, $5 -> 5 dollars, $0.01 -> 1 cent
     result = result.replace(/\$\s*([0-9]+(?:,[0-9]+)*(?:\.[0-9]+)?)/g, (_match, numStr) => {
       const cleanNum = parseFloat(numStr.replace(/,/g, ''));
-      return cleanNum === 1 ? '1 dollar ' : `${numStr} dollars `;
+      if (isNaN(cleanNum)) return `${numStr} dollars `;
+      if (Math.abs(cleanNum - 0.01) < 0.0001) return '1 cent ';
+      if (cleanNum > 0 && cleanNum < 1) {
+        const cents = Math.round(cleanNum * 100);
+        return cents === 1 ? '1 cent ' : `${cents} cents `;
+      }
+      const dollars = Math.floor(cleanNum);
+      const cents = Math.round((cleanNum - dollars) * 100);
+      if (cents > 0) {
+        return `${dollars === 1 ? '1 dollar' : `${dollars} dollars`} and ${cents === 1 ? '1 cent' : `${cents} cents`} `;
+      }
+      return cleanNum === 1 ? '1 dollar ' : `${dollars} dollars `;
     });
 
-    // 5. Dollar with amount (suffix): 1$ -> 1 dollar, 5$ -> 5 dollars
+    // 5. Dollar with amount (suffix): 1$ -> 1 dollar, 5$ -> 5 dollars, 0.01$ -> 1 cent
     result = result.replace(/([0-9]+(?:,[0-9]+)*(?:\.[0-9]+)?)\s*\$/g, (_match, numStr) => {
       const cleanNum = parseFloat(numStr.replace(/,/g, ''));
-      return cleanNum === 1 ? '1 dollar ' : `${numStr} dollars `;
+      if (isNaN(cleanNum)) return `${numStr} dollars `;
+      if (Math.abs(cleanNum - 0.01) < 0.0001) return '1 cent ';
+      if (cleanNum > 0 && cleanNum < 1) {
+        const cents = Math.round(cleanNum * 100);
+        return cents === 1 ? '1 cent ' : `${cents} cents `;
+      }
+      const dollars = Math.floor(cleanNum);
+      const cents = Math.round((cleanNum - dollars) * 100);
+      if (cents > 0) {
+        return `${dollars === 1 ? '1 dollar' : `${dollars} dollars`} and ${cents === 1 ? '1 cent' : `${cents} cents`} `;
+      }
+      return cleanNum === 1 ? '1 dollar ' : `${dollars} dollars `;
     });
 
     // 6. Standalone Dollar symbol $
@@ -218,11 +282,33 @@ export function normalizeCurrencyAndSymbols(text: string, isKhmer?: boolean): st
     result = result.replace(/\bKHR\s*([0-9]+(?:,[0-9]+)*)\b/gi, '$1 riel ');
     result = result.replace(/\b([0-9]+(?:,[0-9]+)*(?:\.[0-9]+)?)\s*USD\b/gi, (_match, numStr) => {
       const cleanNum = parseFloat(numStr.replace(/,/g, ''));
-      return cleanNum === 1 ? '1 dollar ' : `${numStr} dollars `;
+      if (isNaN(cleanNum)) return `${numStr} dollars `;
+      if (Math.abs(cleanNum - 0.01) < 0.0001) return '1 cent ';
+      if (cleanNum > 0 && cleanNum < 1) {
+        const cents = Math.round(cleanNum * 100);
+        return cents === 1 ? '1 cent ' : `${cents} cents `;
+      }
+      const dollars = Math.floor(cleanNum);
+      const cents = Math.round((cleanNum - dollars) * 100);
+      if (cents > 0) {
+        return `${dollars === 1 ? '1 dollar' : `${dollars} dollars`} and ${cents === 1 ? '1 cent' : `${cents} cents`} `;
+      }
+      return cleanNum === 1 ? '1 dollar ' : `${dollars} dollars `;
     });
     result = result.replace(/\bUSD\s*([0-9]+(?:,[0-9]+)*(?:\.[0-9]+)?)\b/gi, (_match, numStr) => {
       const cleanNum = parseFloat(numStr.replace(/,/g, ''));
-      return cleanNum === 1 ? '1 dollar ' : `${numStr} dollars `;
+      if (isNaN(cleanNum)) return `${numStr} dollars `;
+      if (Math.abs(cleanNum - 0.01) < 0.0001) return '1 cent ';
+      if (cleanNum > 0 && cleanNum < 1) {
+        const cents = Math.round(cleanNum * 100);
+        return cents === 1 ? '1 cent ' : `${cents} cents `;
+      }
+      const dollars = Math.floor(cleanNum);
+      const cents = Math.round((cleanNum - dollars) * 100);
+      if (cents > 0) {
+        return `${dollars === 1 ? '1 dollar' : `${dollars} dollars`} and ${cents === 1 ? '1 cent' : `${cents} cents`} `;
+      }
+      return cleanNum === 1 ? '1 dollar ' : `${dollars} dollars `;
     });
     result = result.replace(/\bKHR\b/gi, 'riel');
     result = result.replace(/\bUSD\b/gi, 'dollars');

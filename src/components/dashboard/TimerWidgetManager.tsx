@@ -288,7 +288,7 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
     const minutesToAdd = amountInUsd * rateMinutesPerUsd;
     const secondsToAdd = Math.round(minutesToAdd * 60);
 
-    addSeconds(secondsToAdd, 'CyberValkyrie', amount);
+    addSeconds(secondsToAdd, 'Supporter', amount);
   };
 
   const currentTemplate =

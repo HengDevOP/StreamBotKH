@@ -257,9 +257,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   }, []);
 
   // Sample Simulation Data
-  const [demoDonorName, setDemoDonorName] = useState('CyberValkyrie');
-  const [demoAmount, setDemoAmount] = useState(minAmountCondition >= 10 ? minAmountCondition : 5.0);
-  const [demoMessage, setDemoMessage] = useState('Awesome stream! Keep up the insane gameplay 🔥');
+  const [demoDonorName, setDemoDonorName] = useState('Supporter');
+  const [demoAmount, setDemoAmount] = useState(minAmountCondition >= 10 ? minAmountCondition : 1.0);
+  const [demoMessage, setDemoMessage] = useState('Thank you for the stream!');
 
   // Listen to real socket donation alerts so they trigger in preview too
   useEffect(() => {
@@ -491,15 +491,40 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         ttsType.includes('sreymom');
 
       const hasCurrencyTag = template.toLowerCase().includes('{currency}');
-      const formattedAmount = isKhmer
-        ? (hasCurrencyTag ? khmerNumberToWords(demoAmount) : `${khmerNumberToWords(demoAmount)} ដុល្លារ`)
-        : (hasCurrencyTag ? Number(demoAmount).toLocaleString('en-US') : `${Number(demoAmount).toLocaleString('en-US')} ${Number(demoAmount) === 1 ? 'dollar' : 'dollars'}`);
+      const numAmount = Number(demoAmount) || 0;
+      let formattedAmount = '';
+      let currencyWord = '';
+
+      if (Math.abs(numAmount - 0.01) < 0.0001) {
+        formattedAmount = isKhmer ? '1 សេន' : '1 cent';
+        currencyWord = isKhmer ? 'សេន' : 'cent';
+      } else if (numAmount > 0 && numAmount < 1) {
+        const cents = Math.round(numAmount * 100);
+        formattedAmount = isKhmer
+          ? `${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន`
+          : `${cents} cents`;
+        currencyWord = isKhmer ? 'សេន' : 'cents';
+      } else {
+        const dollars = Math.floor(numAmount);
+        const cents = Math.round((numAmount - dollars) * 100);
+        if (cents > 0) {
+          formattedAmount = isKhmer
+            ? `${khmerNumberToWords(dollars)} ដុល្លារ ${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន`
+            : `${dollars === 1 ? '1 dollar' : `${dollars} dollars`} and ${cents === 1 ? '1 cent' : `${cents} cents`}`;
+          currencyWord = isKhmer ? 'ដុល្លារ' : 'dollars';
+        } else {
+          formattedAmount = isKhmer
+            ? (hasCurrencyTag ? khmerNumberToWords(dollars) : `${khmerNumberToWords(dollars)} ដុល្លារ`)
+            : `${dollars} ${dollars === 1 ? 'dollar' : 'dollars'}`;
+          currencyWord = isKhmer ? 'ដុល្លារ' : (dollars === 1 ? 'dollar' : 'dollars');
+        }
+      }
 
       let headline = template
         .replace(/\{donator\}/gi, demoDonorName)
         .replace(/\{name\}/gi, demoDonorName)
         .replace(/\{amount\}/gi, formattedAmount)
-        .replace(/\{currency\}/gi, isKhmer ? 'ដុល្លារ' : (Number(demoAmount) === 1 ? 'dollar' : 'dollars'))
+        .replace(/\{currency\}/gi, currencyWord)
         .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
         .trim();
 
