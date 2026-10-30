@@ -4,6 +4,8 @@ import fs from 'fs/promises';
 import { ObjectId } from 'mongodb';
 import { getAuthenticatedUser } from '@/server/auth';
 import { getMediaCollection } from '@/server/database/mongo';
+import { invalidateMediaCache, fetchUserMediaData } from '../route';
+import { broadcastMediaDelete, broadcastMediaUpdate } from '@/server/services/socketService';
 
 export async function DELETE(
   req: NextRequest,
@@ -12,6 +14,7 @@ export async function DELETE(
   try {
     const authUser = getAuthenticatedUser(req);
     const userId = authUser?.id || 'demo-streamer-id-1001';
+    const email = authUser?.email || '';
 
     const mediaId = params.id;
     if (!mediaId || !ObjectId.isValid(mediaId)) {
@@ -47,9 +50,22 @@ export async function DELETE(
     // 2. Delete document from MongoDB
     await mediaCol.deleteOne({ _id: new ObjectId(mediaId) });
 
+    // 3. Invalidate server cache
+    invalidateMediaCache(userId);
+
+    // 4. Fetch updated media collection and broadcast real-time sync via WebSocket
+    const freshData = await fetchUserMediaData(userId, email);
+
+    broadcastMediaDelete(userId, mediaId);
+    broadcastMediaUpdate(userId, {
+      media: freshData.media,
+      storage: freshData.storage
+    });
+
     return NextResponse.json({
       success: true,
-      message: 'Media deleted successfully.'
+      message: 'Media deleted successfully.',
+      storage: freshData.storage
     });
   } catch (err: any) {
     console.error('API /api/media/[id] DELETE error:', err);

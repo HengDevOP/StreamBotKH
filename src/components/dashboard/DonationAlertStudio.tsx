@@ -47,6 +47,7 @@ import { useAudio } from '../../hooks/useAudio';
 import { useSocket } from '../../context/SocketContext';
 import { VoiceClonerModal } from './VoiceClonerModal';
 import { MediaItem } from './MediaLibraryManager';
+import { mediaService } from '../../services/mediaService';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 
 interface DonationAlertStudioProps {
@@ -252,14 +253,31 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   }, [socket, soundUrl, soundVolume, ttsEnabled, durationSeconds]);
 
   useEffect(() => {
+    // 1. Initialize from cache immediately
+    const cached = mediaService.getCachedMedia();
+    if (cached.length > 0) {
+      setStorageMedia(cached);
+    }
+
+    // 2. Subscribe to real-time updates via WebSocket
+    const unsubscribe = mediaService.subscribe((data) => {
+      if (data?.media) {
+        setStorageMedia(data.media);
+      }
+    });
+
+    // 3. Fetch/revalidate in background
     fetchStorageMedia();
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const fetchStorageMedia = async () => {
     try {
-      const res = await fetch('/api/media');
-      const data = await res.json();
-      if (res.ok && data.success && data.media) {
+      const data = await mediaService.fetchMedia();
+      if (data?.media) {
         setStorageMedia(data.media);
       }
     } catch (e) {
@@ -316,32 +334,26 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/media', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (res.ok && data.success && data.media) {
-        setStorageMedia((prev) => [data.media, ...prev]);
+      const result = await mediaService.uploadMedia(file);
+      if (result.media) {
+        setStorageMedia((prev) => [result.media, ...prev.filter((m) => m._id !== result.media._id)]);
 
         // Automatically assign and apply newly uploaded file
         const isAudio =
-          data.media.fileType?.startsWith('audio') ||
-          /\.(mp3|wav|ogg|webm|m4a)$/i.test(data.media.url || data.media.filename);
+          result.media.fileType?.startsWith('audio') ||
+          /\.(mp3|wav|ogg|webm|m4a)$/i.test(result.media.url || result.media.filename);
 
         if (isAudio || storagePickerMode === 'sound') {
-          setSoundUrl(data.media.url);
-          playSound(data.media.url, soundVolume);
+          setSoundUrl(result.media.url);
+          playSound(result.media.url, soundVolume);
         } else {
-          setMediaUrl(data.media.url);
+          setMediaUrl(result.media.url);
         }
 
         // Close picker after a brief moment
         setTimeout(() => {
           closeStoragePicker();
         }, 400);
-      } else {
-        setUploadError(data.error || 'Failed to upload media file');
       }
     } catch (err: any) {
       console.error('Error uploading file:', err);

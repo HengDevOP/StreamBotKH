@@ -35,17 +35,9 @@ import {
 } from 'lucide-react';
 import { useModal } from '../../context/ModalContext';
 import { POPULAR_ALERT_SOUNDS, ONLINE_MEDIA_CATEGORIES, OnlineMediaItem } from '../../data/onlineMedia';
+import { mediaService, MediaItem, StorageInfo } from '../../services/mediaService';
 
-export interface MediaItem {
-  _id: string;
-  userId: string;
-  filename: string;
-  storedFilename: string;
-  url: string;
-  fileType: string;
-  fileSize: number;
-  createdAt: string;
-}
+export type { MediaItem, StorageInfo };
 
 interface MediaLibraryManagerProps {
   onSelectForOverlay?: (media: MediaItem | { url: string; filename: string; _id?: string }) => void;
@@ -95,21 +87,14 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   onSelectForOverlay
 }) => {
   const { showConfirm, showAlert } = useModal();
-  const [mediaList, setMediaList] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [mediaList, setMediaList] = useState<MediaItem[]>(() => mediaService.getCachedMedia());
+  const [loading, setLoading] = useState(() => mediaService.getCachedMedia().length === 0);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [storageInfo, setStorageInfo] = useState<{
-    plan: string;
-    planLabel: string;
-    usedBytes: number;
-    limitBytes: number;
-    remainingBytes: number;
-    percentUsed: number;
-  } | null>(null);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(() => mediaService.getCachedStorage());
 
   // Online Media State
   const [activeSection, setActiveSection] = useState<'uploads' | 'online'>('uploads');
@@ -181,18 +166,15 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  const fetchMedia = async () => {
+  const fetchMedia = async (force = false) => {
     try {
-      setLoading(true);
-      const res = await fetch('/api/media', {
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setMediaList(data.media || []);
-        if (data.storage) {
-          setStorageInfo(data.storage);
-        }
+      if (mediaList.length === 0) {
+        setLoading(true);
+      }
+      const data = await mediaService.fetchMedia({ force });
+      setMediaList(data.media || []);
+      if (data.storage) {
+        setStorageInfo(data.storage);
       }
     } catch (e: any) {
       console.error('Failed to load media:', e);
@@ -202,7 +184,21 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   };
 
   useEffect(() => {
-    fetchMedia();
+    // 1. Subscribe to real-time WebSocket updates and cache events
+    const unsubscribe = mediaService.subscribe((data) => {
+      setMediaList(data.media || []);
+      if (data.storage) {
+        setStorageInfo(data.storage);
+      }
+      setLoading(false);
+    });
+
+    // 2. Fetch or revalidate in background without blocking UI
+    fetchMedia(false);
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const formatFileSize = (bytes: number) => {
@@ -228,24 +224,15 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     }
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const res = await fetch('/api/media', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: formData
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSuccessMsg(`"${file.name}" uploaded successfully!`);
-        await fetchMedia();
-        setTimeout(() => setSuccessMsg(null), 3000);
-      } else {
-        setErrorMsg(data.error || 'Failed to upload media.');
+      const result = await mediaService.uploadMedia(file);
+      setSuccessMsg(`"${file.name}" uploaded successfully!`);
+      setMediaList(mediaService.getCachedMedia());
+      if (result.storage) {
+        setStorageInfo(result.storage);
       }
+      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Network error during upload.');
     } finally {
@@ -293,30 +280,16 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
       confirmText: 'Delete Asset',
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/media/${id}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders()
+          await mediaService.deleteMedia(id);
+          showAlert({
+            title: 'Asset Deleted',
+            message: `"${name}" has been removed successfully.`,
+            type: 'success'
           });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            setMediaList((prev) => prev.filter((m) => m._id !== id));
-            await fetchMedia();
-            showAlert({
-              title: 'Asset Deleted',
-              message: `"${name}" has been removed successfully.`,
-              type: 'success'
-            });
-          } else {
-            showAlert({
-              title: 'Delete Failed',
-              message: data.error || 'Failed to delete media asset',
-              type: 'danger'
-            });
-          }
         } catch (e: any) {
           showAlert({
-            title: 'Network Error',
-            message: 'A network error occurred while deleting the media asset.',
+            title: 'Delete Failed',
+            message: e.message || 'Failed to delete media asset',
             type: 'danger'
           });
         }
@@ -511,8 +484,8 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                 Uploaded Media ({mediaList.length})
               </h3>
               <button
-                onClick={fetchMedia}
-                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-mono transition-colors"
+                onClick={() => fetchMedia(true)}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-mono transition-colors cursor-pointer"
               >
                 <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
                 <span>Refresh</span>

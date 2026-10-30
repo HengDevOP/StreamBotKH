@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { MediaItem, isVideoAsset, isAudioAsset, isImageAsset, renderOnlineIcon } from './MediaLibraryManager';
 import { POPULAR_ALERT_SOUNDS, ONLINE_MEDIA_CATEGORIES, OnlineMediaItem } from '../../data/onlineMedia';
+import { mediaService, StorageInfo } from '../../services/mediaService';
 
 interface MediaPickerModalProps {
   isOpen: boolean;
@@ -40,21 +41,14 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   title = 'Choose from Media Library',
   subtitle = 'Select a file from your library, or upload MP4, GIF, MP3, WAV, PNG, JPG directly.'
 }) => {
-  const [mediaList, setMediaList] = useState<MediaItem[]>([]);
+  const [mediaList, setMediaList] = useState<MediaItem[]>(() => mediaService.getCachedMedia());
   const [selectedUrl, setSelectedUrl] = useState<string>(currentUrl || '');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [storageInfo, setStorageInfo] = useState<{
-    plan: string;
-    planLabel: string;
-    usedBytes: number;
-    limitBytes: number;
-    remainingBytes: number;
-    percentUsed: number;
-  } | null>(null);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(() => mediaService.getCachedStorage());
 
   // Online Media State
   const isInitiallyOnline = useMemo(() => {
@@ -133,21 +127,16 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  const fetchMedia = async () => {
+  const fetchMedia = async (force = false) => {
     try {
-      setLoading(true);
+      if (mediaList.length === 0) {
+        setLoading(true);
+      }
       setErrorMsg(null);
-      const res = await fetch('/api/media', {
-        headers: getAuthHeaders()
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setMediaList(data.media || []);
-        if (data.storage) {
-          setStorageInfo(data.storage);
-        }
-      } else {
-        setErrorMsg(data.error || 'Could not load Media Library');
+      const data = await mediaService.fetchMedia({ force });
+      setMediaList(data.media || []);
+      if (data.storage) {
+        setStorageInfo(data.storage);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to load Media Library');
@@ -157,12 +146,27 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
-      setSelectedUrl(currentUrl || '');
-      setErrorMsg(null);
-      setSuccessMsg(null);
-      fetchMedia();
-    }
+    if (!isOpen) return;
+
+    setSelectedUrl(currentUrl || '');
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    // Subscribe to real-time WebSocket updates while modal is open
+    const unsubscribe = mediaService.subscribe((data) => {
+      setMediaList(data.media || []);
+      if (data.storage) {
+        setStorageInfo(data.storage);
+      }
+      setLoading(false);
+    });
+
+    // Revalidate in background without blocking
+    fetchMedia(false);
+
+    return () => {
+      unsubscribe();
+    };
   }, [isOpen, currentUrl]);
 
   if (!isOpen) return null;
@@ -190,26 +194,18 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     }
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const res = await fetch('/api/media', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: formData
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setSuccessMsg(`"${file.name}" uploaded to your Media Library!`);
-        await fetchMedia();
-        if (data.media?.url) {
-          setSelectedUrl(data.media.url);
-        }
-        setTimeout(() => setSuccessMsg(null), 3000);
-      } else {
-        setErrorMsg(data.error || 'Failed to upload media.');
+      const result = await mediaService.uploadMedia(file);
+      setSuccessMsg(`"${file.name}" uploaded to your Media Library!`);
+      setMediaList(mediaService.getCachedMedia());
+      if (result.storage) {
+        setStorageInfo(result.storage);
       }
+      if (result.media?.url) {
+        setSelectedUrl(result.media.url);
+      }
+      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
       setErrorMsg(err.message || 'Network error during upload.');
     } finally {

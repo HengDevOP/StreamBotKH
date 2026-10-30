@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { MediaItem } from './MediaLibraryManager';
+import { mediaService } from '../../services/mediaService';
 import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
 import { CreateOverlayModal } from './CreateOverlayModal';
@@ -60,7 +61,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
   const { socket } = useSocket();
   const { showConfirm, showAlert } = useModal();
   const [overlays, setOverlays] = useState<OverlayItem[]>([]);
-  const [mediaList, setMediaList] = useState<MediaItem[]>([]);
+  const [mediaList, setMediaList] = useState<MediaItem[]>(() => mediaService.getCachedMedia());
   const [loading, setLoading] = useState(true);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -71,19 +72,16 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
   const fetchOverlaysAndMedia = async () => {
     try {
       setLoading(true);
-      const [resOverlays, resMedia] = await Promise.all([
-        fetch('/api/overlays'),
-        fetch('/api/media')
+      const [resOverlays, mediaData] = await Promise.all([
+        fetch('/api/overlays').then((r) => r.json()).catch(() => ({})),
+        mediaService.fetchMedia().catch(() => ({ media: [] }))
       ]);
 
-      const dataOverlays = await resOverlays.json();
-      const dataMedia = await resMedia.json();
-
-      if (resOverlays.ok && dataOverlays.success) {
-        setOverlays(dataOverlays.overlays || []);
+      if (resOverlays?.success && resOverlays?.overlays) {
+        setOverlays(resOverlays.overlays || []);
       }
-      if (resMedia.ok && dataMedia.success) {
-        setMediaList(dataMedia.media || []);
+      if (mediaData?.media) {
+        setMediaList(mediaData.media || []);
       }
     } catch (e) {
       console.error('Error fetching overlay data:', e);

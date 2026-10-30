@@ -38,6 +38,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
 import { useAudio } from '../../hooks/useAudio';
 import { MediaItem } from './MediaLibraryManager';
+import { mediaService } from '../../services/mediaService';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 
 interface OverlayStudioProps {
@@ -165,13 +166,13 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
     const fetchOverlay = async () => {
       try {
         setLoading(true);
-        const [resOverlay, resMedia] = await Promise.all([
+        const [resOverlay, mediaData] = await Promise.all([
           fetch(`/api/overlays/${overlayId}`),
-          fetch('/api/media')
+          mediaService.fetchMedia().catch(() => ({ media: [] }))
         ]);
 
         const dataOverlay = await resOverlay.json();
-        const dataMedia = await resMedia.json();
+        const dataMedia = mediaData;
 
         if (isMounted) {
           if (resOverlay.ok && dataOverlay.success && dataOverlay.overlay) {

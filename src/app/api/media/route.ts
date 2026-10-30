@@ -5,16 +5,64 @@ import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
 import { getMediaCollection, MediaDoc, restoreMediaFile } from '@/server/database/mongo';
 import { db } from '@/server/database/db';
+import { broadcastMediaUpdate } from '@/server/services/socketService';
 
 // Media storage limits per user plan (no per-upload limit, only bounded by total remaining plan quota)
-const PLAN_STORAGE_LIMITS: Record<string, { label: string; limitBytes: number }> = {
+export const PLAN_STORAGE_LIMITS: Record<string, { label: string; limitBytes: number }> = {
   free: { label: 'Free (20MB)', limitBytes: 20 * 1024 * 1024 }, // 20MB
   starter: { label: 'Starter (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
   pro: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
   studio: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 } // backwards compatibility
 };
 
-function detectMimeType(mimeType: string, ext: string): string {
+export interface CachedMediaResult {
+  media: any[];
+  storage: {
+    plan: string;
+    planLabel: string;
+    usedBytes: number;
+    limitBytes: number;
+    remainingBytes: number;
+    percentUsed: number;
+  };
+  etag: string;
+}
+
+interface ServerCacheEntry extends CachedMediaResult {
+  timestamp: number;
+}
+
+// In-memory cache for media to avoid hammering DB & disk on repeated page reloads (persisted on globalThis across dev hot-reloads)
+const g = globalThis as any;
+if (!g.__streamneon_mediaCache) g.__streamneon_mediaCache = new Map<string, ServerCacheEntry>();
+if (!g.__streamneon_inFlightFetches) g.__streamneon_inFlightFetches = new Map<string, Promise<CachedMediaResult>>();
+if (!g.__streamneon_verifiedFilesOnDisk) g.__streamneon_verifiedFilesOnDisk = new Set<string>();
+
+const mediaCache: Map<string, ServerCacheEntry> = g.__streamneon_mediaCache;
+const inFlightFetches: Map<string, Promise<CachedMediaResult>> = g.__streamneon_inFlightFetches;
+const verifiedFilesOnDisk: Set<string> = g.__streamneon_verifiedFilesOnDisk;
+
+const CACHE_TTL_MS = 45 * 1000; // 45 seconds TTL
+
+export function invalidateMediaCache(userId?: string) {
+  if (userId) {
+    for (const key of Array.from(mediaCache.keys())) {
+      if (key.startsWith(userId) || key.includes(userId)) {
+        mediaCache.delete(key);
+      }
+    }
+    for (const key of Array.from(inFlightFetches.keys())) {
+      if (key.startsWith(userId) || key.includes(userId)) {
+        inFlightFetches.delete(key);
+      }
+    }
+  } else {
+    mediaCache.clear();
+    inFlightFetches.clear();
+  }
+}
+
+export function detectMimeType(mimeType: string, ext: string): string {
   const cleanMime = (mimeType || '').toLowerCase().trim();
   if (cleanMime && cleanMime !== 'application/octet-stream') {
     return cleanMime;
@@ -49,41 +97,133 @@ function detectMimeType(mimeType: string, ext: string): string {
   return mimeMap[lowerExt] || 'application/octet-stream';
 }
 
+/**
+ * Fetch and synchronize media files for a user from MongoDB and disk
+ */
+export async function fetchUserMediaData(userId: string, email?: string): Promise<CachedMediaResult> {
+  const mediaCol = await getMediaCollection();
+  const filter = email
+    ? { $or: [{ userId }, { userEmail: email }] }
+    : { userId };
+  const mediaList = await mediaCol.find(filter).sort({ createdAt: -1 }).toArray();
+
+  // Ensure all media files for this user exist on disk or are restored from Cloud backup
+  // Optimize: skip file check if already verified on disk in this process
+  for (const item of mediaList) {
+    if (item.storedFilename && !verifiedFilesOnDisk.has(item.storedFilename)) {
+      const ok = await restoreMediaFile(item);
+      if (ok) {
+        verifiedFilesOnDisk.add(item.storedFilename);
+      }
+    }
+  }
+
+  // Get user plan
+  const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ? OR LOWER(email) = LOWER(?)').get(userId, email || '') as any;
+  const userPlan = (streamerRow?.plan || 'free').toLowerCase();
+  const quota = PLAN_STORAGE_LIMITS[userPlan] || PLAN_STORAGE_LIMITS.free;
+
+  const usedBytes = mediaList.reduce((acc, item) => acc + (item.fileSize || 0), 0);
+  const storage = {
+    plan: userPlan,
+    planLabel: quota.label,
+    usedBytes,
+    limitBytes: quota.limitBytes,
+    remainingBytes: Math.max(0, quota.limitBytes - usedBytes),
+    percentUsed: Math.min(100, parseFloat(((usedBytes / quota.limitBytes) * 100).toFixed(1)))
+  };
+
+  const latestTime = mediaList[0]?.createdAt ? new Date(mediaList[0].createdAt).getTime() : 0;
+  const etag = `W/"media-${userId}-${mediaList.length}-${usedBytes}-${latestTime}"`;
+
+  return { media: mediaList, storage, etag };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
     const userId = authUser?.id || 'demo-streamer-id-1001';
+    const email = authUser?.email || '';
+    const cacheKey = `${userId}:${email}`;
 
-    const mediaCol = await getMediaCollection();
-    const filter = authUser?.email
-      ? { $or: [{ userId }, { userEmail: authUser.email }] }
-      : { userId };
-    const mediaList = await mediaCol.find(filter).sort({ createdAt: -1 }).toArray();
+    const ifNoneMatch = req.headers.get('if-none-match');
+    const now = Date.now();
 
-    // Ensure all media files for this user exist on disk or are restored from Cloud backup
-    for (const item of mediaList) {
-      await restoreMediaFile(item);
+    // 1. Check in-memory server cache
+    const cached = mediaCache.get(cacheKey);
+    if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+      if (ifNoneMatch && ifNoneMatch === cached.etag) {
+        return new NextResponse(null, {
+          status: 304,
+          headers: {
+            ETag: cached.etag,
+            'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+            'X-Cache': 'HIT-304'
+          }
+        });
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          media: cached.media,
+          storage: cached.storage
+        },
+        {
+          headers: {
+            ETag: cached.etag,
+            'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+            'X-Cache': 'HIT'
+          }
+        }
+      );
     }
 
-    // Get user plan
-    const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ? OR LOWER(email) = LOWER(?)').get(userId, authUser?.email || '') as any;
-    const userPlan = (streamerRow?.plan || 'free').toLowerCase();
-    const quota = PLAN_STORAGE_LIMITS[userPlan] || PLAN_STORAGE_LIMITS.free;
+    // 2. In-flight request deduplication (prevents server overload when multiple components mount concurrently)
+    let fetchPromise = inFlightFetches.get(cacheKey);
+    if (!fetchPromise) {
+      fetchPromise = fetchUserMediaData(userId, email)
+        .then((result) => {
+          mediaCache.set(cacheKey, {
+            ...result,
+            timestamp: Date.now()
+          });
+          return result;
+        })
+        .finally(() => {
+          inFlightFetches.delete(cacheKey);
+        });
 
-    const usedBytes = mediaList.reduce((acc, item) => acc + (item.fileSize || 0), 0);
+      inFlightFetches.set(cacheKey, fetchPromise);
+    }
 
-    return NextResponse.json({
-      success: true,
-      media: mediaList,
-      storage: {
-        plan: userPlan,
-        planLabel: quota.label,
-        usedBytes,
-        limitBytes: quota.limitBytes,
-        remainingBytes: Math.max(0, quota.limitBytes - usedBytes),
-        percentUsed: Math.min(100, parseFloat(((usedBytes / quota.limitBytes) * 100).toFixed(1)))
+    const result = await fetchPromise;
+
+    if (ifNoneMatch && ifNoneMatch === result.etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          ETag: result.etag,
+          'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+          'X-Cache': 'MISS-304'
+        }
+      });
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        media: result.media,
+        storage: result.storage
+      },
+      {
+        headers: {
+          ETag: result.etag,
+          'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+          'X-Cache': 'MISS'
+        }
       }
-    });
+    );
   } catch (err: any) {
     console.error('API /api/media GET error:', err);
     return NextResponse.json(
@@ -97,6 +237,8 @@ export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
     const userId = authUser?.id || 'demo-streamer-id-1001';
+    const email = authUser?.email || '';
+    const cacheKey = `${userId}:${email}`;
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -169,6 +311,7 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     await fs.writeFile(filePath, buffer);
+    verifiedFilesOnDisk.add(storedFilename);
 
     const publicUrl = `/uploads/media/${storedFilename}`;
     const detectedMime = detectMimeType(mimeType, safeExt);
@@ -189,6 +332,20 @@ export async function POST(req: NextRequest) {
 
     const insertResult = await mediaCol.insertOne(mediaDoc);
 
+    // 6. Invalidate server cache and compute fresh list
+    invalidateMediaCache(userId);
+    const freshData = await fetchUserMediaData(userId, email);
+    mediaCache.set(cacheKey, {
+      ...freshData,
+      timestamp: Date.now()
+    });
+
+    // 7. Broadcast real-time WebSocket update to all open dashboards and overlays
+    broadcastMediaUpdate(userId, {
+      media: freshData.media,
+      storage: freshData.storage
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Media uploaded successfully!',
@@ -196,13 +353,7 @@ export async function POST(req: NextRequest) {
         ...mediaDoc,
         _id: insertResult.insertedId
       },
-      storage: {
-        plan: userPlan,
-        planLabel: quota.label,
-        usedBytes: usedBytes + file.size,
-        limitBytes: quota.limitBytes,
-        remainingBytes: Math.max(0, quota.limitBytes - (usedBytes + file.size))
-      }
+      storage: freshData.storage
     });
   } catch (err: any) {
     console.error('API /api/media POST error:', err);

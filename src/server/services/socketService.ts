@@ -162,3 +162,21 @@ export function broadcastDonationToDashboard(streamerId: string, donation: any) 
     status: 'PAID'
   });
 }
+
+export function broadcastMediaUpdate(userId: string, data: { media: any[]; storage: any }) {
+  const activeIo = getIO();
+  if (!activeIo) return;
+  console.log(`⚡ [Socket] Broadcasting media:updated for user [${userId}] (${data?.media?.length || 0} items)`);
+  activeIo.to(`dashboard:${userId}`).emit('media:updated', data);
+  activeIo.emit(`media:${userId}:updated`, data);
+  activeIo.emit('media:updated', { ...data, userId });
+}
+
+export function broadcastMediaDelete(userId: string, mediaId: string) {
+  const activeIo = getIO();
+  if (!activeIo) return;
+  console.log(`⚡ [Socket] Broadcasting media:deleted for user [${userId}] (mediaId: ${mediaId})`);
+  activeIo.to(`dashboard:${userId}`).emit('media:deleted', { mediaId, userId });
+  activeIo.emit(`media:${userId}:deleted`, { mediaId });
+  activeIo.emit('media:deleted', { mediaId, userId });
+}

@@ -78,6 +78,7 @@ import { PaymentGatewayConfig } from '../components/dashboard/PaymentGatewayConf
 import { TelegramBotCard } from '../components/dashboard/TelegramBotCard';
 import { ObsOverlayModal } from '../components/dashboard/ObsOverlayModal';
 import { MediaLibraryManager, MediaItem } from '../components/dashboard/MediaLibraryManager';
+import { mediaService } from '../services/mediaService';
 import { PaymentGatewayAdmin } from '../components/dashboard/PaymentGatewayAdmin';
 import { DashboardSkeleton } from '../components/dashboard/DashboardSkeleton';
 import { DonationAlertsManager } from '../components/dashboard/DonationAlertsManager';
@@ -328,16 +329,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setAlertSettings(alertData);
       setPaymentSettings(paymentData);
 
-      // Fetch storage quota info
+      // Fetch storage quota info using mediaService (cached & deduplicated)
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
-        if (token) {
-          const mediaRes = await streamerService.getMediaStorageInfo?.() || await fetch('/api/media', {
-            headers: { Authorization: `Bearer ${token}` }
-          }).then(r => r.json()).catch(() => null);
-          if (mediaRes?.storage) {
-            setStorageInfo(mediaRes.storage);
-          }
+        const cachedStorage = mediaService.getCachedStorage();
+        if (cachedStorage) {
+          setStorageInfo(cachedStorage);
+        }
+        const mediaRes = await mediaService.fetchMedia().catch(() => null);
+        if (mediaRes?.storage) {
+          setStorageInfo(mediaRes.storage);
         }
       } catch (storageErr) {
         console.warn('Could not fetch storage quota:', storageErr);

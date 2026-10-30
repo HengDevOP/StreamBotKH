@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { mediaService } from '../services/mediaService';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -41,6 +42,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const s = getGlobalSocket();
     setSocket(s);
     setConnected(s.connected);
+    mediaService.attachSocket(s);
 
     const onConnect = () => {
       console.log('⚡ [Socket] Connected to streambotkh gateway:', s.id);
