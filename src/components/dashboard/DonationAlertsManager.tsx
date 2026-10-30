@@ -233,6 +233,8 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
       ttsType: box.ttsType || 'google',
       clonedVoiceSampleUrl: box.clonedVoiceSampleUrl,
       overlayToken: effectiveToken,
+      isVideoTest: false,
+      videoUrl: undefined,
       isTest: true
     };
 

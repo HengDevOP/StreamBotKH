@@ -1,14 +1,98 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { getUsersCollection, getOverlayTokenHistoryCollection } from '../database/mongo';
+import { randomUUID } from 'crypto';
+import { getUsersCollection, getOverlayTokenHistoryCollection, getMongoDb } from '../database/mongo';
 
 let io: SocketIOServer | null = null;
 const recentOverlayAlerts = new Map<string, { payload: AlertPayload; timestamp: number }>();
+
+// ---------------------------------------------------------------------------
+// Cross-instance alert relay (MongoDB `alert_events`)
+// Several server instances (local dev, production, replicas) can share the same
+// MongoDB + Telegram session. The instance that matches a donation is not always
+// the instance the OBS overlay socket is connected to, so every alert is also
+// published to MongoDB and re-emitted by all OTHER instances.
+// ---------------------------------------------------------------------------
+const g = globalThis as any;
+const INSTANCE_ID: string = g.__alertRelayInstanceId || (g.__alertRelayInstanceId = randomUUID());
+const ALERT_EVENTS_COLLECTION = 'alert_events';
+
+async function publishAlertEvent(overlayToken: string, payload: AlertPayload) {
+  try {
+    const db = await getMongoDb();
+    await db.collection(ALERT_EVENTS_COLLECTION).insertOne({
+      instanceId: INSTANCE_ID,
+      overlayToken,
+      payload,
+      createdAt: new Date()
+    });
+  } catch (e) {
+    console.warn('[Socket Relay] Failed to publish alert event to MongoDB:', (e as any)?.message || e);
+  }
+}
+
+function handleRelayedEvent(doc: any) {
+  if (!doc || doc.instanceId === INSTANCE_ID || !doc.overlayToken || !doc.payload) return;
+  console.log(`🔁 [Socket Relay] Alert from another server instance → overlay:${String(doc.overlayToken).slice(0, 10)}...: ${doc.payload.donorName} ($${doc.payload.amount})`);
+  emitAlertLocally(doc.overlayToken, doc.payload);
+}
+
+async function startAlertRelay() {
+  if (g.__alertRelayStarted) return;
+  g.__alertRelayStarted = true;
+  try {
+    const db = await getMongoDb();
+    const col = db.collection(ALERT_EVENTS_COLLECTION);
+    await col.createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 }).catch(() => {});
+
+    let lastSeen = new Date();
+    let pollTimer: NodeJS.Timeout | null = null;
+
+    const startPolling = () => {
+      if (pollTimer) return;
+      console.log('[Socket Relay] Using polling fallback for cross-instance alerts');
+      pollTimer = setInterval(async () => {
+        try {
+          const docs = await col
+            .find({ createdAt: { $gt: lastSeen }, instanceId: { $ne: INSTANCE_ID } })
+            .sort({ createdAt: 1 })
+            .limit(50)
+            .toArray();
+          for (const d of docs) {
+            if (d.createdAt > lastSeen) lastSeen = d.createdAt;
+            handleRelayedEvent(d);
+          }
+        } catch (e) {}
+      }, 1500);
+    };
+
+    try {
+      const stream = col.watch([{ $match: { operationType: 'insert' } }]);
+      stream.on('change', (change: any) => {
+        const doc = change.fullDocument;
+        if (doc?.createdAt && doc.createdAt > lastSeen) lastSeen = doc.createdAt;
+        handleRelayedEvent(doc);
+      });
+      stream.on('error', (err: any) => {
+        console.warn('[Socket Relay] Change stream error, switching to polling:', err?.message || err);
+        try { stream.close(); } catch (e) {}
+        startPolling();
+      });
+      console.log(`⚡ [Socket Relay] Cross-instance alert relay active (instance ${INSTANCE_ID.slice(0, 8)})`);
+    } catch (e) {
+      startPolling();
+    }
+  } catch (e) {
+    g.__alertRelayStarted = false;
+    console.warn('[Socket Relay] Could not start alert relay:', (e as any)?.message || e);
+  }
+}
 
 async function joinStreamerRooms(socket: Socket, token: string) {
   try {
     const usersCol = await getUsersCollection();
     const histCol = await getOverlayTokenHistoryCollection();
+    const db = await getMongoDb();
 
     let streamer = await usersCol.findOne({
       $or: [{ overlayToken: token }, { overlay_token: token } as any]
@@ -19,6 +103,17 @@ async function joinStreamerRooms(socket: Socket, token: string) {
       if (hist?.streamerId) {
         streamer = await usersCol.findOne({
           $or: [{ userId: hist.streamerId }, { id: hist.streamerId } as any]
+        });
+      }
+    }
+
+    if (!streamer) {
+      const overlayDoc: any = await db.collection('overlays').findOne({
+        $or: [{ overlayToken: token }, { token }]
+      });
+      if (overlayDoc?.userId) {
+        streamer = await usersCol.findOne({
+          $or: [{ userId: overlayDoc.userId }, { id: overlayDoc.userId as any }]
         });
       }
     }
@@ -34,40 +129,83 @@ async function joinStreamerRooms(socket: Socket, token: string) {
         for (const h of histories) {
           if (h.token) socket.join(`overlay:${h.token}`);
         }
+        const overlays = await db.collection('overlays').find({ userId: sId }).toArray();
+        for (const o of overlays) {
+          if (o.overlayToken) socket.join(`overlay:${o.overlayToken}`);
+        }
       }
     }
   } catch (e) {}
 }
 
 async function broadcastToAllStreamerRooms(token: string, event: string, payload: any) {
+  const io = getIO();
   if (!io) return;
   try {
     const usersCol = await getUsersCollection();
     const histCol = await getOverlayTokenHistoryCollection();
+    const db = await getMongoDb();
 
-    let streamer = await usersCol.findOne({
-      $or: [{ overlayToken: token }, { overlay_token: token } as any]
-    });
+    let streamer: any = null;
+    if (token && token !== 'demo-token') {
+      streamer = await usersCol.findOne({
+        $or: [{ overlayToken: token }, { overlay_token: token } as any]
+      });
 
-    if (!streamer) {
-      const hist = await histCol.findOne({ token });
-      if (hist?.streamerId) {
-        streamer = await usersCol.findOne({
-          $or: [{ userId: hist.streamerId }, { id: hist.streamerId } as any]
+      if (!streamer) {
+        const hist = await histCol.findOne({ token });
+        if (hist?.streamerId) {
+          streamer = await usersCol.findOne({
+            $or: [{ userId: hist.streamerId }, { id: hist.streamerId } as any]
+          });
+        }
+      }
+
+      if (!streamer) {
+        const overlayDoc: any = await db.collection('overlays').findOne({
+          $or: [{ overlayToken: token }, { token }]
         });
+        if (overlayDoc?.userId) {
+          streamer = await usersCol.findOne({
+            $or: [{ userId: overlayDoc.userId }, { id: overlayDoc.userId as any }]
+          });
+        }
       }
     }
 
+    // Fallback: resolve streamer directly by payload.streamerId
+    if (!streamer && payload?.streamerId) {
+      streamer = await usersCol.findOne({
+        $or: [
+          { userId: payload.streamerId },
+          { id: payload.streamerId as any },
+          { username: payload.streamerId }
+        ]
+      });
+    }
+
     if (streamer) {
+      // Collect every linked room and emit across all of them (Socket.IO natively de-duplicates sockets)
+      const rooms = new Set<string>();
       const sId = streamer.userId || (streamer as any).id;
-      if (sId) io.to(`streamer_overlay:${sId}`).emit(event, payload);
+      if (sId) rooms.add(`streamer_overlay:${sId}`);
       const activeTok = streamer.overlayToken || streamer.overlay_token;
-      if (activeTok && activeTok !== token) io.to(`overlay:${activeTok}`).emit(event, payload);
+      if (activeTok) rooms.add(`overlay:${activeTok}`);
+      if (token && token !== 'demo-token') rooms.add(`overlay:${token}`);
+
       if (sId) {
         const histories = await histCol.find({ streamerId: sId }).toArray();
         for (const h of histories) {
-          if (h.token && h.token !== token) io.to(`overlay:${h.token}`).emit(event, payload);
+          if (h.token) rooms.add(`overlay:${h.token}`);
         }
+        const overlays = await db.collection('overlays').find({ userId: sId }).toArray();
+        for (const o of overlays) {
+          if (o.overlayToken) rooms.add(`overlay:${o.overlayToken}`);
+        }
+      }
+
+      if (rooms.size > 0) {
+        io.to(Array.from(rooms)).emit(event, payload);
       }
     }
   } catch (e) {}
@@ -75,6 +213,8 @@ async function broadcastToAllStreamerRooms(token: string, event: string, payload
 
 export interface AlertPayload {
   id?: string;
+  streamerId?: string;
+  streamerUsername?: string;
   boxId?: string;
   donationId: string;
   donorName: string;
@@ -235,6 +375,7 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
   });
 
   (global as any).socketIO = io;
+  startAlertRelay();
   return io;
 }
 
@@ -245,13 +386,21 @@ export function getIO(): SocketIOServer | null {
 export function broadcastAlertToOverlay(overlayToken: string, payload: AlertPayload) {
   const activeIo = getIO();
   if (!activeIo) {
-    console.warn('[Socket] Socket server not initialized yet');
-    return;
+    console.warn('[Socket] Socket server not initialized yet — relaying alert via MongoDB only');
+  } else {
+    console.log(`[Socket] Broadcasting donation alert to overlay:${overlayToken.slice(0, 10)}...: ${payload.donorName} ($${payload.amount})`);
+    emitAlertLocally(overlayToken, payload);
   }
+  // Relay to other server instances whose sockets may hold the OBS overlay connection
+  publishAlertEvent(overlayToken, payload);
+}
+
+function emitAlertLocally(overlayToken: string, payload: AlertPayload) {
+  const activeIo = getIO();
+  if (!activeIo) return;
   recentOverlayAlerts.set(overlayToken, { payload, timestamp: Date.now() });
   recentOverlayAlerts.set('demo-token', { payload, timestamp: Date.now() });
 
-  console.log(`[Socket] Broadcasting donation alert to overlay:${overlayToken.slice(0, 10)}...: ${payload.donorName} ($${payload.amount})`);
   activeIo.to(`overlay:${overlayToken}`).emit('donation:alert', payload);
 
   // Broadcast to streamer master room and all linked overlay tokens via MongoDB

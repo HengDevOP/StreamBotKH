@@ -458,6 +458,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       ttsType,
       clonedVoiceSampleUrl,
       overlayToken: effectiveToken,
+      isVideoTest: false,
+      videoUrl: undefined,
       isTest: true
     };
 

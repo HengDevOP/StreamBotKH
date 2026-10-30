@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
       videoAlertEnabled: body.videoAlertEnabled,
       videoMinTipAmount: body.videoMinTipAmount,
       videoMaxDurationSeconds: body.videoMaxDurationSeconds,
-      isVideoTest: body.isVideoTest ?? Boolean(body.videoUrl),
-      directVideo: body.directVideo ?? Boolean(body.videoUrl),
+      isVideoTest: Boolean(body.isVideoTest && (body.videoUrl || body.isVideoTest === true)),
+      directVideo: Boolean(body.directVideo && body.videoUrl),
       overlayToken,
       isTest: true
     };

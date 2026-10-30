@@ -55,6 +55,10 @@ export async function POST(req: NextRequest) {
       ttsType: resolvedTtsType,
       ttsVoice: alertSettings?.ttsVoice || alertSettings?.tts_voice || 'Google US English',
       customGifUrl: alertSettings?.customGifUrl || alertSettings?.custom_gif_url,
+      streamerId: user.id,
+      streamerUsername: user.username,
+      isVideoTest: false,
+      videoUrl: undefined,
       isTest: true
     };
 

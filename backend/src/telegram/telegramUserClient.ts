@@ -774,38 +774,35 @@ class TelegramUserClientManager {
       let targetStreamer: any = null;
       try {
         const usersCol = await getUsersCollection();
-        if (parsed.recipient) {
-          const cleanRecipient = parsed.recipient.toLowerCase().trim();
-          targetStreamer = await usersCol.findOne({
-            $or: [
-              { username: { $regex: new RegExp(`^${cleanRecipient}$`, 'i') } },
-              { displayName: { $regex: new RegExp(`^${cleanRecipient}$`, 'i') } }
-            ]
-          });
-          if (targetStreamer) {
-            console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username} via recipient "${parsed.recipient}"`);
-          }
-        }
-        if (!targetStreamer) {
-          const usernameMatch = text.match(/@([a-zA-Z0-9_]+)/);
-          if (usernameMatch && usernameMatch[1]) {
-            targetStreamer = await usersCol.findOne({
-              username: { $regex: new RegExp(`^${usernameMatch[1]}$`, 'i') }
-            });
-            if (targetStreamer) {
-              console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username}`);
-            }
-          }
-        }
-        if (!targetStreamer && streamerId) {
+        // 1. Primary: The streamer who configured and owns this Telegram listener session
+        if (streamerId) {
           targetStreamer = await usersCol.findOne({
             $or: [
               { userId: streamerId },
+              { id: streamerId as any },
               { username: streamerId },
               ...(ObjectId.isValid(streamerId) && streamerId.length === 24 ? [{ _id: new ObjectId(streamerId) }] : [])
             ]
           });
+          if (targetStreamer) {
+            console.log(`🎯 [TelegramJS] Routed payment to streamer session owner @${targetStreamer.username} (${targetStreamer.userId})`);
+          }
         }
+
+        // 2. If the message explicitly mentions an @username, check if it targets that streamer
+        if (!targetStreamer) {
+          const usernameMatch = text.match(/@([a-zA-Z0-9_]+)/);
+          if (usernameMatch && usernameMatch[1] && usernameMatch[1].toLowerCase() !== 'streambotkh') {
+            targetStreamer = await usersCol.findOne({
+              username: { $regex: new RegExp(`^${usernameMatch[1]}$`, 'i') }
+            });
+            if (targetStreamer) {
+              console.log(`🎯 [TelegramJS] Routed payment to tagged streamer @${targetStreamer.username}`);
+            }
+          }
+        }
+
+        // 3. Fallback to active streamer
         if (!targetStreamer) {
           targetStreamer = (await usersCol.findOne({ username: 'streambotkh' })) || (await usersCol.findOne({}));
         }
@@ -814,6 +811,16 @@ class TelegramUserClientManager {
       }
 
       if (targetStreamer) {
+        // Ensure streamer has a valid overlayToken
+        if (!targetStreamer.overlayToken && !targetStreamer.overlay_token) {
+          const newTok = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+          targetStreamer.overlayToken = newTok;
+          try {
+            const usersCol = await getUsersCollection();
+            await usersCol.updateOne({ _id: targetStreamer._id }, { $set: { overlayToken: newTok, updatedAt: new Date() } });
+          } catch (e) {}
+        }
+
         const targetStreamerId = targetStreamer.userId || (targetStreamer as any).id || String(targetStreamer._id);
         const targetOverlayToken = targetStreamer.overlayToken || targetStreamer.overlay_token || 'demo-token';
 
@@ -1127,6 +1134,8 @@ class TelegramUserClientManager {
 
           // Broadcast alert to OBS Studio overlay in real-time with current saved settings
           broadcastAlertToOverlay(targetOverlayToken, {
+            streamerId: targetStreamerId,
+            streamerUsername: targetStreamer.username,
             boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
             donationId: activeDonationId,
             donorName: effectiveDonorName,

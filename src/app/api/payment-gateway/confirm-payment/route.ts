@@ -58,6 +58,13 @@ export async function POST(req: NextRequest) {
     }
 
     const resolvedStreamerId = streamer.userId || streamer.id || String(streamer._id);
+    if (!streamer.overlayToken && !streamer.overlay_token) {
+      const newTok = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+      streamer.overlayToken = newTok;
+      try {
+        await usersCol.updateOne({ _id: streamer._id }, { $set: { overlayToken: newTok, updatedAt: new Date() } });
+      } catch (e) {}
+    }
     const resolvedOverlayToken = streamer.overlayToken || streamer.overlay_token;
 
     const numericAmount = Math.max(0.01, parseFloat(String(amount)) || 1.0);
@@ -274,6 +281,8 @@ export async function POST(req: NextRequest) {
 
     // 4. Trigger Real-Time OBS Studio Overlay Alert with current saved settings
     broadcastAlertToOverlay(resolvedOverlayToken, {
+      streamerId: resolvedStreamerId,
+      streamerUsername: streamer.username,
       boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
       donationId: activeDonationId,
       donorName: effectiveDonorName,

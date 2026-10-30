@@ -534,10 +534,11 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         : (overlayConfig?.videoAlertEnabled !== undefined ? Boolean(overlayConfig.videoAlertEnabled) : true);
 
       const isVideoTest = Boolean(payload.isVideoTest || (isTestAlert && payload.videoUrl));
-      // For test alerts on video overlay: if no video URL is supplied, use standard demo clip so test works!
-      const effectiveVideoUrl = payload.videoUrl || (isTestAlert ? 'https://www.youtube.com/watch?v=HSsGnEOFY6U' : undefined);
+      // Only dedicated VIDEO tests fall back to the demo clip. Donation alert tests must
+      // broadcast ONLY the donation alert (no video stage on any source).
+      const effectiveVideoUrl = payload.videoUrl || (payload.isVideoTest ? 'https://www.youtube.com/watch?v=HSsGnEOFY6U' : undefined);
       // For test video alerts: bypass minimum tip amount & video alert enabled checks!
-      const hasValidVideo = Boolean(effectiveVideoUrl) && (isVideoTest || isTestAlert || (tipAmountInUsd >= minTipRequired && videoAlertsEnabled));
+      const hasValidVideo = Boolean(effectiveVideoUrl) && (isVideoTest || (tipAmountInUsd >= minTipRequired && videoAlertsEnabled));
       const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
       const alertDuration = Number(finalPayload.durationSeconds) || 8;
 

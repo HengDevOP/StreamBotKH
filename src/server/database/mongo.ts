@@ -959,6 +959,19 @@ export async function initMongo() {
     await db.collection('mailbox_messages').createIndex({ id: 1 }, { unique: true });
     await db.collection('mailbox_messages').createIndex({ streamerId: 1, createdAt: -1 });
 
+    // Ensure every user has a valid overlayToken
+    const usersMissingTokens = await db.collection('users').find({
+      $or: [
+        { overlayToken: { $exists: false } },
+        { overlayToken: null },
+        { overlayToken: '' }
+      ]
+    }).toArray();
+    for (const u of usersMissingTokens) {
+      const newToken = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+      await db.collection('users').updateOne({ _id: u._id }, { $set: { overlayToken: newToken, updatedAt: new Date() } });
+    }
+
     // Seed default user if not exists
     const usersCol = await getUsersCollection();
     const existingUser = await usersCol.findOne({ userId: 'demo-streamer-id-1001' });

@@ -427,6 +427,7 @@ export class TelegramGroupListener {
             $set: {
               id: activeDonationId,
               streamerId,
+        streamerUsername: streamer.username,
               donorName: effectiveDonorName,
               donorMessage: effectiveDonorMessage,
               amount: effectiveAmount,
@@ -486,6 +487,7 @@ export class TelegramGroupListener {
         donationId: activeDonationId,
         id: activeDonationId,
         streamerId,
+        streamerUsername: streamer.username,
         donorName: effectiveDonorName,
         donorMessage: effectiveDonorMessage,
         donor_message: effectiveDonorMessage,
