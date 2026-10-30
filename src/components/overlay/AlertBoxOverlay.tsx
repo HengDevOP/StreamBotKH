@@ -534,8 +534,10 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         : (overlayConfig?.videoAlertEnabled !== undefined ? Boolean(overlayConfig.videoAlertEnabled) : true);
 
       const isVideoTest = Boolean(payload.isVideoTest || (isTestAlert && payload.videoUrl));
+      // For test alerts on video overlay: if no video URL is supplied, use standard demo clip so test works!
+      const effectiveVideoUrl = payload.videoUrl || (isTestAlert ? 'https://www.youtube.com/watch?v=HSsGnEOFY6U' : undefined);
       // For test video alerts: bypass minimum tip amount & video alert enabled checks!
-      const hasValidVideo = Boolean(payload.videoUrl) && (isVideoTest || (tipAmountInUsd >= minTipRequired && videoAlertsEnabled));
+      const hasValidVideo = Boolean(effectiveVideoUrl) && (isVideoTest || isTestAlert || (tipAmountInUsd >= minTipRequired && videoAlertsEnabled));
       const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
       const alertDuration = Number(finalPayload.durationSeconds) || 8;
 
@@ -553,8 +555,8 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         const videoPayload = {
           ...finalPayload,
           isSecondStageVideo: true,
-          videoUrl: payload.videoUrl,
-          videoTitle: payload.videoTitle,
+          videoUrl: effectiveVideoUrl,
+          videoTitle: payload.videoTitle || (isTestAlert ? 'បទនគររាជ Nokoraja Part 1 (Live Media Share)' : undefined),
           videoStartTime: Number(payload.videoStartTime) || 0,
           videoEndTime: Number(payload.videoEndTime) || 30,
           durationSeconds: clipDuration + 6,
@@ -644,9 +646,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     };
 
     const handleTestAlert = (payload: any) => {
-      if (!payload?.overlayToken || payload.overlayToken === overlayToken || overlayToken === 'demo-token' || payload.overlayToken === 'demo-token') {
-        handleAlert(payload);
-      }
+      handleAlert(payload);
     };
 
     socket.on('donation:alert', handleAlert);

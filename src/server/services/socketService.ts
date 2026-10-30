@@ -75,8 +75,12 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
 
           if (streamer) {
             socket.join(`streamer_overlay:${streamer.id}`);
-            if (streamer.overlay_token && streamer.overlay_token !== data.overlayToken) {
+            if (streamer.overlay_token) {
               socket.join(`overlay:${streamer.overlay_token}`);
+            }
+            const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
+            for (const h of histories) {
+              if (h.token) socket.join(`overlay:${h.token}`);
             }
           }
         } catch (e) {}
@@ -122,8 +126,12 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
 
         if (streamer) {
           io?.to(`streamer_overlay:${streamer.id}`).emit('donation:alert', testPayload);
-          if (streamer.overlay_token && streamer.overlay_token !== token) {
+          if (streamer.overlay_token) {
             io?.to(`overlay:${streamer.overlay_token}`).emit('donation:alert', testPayload);
+          }
+          const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
+          for (const h of histories) {
+            if (h.token) io?.to(`overlay:${h.token}`).emit('donation:alert', testPayload);
           }
         }
       } catch (e) {}
@@ -139,6 +147,24 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       const token = data?.overlayToken || 'demo-token';
       console.log(`[Socket] Overlay alert finished for donation "${data?.donationId}" (Token: ${token})`);
       io?.to(`overlay:${token}`).emit('donation:alert_finished', data);
+
+      try {
+        const streamer = db.prepare(`
+          SELECT id, overlay_token FROM streamers 
+          WHERE overlay_token = ? 
+             OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
+        `).get(token, token) as any;
+
+        if (streamer) {
+          io?.to(`streamer_overlay:${streamer.id}`).emit('donation:alert_finished', data);
+          if (streamer.overlay_token) io?.to(`overlay:${streamer.overlay_token}`).emit('donation:alert_finished', data);
+          const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
+          for (const h of histories) {
+            if (h.token) io?.to(`overlay:${h.token}`).emit('donation:alert_finished', data);
+          }
+        }
+      } catch (e) {}
+
       if (token !== 'demo-token') {
         io?.to('overlay:demo-token').emit('donation:alert_finished', data);
       }
@@ -149,6 +175,24 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       const token = data?.overlayToken || 'demo-token';
       console.log(`[Socket] Video alert finished for donation "${data?.donationId}" (Token: ${token})`);
       io?.to(`overlay:${token}`).emit('donation:video_finished', data);
+
+      try {
+        const streamer = db.prepare(`
+          SELECT id, overlay_token FROM streamers 
+          WHERE overlay_token = ? 
+             OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
+        `).get(token, token) as any;
+
+        if (streamer) {
+          io?.to(`streamer_overlay:${streamer.id}`).emit('donation:video_finished', data);
+          if (streamer.overlay_token) io?.to(`overlay:${streamer.overlay_token}`).emit('donation:video_finished', data);
+          const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
+          for (const h of histories) {
+            if (h.token) io?.to(`overlay:${h.token}`).emit('donation:video_finished', data);
+          }
+        }
+      } catch (e) {}
+
       if (token !== 'demo-token') {
         io?.to('overlay:demo-token').emit('donation:video_finished', data);
       }
@@ -216,8 +260,12 @@ export function broadcastAlertToOverlay(overlayToken: string, payload: AlertPayl
 
     if (streamer) {
       activeIo.to(`streamer_overlay:${streamer.id}`).emit('donation:alert', payload);
-      if (streamer.overlay_token && streamer.overlay_token !== overlayToken) {
+      if (streamer.overlay_token) {
         activeIo.to(`overlay:${streamer.overlay_token}`).emit('donation:alert', payload);
+      }
+      const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
+      for (const h of histories) {
+        if (h.token) activeIo.to(`overlay:${h.token}`).emit('donation:alert', payload);
       }
     }
   } catch (e) {}
