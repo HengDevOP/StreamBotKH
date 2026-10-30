@@ -60,6 +60,7 @@ interface DonationAlertStudioProps {
   onDeleteSuccess?: (deletedBoxId: string) => void;
   onNavigateToStorage?: () => void;
   inlineMode?: boolean;
+  onRegenerateToken?: () => void;
 }
 
 const SYSTEM_STREAM_FONTS = [
@@ -123,7 +124,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   onSaveSuccess,
   onDeleteSuccess,
   onNavigateToStorage,
-  inlineMode = false
+  inlineMode = false,
+  onRegenerateToken
 }) => {
   const isNew = !box || !box._id;
   const { playSound } = useAudio();
@@ -229,7 +231,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const effectiveToken = activeOverlayToken || streamerToken || 'demo-token';
 
   // Live Canvas Simulation State (Default: Alert is hidden until tested or triggered)
-  const [canvasBg, setCanvasBg] = useState<'dark' | 'game' | 'transparent'>('transparent');
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isSimulating, setIsSimulating] = useState(false);
   const [isTtsPlaying, setIsTtsPlaying] = useState(false);
@@ -707,8 +708,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
             </button>
           )}
 
-          {/* Dedicated OBS Studio Browser Source URL with Copy Icon (desktop only) */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono max-w-[340px]">
+          {/* Dedicated OBS Studio Browser Source URL with Copy & Regenerate Icons (desktop only) */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono max-w-[360px]">
             <Monitor size={14} className="text-cyan-400 flex-shrink-0" />
             <span className="text-[11px] text-slate-400 truncate select-all flex-1" title={dedicatedBoxUrl}>
               {dedicatedBoxUrl}
@@ -721,6 +722,16 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
             >
               {copiedUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
             </button>
+            {onRegenerateToken && (
+              <button
+                type="button"
+                onClick={onRegenerateToken}
+                title="Regenerate Overlay Security Token"
+                className="p-1 rounded-lg hover:bg-red-950/40 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
+              >
+                <RefreshCw size={14} className="hover:rotate-180 transition-transform duration-500" />
+              </button>
+            )}
           </div>
 
           {/* Test Alert Button */}
@@ -1956,36 +1967,11 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
               <span className="text-slate-500 text-[11px]">Real-time Reactive</span>
             </div>
 
-            {/* Background Simulator Switcher & Scale Controls */}
+            {/* Transparent Canvas Indicator & Scale Controls */}
             <div className="flex items-center gap-2">
-              <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setCanvasBg('dark')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
-                    canvasBg === 'dark' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Dark OBS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCanvasBg('game')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
-                    canvasBg === 'game' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Gameplay Mock
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCanvasBg('transparent')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
-                    canvasBg === 'transparent' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Transparent
-                </button>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-400 font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span>100% Transparent Canvas</span>
               </div>
 
               {/* Zoom Scale Buttons */}
@@ -2012,22 +1998,10 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
           </div>
 
           {/* ========================================================== */}
-          {/* THE INTERACTIVE OBS STREAM CANVAS SIMULATOR               */}
+          {/* THE INTERACTIVE OBS STREAM CANVAS SIMULATOR (TRANSPARENT)  */}
           {/* ========================================================== */}
           <div
-            className={`w-full rounded-3xl border-2 border-slate-800 relative overflow-hidden transition-all flex items-center justify-center p-6 sm:p-12 min-h-[440px] shadow-2xl ${
-              canvasBg === 'dark'
-                ? 'bg-[#05070E]'
-                : canvasBg === 'transparent'
-                ? 'bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] bg-slate-950'
-                : 'bg-cover bg-center'
-            }`}
-            style={{
-              backgroundImage:
-                canvasBg === 'game'
-                  ? 'linear-gradient(rgba(5, 7, 14, 0.65), rgba(5, 7, 14, 0.85)), url(https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1920&q=80)'
-                  : undefined
-            }}
+            className="w-full rounded-3xl border-2 border-slate-800 relative overflow-hidden transition-all flex items-center justify-center p-6 sm:p-12 min-h-[440px] shadow-2xl bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] bg-slate-950/70"
           >
             {/* Corner OBS Crosshairs */}
             <div className="absolute top-3 left-4 text-[10px] font-mono text-slate-600 flex items-center gap-1.5 select-none">

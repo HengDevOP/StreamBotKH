@@ -1327,6 +1327,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           streamerToken={user?.overlayToken}
           initialSelectedBoxId={selectedDonationId}
           onSelectBoxId={(id) => setSelectedDonationId(id)}
+          onRegenerateToken={handleRegenerateToken}
           onNavigateToMedia={() => {
             setSelectedDonationId(null);
             setActiveTab('media');
@@ -1474,24 +1475,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
           {/* Quick Action Command Deck: Overlay Copy Icon (Assets category only) & Streamer Mailbox Icon */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Copy Overlay URL Icon Button (display only from the assets category) */}
+            {/* Copy & Regenerate Overlay URL Action Buttons (display only from the assets category) */}
             {currentObsConfig && (
-              <button
-                type="button"
-                onClick={handleCopyCurrentObsUrl}
-                className={`relative p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer shadow-sm ${
-                  copiedObsUrl
-                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-750 hover:border-cyan-500/50'
-                }`}
-                title={copiedObsUrl ? 'Copied to Clipboard!' : `Copy ${currentObsConfig.label} URL`}
-              >
-                {copiedObsUrl ? (
-                  <Check size={16} className="text-emerald-400" />
-                ) : (
-                  <Copy size={16} className="text-slate-400 hover:text-cyan-400 transition-colors" />
-                )}
-              </button>
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-750 shadow-sm">
+                <button
+                  type="button"
+                  onClick={handleCopyCurrentObsUrl}
+                  className={`relative p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer ${
+                    copiedObsUrl
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                  title={copiedObsUrl ? 'Copied to Clipboard!' : `Copy ${currentObsConfig.label} URL`}
+                >
+                  {copiedObsUrl ? (
+                    <Check size={16} className="text-emerald-400" />
+                  ) : (
+                    <Copy size={16} className="text-slate-400 hover:text-cyan-400 transition-colors" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRegenerateToken}
+                  className="relative p-1.5 sm:p-2 rounded-lg hover:bg-red-950/40 text-slate-400 hover:text-red-400 transition-all cursor-pointer group"
+                  title={`Regenerate ${currentObsConfig.label} Security Token`}
+                >
+                  <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
+                </button>
+              </div>
             )}
 
             {/* Streamer Mailbox: Icon only, no text */}
@@ -1659,6 +1671,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               streamerToken={user?.overlayToken}
               initialSelectedBoxId={selectedDonationId || undefined}
               onSelectBoxId={(id) => setSelectedDonationId(id)}
+              onRegenerateToken={handleRegenerateToken}
               onNavigateToMedia={() => {
                 setSelectedDonationId(null);
                 setActiveTab('media');
@@ -1739,6 +1752,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               isLocked={false}
               currentPlan={currentPlan}
               onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
+              onRegenerateToken={handleRegenerateToken}
             />
           )}
 

@@ -5,7 +5,6 @@ import {
   DollarSign,
   MessageSquare,
   User,
-  Zap,
   Sparkles,
   Volume2,
   ShieldCheck,
@@ -44,6 +43,7 @@ interface DonorFormProps {
   streamer: PublicStreamerInfo;
   onSubmit: (data: DonorFormData) => Promise<void>;
   loading?: boolean;
+  isModalOpen?: boolean;
 }
 
 const DEMO_YOUTUBE_URL = 'https://www.youtube.com/watch?v=HSsGnEOFY6U&list=RDHSsGnEOFY6U&start_radio=1';
@@ -66,7 +66,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
-export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loading }) => {
+export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loading, isModalOpen }) => {
   const storageKey = `streambotkh_draft_${streamer.username || 'neonstreamer'}`;
   const isLoadedRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -272,11 +272,33 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
     } catch (e) {}
   };
 
+  // Auto pause preview playback when viewer clicks Tip to show Bakong KHQR modal
+  useEffect(() => {
+    if (loading || isModalOpen) {
+      setIsPlayingPreview(false);
+    }
+  }, [loading, isModalOpen]);
+
+  // Ensure clip duration boundaries strictly match video duration 100% without glitches
+  useEffect(() => {
+    if (videoDuration && videoDuration > 0) {
+      if (videoEndTime > videoDuration) {
+        setVideoEndTime(videoDuration);
+      }
+      if (videoStartTime >= videoDuration) {
+        setVideoStartTime(Math.max(0, videoDuration - Math.min(30, videoDuration)));
+      }
+    }
+  }, [videoDuration]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanDonor = donorName.trim();
     const cleanBanking = bankingName.trim();
     if (!cleanDonor && !cleanBanking) return;
+
+    // Auto pause preview video immediately when viewer clicks Tip to show Bakong KHQR modal
+    setIsPlayingPreview(false);
 
     // Show donor username on alerts and TTS, and pass bankingName for bank payment matching
     await onSubmit({
@@ -550,7 +572,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
                       videoId={activeVideoId}
                       startTime={videoStartTime}
                       endTime={videoEndTime}
-                      autoplay={true}
+                      autoplay={isPlayingPreview && !loading && !isModalOpen}
+                      isPaused={!isPlayingPreview || loading || Boolean(isModalOpen)}
                       muted={false}
                       videoTitle={videoTitle}
                       donorName={donorName || 'Viewer'}
@@ -586,7 +609,6 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
             loading={loading}
             disabled={!donorName.trim()}
             className="w-full py-3 text-sm sm:text-base font-bold bg-cyan-400 hover:bg-cyan-300 text-slate-950 rounded-none shadow-lg shadow-cyan-500/20 transition-all font-['Chakra_Petch']"
-            icon={<Zap size={18} className="fill-slate-950" />}
           >
             Tips
           </Button>

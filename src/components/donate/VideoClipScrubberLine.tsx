@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Clock, Sliders, ChevronLeft, ChevronRight, MoveHorizontal, Maximize2 } from 'lucide-react';
 import { formatTime } from '../common/VideoPlayerWithProgressBar';
 
@@ -21,11 +21,19 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
   totalTimelineLength = 600,
   onChange
 }) => {
-  const currentDuration = Math.max(5, endTime - startTime);
-  // If actual videoDuration is known, scale to the exact length of the video!
+  const minClipDuration = videoDuration && videoDuration < 5 ? Math.max(1, videoDuration) : 5;
+
+  // Scale 100% matches the exact video duration when known!
   const maxScale = videoDuration && videoDuration > 0
-    ? Math.max(videoDuration, endTime)
-    : Math.max(totalTimelineLength, startTime + currentDuration + 60);
+    ? videoDuration
+    : Math.max(totalTimelineLength, Math.max(startTime + 60, endTime));
+
+  const upperLimit = videoDuration && videoDuration > 0 ? videoDuration : maxScale;
+
+  // Safe clamped values to prevent scale jump or out-of-range handles
+  const safeEnd = Math.max(minClipDuration, Math.min(endTime, upperLimit));
+  const safeStart = Math.max(0, Math.min(startTime, safeEnd - minClipDuration));
+  const currentDuration = Math.max(1, Math.round(safeEnd - safeStart));
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [activeHandle, setActiveHandle] = useState<'start' | 'end' | 'middle' | null>(null);
@@ -35,7 +43,7 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
     endSec: 0
   });
 
-  // Allowed preset buttons (up to streamer's maximum allowed duration)
+  // Allowed preset buttons (up to streamer's maximum allowed duration and within video length)
   const presets = [
     { label: '15s', sec: 15 },
     { label: '30s', sec: 30 },
@@ -43,105 +51,106 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
     { label: '2m', sec: 120 },
     { label: '3m', sec: 180 },
     { label: '5m', sec: 300 }
-  ].filter((p) => p.sec <= maxAllowedDuration);
+  ].filter((p) => p.sec <= maxAllowedDuration && (!videoDuration || p.sec <= videoDuration));
 
   // Pointer drag initialization
   const onPointerDown = (e: React.PointerEvent, handle: 'start' | 'end' | 'middle') => {
     e.preventDefault();
     e.stopPropagation();
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {}
 
     setActiveHandle(handle);
     dragRef.current = {
       clientX: e.clientX,
-      startSec: startTime,
-      endSec: endTime
+      startSec: safeStart,
+      endSec: safeEnd
     };
   };
 
-  // Pointer drag movement
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!activeHandle || !trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    if (rect.width <= 0) return;
+  // Smooth 60fps window-level pointer drag tracking without dropping handles
+  useEffect(() => {
+    if (!activeHandle) return;
 
-    const deltaPx = e.clientX - dragRef.current.clientX;
-    const deltaSec = Math.round((deltaPx / rect.width) * maxScale);
-    const upperLimit = videoDuration && videoDuration > 0 ? videoDuration : maxScale;
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!trackRef.current) return;
+      const rect = trackRef.current.getBoundingClientRect();
+      if (rect.width <= 0) return;
 
-    if (activeHandle === 'start') {
-      const targetStart = dragRef.current.startSec + deltaSec;
-      const clampedStart = Math.max(0, Math.min(targetStart, endTime - 5));
-      if (endTime - clampedStart > maxAllowedDuration) {
-        onChange(clampedStart, clampedStart + maxAllowedDuration);
-      } else {
-        onChange(clampedStart, endTime);
+      const deltaPx = e.clientX - dragRef.current.clientX;
+      const deltaSec = Math.round((deltaPx / rect.width) * maxScale);
+
+      if (activeHandle === 'start') {
+        const targetStart = dragRef.current.startSec + deltaSec;
+        const clampedStart = Math.max(0, Math.min(targetStart, safeEnd - minClipDuration));
+        if (safeEnd - clampedStart > maxAllowedDuration) {
+          onChange(clampedStart, clampedStart + maxAllowedDuration);
+        } else {
+          onChange(clampedStart, safeEnd);
+        }
+      } else if (activeHandle === 'end') {
+        const targetEnd = dragRef.current.endSec + deltaSec;
+        const clampedEnd = Math.max(safeStart + minClipDuration, Math.min(targetEnd, upperLimit));
+        if (clampedEnd - safeStart > maxAllowedDuration) {
+          onChange(clampedEnd - maxAllowedDuration, clampedEnd);
+        } else {
+          onChange(safeStart, clampedEnd);
+        }
+      } else if (activeHandle === 'middle') {
+        const dur = Math.max(minClipDuration, dragRef.current.endSec - dragRef.current.startSec);
+        const targetStart = dragRef.current.startSec + deltaSec;
+        const clampedStart = Math.max(0, Math.min(targetStart, upperLimit - dur));
+        onChange(clampedStart, clampedStart + dur);
       }
-    } else if (activeHandle === 'end') {
-      const targetEnd = dragRef.current.endSec + deltaSec;
-      const clampedEnd = Math.max(startTime + 5, Math.min(targetEnd, upperLimit));
-      if (clampedEnd - startTime > maxAllowedDuration) {
-        onChange(clampedEnd - maxAllowedDuration, clampedEnd);
-      } else {
-        onChange(startTime, clampedEnd);
-      }
-    } else if (activeHandle === 'middle') {
-      const dur = dragRef.current.endSec - dragRef.current.startSec;
-      const targetStart = dragRef.current.startSec + deltaSec;
-      const clampedStart = Math.max(0, Math.min(targetStart, upperLimit - dur));
-      onChange(clampedStart, clampedStart + dur);
-    }
-  };
+    };
 
-  // Pointer drag release
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (activeHandle) {
-      try {
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch {}
+    const handlePointerUp = () => {
       setActiveHandle(null);
-    }
-  };
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [activeHandle, maxScale, upperLimit, maxAllowedDuration, minClipDuration, safeStart, safeEnd, onChange]);
 
   // Click on background track to shift clip
   const onTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (activeHandle || !trackRef.current) return;
     const rect = trackRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return;
     const clickPx = e.clientX - rect.left;
-    const upperLimit = videoDuration && videoDuration > 0 ? videoDuration : maxScale;
     const clickSec = Math.max(0, Math.min(upperLimit, Math.round((clickPx / rect.width) * maxScale)));
 
-    const distToStart = Math.abs(clickSec - startTime);
-    const distToEnd = Math.abs(clickSec - endTime);
+    const distToStart = Math.abs(clickSec - safeStart);
+    const distToEnd = Math.abs(clickSec - safeEnd);
 
     if (distToStart < distToEnd) {
-      const newStart = Math.min(clickSec, endTime - 5);
-      onChange(newStart, endTime);
+      const newStart = Math.max(0, Math.min(clickSec, safeEnd - minClipDuration));
+      onChange(newStart, safeEnd);
     } else {
-      const newEnd = Math.max(clickSec, startTime + 5);
-      onChange(startTime, Math.min(newEnd, Math.min(startTime + maxAllowedDuration, upperLimit)));
+      const newEnd = Math.max(safeStart + minClipDuration, Math.min(clickSec, upperLimit));
+      onChange(safeStart, Math.min(newEnd, Math.min(safeStart + maxAllowedDuration, upperLimit)));
     }
   };
 
   // Preset click handler: If video duration is less than the preset, default to full duration!
   const handleSelectPreset = (presetSec: number) => {
-    // If video duration is less than or equal to preset, default to full duration!
     if (videoDuration && videoDuration <= presetSec) {
       onChange(0, videoDuration);
       return;
     }
 
-    const upperLimit = videoDuration && videoDuration > 0 ? videoDuration : maxScale;
-    const targetEnd = Math.min(startTime + presetSec, upperLimit);
+    const targetEnd = Math.min(safeStart + presetSec, upperLimit);
 
-    // If starting from current startTime would exceed end of video, shift start back to capture the full preset
-    if (targetEnd - startTime < presetSec && upperLimit >= presetSec) {
+    if (targetEnd - safeStart < presetSec && upperLimit >= presetSec) {
       const adjustedStart = Math.max(0, upperLimit - presetSec);
       onChange(adjustedStart, upperLimit);
     } else {
-      onChange(startTime, targetEnd);
+      onChange(safeStart, targetEnd);
     }
   };
 
@@ -155,20 +164,19 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
 
   // Nudge functions
   const nudgeStart = (delta: number) => {
-    const newStart = Math.max(0, Math.min(startTime + delta, endTime - 5));
-    onChange(newStart, endTime);
+    const newStart = Math.max(0, Math.min(safeStart + delta, safeEnd - minClipDuration));
+    onChange(newStart, safeEnd);
   };
 
   const nudgeEnd = (delta: number) => {
-    const upperLimit = videoDuration && videoDuration > 0 ? videoDuration : maxScale;
-    const newEnd = Math.max(startTime + 5, Math.min(endTime + delta, Math.min(startTime + maxAllowedDuration, upperLimit)));
-    onChange(startTime, newEnd);
+    const newEnd = Math.max(safeStart + minClipDuration, Math.min(safeEnd + delta, Math.min(safeStart + maxAllowedDuration, upperLimit)));
+    onChange(safeStart, newEnd);
   };
 
-  // Percentage calculations
-  const startPct = Math.max(0, Math.min(100, (startTime / maxScale) * 100));
-  const endPct = Math.max(0, Math.min(100, (endTime / maxScale) * 100));
-  const clipWidthPct = Math.max(3, endPct - startPct);
+  // Accurate percentage calculations
+  const startPct = Math.max(0, Math.min(100, (safeStart / maxScale) * 100));
+  const endPct = Math.max(0, Math.min(100, (safeEnd / maxScale) * 100));
+  const clipWidthPct = Math.max(0, endPct - startPct);
 
   return (
     <div className="p-3.5 rounded-xl bg-slate-950/95 border border-slate-800 space-y-3 font-mono select-none">
@@ -185,9 +193,9 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
             </span>
           )}
           <span className="text-[10px] text-slate-300">
-            <span className="text-white font-bold">{formatTime(startTime)}</span>
+            <span className="text-white font-bold">{formatTime(safeStart)}</span>
             <span className="mx-1 text-slate-500">➔</span>
-            <span className="text-white font-bold">{formatTime(endTime)}</span>
+            <span className="text-white font-bold">{formatTime(safeEnd)}</span>
           </span>
           <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400 font-extrabold text-[11px]">
             {currentDuration}s
@@ -202,13 +210,11 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
         <div
           ref={trackRef}
           onClick={onTrackClick}
-          className="relative w-full h-2.5 rounded-sm bg-slate-800 cursor-pointer overflow-visible flex items-center my-3"
+          className="relative w-full h-2.5 rounded-sm bg-slate-800 cursor-pointer overflow-visible flex items-center my-3 touch-none"
         >
           {/* Active Highlighted Line Segment Between Start and End */}
           <div
             onPointerDown={(e) => onPointerDown(e, 'middle')}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
             className={`absolute top-0 bottom-0 rounded-sm cursor-grab active:cursor-grabbing transition-colors z-10 ${
               activeHandle === 'middle' ? 'bg-red-500' : 'bg-red-600'
             }`}
@@ -222,13 +228,11 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
           {/* HANDLE 1: START (VERTICAL LINE HANDLE) */}
           <div
             onPointerDown={(e) => onPointerDown(e, 'start')}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-7 rounded-sm bg-white border border-slate-300 shadow-md cursor-ew-resize z-30 transition-transform hover:scale-110 active:scale-105 flex items-center justify-center ${
-              activeHandle === 'start' ? 'ring-2 ring-red-500' : ''
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-7 rounded-sm bg-white border border-slate-300 shadow-md cursor-ew-resize z-30 transition-transform hover:scale-110 active:scale-105 flex items-center justify-center touch-none ${
+              activeHandle === 'start' ? 'ring-2 ring-red-500 scale-110' : ''
             }`}
             style={{ left: `${startPct}%` }}
-            title={`Start: ${formatTime(startTime)}`}
+            title={`Start: ${formatTime(safeStart)}`}
           >
             {/* Center line indicator inside handle */}
             <div className="w-[1.5px] h-3.5 bg-slate-700 rounded-full" />
@@ -237,13 +241,11 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
           {/* HANDLE 2: END (VERTICAL LINE HANDLE) */}
           <div
             onPointerDown={(e) => onPointerDown(e, 'end')}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-7 rounded-sm bg-white border border-slate-300 shadow-md cursor-ew-resize z-30 transition-transform hover:scale-110 active:scale-105 flex items-center justify-center ${
-              activeHandle === 'end' ? 'ring-2 ring-red-500' : ''
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-7 rounded-sm bg-white border border-slate-300 shadow-md cursor-ew-resize z-30 transition-transform hover:scale-110 active:scale-105 flex items-center justify-center touch-none ${
+              activeHandle === 'end' ? 'ring-2 ring-red-500 scale-110' : ''
             }`}
             style={{ left: `${endPct}%` }}
-            title={`End: ${formatTime(endTime)}`}
+            title={`End: ${formatTime(safeEnd)}`}
           >
             {/* Center line indicator inside handle */}
             <div className="w-[1.5px] h-3.5 bg-slate-700 rounded-full" />
@@ -252,13 +254,13 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
 
         {/* Timeline Bottom Time Labels */}
         <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-          <span className="text-white font-bold">{formatTime(startTime)}</span>
+          <span className="text-white font-bold">{formatTime(safeStart)}</span>
           <span className="text-slate-500 text-[10px] flex items-center gap-1 font-sans">
             <MoveHorizontal size={11} />
             <span>Drag line or vertical handles to adjust clip</span>
           </span>
           <span className="text-white font-bold">
-            {formatTime(endTime)} {videoDuration ? `/ ${formatTime(videoDuration)}` : ''}
+            {formatTime(safeEnd)} {videoDuration ? `/ ${formatTime(videoDuration)}` : ''}
           </span>
         </div>
       </div>
@@ -308,7 +310,7 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
               type="button"
               onClick={handleSetFullDuration}
               className={`px-2 py-0.5 rounded font-bold border transition-colors flex items-center gap-1 ${
-                startTime === 0 && (endTime === videoDuration || endTime === maxAllowedDuration)
+                safeStart === 0 && (safeEnd === videoDuration || safeEnd === maxAllowedDuration)
                   ? 'bg-red-500/20 border-red-500/40 text-red-300'
                   : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-white'
               }`}

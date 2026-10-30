@@ -17,6 +17,7 @@ import {
   Cpu,
   Monitor,
   CheckCircle2,
+  RefreshCw,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
@@ -32,13 +33,15 @@ interface DonationAlertsManagerProps {
   initialSelectedBoxId?: string;
   onSelectBoxId?: (boxId: string | null) => void;
   onNavigateToMedia?: () => void;
+  onRegenerateToken?: () => void;
 }
 
 export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
   streamerToken,
   initialSelectedBoxId,
   onSelectBoxId,
-  onNavigateToMedia
+  onNavigateToMedia,
+  onRegenerateToken
 }) => {
   const [alertBoxes, setAlertBoxes] = useState<AlertBox[]>([]);
   const [loading, setLoading] = useState(true);
@@ -274,6 +277,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
         onSaveSuccess={handleSaveSuccess}
         onDeleteSuccess={handleDeleteSuccess}
         onNavigateToStorage={onNavigateToMedia}
+        onRegenerateToken={onRegenerateToken}
       />
     );
   }
@@ -335,6 +339,17 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
             {copiedUrl ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
             <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
           </button>
+          {onRegenerateToken && (
+            <button
+              type="button"
+              onClick={onRegenerateToken}
+              className="px-3 py-1.5 rounded-xl bg-red-950/30 hover:bg-red-900/50 border border-red-500/30 text-xs font-mono font-bold text-red-400 flex items-center gap-1.5 transition-colors flex-shrink-0"
+              title="Regenerate Universal OBS Overlay Token"
+            >
+              <RefreshCw size={13} className="hover:rotate-180 transition-transform duration-500" />
+              <span>Regenerate</span>
+            </button>
+          )}
         </div>
       </div>
 

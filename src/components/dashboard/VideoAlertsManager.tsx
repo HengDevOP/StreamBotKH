@@ -18,6 +18,7 @@ import {
   Tv,
   DollarSign,
   CheckCircle2,
+  RefreshCw,
   AlertCircle
 } from 'lucide-react';
 import { Card } from '../common/Card';
@@ -34,13 +35,15 @@ interface VideoAlertsManagerProps {
   isLocked?: boolean;
   currentPlan?: 'free' | 'pro' | string;
   onUpgrade?: () => void;
+  onRegenerateToken?: () => void;
 }
 
 export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
   streamerToken,
   isLocked = false,
   currentPlan = 'free',
-  onUpgrade
+  onUpgrade,
+  onRegenerateToken
 }) => {
   const { socket } = useSocket();
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -209,6 +212,17 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
             {copiedUrl ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
             <span>{copiedUrl ? 'Copied' : 'Copy URL'}</span>
           </button>
+          {onRegenerateToken && (
+            <button
+              type="button"
+              onClick={onRegenerateToken}
+              className="px-3 py-1.5 rounded-xl bg-red-950/30 hover:bg-red-900/50 border border-red-500/30 text-xs font-mono font-bold text-red-400 flex items-center gap-1.5 transition-colors"
+              title="Regenerate Video Overlay Security Token"
+            >
+              <RefreshCw size={13} className="hover:rotate-180 transition-transform duration-500" />
+              <span>Regenerate URL</span>
+            </button>
+          )}
           <a
             href={obsUrl}
             target="_blank"

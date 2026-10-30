@@ -240,6 +240,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
               streamer={streamer}
               onSubmit={handleFormSubmit}
               loading={submitting}
+              isModalOpen={isModalOpen}
             />
           </div>
 

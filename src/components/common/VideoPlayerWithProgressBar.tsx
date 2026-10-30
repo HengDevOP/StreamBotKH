@@ -9,6 +9,7 @@ export interface VideoPlayerWithProgressBarProps {
   endTime?: number;
   autoplay?: boolean;
   muted?: boolean;
+  isPaused?: boolean;
   videoTitle?: string;
   donorName?: string;
   amount?: number;
@@ -33,6 +34,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   endTime = 30,
   autoplay = true,
   muted = false,
+  isPaused = false,
   videoTitle,
   donorName,
   amount,
@@ -47,10 +49,11 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   const safeEnd = Math.max(safeStart + 1, endTime);
   const totalDuration = safeEnd - safeStart;
 
-  const [isPlaying, setIsPlaying] = useState<boolean>(autoplay);
+  const [isPlaying, setIsPlaying] = useState<boolean>(autoplay && !isPaused);
   const [renderKey, setRenderKey] = useState<number>(0);
 
   const barRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const onEndedRef = useRef(onEnded);
   const animFrameRef = useRef<number | null>(null);
   const pausedProgressRef = useRef<number>(0);
@@ -61,6 +64,30 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
     onEndedRef.current = onEnded;
   }, [onEnded]);
 
+  // Handle external pause command (e.g. viewer clicked Tips to show Bakong KHQR modal)
+  useEffect(() => {
+    if (isPaused) {
+      setIsPlaying(false);
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }),
+          '*'
+        );
+      } catch (e) {}
+    }
+  }, [isPaused]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }),
+          '*'
+        );
+      } catch (e) {}
+    }
+  }, [isPlaying]);
+
   // Reset timer when videoId, startTime, or endTime changes
   useEffect(() => {
     pausedProgressRef.current = 0;
@@ -69,9 +96,9 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
     if (barRef.current) {
       barRef.current.style.width = '100%';
     }
-    setIsPlaying(autoplay);
+    setIsPlaying(autoplay && !isPaused);
     setRenderKey((k) => k + 1);
-  }, [videoId, safeStart, safeEnd, autoplay]);
+  }, [videoId, safeStart, safeEnd, autoplay, isPaused]);
 
   // Real-time smooth 60fps countdown animation loop
   useEffect(() => {
@@ -190,8 +217,9 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       {/* 100% Clean Video Area (No Amount, No Title, No Message) */}
       <div className="relative w-full aspect-video bg-black overflow-hidden">
         <iframe
+          ref={iframeRef}
           key={renderKey}
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=${isPlaying ? 1 : 0}&mute=${muted ? 1 : 0}&controls=${showControls ? 1 : 0}&start=${safeStart}&end=${safeEnd}&enablejsapi=1`}
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=${isPlaying && !isPaused ? 1 : 0}&mute=${muted ? 1 : 0}&controls=${showControls ? 1 : 0}&start=${safeStart}&end=${safeEnd}&enablejsapi=1`}
           title={videoTitle || 'YouTube Media Share'}
           className="w-full h-full pointer-events-none"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
