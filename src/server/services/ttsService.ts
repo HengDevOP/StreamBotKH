@@ -6,9 +6,9 @@ import axios from 'axios';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
-import { normalizeCurrencyAndSymbols, isKhmerText } from '../../utils/ttsHelper';
+import { normalizeCurrencyAndSymbols, isKhmerText, khmerNumberToWords } from '../../utils/ttsHelper';
 
-export { normalizeCurrencyAndSymbols, isKhmerText };
+export { normalizeCurrencyAndSymbols, isKhmerText, khmerNumberToWords };
 
 const execFileAsync = promisify(execFile);
 

@@ -48,7 +48,7 @@ import { useSocket } from '../../context/SocketContext';
 import { VoiceClonerModal } from './VoiceClonerModal';
 import { MediaItem } from './MediaLibraryManager';
 import { mediaService } from '../../services/mediaService';
-import { normalizeCurrencyAndSymbols } from '../../utils/ttsHelper';
+import { normalizeCurrencyAndSymbols, khmerNumberToWords } from '../../utils/ttsHelper';
 import { KHMER_FONTS_2019 } from '../../data/khmerFonts';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 
@@ -487,9 +487,10 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         ttsType.includes('piseth') ||
         ttsType.includes('sreymom');
 
+      const hasCurrencyTag = template.toLowerCase().includes('{currency}');
       const formattedAmount = isKhmer
-        ? `${Number(demoAmount)} ដុល្លារ`
-        : `${Number(demoAmount)} ${Number(demoAmount) === 1 ? 'dollar' : 'dollars'}`;
+        ? (hasCurrencyTag ? khmerNumberToWords(demoAmount) : `${khmerNumberToWords(demoAmount)} ដុល្លារ`)
+        : (hasCurrencyTag ? Number(demoAmount).toLocaleString('en-US') : `${Number(demoAmount).toLocaleString('en-US')} ${Number(demoAmount) === 1 ? 'dollar' : 'dollars'}`);
 
       let headline = template
         .replace(/\{donator\}/gi, demoDonorName)
@@ -625,7 +626,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const renderedHeadline = textTemplate
     .replace(/\{donator\}/gi, demoDonorName)
     .replace(/\{name\}/gi, demoDonorName)
-    .replace(/\{amount\}/gi, `$${demoAmount.toFixed(2)}`)
+    .replace(/\{amount\}/gi, `$${demoAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
     .replace(/\{currency\}/gi, 'USD');
 
   return (
@@ -950,7 +951,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                             : { color: amountColor }
                         }
                       >
-                        ${demoAmount.toFixed(2)}
+                        ${demoAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
 

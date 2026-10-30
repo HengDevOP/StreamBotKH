@@ -806,7 +806,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                         {pct}%
                       </span>
                       <div className="text-[10px] font-mono text-slate-400">
-                        ${goal.currentAmount.toFixed(2)} / ${goal.targetAmount.toFixed(2)}
+                        ${goal.currentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${goal.targetAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>

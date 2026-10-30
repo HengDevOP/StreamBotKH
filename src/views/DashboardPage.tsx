@@ -566,7 +566,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     const amountStr = targetDonation
       ? targetDonation.currency === 'KHR'
         ? `${targetDonation.amount.toLocaleString()} ៛`
-        : `$${Number(targetDonation.amount).toFixed(2)}`
+        : `$${Number(targetDonation.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : '';
 
     showConfirm({

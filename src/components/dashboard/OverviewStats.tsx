@@ -45,6 +45,14 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
   const totalKhr = stats?.totalRevenueKhr ?? 0;
   const totalCount = stats?.totalDonationsCount ?? 0;
 
+  // Number & currency locale formatters (e.g. 12,123.60, 4,000 ៛)
+  const formatUSD = (val: number) =>
+    (val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatKHR = (val: number) =>
+    Math.round(val || 0).toLocaleString('en-US');
+  const formatCount = (val: number) =>
+    (val || 0).toLocaleString('en-US');
+
   // Active metrics based on selected timeframe
   const activeMetrics: TimeframeMetrics = timeframeAnalytics?.[selectedTimeframe] || {
     usd: selectedTimeframe === 'today' ? (stats?.todayRevenueUsd ?? 0) : 0,
@@ -160,12 +168,12 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
-              ${activeMetrics.usd.toFixed(2)}
+              ${formatUSD(activeMetrics.usd)}
             </span>
           </div>
           <div className="mt-2 flex items-center text-xs text-slate-400 font-mono">
             <span className="text-cyan-400 font-semibold mr-1.5 flex items-center gap-0.5">
-              <TrendingUp size={12} /> ${activeMetrics.avgPerDayUsd.toFixed(2)}/day
+              <TrendingUp size={12} /> ${formatUSD(activeMetrics.avgPerDayUsd)}/day
             </span>
             velocity
           </div>
@@ -183,12 +191,12 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
-              {activeMetrics.khr.toLocaleString()} <span className="text-base sm:text-lg font-bold text-pink-400">៛</span>
+              {formatKHR(activeMetrics.khr)} <span className="text-base sm:text-lg font-bold text-pink-400">៛</span>
             </span>
           </div>
           <div className="mt-2 flex items-center text-xs text-slate-400 font-mono">
             <span className="text-pink-400 font-semibold mr-1.5">
-              ~{activeMetrics.avgPerDayKhr.toLocaleString()} ៛/day
+              ~{formatKHR(activeMetrics.avgPerDayKhr)} ៛/day
             </span>
             daily rate
           </div>
@@ -206,7 +214,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
-              {activeMetrics.count}
+              {formatCount(activeMetrics.count)}
             </span>
             <span className="text-xs text-slate-400 font-mono">paid tips</span>
           </div>
@@ -228,14 +236,14 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
           </div>
           <div className="mt-4 flex items-baseline gap-1.5">
             <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
-              ${activeMetrics.potentialMonthlyUsd.toFixed(2)}
+              ${formatUSD(activeMetrics.potentialMonthlyUsd)}
             </span>
             <span className="text-[11px] font-mono text-cyan-400 font-bold">/mo</span>
           </div>
           <div className="mt-2 flex items-center text-xs text-slate-400 font-mono truncate">
             {activeMetrics.potentialMonthlyKhr > 0 ? (
               <span className="text-emerald-400 font-semibold">
-                + {activeMetrics.potentialMonthlyKhr.toLocaleString()} ៛/mo projected
+                + {formatKHR(activeMetrics.potentialMonthlyKhr)} ៛/mo projected
               </span>
             ) : (
               <span className="text-slate-400">Based on {currentTab.label} stream velocity</span>
@@ -249,14 +257,14 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
         <div className="flex items-center gap-2 text-slate-400">
           <Users size={14} className="text-cyan-400 flex-shrink-0" />
           <span>Lifetime Community Total:</span>
-          <span className="font-bold text-white">${totalUsd.toFixed(2)}</span>
+          <span className="font-bold text-white">${formatUSD(totalUsd)}</span>
           {totalKhr > 0 && (
             <>
               <span>+</span>
-              <span className="font-bold text-pink-400">{totalKhr.toLocaleString()} ៛</span>
+              <span className="font-bold text-pink-400">{formatKHR(totalKhr)} ៛</span>
             </>
           )}
-          <span className="text-slate-500">({totalCount} completed tips)</span>
+          <span className="text-slate-500">({formatCount(totalCount)} completed tips)</span>
         </div>
         <span className="text-[11px] text-slate-500">Auto-calculated from paid transactions</span>
       </div>

@@ -67,7 +67,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
 
   const formattedAmount = currency === 'KHR'
     ? `${amount.toLocaleString()} ៛`
-    : `$${Number(amount).toFixed(2)}`;
+    : `$${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const defaultGif = 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif';
   const displayGif = customGifUrl || mediaUrl || defaultGif;

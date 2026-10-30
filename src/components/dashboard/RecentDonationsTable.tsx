@@ -77,7 +77,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
                   {d.currency === 'KHR' ? (
                     <span className="text-pink-400">{d.amount.toLocaleString()} ៛</span>
                   ) : (
-                    <span className="text-cyan-400">${d.amount.toFixed(2)}</span>
+                    <span className="text-cyan-400">${d.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   )}
                 </div>
               </div>
@@ -166,7 +166,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
                     {d.currency === 'KHR' ? (
                       <span className="text-pink-400">{d.amount.toLocaleString()} ៛</span>
                     ) : (
-                      <span className="text-cyan-400">${d.amount.toFixed(2)}</span>
+                      <span className="text-cyan-400">${d.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     )}
                   </td>
                   <td className="py-3.5 px-5 max-w-xs truncate text-slate-300">

@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { useAlertQueue } from '../../hooks/useAlertQueue';
 import { NeonAlertCard } from './NeonAlertCard';
-import { normalizeCurrencyAndSymbols } from '../../utils/ttsHelper';
+import { normalizeCurrencyAndSymbols, khmerNumberToWords } from '../../utils/ttsHelper';
 
 interface AlertBoxOverlayProps {
   overlayToken: string;
@@ -99,9 +99,14 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         type.includes('piseth') ||
         type.includes('sreymom');
 
+      const hasCurrencyTag = template.toLowerCase().includes('{currency}');
       const formattedAmount = currency === 'KHR'
-        ? (isKhmer ? `${Number(amount).toLocaleString()} រៀល` : `${Number(amount).toLocaleString()} riel`)
-        : (isKhmer ? `${Number(amount)} ដុល្លារ` : `${Number(amount)} ${Number(amount) === 1 ? 'dollar' : 'dollars'}`);
+        ? (isKhmer
+            ? (hasCurrencyTag ? khmerNumberToWords(amount) : `${khmerNumberToWords(amount)} រៀល`)
+            : `${Number(amount).toLocaleString()} riel`)
+        : (isKhmer
+            ? (hasCurrencyTag ? khmerNumberToWords(amount) : `${khmerNumberToWords(amount)} ដុល្លារ`)
+            : `${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${Number(amount) === 1 ? 'dollar' : 'dollars'}`);
 
       // 1. Format the headline announcement text
       let headline = template
