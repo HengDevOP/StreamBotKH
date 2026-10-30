@@ -30,6 +30,8 @@ interface TelegramGlobalState {
   activeClients: Map<string, TelegramClient>;
   monitoredChats: Map<string, string[]>;
   connectingPromises: Map<string, Promise<TelegramClient | null>>;
+  processedMessageKeys: Set<string>;
+  processedTxRefs: Set<string>;
   managerInstance?: TelegramUserClientManager;
 }
 
@@ -44,7 +46,12 @@ if (!g.__telegramGlobalState) {
     activeClients: new Map(),
     monitoredChats: new Map(),
     connectingPromises: new Map(),
+    processedMessageKeys: new Set(),
+    processedTxRefs: new Set(),
   };
+} else {
+  if (!g.__telegramGlobalState.processedMessageKeys) g.__telegramGlobalState.processedMessageKeys = new Set();
+  if (!g.__telegramGlobalState.processedTxRefs) g.__telegramGlobalState.processedTxRefs = new Set();
 }
 
 class TelegramUserClientManager {
@@ -104,6 +111,16 @@ class TelegramUserClientManager {
 
     const apiId = params.apiId || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
     const apiHash = params.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
+
+    // Disconnect and clean up any existing active client for this streamer to prevent zombie connections
+    const existingClient = this.activeClients.get(streamerId);
+    if (existingClient) {
+      try {
+        console.log(`🧹 [TelegramJS] Disconnecting existing active client for [${streamerId}] before starting new login...`);
+        await existingClient.disconnect();
+      } catch (_) {}
+      this.activeClients.delete(streamerId);
+    }
 
     try {
       console.log(`⚡ [TelegramJS] Connecting to REAL Telegram MTProto for ${cleanPhone} (API ID: ${apiId})...`);
@@ -527,6 +544,12 @@ class TelegramUserClientManager {
       const text = (msg.message || msg.text || msg.caption || msg.rawText || (msg.media && (msg.media as any).caption) || '').trim();
       if (!text) return;
 
+      // 1. Message-level deduplication: Skip if this exact Telegram message was already processed
+      const msgKey = `${msg.chatId || ''}:${msg.id || ''}`;
+      if (msg.id && g.__telegramGlobalState?.processedMessageKeys.has(msgKey)) {
+        return;
+      }
+
       // STRICT TARGET GROUP ENFORCEMENT: GramJS will ONLY listen from configured target groups (MongoDB & SQLite)!
       let targetGroups: Array<{ id: string; streamer_id: string; chat_id: string; title: string; username?: string }> = [];
       const seenGroupIds = new Set<string>();
@@ -672,6 +695,16 @@ class TelegramUserClientManager {
       console.log(`   💰 [Amount]: ${parsed.currency === 'KHR' ? `${parsed.amount.toLocaleString()} ៛` : `$${parsed.amount.toFixed(2)}`}`);
       console.log(`   💬 [Donor Message]: ${parsed.donorMessage || 'None'}`);
       console.log(`   🔖 [Transaction Ref]: ${parsed.transactionRef || 'None'}`);
+
+      // 2. Transaction-level deduplication: Skip if this bank transaction ref was already processed
+      if (parsed.transactionRef) {
+        const cleanRef = parsed.transactionRef.toLowerCase().trim();
+        if (g.__telegramGlobalState?.processedTxRefs.has(cleanRef)) {
+          console.log(`   ⚠️ [GramJS] Duplicate transaction ref "${parsed.transactionRef}" already processed. Skipping duplicate alert.`);
+          console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+          return;
+        }
+      }
 
       // Resolve target streamer:
       let targetStreamer: any = null;
@@ -1005,6 +1038,22 @@ class TelegramUserClientManager {
             payment_method: parsed.bankingName,
             status: 'PAID'
           });
+
+          // Cache processed message and transaction keys to prevent duplicates
+          if (msg.id && g.__telegramGlobalState?.processedMessageKeys) {
+            g.__telegramGlobalState.processedMessageKeys.add(msgKey);
+            if (g.__telegramGlobalState.processedMessageKeys.size > 2000) {
+              const firstKey = g.__telegramGlobalState.processedMessageKeys.values().next().value;
+              if (firstKey) g.__telegramGlobalState.processedMessageKeys.delete(firstKey);
+            }
+          }
+          if (parsed.transactionRef && g.__telegramGlobalState?.processedTxRefs) {
+            g.__telegramGlobalState.processedTxRefs.add(parsed.transactionRef.toLowerCase().trim());
+            if (g.__telegramGlobalState.processedTxRefs.size > 2000) {
+              const firstTx = g.__telegramGlobalState.processedTxRefs.values().next().value;
+              if (firstTx) g.__telegramGlobalState.processedTxRefs.delete(firstTx);
+            }
+          }
 
           console.log(`   📡 [OBS Alert Broadcast] Alert fired to overlay token [${targetStreamer.overlay_token}]!`);
           console.log(`      - Donor: "${effectiveDonorName}"`);
@@ -1350,13 +1399,11 @@ class TelegramUserClientManager {
     this.pendingAuth.delete(streamerId);
     this.monitoredChats.delete(streamerId);
 
-    // 1. Delete session from MongoDB
+    // 1. Delete session from MongoDB (preserve monitored target groups so reconnecting does not lose them)
     try {
       const sessionsCol = await getTelegramSessionsCollection();
       await sessionsCol.deleteOne({ streamerId });
-      const groupsCol = await getTelegramMonitoredGroupsCollection();
-      await groupsCol.deleteMany({ streamerId });
-      console.log(`⚡ [MongoDB] Purged GramJS session and monitored groups for streamer [${streamerId}]`);
+      console.log(`⚡ [MongoDB] Purged GramJS session for streamer [${streamerId}] (target groups preserved)`);
     } catch (e) {
       console.error('[MongoDB] Error removing telegram session on disconnect:', e);
     }
@@ -1373,10 +1420,6 @@ class TelegramUserClientManager {
             telegram_pending_session = NULL
         WHERE id = ?
       `).run(streamerId);
-    } catch (e) {}
-
-    try {
-      db.prepare('DELETE FROM telegram_monitored_groups WHERE streamer_id = ?').run(streamerId);
     } catch (e) {}
 
     return {
