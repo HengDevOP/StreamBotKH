@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { useAlertQueue } from '../../hooks/useAlertQueue';
 import { NeonAlertCard } from './NeonAlertCard';
