@@ -191,36 +191,34 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
   return (
     <div className="space-y-6">
       {/* ============================================================== */}
-      {/* TOP HEADER & OBS BROWSER SOURCE URL                           */}
+      {/* OBS BROWSER SOURCE URL BAR                                     */}
       {/* ============================================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#090D18] border border-slate-800">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-cyan-950/60 border border-cyan-800/40 flex items-center justify-center text-cyan-400">
-              <Video size={18} />
-            </div>
-            <h2 className="text-xl font-bold text-white font-['Chakra_Petch']">
-              Video Alerts (Media Share)
-            </h2>
-            {isLocked ? (
-              <span className="flex items-center gap-1 text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold">
-                <Lock size={11} />
-                PAID PLAN ONLY
-              </span>
-            ) : isEnabled ? (
-              <span className="flex items-center gap-1 text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                ACTIVE ON DONATION PAGE
-              </span>
-            ) : (
-              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-400 font-bold">
-                DISABLED (HIDDEN)
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Allow viewers to submit and play YouTube video clips on your stream when tipping via ABA PayWay or Bakong KHQR.
-          </p>
+      <div className="p-4 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Monitor size={16} className="text-cyan-400 flex-shrink-0" />
+          <span className="text-xs font-mono font-bold text-slate-300 flex-shrink-0">OBS Video Overlay URL:</span>
+          <span className="text-[11px] font-mono text-slate-400 truncate select-all" title={obsUrl}>
+            {obsUrl}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={copyObsUrl}
+            className="px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-xs font-mono font-bold text-cyan-300 flex items-center gap-1.5 transition-colors"
+          >
+            {copiedUrl ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+            <span>{copiedUrl ? 'Copied' : 'Copy URL'}</span>
+          </button>
+          <a
+            href={obsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors"
+            title="Open in new tab"
+          >
+            <ExternalLink size={13} />
+          </a>
         </div>
       </div>
 

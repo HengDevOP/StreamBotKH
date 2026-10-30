@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Volume2, Sparkles, Tv, Clock } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Tv, Clock } from 'lucide-react';
 
 export interface VideoPlayerWithProgressBarProps {
   videoId: string;
@@ -50,7 +50,10 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   const [isPlaying, setIsPlaying] = useState<boolean>(autoplay);
   const [elapsed, setElapsed] = useState<number>(0);
   const [renderKey, setRenderKey] = useState<number>(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const elapsedOffsetRef = useRef<number>(0);
+  const onEndedFiredRef = useRef<boolean>(false);
 
   // Remaining countdown seconds (from full duration down to 0)
   const remaining = Math.max(0, totalDuration - elapsed);
@@ -62,42 +65,63 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   // Reset timer when videoId, startTime, or endTime changes
   useEffect(() => {
     setElapsed(0);
+    elapsedOffsetRef.current = 0;
+    startTimeRef.current = null;
+    onEndedFiredRef.current = false;
     setIsPlaying(autoplay);
     setRenderKey((k) => k + 1);
   }, [videoId, safeStart, safeEnd, autoplay]);
 
-  // Real-time ticking loop for the countdown bar (with 1.2s buffer for YouTube iframe buffering)
+  // Real-time smooth 60fps ticking loop for the countdown bar (with 1.0s buffer for YouTube iframe buffering)
   useEffect(() => {
     if (!isPlaying) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       return;
     }
 
+    onEndedFiredRef.current = false;
+
     const startDelayTimer = setTimeout(() => {
-      intervalRef.current = setInterval(() => {
-        setElapsed((prev) => {
-          const next = prev + 1;
-          if (next >= totalDuration) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            // Allow clip to finish playing completely to the last frame before triggering onEnded
+      startTimeRef.current = performance.now();
+
+      const loop = () => {
+        if (!startTimeRef.current) return;
+        const now = performance.now();
+        const currentElapsed = elapsedOffsetRef.current + (now - startTimeRef.current) / 1000;
+
+        if (currentElapsed >= totalDuration) {
+          setElapsed(totalDuration);
+          if (!onEndedFiredRef.current) {
+            onEndedFiredRef.current = true;
             setTimeout(() => {
               if (onEnded) onEnded();
-            }, 800);
-            return totalDuration;
+            }, 500);
           }
-          return next;
-        });
-      }, 1000);
-    }, 1200);
+          return;
+        }
+
+        setElapsed(currentElapsed);
+        animFrameRef.current = requestAnimationFrame(loop);
+      };
+
+      animFrameRef.current = requestAnimationFrame(loop);
+    }, 1000);
 
     return () => {
       clearTimeout(startDelayTimer);
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (startTimeRef.current) {
+        elapsedOffsetRef.current += (performance.now() - startTimeRef.current) / 1000;
+        startTimeRef.current = null;
+      }
     };
-  }, [isPlaying, totalDuration, onEnded]);
+  }, [isPlaying, totalDuration, onEnded, renderKey]);
 
   const handleRestart = () => {
     setElapsed(0);
+    elapsedOffsetRef.current = 0;
+    startTimeRef.current = null;
+    onEndedFiredRef.current = false;
     setIsPlaying(true);
     setRenderKey((k) => k + 1);
   };
@@ -122,14 +146,10 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
         boxShadow: `0 0 30px ${glowColor}25, 0 8px 32px rgba(0,0,0,0.85)`
       }}
     >
-      {/* Top Header: Donor on the top of the video */}
+      {/* Top Header: Show ONLY the donor name (No emojis, no "DONOR:") */}
       {donorName && (
         <div className="w-full px-4 py-2 bg-slate-950/95 border-b border-slate-800/80 flex items-center justify-between text-xs font-mono">
-          <div className="flex items-center gap-2">
-            <Sparkles size={13} style={{ color: glowColor || '#00F0FF' }} />
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              DONOR:
-            </span>
+          <div className="flex items-center">
             <span
               className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] tracking-wide"
               style={{
@@ -170,15 +190,15 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       </div>
 
       {/* ============================================================== */}
-      {/* PURE PROGRESS DURATION BAR ON THE BOTTOM BORDER (NO LABELS)     */}
+      {/* SMOOTH RED COUNTDOWN PROGRESS DURATION BAR                      */}
       {/* ============================================================== */}
       <div className="w-full h-1.5 sm:h-2 bg-slate-950 relative overflow-hidden border-t border-slate-800/80">
         <div
-          className="h-full transition-all duration-300 ease-linear rounded-r-full"
+          className="h-full transition-[width] duration-75 ease-linear rounded-r-sm"
           style={{
             width: `${Math.max(0, Math.min(100, countdownPct))}%`,
-            background: `linear-gradient(90deg, #F59E0B 0%, ${glowColor} 100%)`,
-            boxShadow: `0 0 10px ${glowColor}`
+            backgroundColor: '#DC2626',
+            boxShadow: '0 0 10px rgba(220, 38, 38, 0.75)'
           }}
         />
       </div>
