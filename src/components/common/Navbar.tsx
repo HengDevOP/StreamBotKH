@@ -128,7 +128,7 @@ const RESOURCE_FEATURES = [
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
-  const { user, logout, loginWithGoogleRedirect } = useAuth();
+  const { user, loading, logout, loginWithGoogleRedirect } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileResourcesOpen, setMobileResourcesOpen] = useState(false);
@@ -459,6 +459,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                   <LogOut size={15} />
                 </button>
               </div>
+            ) : loading ? (
+              /* Sleek Skeleton placeholder while verifying auth - never flash Sign In button */
+              <div className="flex items-center gap-2">
+                <div className="w-24 sm:w-36 h-8 sm:h-9 rounded-xl bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center px-2.5 gap-2">
+                  <div className="w-5 h-5 rounded-full bg-slate-800 animate-pulse flex-shrink-0" />
+                  <div className="w-16 h-2.5 rounded bg-slate-800 animate-pulse hidden sm:block" />
+                </div>
+              </div>
             ) : (
               <div className="flex items-center gap-2">
                 <a
@@ -582,7 +590,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             </button>
           )}
 
-          {!user && (
+          {!user && !loading && (
             <div className="pt-2 border-t border-slate-800">
               <a
                 href={`/api/auth/google?origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}

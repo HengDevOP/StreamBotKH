@@ -18,23 +18,64 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<Streamer | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Synchronous initialization from localStorage prevents flash-of-unauthenticated-state on window refresh
+  const [user, setUser] = useState<Streamer | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const storedToken = localStorage.getItem('streamneon_auth_token');
+        const storedUser = localStorage.getItem('streamneon_user');
+        if (storedToken && storedUser) {
+          return JSON.parse(storedUser);
+        }
+      } catch (_) {}
+    }
+    return null;
+  });
+
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('streamneon_auth_token');
+    }
+    return null;
+  });
+
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem('streamneon_auth_token');
+      const params = new URLSearchParams(window.location.search);
+      const hasToken = Boolean(storedToken || params.get('token'));
+      if (hasToken) {
+        // If user profile is already cached synchronously, not loading
+        const storedUser = localStorage.getItem('streamneon_user');
+        return !storedUser;
+      }
+      return false;
+    }
+    return true;
+  });
 
   const refreshUser = async () => {
     try {
       if (typeof window !== 'undefined' && localStorage.getItem('streamneon_auth_token')) {
         const profile = await authService.getMe();
         setUser(profile);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('streamneon_user', JSON.stringify(profile));
+        }
       } else {
         setUser(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('streamneon_user');
+        }
       }
     } catch (err) {
       console.error('Failed to restore session:', err);
       authService.logout();
       setToken(null);
       setUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('streamneon_user');
+      }
     } finally {
       setLoading(false);
     }
@@ -81,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await authService.googleLogin(credential, code);
       if (typeof window !== 'undefined') {
         localStorage.setItem('streamneon_auth_token', res.token);
+        localStorage.setItem('streamneon_user', JSON.stringify(res.user));
       }
       setToken(res.token);
       setUser(res.user);
@@ -104,6 +146,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     authService.logout();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('streamneon_user');
+    }
     setToken(null);
     setUser(null);
   };

@@ -36,6 +36,9 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem('streamneon_auth_token');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('streamneon_auth_token');
+      localStorage.removeItem('streamneon_user');
+    }
   }
 };
