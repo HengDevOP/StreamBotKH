@@ -48,86 +48,111 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   const totalDuration = safeEnd - safeStart;
 
   const [isPlaying, setIsPlaying] = useState<boolean>(autoplay);
-  const [elapsed, setElapsed] = useState<number>(0);
   const [renderKey, setRenderKey] = useState<number>(0);
+
+  const barRef = useRef<HTMLDivElement>(null);
+  const onEndedRef = useRef(onEnded);
   const animFrameRef = useRef<number | null>(null);
+  const pausedProgressRef = useRef<number>(0);
   const startTimeRef = useRef<number | null>(null);
-  const elapsedOffsetRef = useRef<number>(0);
   const onEndedFiredRef = useRef<boolean>(false);
 
-  // Remaining countdown seconds (from full duration down to 0)
-  const remaining = Math.max(0, totalDuration - elapsed);
-  // Countdown percentage (from 100% down to 0%)
-  const countdownPct = totalDuration > 0 ? (remaining / totalDuration) * 100 : 0;
-  // Progress elapsed percentage (from 0% up to 100%)
-  const elapsedPct = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+  useEffect(() => {
+    onEndedRef.current = onEnded;
+  }, [onEnded]);
 
   // Reset timer when videoId, startTime, or endTime changes
   useEffect(() => {
-    setElapsed(0);
-    elapsedOffsetRef.current = 0;
+    pausedProgressRef.current = 0;
     startTimeRef.current = null;
     onEndedFiredRef.current = false;
+    if (barRef.current) {
+      barRef.current.style.width = '100%';
+    }
     setIsPlaying(autoplay);
     setRenderKey((k) => k + 1);
   }, [videoId, safeStart, safeEnd, autoplay]);
 
-  // Real-time smooth 60fps ticking loop for the countdown bar (with 1.0s buffer for YouTube iframe buffering)
+  // Real-time smooth 60fps countdown animation loop
   useEffect(() => {
     if (!isPlaying) {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       return;
     }
 
-    onEndedFiredRef.current = false;
+    let isCancelled = false;
+    let localFrameId: number | null = null;
+    let localStartTime: number | null = null;
+
+    // Small 200ms initial buffer for YouTube iframe to buffer on first play
+    const delay = pausedProgressRef.current === 0 ? 200 : 0;
 
     const startDelayTimer = setTimeout(() => {
-      startTimeRef.current = performance.now();
+      if (isCancelled) return;
+      localStartTime = performance.now();
+      startTimeRef.current = localStartTime;
 
-      const loop = () => {
-        if (!startTimeRef.current) return;
-        const now = performance.now();
-        const currentElapsed = elapsedOffsetRef.current + (now - startTimeRef.current) / 1000;
+      const loop = (now: number) => {
+        if (isCancelled || !localStartTime) return;
+        const deltaSec = (now - localStartTime) / 1000;
+        const currentElapsed = (pausedProgressRef.current * totalDuration) + deltaSec;
+        const progress = Math.min(1, currentElapsed / totalDuration);
+        const remainingPct = Math.max(0, (1 - progress) * 100);
 
-        if (currentElapsed >= totalDuration) {
-          setElapsed(totalDuration);
+        if (barRef.current) {
+          barRef.current.style.width = `${remainingPct}%`;
+        }
+
+        if (progress >= 1) {
           if (!onEndedFiredRef.current) {
             onEndedFiredRef.current = true;
+            if (barRef.current) {
+              barRef.current.style.width = '0%';
+            }
+            if (isPreview) {
+              setIsPlaying(false);
+            }
             setTimeout(() => {
-              if (onEnded) onEnded();
-            }, 500);
+              onEndedRef.current?.();
+            }, 300);
           }
           return;
         }
 
-        setElapsed(currentElapsed);
-        animFrameRef.current = requestAnimationFrame(loop);
+        localFrameId = requestAnimationFrame(loop);
+        animFrameRef.current = localFrameId;
       };
 
-      animFrameRef.current = requestAnimationFrame(loop);
-    }, 1000);
+      localFrameId = requestAnimationFrame(loop);
+      animFrameRef.current = localFrameId;
+    }, delay);
 
     return () => {
+      isCancelled = true;
       clearTimeout(startDelayTimer);
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      if (startTimeRef.current) {
-        elapsedOffsetRef.current += (performance.now() - startTimeRef.current) / 1000;
+      if (localFrameId) cancelAnimationFrame(localFrameId);
+      if (localStartTime) {
+        const deltaSec = (performance.now() - localStartTime) / 1000;
+        pausedProgressRef.current = Math.min(1, pausedProgressRef.current + deltaSec / totalDuration);
+        localStartTime = null;
         startTimeRef.current = null;
       }
     };
-  }, [isPlaying, totalDuration, onEnded, renderKey]);
+  }, [isPlaying, totalDuration, renderKey]);
 
   const handleRestart = () => {
-    setElapsed(0);
-    elapsedOffsetRef.current = 0;
+    pausedProgressRef.current = 0;
     startTimeRef.current = null;
     onEndedFiredRef.current = false;
+    if (barRef.current) {
+      barRef.current.style.width = '100%';
+    }
     setIsPlaying(true);
     setRenderKey((k) => k + 1);
   };
 
   const handleTogglePlay = () => {
-    if (elapsed >= totalDuration) {
+    if (pausedProgressRef.current >= 1) {
       handleRestart();
     } else {
       setIsPlaying((prev) => !prev);
@@ -194,9 +219,10 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       {/* ============================================================== */}
       <div className="w-full h-1.5 sm:h-2 bg-slate-950 relative overflow-hidden border-t border-slate-800/80">
         <div
-          className="h-full transition-[width] duration-75 ease-linear rounded-r-sm"
+          ref={barRef}
+          className="h-full rounded-r-sm will-change-[width]"
           style={{
-            width: `${Math.max(0, Math.min(100, countdownPct))}%`,
+            width: '100%',
             backgroundColor: '#DC2626',
             boxShadow: '0 0 10px rgba(220, 38, 38, 0.75)'
           }}
