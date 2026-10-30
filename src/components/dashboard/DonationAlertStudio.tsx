@@ -1990,7 +1990,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                   {isUploadingMedia ? (
                     <>
                       <Loader2 size={13} className="animate-spin" />
-                      <span>Uploading Media...</span>
+                      <span>Uploading Into Cloud...</span>
                     </>
                   ) : (
                     <>

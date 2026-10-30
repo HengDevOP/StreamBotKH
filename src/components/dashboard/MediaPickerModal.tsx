@@ -128,8 +128,6 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // Up to 100MB per file (bounded by plan quota: 20MB Free / 100MB Pro)
-
   const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -179,17 +177,14 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (file.size > MAX_SIZE_BYTES) {
-      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      setErrorMsg(`File exceeds the 100MB per-file limit (${sizeMb} MB).`);
-      return;
-    }
-
+    // Bounded only by total remaining storage quota (no per-upload size restriction)
     if (storageInfo && file.size > storageInfo.remainingBytes) {
+      const totalMb = ((storageInfo.usedBytes + file.size) / (1024 * 1024)).toFixed(1);
+      const usedMb = (storageInfo.usedBytes / (1024 * 1024)).toFixed(1);
+      const fileMb = (file.size / (1024 * 1024)).toFixed(1);
+      const limitMb = (storageInfo.limitBytes / (1024 * 1024)).toFixed(0);
       setErrorMsg(
-        `File size (${formatFileSize(file.size)}) exceeds your remaining quota (${formatFileSize(
-          storageInfo.remainingBytes
-        )} left of ${storageInfo.planLabel}).`
+        `Total storage limit reached: ${totalMb} MB attempted (${usedMb} MB used + ${fileMb} MB file) of ${limitMb} MB max quota. Delete older files or upgrade plan.`
       );
       return;
     }
@@ -362,7 +357,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                     {uploading ? (
                       <>
                         <Loader2 size={15} className="animate-spin" />
-                        <span>Uploading...</span>
+                        <span>Uploading Into Cloud...</span>
                       </>
                     ) : (
                       <>
@@ -397,9 +392,21 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
               {/* Feedback Banners */}
               {errorMsg && (
-                <div className="mt-3 p-3 rounded-xl bg-red-950/50 border border-red-500/40 text-red-300 text-xs font-mono flex items-center gap-2">
-                  <AlertCircle size={15} className="text-red-400 flex-shrink-0" />
-                  <span>{errorMsg}</span>
+                <div className="mt-3 p-3 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs font-mono flex items-center justify-between gap-2 shadow-lg shadow-red-950/40 animate-fadeIn">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
+                      <AlertCircle size={12} className="text-red-400" />
+                      Storage Limit Exceeded
+                    </span>
+                    <span className="font-sans text-xs">{errorMsg}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setErrorMsg(null)}
+                    className="text-red-400 hover:text-white text-xs font-bold px-1.5 py-0.5 cursor-pointer ml-auto flex-shrink-0"
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
               {successMsg && (

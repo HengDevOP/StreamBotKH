@@ -176,8 +176,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_SIZE_BYTES = 100 * 1024 * 1024; // Up to 100MB per file (bounded by plan quota: 20MB Free / 100MB Pro)
-
   const getAuthHeaders = (): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -217,17 +215,14 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (file.size > MAX_SIZE_BYTES) {
-      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      setErrorMsg(`File size (${sizeMb} MB) exceeds the 100MB per-file upload limit.`);
-      return;
-    }
-
+    // Bounded only by total remaining storage quota (no per-upload size restriction)
     if (storageInfo && file.size > storageInfo.remainingBytes) {
+      const totalMb = ((storageInfo.usedBytes + file.size) / (1024 * 1024)).toFixed(1);
+      const usedMb = (storageInfo.usedBytes / (1024 * 1024)).toFixed(1);
+      const fileMb = (file.size / (1024 * 1024)).toFixed(1);
+      const limitMb = (storageInfo.limitBytes / (1024 * 1024)).toFixed(0);
       setErrorMsg(
-        `File size (${formatFileSize(file.size)}) exceeds your remaining quota (${formatFileSize(
-          storageInfo.remainingBytes
-        )} left of ${storageInfo.planLabel}).`
+        `Total storage limit reached: ${totalMb} MB attempted (${usedMb} MB used + ${fileMb} MB file) of ${limitMb} MB max quota. Delete older files or upgrade plan.`
       );
       return;
     }
@@ -397,14 +392,17 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
       {/* Alert Messages */}
       {errorMsg && (
-        <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-800/50 text-red-300 text-xs flex items-center justify-between animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <AlertCircle size={16} className="flex-shrink-0" />
-            <span>{errorMsg}</span>
+        <div className="p-3.5 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs flex items-center justify-between shadow-lg shadow-red-950/40 animate-fadeIn">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="px-2 py-0.5 rounded-md bg-red-500/20 text-red-400 border border-red-500/40 font-mono font-bold text-[10px] uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
+              <AlertCircle size={12} className="text-red-400" />
+              Storage Limit Exceeded
+            </span>
+            <span className="font-sans font-medium text-red-200">{errorMsg}</span>
           </div>
           <button
             onClick={() => setErrorMsg(null)}
-            className="text-red-400 hover:text-white text-xs font-bold px-2 py-0.5"
+            className="text-red-400 hover:text-white text-xs font-bold px-2 py-0.5 ml-2 cursor-pointer flex-shrink-0"
           >
             ✕
           </button>
@@ -425,17 +423,24 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
           {storageInfo && (
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-slate-300 font-bold uppercase tracking-wider">
                     Media Storage Usage:
                   </span>
                   <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono text-[11px] font-bold">
                     {storageInfo.planLabel}
                   </span>
+                  {(storageInfo.remainingBytes <= 0 || storageInfo.percentUsed >= 100) && (
+                    <span className="px-2 py-0.5 rounded-md bg-red-500/20 text-red-400 border border-red-500/40 font-mono text-[10px] font-bold uppercase tracking-wider animate-pulse flex-shrink-0">
+                      MAX LIMIT REACHED
+                    </span>
+                  )}
                 </div>
                 <div className="font-mono text-slate-400 text-xs">
-                  <strong className="text-white">{formatFileSize(storageInfo.usedBytes)}</strong> used of{' '}
-                  <strong className="text-white">{formatFileSize(storageInfo.limitBytes)}</strong> ({storageInfo.percentUsed}%)
+                  <strong className={storageInfo.percentUsed >= 100 ? 'text-red-400 font-bold' : 'text-white'}>
+                    {formatFileSize(storageInfo.usedBytes)}
+                  </strong>{' '}
+                  used of <strong className="text-white">{formatFileSize(storageInfo.limitBytes)}</strong> ({storageInfo.percentUsed}%)
                 </div>
               </div>
 
@@ -491,7 +496,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
             <div className="space-y-1">
               <div className="text-sm font-semibold text-white">
-                {uploading ? 'Uploading media to MongoDB...' : 'Click to upload or drag and drop'}
+                {uploading ? 'Uploading Into Cloud...' : 'Click to upload or drag and drop'}
               </div>
               <p className="text-xs text-slate-400">
                 Supports <strong className="text-slate-300">MP4</strong>, <strong className="text-slate-300">GIF</strong>, <strong className="text-slate-300">MP3</strong>, <strong className="text-slate-300">WAV</strong>, <strong className="text-slate-300">PNG</strong>, <strong className="text-slate-300">JPG</strong>, <strong className="text-slate-300">WEBP</strong> &amp; all formatted files (Free: <strong className="text-cyan-400">20MB</strong> • Pro: <strong className="text-purple-400">100MB</strong>).
@@ -517,7 +522,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
             {loading ? (
               <div className="py-12 text-center text-xs text-slate-500 font-mono flex items-center justify-center gap-2">
                 <RefreshCw size={14} className="animate-spin" />
-                <span>Loading media from MongoDB...</span>
+                <span>Loading media from Cloud...</span>
               </div>
             ) : mediaList.length === 0 ? (
               <div className="p-10 rounded-2xl bg-slate-900/30 border border-slate-800/60 text-center space-y-2">
@@ -615,7 +620,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
                           <button
                             onClick={() => handleDelete(item._id, item.filename)}
-                            title="Delete from MongoDB"
+                            title="Delete from Cloud"
                             className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           >
                             <Trash2 size={13} />

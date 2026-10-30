@@ -58,7 +58,8 @@ export interface MediaDoc {
   storedFilename: string;
   url: string; // e.g. /uploads/media/xxx.gif
   fileType: string; // 'image/png' | 'image/jpeg' | 'image/gif'
-  fileSize: number; // bytes (max 2MB = 2097152 bytes)
+  fileSize: number; // bytes
+  fileBase64?: string; // Persistent base64 backup to withstand server restarts, container redeploys & ephemeral storage
   createdAt: Date;
 }
 
@@ -669,6 +670,9 @@ export async function initMongo() {
 
     // Restore and synchronize all streamer Master KHQR images across MongoDB Atlas and local disk
     await restoreAllMasterKhqrImages();
+
+    // Restore and synchronize all media library assets across MongoDB Atlas and local disk
+    await restoreAllMediaFiles();
   } catch (err) {
     console.error('❌ [MongoDB] Error during initialization:', err);
   }
@@ -938,5 +942,96 @@ export async function restoreAllMasterKhqrImages(): Promise<void> {
     console.log('⚡ [Master KHQR] Restored and synchronized all streamer Master KHQRs');
   } catch (err) {
     console.warn('⚠️ [Master KHQR] Warning during startup restoration:', err);
+  }
+}
+
+/**
+ * Helper to ensure a single media file is restored onto disk:
+ * 1. Checks if public/uploads/media/<storedFilename> exists on disk.
+ * 2. If it exists and fileBase64 is missing in MongoDB, reads the file and saves fileBase64 to MongoDB.
+ * 3. If it does not exist on disk and fileBase64 is present, writes the file to disk from fileBase64.
+ * 4. Fallback: if storedFilename is missing on disk and no base64, checks public/uploads/media for matching file size.
+ */
+export async function restoreMediaFile(media: MediaDoc): Promise<boolean> {
+  if (!media.storedFilename) return false;
+  const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'media');
+  const filePath = path.join(uploadDir, media.storedFilename);
+
+  try {
+    // 1. If file already exists on disk
+    if (fs.existsSync(filePath)) {
+      const st = fs.statSync(filePath);
+      if (st.isFile() && st.size > 0) {
+        // Back up to MongoDB if fileBase64 is missing (safe for MongoDB document limit <= 15MB)
+        if (!media.fileBase64 && st.size <= 15 * 1024 * 1024) {
+          try {
+            const buffer = fs.readFileSync(filePath);
+            const base64 = buffer.toString('base64');
+            const mediaCol = await getMediaCollection();
+            await mediaCol.updateOne(
+              { _id: media._id },
+              { $set: { fileBase64: base64, fileSize: buffer.length } }
+            );
+          } catch (e) {}
+        }
+        return true;
+      }
+    }
+
+    // 2. If file is missing on disk, but MongoDB has fileBase64 backup!
+    if (media.fileBase64 && media.fileBase64.trim() !== '') {
+      fs.mkdirSync(uploadDir, { recursive: true });
+      const buffer = Buffer.from(media.fileBase64, 'base64');
+      fs.writeFileSync(filePath, buffer);
+      console.log(`✅ [Media Storage] Restored media file from Cloud backup [${media.filename}]: ${media.storedFilename} (${(buffer.length / 1024).toFixed(1)} KB)`);
+      return true;
+    }
+
+    // 3. Fallback matching: if storedFilename is missing, search public/uploads/media for a file of identical byte size
+    if (fs.existsSync(uploadDir) && media.fileSize > 0) {
+      const files = fs.readdirSync(uploadDir);
+      for (const f of files) {
+        const candidatePath = path.join(uploadDir, f);
+        try {
+          const st = fs.statSync(candidatePath);
+          if (st.isFile() && st.size === media.fileSize) {
+            fs.copyFileSync(candidatePath, filePath);
+            const buffer = fs.readFileSync(filePath);
+            const base64 = buffer.toString('base64');
+            const mediaCol = await getMediaCollection();
+            await mediaCol.updateOne(
+              { _id: media._id },
+              { $set: { fileBase64: base64 } }
+            );
+            console.log(`✅ [Media Storage] Linked and restored media file [${media.filename}] from existing local asset`);
+            return true;
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ [Media Storage] Could not restore media file [${media.filename}]:`, err);
+  }
+
+  return false;
+}
+
+/**
+ * Startup restoration: verifies and restores all media files across MongoDB Atlas and disk
+ */
+export async function restoreAllMediaFiles(): Promise<void> {
+  try {
+    const mediaCol = await getMediaCollection();
+    const allMedia = await mediaCol.find({}).toArray();
+
+    let restoredCount = 0;
+    for (const item of allMedia) {
+      const ok = await restoreMediaFile(item);
+      if (ok) restoredCount++;
+    }
+
+    console.log(`⚡ [Media Storage] Verified and synchronized ${restoredCount}/${allMedia.length} media library assets`);
+  } catch (err) {
+    console.warn('⚠️ [Media Storage] Warning during startup media restoration:', err);
   }
 }

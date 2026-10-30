@@ -203,7 +203,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-500 font-mono flex items-center justify-center gap-2">
             <RefreshCw size={14} className="animate-spin" />
-            <span>Loading overlays from MongoDB...</span>
+            <span>Loading overlays from Cloud...</span>
           </div>
         ) : overlays.length === 0 ? (
           <div className="p-10 rounded-2xl bg-slate-900/30 border border-slate-800/60 text-center space-y-3">

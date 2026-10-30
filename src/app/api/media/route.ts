@@ -3,12 +3,10 @@ import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getMediaCollection, MediaDoc } from '@/server/database/mongo';
+import { getMediaCollection, MediaDoc, restoreMediaFile } from '@/server/database/mongo';
 import { db } from '@/server/database/db';
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // Up to 100MB per individual file (bounded by plan quota)
-
-// Media storage limits per user plan
+// Media storage limits per user plan (no per-upload limit, only bounded by total remaining plan quota)
 const PLAN_STORAGE_LIMITS: Record<string, { label: string; limitBytes: number }> = {
   free: { label: 'Free (20MB)', limitBytes: 20 * 1024 * 1024 }, // 20MB
   starter: { label: 'Starter (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
@@ -62,6 +60,11 @@ export async function GET(req: NextRequest) {
       : { userId };
     const mediaList = await mediaCol.find(filter).sort({ createdAt: -1 }).toArray();
 
+    // Ensure all media files for this user exist on disk or are restored from Cloud backup
+    for (const item of mediaList) {
+      await restoreMediaFile(item);
+    }
+
     // Get user plan
     const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ? OR LOWER(email) = LOWER(?)').get(userId, authUser?.email || '') as any;
     const userPlan = (streamerRow?.plan || 'free').toLowerCase();
@@ -105,18 +108,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Validate individual file size (up to 100MB per file)
-    if (file.size > MAX_FILE_SIZE) {
-      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      return NextResponse.json(
-        {
-          error: `File size (${sizeMb} MB) exceeds the 100MB per-file upload limit.`
-        },
-        { status: 400 }
-      );
-    }
-
-    // 2. Check User's Plan Storage Quota in MongoDB
+    // 1. Check User's Total Plan Storage Quota (No per-file size limit; only total remaining plan storage)
     const mediaCol = await getMediaCollection();
     const quotaFilter = authUser?.email
       ? { $or: [{ userId }, { userEmail: authUser.email }] }
@@ -130,20 +122,27 @@ export async function POST(req: NextRequest) {
 
     if (usedBytes + file.size > quota.limitBytes) {
       const usedMb = (usedBytes / (1024 * 1024)).toFixed(1);
-      const limitDisplay = userPlan === 'free' ? '20MB' : '100MB';
+      const fileMb = (file.size / (1024 * 1024)).toFixed(1);
+      const totalAttemptedMb = ((usedBytes + file.size) / (1024 * 1024)).toFixed(1);
+      const limitMb = (quota.limitBytes / (1024 * 1024)).toFixed(0);
       return NextResponse.json(
         {
-          error: `Storage quota exceeded for your ${userPlan.toUpperCase()} plan (${usedMb}MB used of ${limitDisplay} limit). Upgrade to Pro ($4.99/mo for 100MB) or delete older files.`
+          error: `Storage Limit Exceeded: ${totalAttemptedMb} MB attempted (${usedMb} MB used + ${fileMb} MB file) exceeds max ${limitMb} MB limit. Delete existing media or upgrade plan.`,
+          storageLimitExceeded: true,
+          usedBytes,
+          attemptedBytes: file.size,
+          totalAttemptedBytes: usedBytes + file.size,
+          limitBytes: quota.limitBytes
         },
         { status: 400 }
       );
     }
 
-    // 3. Prepare target upload directory
+    // 2. Prepare target upload directory
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'media');
     await fs.mkdir(uploadDir, { recursive: true });
 
-    // 4. Generate unique stored filename preserving original extension
+    // 3. Generate unique stored filename preserving original extension
     const originalName = file.name || 'uploaded-media';
     const rawExt = path.extname(originalName).toLowerCase();
     const mimeType = (file.type || '').toLowerCase();
@@ -166,15 +165,16 @@ export async function POST(req: NextRequest) {
     const storedFilename = `${Date.now()}-${uuidv4().slice(0, 8)}${safeExt}`;
     const filePath = path.join(uploadDir, storedFilename);
 
-    // 5. Write file to disk
+    // 4. Write file to disk
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     await fs.writeFile(filePath, buffer);
 
     const publicUrl = `/uploads/media/${storedFilename}`;
     const detectedMime = detectMimeType(mimeType, safeExt);
+    const base64Data = buffer.toString('base64');
 
-    // 6. Save media document to MongoDB
+    // 5. Save media document to MongoDB with persistent Cloud backup
     const mediaDoc: MediaDoc = {
       userId,
       userEmail: authUser?.email || '',
@@ -183,6 +183,7 @@ export async function POST(req: NextRequest) {
       url: publicUrl,
       fileType: detectedMime,
       fileSize: file.size,
+      fileBase64: file.size <= 15 * 1024 * 1024 ? base64Data : undefined,
       createdAt: new Date()
     };
 
