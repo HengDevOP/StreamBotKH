@@ -120,7 +120,16 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     onTtsFinished?: () => void
   ) => {
     let finishedFired = false;
+    let safetyTimer: NodeJS.Timeout | null = setTimeout(() => {
+      console.warn('⏱️ [Overlay TTS] TTS speech safety timeout elapsed (12s).');
+      notifyFinished();
+    }, 12000);
+
     const notifyFinished = () => {
+      if (safetyTimer) {
+        clearTimeout(safetyTimer);
+        safetyTimer = null;
+      }
       if (!finishedFired) {
         finishedFired = true;
         if (onTtsFinished) onTtsFinished();
@@ -358,7 +367,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
           videoWaitingTimerRef.current = setTimeout(() => {
             console.log(`⏱️ [Donation Overlay] Safety buffer elapsed. Auto-resuming donation queue.`);
             resumeQueue();
-          }, (clipSeconds + 10) * 1000);
+          }, Math.min(20, clipSeconds + 3) * 1000);
         }
       }
     }

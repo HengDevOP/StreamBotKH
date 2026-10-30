@@ -39,6 +39,17 @@ try {
   db.exec('ALTER TABLE streamers ADD COLUMN telegram_pending_session TEXT');
 } catch (e) {}
 
+// Overlay token history table to ensure old OBS browser source URLs never break when regenerating
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS overlay_token_history (
+      token TEXT PRIMARY KEY,
+      streamer_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+} catch (e) {}
+
 // Ensure all existing streamers have unique, non-null telegram_pairing_code
 try {
   const existingRows = db.prepare('SELECT id, telegram_pairing_code FROM streamers').all() as Array<{ id: string; telegram_pairing_code?: string | null }>;

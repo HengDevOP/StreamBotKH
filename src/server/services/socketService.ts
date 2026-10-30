@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
+import { db } from '../database/db';
 
 let io: SocketIOServer | null = null;
 const recentOverlayAlerts = new Map<string, { payload: AlertPayload; timestamp: number }>();
@@ -63,6 +64,23 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       if (data?.overlayToken) {
         socket.join(`overlay:${data.overlayToken}`);
         console.log(`[Socket] Overlay connected for token: ${data.overlayToken.slice(0, 10)}... (Socket ID: ${socket.id})`);
+
+        // Automatically map legacy or regenerated tokens to the streamer's room so OBS never breaks!
+        try {
+          const streamer = db.prepare(`
+            SELECT id, overlay_token FROM streamers 
+            WHERE overlay_token = ? 
+               OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
+          `).get(data.overlayToken, data.overlayToken) as any;
+
+          if (streamer) {
+            socket.join(`streamer_overlay:${streamer.id}`);
+            if (streamer.overlay_token && streamer.overlay_token !== data.overlayToken) {
+              socket.join(`overlay:${streamer.overlay_token}`);
+            }
+          }
+        } catch (e) {}
+
         socket.emit('overlay:connected', { status: 'ready', message: 'StreamNeon overlay connected successfully' });
 
         // If an alert was fired within the last 25 seconds, replay it to the newly connected overlay!
@@ -93,6 +111,22 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
 
       // Broadcast single alert event to target overlay room
       io?.to(`overlay:${token}`).emit('donation:alert', testPayload);
+
+      // Also broadcast to streamer's master overlay room and active overlay token
+      try {
+        const streamer = db.prepare(`
+          SELECT id, overlay_token FROM streamers 
+          WHERE overlay_token = ? 
+             OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
+        `).get(token, token) as any;
+
+        if (streamer) {
+          io?.to(`streamer_overlay:${streamer.id}`).emit('donation:alert', testPayload);
+          if (streamer.overlay_token && streamer.overlay_token !== token) {
+            io?.to(`overlay:${streamer.overlay_token}`).emit('donation:alert', testPayload);
+          }
+        }
+      } catch (e) {}
 
       // If token is specific, also send to demo-token room in case preview overlay uses demo-token
       if (token !== 'demo-token') {
@@ -171,6 +205,23 @@ export function broadcastAlertToOverlay(overlayToken: string, payload: AlertPayl
 
   console.log(`[Socket] Broadcasting donation alert to overlay:${overlayToken.slice(0, 10)}...: ${payload.donorName} ($${payload.amount})`);
   activeIo.to(`overlay:${overlayToken}`).emit('donation:alert', payload);
+
+  // Broadcast to streamer master room and all linked overlay tokens
+  try {
+    const streamer = db.prepare(`
+      SELECT id, overlay_token FROM streamers 
+      WHERE overlay_token = ? 
+         OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
+    `).get(overlayToken, overlayToken) as any;
+
+    if (streamer) {
+      activeIo.to(`streamer_overlay:${streamer.id}`).emit('donation:alert', payload);
+      if (streamer.overlay_token && streamer.overlay_token !== overlayToken) {
+        activeIo.to(`overlay:${streamer.overlay_token}`).emit('donation:alert', payload);
+      }
+    }
+  } catch (e) {}
+
   activeIo.emit('donation:paid', {
     ...payload,
     id: payload.donationId || payload.id,

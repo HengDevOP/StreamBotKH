@@ -48,7 +48,7 @@ export function useAlertQueue() {
     const durationMs = isVideo
       ? Math.max(15, (Number(nextAlert.durationSeconds) || 30) + 15) * 1000
       : (hasTts
-          ? Math.max(50, (Number(nextAlert.durationSeconds) || 8) + 40) * 1000
+          ? Math.max(16, (Number(nextAlert.durationSeconds) || 8) + 8) * 1000
           : Math.max(3, Number(nextAlert.durationSeconds) || 8) * 1000);
 
     if (dismissTimerRef.current) {
