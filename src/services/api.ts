@@ -26,13 +26,19 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(data.error || `HTTP error ${response.status}`);
+      const err: any = new Error(data.error || `HTTP error ${response.status}`);
+      err.status = response.status;
+      err.data = data;
+      throw err;
     }
 
     return data as T;
   } catch (err: any) {
     if (err.name === 'AbortError') {
-      throw new Error(`Request timed out for ${endpoint}`);
+      const abortErr: any = new Error(`Request timed out or aborted for ${endpoint}`);
+      abortErr.name = 'AbortError';
+      abortErr.isAbort = true;
+      throw abortErr;
     }
     throw err;
   } finally {

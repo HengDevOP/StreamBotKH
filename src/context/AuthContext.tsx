@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Streamer } from '../types/streamer';
 import { authService } from '../services/authService';
 
@@ -54,7 +54,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   });
 
+  const isRefreshingRef = useRef<boolean>(false);
+
   const refreshUser = async () => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+
     try {
       if (typeof window !== 'undefined' && localStorage.getItem('streamneon_auth_token')) {
         const profile = await authService.getMe();
@@ -68,15 +73,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem('streamneon_user');
         }
       }
-    } catch (err) {
-      console.error('Failed to restore session:', err);
-      authService.logout();
-      setToken(null);
-      setUser(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('streamneon_user');
+    } catch (err: any) {
+      console.warn('Session refresh check notice:', err?.message || err);
+      // ONLY log out if the server explicitly responded with 401 Unauthorized
+      // Aborted requests (e.g. from page reload / spam reload), network timeouts, or server 5xx errors MUST NOT log out the user!
+      const isExplicitUnauthorized =
+        err?.status === 401 ||
+        err?.message?.includes('401') ||
+        err?.message?.toLowerCase().includes('unauthorized') ||
+        err?.message?.toLowerCase().includes('invalid token') ||
+        err?.message?.toLowerCase().includes('jwt expired');
+
+      if (isExplicitUnauthorized) {
+        console.warn('Session expired or unauthorized. Logging out.');
+        authService.logout();
+        setToken(null);
+        setUser(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('streamneon_user');
+        }
+      } else {
+        // Transient error or page reload abort: Keep existing token and cached user!
+        console.log('Preserving cached session across transient reload / network event.');
       }
     } finally {
+      isRefreshingRef.current = false;
       setLoading(false);
     }
   };
