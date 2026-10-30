@@ -17,15 +17,14 @@ export async function GET(req: NextRequest) {
       clonedVoiceUrl
     });
 
-    // Stream raw audio/mpeg bytes directly from /api/tts so Nginx, browsers, and OBS Studio
-    // never hit 404 on /uploads/tts or 403 Referer blocks on translate.google.com
+    // Stream raw audio/mpeg bytes directly from /api/tts in-memory (no files stored on disk)
     if (result.buffer && result.buffer.length > 0) {
       return new NextResponse(result.buffer, {
         status: 200,
         headers: {
           'Content-Type': 'audio/mpeg',
           'Content-Length': String(result.buffer.length),
-          'Cache-Control': 'public, max-age=86400',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Access-Control-Allow-Origin': '*'
         }
       });

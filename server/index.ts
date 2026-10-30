@@ -47,6 +47,11 @@ function createRouteHandler(fullPath: string, method: string) {
     try {
       if (process.env.NODE_ENV !== 'production') {
         try {
+          for (const key of Object.keys(require.cache)) {
+            if (key.includes('/src/server/services/ttsService')) {
+              delete require.cache[key];
+            }
+          }
           delete require.cache[require.resolve(fullPath)];
         } catch (e) {}
       }

@@ -38,3 +38,7 @@ npm-debug.log*
 
 # OS
 Thumbs.db
+
+# Ephemeral TTS generated audio
+public/uploads/tts/
+
