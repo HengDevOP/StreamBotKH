@@ -317,7 +317,9 @@ export async function POST(req: NextRequest) {
       currency: effectiveCurrency,
       banking_name: effectiveBankingName,
       payment_method: bankingName,
-      status: 'PAID'
+      status: 'PAID',
+      created_at: new Date().toISOString(),
+      paid_at: new Date().toISOString()
     });
 
     // 5b. Update Active Stream Goal in Real Time if active

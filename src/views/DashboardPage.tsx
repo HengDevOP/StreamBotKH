@@ -130,7 +130,7 @@ export type DashboardTab =
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initialTab, initialSelectedId }) => {
   const { user, loading: authLoading, refreshUser, logout } = useAuth();
-  const { socket, joinDashboardRoom, connected } = useSocket();
+  const { socket, joinDashboardRoom, joinOverlayRoom, connected } = useSocket();
   const { playSynthNeonChime } = useAudio();
   const { showConfirm, showAlert } = useModal();
 
@@ -376,17 +376,96 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   useEffect(() => {
     if (!user || !socket) return;
 
-    joinDashboardRoom(user.id);
+    const joinRooms = () => {
+      joinDashboardRoom(user.id);
+      if (user.overlayToken) {
+        joinOverlayRoom(user.overlayToken);
+      }
+    };
 
-    const handleNewDonation = (newDonation: any) => {
-      console.log('⚡ [Dashboard] Live new donation received:', newDonation);
+    joinRooms();
+    socket.on('connect', joinRooms);
+
+    const handleIncomingDonation = (incoming: any) => {
+      if (!incoming) return;
+      console.log('⚡ [Dashboard] Realtime incoming tip received:', incoming);
+
+      const donationItem = {
+        id: incoming.id || incoming.donationId || `tx_${Date.now()}`,
+        donor_name: incoming.donor_name || incoming.donorName || 'Anonymous Supporter',
+        donor_message: incoming.donor_message || incoming.donorMessage || '',
+        amount: Number(incoming.amount) || 0,
+        currency: (((incoming.currency || 'USD') as string).toUpperCase() === 'KHR' ? 'KHR' : 'USD') as 'USD' | 'KHR',
+        banking_name: incoming.banking_name || incoming.bankingName || incoming.payment_method || 'ABA Bank',
+        payment_method: incoming.payment_method || incoming.banking_name || 'ABA Bank',
+        status: 'PAID',
+        created_at: incoming.created_at || incoming.paid_at || new Date().toISOString(),
+        paid_at: incoming.paid_at || incoming.created_at || new Date().toISOString()
+      };
+
+      // Optimistically update recent donations list and daily counters immediately
+      setStats((prev) => {
+        if (!prev) return prev;
+        const existing = prev.recentDonations || [];
+        const exists = existing.some((d: any) => d.id === donationItem.id);
+
+        const updatedDonations = exists
+          ? existing.map((d: any) => (d.id === donationItem.id ? { ...d, ...donationItem } : d))
+          : [donationItem, ...existing];
+
+        // Sort descending by timestamp
+        updatedDonations.sort((a: any, b: any) => {
+          const timeA = new Date(a.paid_at || a.created_at || 0).getTime();
+          const timeB = new Date(b.paid_at || b.created_at || 0).getTime();
+          return timeB - timeA;
+        });
+
+        const isUsd = donationItem.currency === 'USD';
+        const amt = donationItem.amount;
+
+        const prevSummary = prev.summary || {
+          totalRevenueUsd: 0,
+          totalRevenueKhr: 0,
+          totalDonationsCount: 0,
+          todayRevenueUsd: 0,
+          todayRevenueKhr: 0,
+          todayDonationsCount: 0
+        };
+
+        return {
+          ...prev,
+          recentDonations: updatedDonations,
+          summary: {
+            ...prevSummary,
+            totalDonationsCount: exists ? prevSummary.totalDonationsCount : prevSummary.totalDonationsCount + 1,
+            todayDonationsCount: exists ? prevSummary.todayDonationsCount : prevSummary.todayDonationsCount + 1,
+            totalRevenueUsd: isUsd ? prevSummary.totalRevenueUsd + amt : prevSummary.totalRevenueUsd,
+            todayRevenueUsd: isUsd ? prevSummary.todayRevenueUsd + amt : prevSummary.todayRevenueUsd,
+            totalRevenueKhr: !isUsd ? prevSummary.totalRevenueKhr + amt : prevSummary.totalRevenueKhr,
+            todayRevenueKhr: !isUsd ? prevSummary.todayRevenueKhr + amt : prevSummary.todayRevenueKhr
+          }
+        };
+      });
+
+      // Fetch background data to keep trend and analytics completely synchronized
       loadData(true);
     };
 
-    socket.on('donation:new', handleNewDonation);
+    const handleDonationPaid = (paidData: any) => {
+      if (!paidData) return;
+      // Filter out if explicitly addressed to another streamer
+      if (paidData.streamerId && paidData.streamerId !== user.id) return;
+      if (paidData.overlayToken && user.overlayToken && paidData.overlayToken !== user.overlayToken) return;
+      handleIncomingDonation(paidData);
+    };
+
+    socket.on('donation:new', handleIncomingDonation);
+    socket.on('donation:paid', handleDonationPaid);
 
     return () => {
-      socket.off('donation:new', handleNewDonation);
+      socket.off('connect', joinRooms);
+      socket.off('donation:new', handleIncomingDonation);
+      socket.off('donation:paid', handleDonationPaid);
     };
   }, [user, socket]);
 
@@ -578,6 +657,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       onConfirm: async () => {
         try {
           setDeletingDonationId(donationId);
+          // Optimistically remove from state immediately
+          setStats((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              recentDonations: (prev.recentDonations || []).filter((d: any) => d.id !== donationId)
+            };
+          });
           await streamerService.deleteDonation(donationId);
           await loadData(true);
         } catch (err: any) {
@@ -604,6 +691,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       cancelText: 'Cancel',
       onConfirm: async () => {
         try {
+          // Optimistically clear from state immediately
+          setStats((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              recentDonations: []
+            };
+          });
           const res = await streamerService.deleteAllDonations();
           await loadData(true);
           showAlert({
@@ -1407,6 +1502,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               {/* Recent Donations Table Preview */}
               <RecentDonationsTable
                 donations={stats?.recentDonations}
+                limit={10}
+                title="Recent Donations"
+                subtitle="Live incoming tips from ABA Bank & Bakong KHQR (Paid Only)"
                 onReplayAlert={handleReplayAlert}
                 onDeleteDonation={handleDeleteDonation}
                 deletingId={deletingDonationId}
@@ -1501,6 +1599,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               {/* Transactions Table */}
               <RecentDonationsTable
                 donations={filteredDonations}
+                limit={50}
+                title="Donation Ledger"
+                subtitle="Audit log of all verified tips matching selected filters (Paid Only)"
                 onReplayAlert={handleReplayAlert}
                 onDeleteDonation={handleDeleteDonation}
                 deletingId={deletingDonationId}

@@ -172,13 +172,17 @@ export function broadcastAlertToOverlay(overlayToken: string, payload: AlertPayl
 export function broadcastDonationToDashboard(streamerId: string, donation: any) {
   const activeIo = getIO();
   if (!activeIo) return;
-  activeIo.to(`dashboard:${streamerId}`).emit('donation:new', donation);
-  activeIo.emit('donation:paid', {
+  const payload = {
     ...donation,
     id: donation.id || donation.donationId,
     donationId: donation.id || donation.donationId,
-    status: 'PAID'
-  });
+    status: 'PAID',
+    streamerId,
+    created_at: donation.created_at || donation.paid_at || new Date().toISOString(),
+    paid_at: donation.paid_at || donation.created_at || new Date().toISOString()
+  };
+  activeIo.to(`dashboard:${streamerId}`).emit('donation:new', payload);
+  activeIo.emit('donation:paid', payload);
 }
 
 export function broadcastMediaUpdate(userId: string, data: { media: any[]; storage: any }) {

@@ -1153,7 +1153,9 @@ class TelegramUserClientManager {
             currency: effectiveCurrency,
             banking_name: effectiveBankingName,
             payment_method: parsed.bankingName,
-            status: 'PAID'
+            status: 'PAID',
+            created_at: new Date().toISOString(),
+            paid_at: new Date().toISOString()
           });
 
           // Cache processed message keys to prevent duplicate socket emissions from MTProto reconnection
