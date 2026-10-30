@@ -338,7 +338,17 @@ export class TelegramGroupListener {
         effectiveDonorName = matchedTemp?.donor_name || dbDonation?.donor_name || parsed.donorName || 'Generous Supporter';
       }
 
-      const effectiveDonorMessage = matchedTemp?.donor_message || dbDonation?.donor_message || (parsed.donorMessage ? parsed.donorMessage.trim() : '');
+      const rawMsg = matchedTemp?.donor_message || dbDonation?.donor_message || (parsed.donorMessage ? parsed.donorMessage.trim() : '');
+      const isMeaningful = Boolean(
+        rawMsg &&
+        typeof rawMsg === 'string' &&
+        rawMsg.trim() &&
+        rawMsg.trim().toLowerCase() !== 'none' &&
+        rawMsg.trim().toLowerCase() !== '(none)' &&
+        rawMsg.trim().toLowerCase() !== 'null' &&
+        rawMsg.trim().toLowerCase() !== 'undefined'
+      );
+      const effectiveDonorMessage = isMeaningful ? rawMsg.trim() : '';
       const effectiveAmount = parsed.amount > 0 ? parsed.amount : (matchedTemp?.amount || dbDonation?.amount || 1.0);
       const effectiveCurrency = parsed.currency || matchedTemp?.currency || dbDonation?.currency || 'USD';
       const effectiveBankingName = matchedTemp?.banking_name || dbDonation?.banking_name || parsed.bankingName || 'Bakong KHQR';
@@ -431,12 +441,19 @@ export class TelegramGroupListener {
         console.error('[DB] Error updating/inserting telegram listener donation:', dbErr);
       }
 
-      // Fetch current saved condition alert box from MongoDB
+      // Fetch current saved condition alert box from MongoDB for this streamer
       let matchingBox: any = null;
       try {
         const alertBoxesCol = await getAlertBoxesCollection();
         const activeBoxes = await alertBoxesCol
-          .find({ isEnabled: true })
+          .find({
+            $or: [
+              { userId: streamer.id },
+              { streamerId: streamer.id },
+              ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : [])
+            ],
+            isEnabled: true
+          })
           .sort({ minAmountCondition: -1 })
           .toArray();
 

@@ -254,7 +254,38 @@ export function findMatchingTemporaryDonation(
     }
   }
 
-  // 4. Exact amount match for sole active candidate in queue
+  // 4. SECOND PRIORITY: Payer Name matches candidate.banking_name (even if transferred amount differs)
+  // e.g. Donor entered $5 on donation form, but scanned QR and sent $0.01 / $1.00 from their banking app
+  if (hasValidPayer) {
+    for (const candidate of candidates) {
+      const bankName = candidate.banking_name;
+      if (bankName && matchBankNames(payer, bankName)) {
+        return candidate;
+      }
+    }
+
+    // Payer Name matches candidate.donor_name
+    for (const candidate of candidates) {
+      const dName = candidate.donor_name;
+      if (dName && matchBankNames(payer, dName)) {
+        return candidate;
+      }
+    }
+  }
+
+  // 5. Candidate's banking_name or donor_name appears in raw message text
+  if (criteria.rawText) {
+    for (const candidate of candidates) {
+      if (candidate.banking_name && matchesBankNameInText(criteria.rawText, candidate.banking_name)) {
+        return candidate;
+      }
+      if (candidate.donor_name && matchesBankNameInText(criteria.rawText, candidate.donor_name)) {
+        return candidate;
+      }
+    }
+  }
+
+  // 6. THIRD PRIORITY: Exact amount match for sole active candidate in queue
   if (criteria.amount !== undefined && criteria.amount !== null && criteria.amount > 0) {
     const amountMatches = candidates.filter((c) =>
       amountsMatch(c.amount, c.currency, criteria.amount, criteria.currency)

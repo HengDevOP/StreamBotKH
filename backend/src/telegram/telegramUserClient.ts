@@ -821,12 +821,25 @@ class TelegramUserClientManager {
             effectiveDonorName = matchedTemp?.donor_name || dbDonation?.donor_name || parsed.donorName || 'Generous Supporter';
           }
 
-          const effectiveDonorMessage =
+          const rawMsg =
             matchedTemp?.donor_message ||
             matchedTemp?.donorMessage ||
             dbDonation?.donor_message ||
             dbDonation?.donorMessage ||
             (parsed.donorMessage ? parsed.donorMessage.trim() : '');
+
+          const isMeaningful = Boolean(
+            rawMsg &&
+            typeof rawMsg === 'string' &&
+            rawMsg.trim() &&
+            rawMsg.trim().toLowerCase() !== 'none' &&
+            rawMsg.trim().toLowerCase() !== '(none)' &&
+            rawMsg.trim().toLowerCase() !== 'null' &&
+            rawMsg.trim().toLowerCase() !== 'undefined'
+          );
+
+          // If incoming message has no custom donor message, effectiveDonorMessage is empty (alert only the title)
+          const effectiveDonorMessage = isMeaningful ? rawMsg.trim() : '';
           const effectiveAmount = parsed.amount > 0 ? parsed.amount : (matchedTemp?.amount || dbDonation?.amount || 1.0);
           const effectiveCurrency = parsed.currency || matchedTemp?.currency || dbDonation?.currency || 'USD';
           const effectiveBankingName = matchedTemp?.banking_name || dbDonation?.banking_name || parsed.bankingName || 'Bakong KHQR';
@@ -922,7 +935,14 @@ class TelegramUserClientManager {
           try {
             const alertBoxesCol = await getAlertBoxesCollection();
             const activeBoxes = await alertBoxesCol
-              .find({ isEnabled: true })
+              .find({
+                $or: [
+                  { userId: targetStreamer.id },
+                  { streamerId: targetStreamer.id },
+                  ...(targetStreamer.username ? [{ userId: targetStreamer.username }, { streamerId: targetStreamer.username }] : [])
+                ],
+                isEnabled: true
+              })
               .sort({ minAmountCondition: -1 })
               .toArray();
 

@@ -5,7 +5,7 @@ import { telegramUserManager } from '@backend/telegram/telegramUserClient';
 export async function GET(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || 'demo-streamer-id-1001';
+    const streamerId = authUser?.id || req.nextUrl.searchParams.get('streamerId') || req.nextUrl.searchParams.get('streamer_id') || 'demo-streamer-id-1001';
 
     const status = await telegramUserManager.getStatus(streamerId);
     return NextResponse.json(status);

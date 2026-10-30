@@ -99,12 +99,24 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
         .trim();
 
-      // 2. Clean the donor's message
-      const cleanMsg = (msg || '')
-        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
-        .trim();
+      // 2. Clean the donor's message (verify meaningful content: not empty, not "None")
+      const isMeaningful = Boolean(
+        msg &&
+        typeof msg === 'string' &&
+        msg.trim() &&
+        msg.trim().toLowerCase() !== 'none' &&
+        msg.trim().toLowerCase() !== '(none)' &&
+        msg.trim().toLowerCase() !== 'null' &&
+        msg.trim().toLowerCase() !== 'undefined'
+      );
 
-      // 3. Read BOTH headline announcement text AND donor message!
+      const cleanMsg = isMeaningful
+        ? (msg || '')
+            .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
+            .trim()
+        : '';
+
+      // 3. If there is no message value, speak ONLY the headline title!
       const speechText = cleanMsg ? `${headline}. ${cleanMsg}` : headline;
       if (!speechText) return;
 
@@ -234,7 +246,16 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         overlayConfig;
 
       const rawMsg = payload.donorMessage || payload.donor_message || payload.message || '';
-      const resolvedDonorMessage = typeof rawMsg === 'string' ? rawMsg.trim() : '';
+      const isMeaningful = Boolean(
+        rawMsg &&
+        typeof rawMsg === 'string' &&
+        rawMsg.trim() &&
+        rawMsg.trim().toLowerCase() !== 'none' &&
+        rawMsg.trim().toLowerCase() !== '(none)' &&
+        rawMsg.trim().toLowerCase() !== 'null' &&
+        rawMsg.trim().toLowerCase() !== 'undefined'
+      );
+      const resolvedDonorMessage = isMeaningful ? rawMsg.trim() : '';
 
       const isTestAlert = Boolean(payload.isTest);
       const rawVoice = (isTestAlert && (payload.ttsType || payload.ttsVoice))

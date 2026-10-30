@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 
 let io: SocketIOServer | null = null;
+const recentOverlayAlerts = new Map<string, { payload: AlertPayload; timestamp: number }>();
 
 export interface AlertPayload {
   id?: string;
@@ -56,6 +57,13 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
         socket.join(`overlay:${data.overlayToken}`);
         console.log(`[Socket] Overlay connected for token: ${data.overlayToken.slice(0, 10)}... (Socket ID: ${socket.id})`);
         socket.emit('overlay:connected', { status: 'ready', message: 'StreamNeon overlay connected successfully' });
+
+        // If an alert was fired within the last 25 seconds, replay it to the newly connected overlay!
+        const recent = recentOverlayAlerts.get(data.overlayToken) || recentOverlayAlerts.get('demo-token');
+        if (recent && (Date.now() - recent.timestamp) < 25000) {
+          console.log(`⚡ [Socket] Replaying recent alert to newly connected overlay (${data.overlayToken.slice(0, 10)}...)`);
+          socket.emit('donation:alert', recent.payload);
+        }
       }
     });
 
@@ -141,6 +149,9 @@ export function broadcastAlertToOverlay(overlayToken: string, payload: AlertPayl
     console.warn('[Socket] Socket server not initialized yet');
     return;
   }
+  recentOverlayAlerts.set(overlayToken, { payload, timestamp: Date.now() });
+  recentOverlayAlerts.set('demo-token', { payload, timestamp: Date.now() });
+
   console.log(`[Socket] Broadcasting donation alert to overlay:${overlayToken.slice(0, 10)}...: ${payload.donorName} ($${payload.amount})`);
   activeIo.to(`overlay:${overlayToken}`).emit('donation:alert', payload);
   activeIo.emit('donation:paid', {

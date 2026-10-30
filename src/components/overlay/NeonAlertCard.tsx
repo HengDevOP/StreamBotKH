@@ -61,23 +61,38 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
   const headlineTemplate = alert.textTemplate || '{donator} donated {amount} through superchat!';
   const rawMsg = donorMessage || (alert as any).donor_message || (alert as any).message || '';
   const cleanDonorMessage = typeof rawMsg === 'string' ? rawMsg.trim() : '';
+
+  // Determine if a real, meaningful donor message exists (not empty, not "None", not "(None)")
+  const hasMeaningfulMessage = Boolean(
+    cleanDonorMessage &&
+    cleanDonorMessage.toLowerCase() !== 'none' &&
+    cleanDonorMessage.toLowerCase() !== '(none)' &&
+    cleanDonorMessage.toLowerCase() !== 'null' &&
+    cleanDonorMessage.toLowerCase() !== 'undefined'
+  );
+
   let formattedHeadline = headlineTemplate
     .replace(/\{donator\}/gi, donorName)
     .replace(/\{name\}/gi, donorName)
     .replace(/\{amount\}/gi, formattedAmount)
     .replace(/\{currency\}/gi, currency || 'USD')
-    .replace(/\{message\}/gi, cleanDonorMessage ? `"${cleanDonorMessage}"` : '')
-    .replace(/\{donor_message\}/gi, cleanDonorMessage ? `"${cleanDonorMessage}"` : '');
+    .replace(/\{message\}/gi, hasMeaningfulMessage ? `"${cleanDonorMessage}"` : '')
+    .replace(/\{donor_message\}/gi, hasMeaningfulMessage ? `"${cleanDonorMessage}"` : '')
+    .replace(/\{context\}/gi, hasMeaningfulMessage ? `"${cleanDonorMessage}"` : '');
+
+  // If there is no message value, clean up any trailing punctuation/quotes in headline so only the title displays
+  if (!hasMeaningfulMessage) {
+    formattedHeadline = formattedHeadline
+      .replace(/\s*[:\-–|]\s*$/, '')
+      .replace(/\s*""\s*$/, '')
+      .trim();
+  }
 
   // If {context} is embedded in headline template
   const hasContextInHeadline =
     headlineTemplate.includes('{context}') ||
     headlineTemplate.includes('{message}') ||
     headlineTemplate.includes('{donor_message}');
-
-  if (headlineTemplate.includes('{context}')) {
-    formattedHeadline = formattedHeadline.replace(/\{context\}/gi, cleanDonorMessage ? `"${cleanDonorMessage}"` : '');
-  }
 
   // Animation class mapping
   const animClass =
@@ -176,8 +191,8 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
             {formattedHeadline}
           </h1>
 
-          {/* Sub H2 for {context} where the donator said (only rendered if donor message exists and is not empty) */}
-          {cleanDonorMessage && !hasContextInHeadline && (
+          {/* Sub H2 for {context} where the donator said (only rendered if donor message exists, is non-empty, and meaningful) */}
+          {hasMeaningfulMessage && !hasContextInHeadline && (
             <h2
               className="text-lg sm:text-xl font-bold tracking-normal leading-snug drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] text-slate-100 italic mt-1.5"
               style={{ fontFamily: `"${activeFont}", sans-serif` }}
