@@ -462,55 +462,30 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       }
 
       // ==============================================================
-      // 2. DEDICATED DONATION ALERT SOURCE (/overlay/alert/[token] or ?mode=alert):
-      // Shows standard donation alert card, chime, and TTS.
-      // NEVER plays media share videos (videos belong exclusively to /overlay/video/[token]).
-      // ==============================================================
-      if (activeMode === 'alert-only') {
-        pushAlert({
-          ...finalPayload,
-          isSecondStageVideo: false,
-          videoUrl: undefined,
-          durationSeconds: finalPayload.durationSeconds || 8
-        });
-        return;
-      }
-
-      // ==============================================================
-      // 3. SEQUENTIAL COMBO SOURCE (?mode=all or ?mode=combo):
-      // If a video meets condition, play Stage 1 (donation alert) first,
-      // and queue Stage 2 (video) so it starts ONLY AFTER Stage 1 finishes!
+      // 2. INTEGRATED DONATION & VIDEO ALERT QUEUE
+      // If a video is attached to the donation:
+      // Stage 1: Start the Donation Alert FIRST (card, chime & TTS).
+      // Stage 2: Put the Video Alert in the queue directly next in line.
+      // The queue strictly WAITS until the video finishes before the next incoming alert plays!
       // ==============================================================
       if (hasValidVideo) {
         const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
         const alertDuration = Number(finalPayload.durationSeconds) || 8;
 
-        // If it's a test video alert, don't wait for donation alert requirement - play video immediately!
-        if (isVideoTest) {
-          console.log(`🎬 [Combo Overlay] Test video alert: playing immediately (no donation alert wait required).`);
-          pushAlert({
-            ...finalPayload,
-            isSecondStageVideo: true,
-            videoUrl: payload.videoUrl,
-            videoTitle: payload.videoTitle,
-            videoStartTime: Number(payload.videoStartTime) || 0,
-            videoEndTime: Number(payload.videoEndTime) || 30,
-            durationSeconds: clipDuration + 6,
-            soundUrl: '',
-            ttsEnabled: false
-          });
-          return;
-        }
+        console.log(`🎬 [Integrated Overlay] Tip attached with video alert!`);
+        console.log(`   - Step 1: Starting Donation Alert first (${alertDuration}s) for "${finalPayload.donorName}" ($${finalPayload.amount})`);
+        console.log(`   - Step 2: Queued Video Alert next (${clipDuration}s). Next incoming alerts will wait in queue until video finishes.`);
 
         // Stage 1: Standard donation alert card, chime & TTS
         pushAlert({
           ...finalPayload,
           isSecondStageVideo: false,
+          upcomingVideo: true,
           videoUrl: undefined,
           durationSeconds: alertDuration
         });
 
-        // Stage 2: Video clip automatically queued behind Stage 1
+        // Stage 2: Video clip automatically queued directly behind Stage 1
         pushAlert({
           ...finalPayload,
           isSecondStageVideo: true,

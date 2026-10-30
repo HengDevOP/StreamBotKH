@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, Sparkles } from 'lucide-react';
+import { Play, Sparkles, Video } from 'lucide-react';
 import { LiveAlertPayload } from '../../types/alert';
 import { VideoPlayerWithProgressBar } from '../common/VideoPlayerWithProgressBar';
 
@@ -273,6 +273,23 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
             >
               "{cleanDonorMessage}"
             </h2>
+          )}
+
+          {/* Indicator: Media Share Video Queued Next */}
+          {hasUpcomingVideo && (
+            <div className="pt-2 flex justify-center">
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold animate-pulse shadow-md"
+                style={{
+                  background: 'rgba(6, 182, 212, 0.15)',
+                  border: '1px solid rgba(6, 182, 212, 0.4)',
+                  color: '#22d3ee'
+                }}
+              >
+                <Video size={13} className="text-cyan-400 animate-bounce" />
+                <span>Media Share Video Queued Next</span>
+              </div>
+            </div>
           )}
         </div>
       </div>

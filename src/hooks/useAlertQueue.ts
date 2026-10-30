@@ -39,7 +39,12 @@ export function useAlertQueue() {
     }
 
     // 2. Set auto-dismiss timer matching alert duration
-    const durationMs = Math.max(3, Number(nextAlert.durationSeconds) || 8) * 1000;
+    const isVideo = Boolean(nextAlert.isSecondStageVideo || nextAlert.videoUrl);
+    // For video alerts, provide a 10s buffer so YouTube finishes naturally first and calls onEnded
+    const durationMs = isVideo
+      ? Math.max(10, (Number(nextAlert.durationSeconds) || 30) + 10) * 1000
+      : Math.max(3, Number(nextAlert.durationSeconds) || 8) * 1000;
+
     if (dismissTimerRef.current) {
       clearTimeout(dismissTimerRef.current);
     }
