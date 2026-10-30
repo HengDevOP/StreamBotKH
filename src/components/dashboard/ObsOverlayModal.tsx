@@ -24,7 +24,7 @@ export const ObsOverlayModal: React.FC<ObsOverlayModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
-  const overlayUrl = `${window.location.origin}/overlay/${overlayToken}`;
+  const overlayUrl = `${window.location.origin}/overlay/alert/${overlayToken}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(overlayUrl);

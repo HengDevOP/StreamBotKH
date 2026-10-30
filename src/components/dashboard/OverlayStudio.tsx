@@ -286,7 +286,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
 
   const copyObsUrl = () => {
     if (!overlay) return;
-    const url = `${window.location.origin}/overlay/${overlay.overlayToken}`;
+    const url = `${window.location.origin}/overlay/alert/${overlay.overlayToken}`;
     navigator.clipboard.writeText(url);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
@@ -319,7 +319,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
     );
   }
 
-  const obsBrowserUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/${overlay.overlayToken}`;
+  const obsBrowserUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/alert/${overlay.overlayToken}`;
   const aspectRatio = width / (height || 1);
 
   return (

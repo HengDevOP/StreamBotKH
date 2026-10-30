@@ -34,6 +34,20 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
   const activeBoxId = boxId || urlBoxId;
 
   let activeMode: 'all' | 'video-only' | 'alert-only' = mode;
+  if (typeof window !== 'undefined') {
+    const pathname = window.location.pathname.toLowerCase();
+    if (pathname.includes('/overlay/video') || pathname.includes('/widget/video')) {
+      activeMode = 'video-only';
+    } else if (
+      pathname.includes('/overlay/alert') ||
+      pathname.includes('/widget/alert')
+    ) {
+      activeMode = 'alert-only';
+    } else if (pathname.includes('/overlay/combo') || pathname.includes('/overlay/all')) {
+      activeMode = 'all';
+    }
+  }
+
   if (urlMode === 'video') activeMode = 'video-only';
   else if (urlMode === 'alert') activeMode = 'alert-only';
   else if (urlMode === 'combo' || urlMode === 'all') activeMode = 'all';
@@ -448,29 +462,11 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       }
 
       // ==============================================================
-      // 2. DEDICATED DONATION ALERT SOURCE (/overlay/[token] or ?mode=alert):
+      // 2. DEDICATED DONATION ALERT SOURCE (/overlay/alert/[token] or ?mode=alert):
       // Shows standard donation alert card, chime, and TTS.
-      // Does NOT show the video clip because video belongs to the video source!
-      // (Exception: test video alert will show the video directly for easy preview)
+      // NEVER plays media share videos (videos belong exclusively to /overlay/video/[token]).
       // ==============================================================
       if (activeMode === 'alert-only') {
-        if (isVideoTest && hasValidVideo) {
-          const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
-          console.log(`🎬 [Alert Overlay] Test video alert: playing video directly on overlay.`);
-          pushAlert({
-            ...finalPayload,
-            isSecondStageVideo: true,
-            videoUrl: payload.videoUrl,
-            videoTitle: payload.videoTitle,
-            videoStartTime: Number(payload.videoStartTime) || 0,
-            videoEndTime: Number(payload.videoEndTime) || 30,
-            durationSeconds: clipDuration + 6,
-            soundUrl: '',
-            ttsEnabled: false
-          });
-          return;
-        }
-
         pushAlert({
           ...finalPayload,
           isSecondStageVideo: false,

@@ -52,7 +52,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
   const { playSound } = useAudio();
   const { socket } = useSocket();
 
-  const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/${streamerToken || 'streamer-token'}`;
+  const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/alert/${streamerToken || 'streamer-token'}`;
 
   const fetchAlertBoxes = async () => {
     try {
@@ -121,7 +121,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     e.stopPropagation();
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const token = streamerToken || 'streamer-token';
-    const url = `${origin}/overlay/${token}?boxId=${box._id}`;
+    const url = `${origin}/overlay/alert/${token}?boxId=${box._id}`;
     navigator.clipboard.writeText(url);
     setCopiedBoxId(box._id);
     setTimeout(() => setCopiedBoxId(null), 2000);

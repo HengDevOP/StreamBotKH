@@ -63,7 +63,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     color: '#00F0FF',
     icon: Bell,
     obsDimensions: { width: '1920 px', height: '1080 px', fps: '60 FPS' },
-    obsRouteExample: '/overlay/:your_token',
+    obsRouteExample: '/overlay/alert/:your_token',
     highlights: [
       {
         title: 'Expandable Condition Categories',
@@ -102,7 +102,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     color: '#3B82F6',
     icon: Layers,
     obsDimensions: { width: '1920 px', height: '1080 px', fps: '60 FPS' },
-    obsRouteExample: '/overlay/:your_token',
+    obsRouteExample: '/overlay/alert/:your_token',
     highlights: [
       {
         title: 'Supports All Formatted Files',
@@ -258,7 +258,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     color: '#8B5CF6',
     icon: Disc,
     obsDimensions: { width: '800 px', height: '800 px', fps: '60 FPS' },
-    obsRouteExample: '/overlay/:your_token',
+    obsRouteExample: '/overlay/alert/:your_token',
     highlights: [
       {
         title: 'Smooth 60 FPS Physics Wheel',

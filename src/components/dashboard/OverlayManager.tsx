@@ -140,7 +140,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
   };
 
   const copyObsUrl = (token: string) => {
-    const fullUrl = `${window.location.origin}/overlay/${token}`;
+    const fullUrl = `${window.location.origin}/overlay/alert/${token}`;
     navigator.clipboard.writeText(fullUrl);
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 2000);
@@ -223,7 +223,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {overlays.map((item) => {
-              const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/${item.overlayToken}`;
+              const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/alert/${item.overlayToken}`;
               const isCopied = copiedToken === item.overlayToken;
 
               return (
@@ -307,7 +307,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
                     </Link>
 
                     <a
-                      href={`/overlay/${item.overlayToken}`}
+                      href={`/overlay/alert/${item.overlayToken}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-xs font-mono flex items-center gap-1.5 transition-colors"

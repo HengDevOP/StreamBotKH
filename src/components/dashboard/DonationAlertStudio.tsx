@@ -407,8 +407,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   };
 
   const dedicatedBoxUrl = box?._id
-    ? (typeof window !== 'undefined' ? `${window.location.origin}/overlay/${effectiveToken}?boxId=${box._id}` : `https://streambotkh.com/overlay/${effectiveToken}?boxId=${box._id}`)
-    : (typeof window !== 'undefined' ? `${window.location.origin}/overlay/${effectiveToken}` : `https://streambotkh.com/overlay/${effectiveToken}`);
+    ? (typeof window !== 'undefined' ? `${window.location.origin}/overlay/alert/${effectiveToken}?boxId=${box._id}` : `https://streambotkh.com/overlay/alert/${effectiveToken}?boxId=${box._id}`)
+    : (typeof window !== 'undefined' ? `${window.location.origin}/overlay/alert/${effectiveToken}` : `https://streambotkh.com/overlay/alert/${effectiveToken}`);
 
   const copyObsUrl = () => {
     navigator.clipboard.writeText(dedicatedBoxUrl);

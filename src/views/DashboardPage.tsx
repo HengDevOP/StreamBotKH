@@ -521,7 +521,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           featureKey: 'donation',
           label: 'Donation Alerts OBS',
           shortLabel: 'Alerts',
-          url: `${origin}/overlay/${effectiveToken}`,
+          url: `${origin}/overlay/alert/${effectiveToken}`,
           icon: Bell,
           color: '#00F0FF', // Cyan
           bgGlow: 'hover:border-cyan-500/50',
