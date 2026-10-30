@@ -269,6 +269,8 @@ export async function POST(req: NextRequest) {
       templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
       textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
       textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+      donorColor: matchingBox?.donorColor || undefined,
+      amountColor: matchingBox?.amountColor || undefined,
       customGifUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
       mediaUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
       showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0),

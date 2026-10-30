@@ -10,6 +10,21 @@ interface NeonAlertCardProps {
   onEnded?: () => void;
 }
 
+export const getGradientOrColorStyle = (colorStr?: string): React.CSSProperties => {
+  if (!colorStr) return {};
+  if (colorStr.includes('gradient')) {
+    return {
+      backgroundImage: colorStr,
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
+      color: 'transparent',
+      display: 'inline-block'
+    };
+  }
+  return { color: colorStr };
+};
+
 export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) => {
   const [isVideoFadingOut, setIsVideoFadingOut] = React.useState(false);
 
@@ -28,7 +43,9 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
     fontSize = 28,
     layoutMode = 'top',
     animationStyle = 'fade',
-    textColor = '#FFFFFF'
+    textColor = '#FFFFFF',
+    donorColor,
+    amountColor
   } = alert;
 
   const handleVideoEnded = () => {
@@ -93,6 +110,64 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
     headlineTemplate.includes('{context}') ||
     headlineTemplate.includes('{message}') ||
     headlineTemplate.includes('{donor_message}');
+
+  // Dynamic token parsing with gradient & custom color support
+  const renderHeadlineElements = () => {
+    if (!donorColor && !amountColor) {
+      return <span style={getGradientOrColorStyle(textColor || '#FFFFFF')}>{formattedHeadline}</span>;
+    }
+
+    const tokenRegex = /(\{(?:donator|name|amount|currency|message|donor_message|context)\})/gi;
+    const tokens = headlineTemplate.split(tokenRegex);
+
+    return tokens.map((part, idx) => {
+      const lower = part.toLowerCase();
+      if (lower === '{donator}' || lower === '{name}') {
+        return (
+          <span
+            key={idx}
+            className="font-extrabold"
+            style={getGradientOrColorStyle(donorColor || textColor || '#00F0FF')}
+          >
+            {donorName}
+          </span>
+        );
+      }
+      if (lower === '{amount}') {
+        return (
+          <span
+            key={idx}
+            className="font-black"
+            style={getGradientOrColorStyle(amountColor || textColor || '#FFE600')}
+          >
+            {formattedAmount}
+          </span>
+        );
+      }
+      if (lower === '{currency}') {
+        return (
+          <span
+            key={idx}
+            style={getGradientOrColorStyle(amountColor || textColor || '#FFE600')}
+          >
+            {currency || 'USD'}
+          </span>
+        );
+      }
+      if (lower === '{message}' || lower === '{donor_message}' || lower === '{context}') {
+        return hasMeaningfulMessage ? (
+          <span key={idx} className="italic" style={getGradientOrColorStyle(textColor)}>
+            "{cleanDonorMessage}"
+          </span>
+        ) : null;
+      }
+      return (
+        <span key={idx} style={getGradientOrColorStyle(textColor)}>
+          {part}
+        </span>
+      );
+    });
+  };
 
   // Animation class mapping
   const animClass =
@@ -182,13 +257,12 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
             style={{
               fontFamily: `"${activeFont}", sans-serif`,
               fontSize: fontSize ? `${fontSize}px` : '28px',
-              color: textColor || '#FFFFFF',
               textShadow: glowColor
                 ? `0 0 20px ${glowColor}aa, 0 2px 4px rgba(0,0,0,0.95)`
                 : '0 2px 4px rgba(0,0,0,0.95)'
             }}
           >
-            {formattedHeadline}
+            {renderHeadlineElements()}
           </h1>
 
           {/* Sub H2 for {context} where the donator said (only rendered if donor message exists, is non-empty, and meaningful) */}

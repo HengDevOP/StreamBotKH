@@ -1,0 +1,217 @@
+/* Khmer 2019 Font Library @font-face rules */
+@font-face {
+  font-family: "Black Burger Rough";
+  src: url("/fonts/black-burger-rough.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cordel Valentine";
+  src: url("/fonts/cordel-valentine.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "FACE_ALIN";
+  src: url("/fonts/face-alin.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "fofbb_ital";
+  src: url("/fonts/fofbb-ital.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "fofbb_reg";
+  src: url("/fonts/fofbb-reg.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "HalovenDemo";
+  src: url("/fonts/halovendemo.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang B.Rodtha";
+  src: url("/fonts/kh-ang-b-rodtha.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Bokor";
+  src: url("/fonts/kh-ang-bokor.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang FreeHand";
+  src: url("/fonts/kh-ang-freehand.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Hand-T.Chhim";
+  src: url("/fonts/kh-ang-hand-t-chhim.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Hand-T.Chhim 2";
+  src: url("/fonts/kh-ang-hand-t-chhim-2.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang KanTout";
+  src: url("/fonts/kh-ang-kantout.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Kbach Seda";
+  src: url("/fonts/kh-ang-kbach-seda.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Klen";
+  src: url("/fonts/kh-ang-klen.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang LetfHand";
+  src: url("/fonts/kh-ang-letfhand.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Link";
+  src: url("/fonts/kh-ang-link.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Moul Seda";
+  src: url("/fonts/kh-ang-moul-seda.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang MoulHand";
+  src: url("/fonts/kh-ang-moulhand.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang MoulHand 2";
+  src: url("/fonts/kh-ang-moulhand-2.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Mura";
+  src: url("/fonts/kh-ang-mura.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang MuraFastHand";
+  src: url("/fonts/kh-ang-murafasthand.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang MuraHand";
+  src: url("/fonts/kh-ang-murahand.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang MuraHand 2";
+  src: url("/fonts/kh-ang-murahand-2.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang NaKry";
+  src: url("/fonts/kh-ang-nakry.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang NaKry Plus";
+  src: url("/fonts/kh-ang-nakry-plus.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang North";
+  src: url("/fonts/kh-ang-north.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang PeaNor";
+  src: url("/fonts/kh-ang-peanor.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang PeaNorent";
+  src: url("/fonts/kh-ang-peanorent.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Penh";
+  src: url("/fonts/kh-ang-penh.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang PheaSaKhmer";
+  src: url("/fonts/kh-ang-pheasakhmer.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang PhkayProek";
+  src: url("/fonts/kh-ang-phkayproek.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Pothisal";
+  src: url("/fonts/kh-ang-pothisal.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang R.Jrung";
+  src: url("/fonts/kh-ang-r-jrung.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Rooster";
+  src: url("/fonts/kh-ang-rooster.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang TaPenh";
+  src: url("/fonts/kh-ang-tapenh.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Kh Ang Vihearsuor";
+  src: url("/fonts/kh-ang-vihearsuor.ttf") format("truetype");
+  font-display: swap;
+}
+

@@ -60,6 +60,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       'clonedVoiceSampleUrl',
       'textTemplate',
       'textColor',
+      'donorColor',
+      'amountColor',
       'messageTemplate',
       'layoutMode',
       'animationStyle'

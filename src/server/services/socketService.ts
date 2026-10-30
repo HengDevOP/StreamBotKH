@@ -29,6 +29,8 @@ export interface AlertPayload {
   showImage?: boolean;
   textTemplate?: string;
   textColor?: string;
+  donorColor?: string;
+  amountColor?: string;
   fontFamily?: string;
   fontSize?: number;
   layoutMode?: string;

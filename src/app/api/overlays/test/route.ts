@@ -17,6 +17,8 @@ export async function POST(req: NextRequest) {
       templateStyle: body.templateStyle || 'neon-box',
       textTemplate: body.textTemplate,
       textColor: body.textColor,
+      donorColor: body.donorColor,
+      amountColor: body.amountColor,
       customGifUrl: body.customGifUrl || body.mediaUrl,
       mediaUrl: body.mediaUrl,
       showImage: body.showImage !== false,

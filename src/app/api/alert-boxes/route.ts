@@ -71,6 +71,8 @@ export async function POST(req: NextRequest) {
       clonedVoiceSampleUrl,
       textTemplate = '{donator} donated {amount} through superchat!',
       textColor = '#FFFFFF',
+      donorColor,
+      amountColor,
       messageTemplate,
       layoutMode = 'top',
       animationStyle = 'bounce'
@@ -102,6 +104,8 @@ export async function POST(req: NextRequest) {
       clonedVoiceSampleUrl,
       textTemplate,
       textColor,
+      donorColor: donorColor || undefined,
+      amountColor: amountColor || undefined,
       messageTemplate,
       layoutMode,
       animationStyle,

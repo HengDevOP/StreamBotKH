@@ -35,6 +35,8 @@ export interface AlertBox {
   clonedVoiceSampleUrl?: string;
   textTemplate?: string;
   textColor?: string;
+  donorColor?: string;
+  amountColor?: string;
   messageTemplate?: string;
   layoutMode?: 'top' | 'left' | 'right' | 'banner';
   animationStyle?: 'bounce' | 'pulse' | 'glitch' | 'slide' | 'zoom';
@@ -52,6 +54,8 @@ export interface LiveAlertPayload {
   bankingName?: string;
   textTemplate?: string;
   textColor?: string;
+  donorColor?: string;
+  amountColor?: string;
   templateStyle?: string;
   glowColor?: string;
   soundUrl?: string;

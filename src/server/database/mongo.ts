@@ -106,6 +106,8 @@ export interface AlertBoxDoc {
   clonedVoiceSampleUrl?: string;
   textTemplate?: string;
   textColor?: string;
+  donorColor?: string;
+  amountColor?: string;
   messageTemplate?: string;
   layoutMode?: string;
   animationStyle?: string;

@@ -215,6 +215,8 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
       currency: 'USD',
       textTemplate: box.textTemplate,
       textColor: box.textColor,
+      donorColor: box.donorColor,
+      amountColor: box.amountColor,
       customGifUrl: box.mediaUrl,
       mediaUrl: box.mediaUrl,
       showImage: box.showImage !== false,

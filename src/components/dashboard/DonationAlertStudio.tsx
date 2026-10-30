@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ArrowLeft,
   Sliders,
@@ -49,6 +49,7 @@ import { VoiceClonerModal } from './VoiceClonerModal';
 import { MediaItem } from './MediaLibraryManager';
 import { mediaService } from '../../services/mediaService';
 import { normalizeCurrencyAndSymbols } from '../../utils/ttsHelper';
+import { KHMER_FONTS_2019 } from '../../data/khmerFonts';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 
 interface DonationAlertStudioProps {
@@ -61,16 +62,33 @@ interface DonationAlertStudioProps {
   inlineMode?: boolean;
 }
 
-const FONT_OPTIONS = [
-  { id: 'Chakra Petch', label: 'Chakra Petch (Cyberpunk Tech)', category: 'Tech' },
-  { id: 'Orbitron', label: 'Orbitron (Futuristic Sci-Fi)', category: 'Sci-Fi' },
-  { id: 'Press Start 2P', label: 'Press Start 2P (Retro 8-Bit)', category: 'Retro' },
-  { id: 'Inter', label: 'Inter (Clean Modern)', category: 'Clean' },
-  { id: 'Bebas Neue', label: 'Bebas Neue (Bold Impact)', category: 'Impact' },
-  { id: 'Kanit', label: 'Kanit (Modern Rounded)', category: 'Rounded' },
-  { id: 'Montserrat', label: 'Montserrat (Streamer Pro)', category: 'Pro' },
-  { id: 'Permanent Marker', label: 'Permanent Marker (Graffiti)', category: 'Street' },
-  { id: 'VT323', label: 'VT323 (Terminal Green)', category: 'Terminal' }
+const SYSTEM_STREAM_FONTS = [
+  { name: 'Chakra Petch (Cyberpunk Tech)', family: 'Chakra Petch', category: 'English & Display' as const },
+  { name: 'Orbitron (Futuristic Sci-Fi)', family: 'Orbitron', category: 'English & Display' as const },
+  { name: 'Press Start 2P (Retro 8-Bit)', family: 'Press Start 2P', category: 'English & Display' as const },
+  { name: 'Inter (Clean Modern)', family: 'Inter', category: 'English & Display' as const },
+  { name: 'Bebas Neue (Bold Impact)', family: 'Bebas Neue', category: 'English & Display' as const },
+  { name: 'Kanit (Modern Rounded)', family: 'Kanit', category: 'English & Display' as const },
+  { name: 'Permanent Marker (Graffiti)', family: 'Permanent Marker', category: 'English & Display' as const },
+  { name: 'Montserrat (Streamer Pro)', family: 'Montserrat', category: 'English & Display' as const }
+];
+
+const ALL_FONT_OPTIONS = [
+  ...KHMER_FONTS_2019,
+  ...SYSTEM_STREAM_FONTS
+];
+
+const GRADIENT_COLOR_PRESETS = [
+  { label: 'Cyan Cyber Glow', value: 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)' },
+  { label: 'Neon Hot Pink', value: 'linear-gradient(135deg, #FF007A 0%, #7000FF 100%)' },
+  { label: 'Golden Royalty', value: 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)' },
+  { label: 'Emerald Cash', value: 'linear-gradient(135deg, #00FF87 0%, #60EFFF 100%)' },
+  { label: 'Sunset Blaze', value: 'linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)' },
+  { label: 'Violet Electric', value: 'linear-gradient(135deg, #B537F2 0%, #3023AE 100%)' },
+  { label: 'Ice Frost Diamond', value: 'linear-gradient(135deg, #E0C3FC 0%, #8EC5FC 100%)' },
+  { label: 'Pure White', value: '#FFFFFF' },
+  { label: 'Hyper Yellow', value: '#FFE600' },
+  { label: 'Cyber Cyan Solid', value: '#00F0FF' }
 ];
 
 const GLOW_COLOR_PRESETS = [
@@ -84,9 +102,9 @@ const GLOW_COLOR_PRESETS = [
 ];
 
 const SOUND_PRESETS = [
-  { label: 'Neon Chime (Default)', url: '/sounds/neon-chime.mp3' },
+  { label: 'Cash Register Ka-Ching', url: '/sounds/cash-register-kaching.mp3' },
+  { label: 'Mario Coin Bell', url: '/sounds/mario-coin.mp3' },
   { label: 'Cyber Pulse Alert', url: '/sounds/cyber-alert.mp3' },
-  { label: 'Retro 8-Bit Coins', url: '/sounds/coin-drop.mp3' },
   { label: 'Victory Synth Fanfare', url: '/sounds/victory-chime.mp3' }
 ];
 
@@ -112,7 +130,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const { socket } = useSocket();
 
   // Active Category Section (Accordion List Item Expanded: null = collapsed)
-  const [activeTab, setActiveTab] = useState<'text' | 'image' | 'tts' | 'font' | 'sound' | 'rules' | null>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'image' | 'tts' | 'rules' | null>('text');
 
   // Form State
   const [name, setName] = useState(box?.name || 'New Donation Alert Box');
@@ -128,13 +146,25 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [layoutMode, setLayoutMode] = useState<'top' | 'left' | 'right' | 'banner'>(
     box?.layoutMode || 'top'
   );
-  const [soundUrl, setSoundUrl] = useState<string>(box?.soundUrl || '/sounds/neon-chime.mp3');
+  const [soundUrl, setSoundUrl] = useState<string>(
+    box?.soundUrl && !box.soundUrl.includes('neon-chime')
+      ? box.soundUrl
+      : '/sounds/cash-register-kaching.mp3'
+  );
   const [soundVolume, setSoundVolume] = useState<number>(box?.soundVolume ?? 0.85);
   const [durationSeconds, setDurationSeconds] = useState<number>(box?.durationSeconds || 8);
   const [glowColor, setGlowColor] = useState<string>(box?.glowColor || '#00F0FF');
-  const [fontFamily, setFontFamily] = useState<string>(box?.fontFamily || 'Chakra Petch');
+  const [fontFamily, setFontFamily] = useState<string>(box?.fontFamily || 'Kh Ang Bokor');
   const [fontSize, setFontSize] = useState<number>(box?.fontSize || 28);
   const [textColor, setTextColor] = useState<string>(box?.textColor || '#FFFFFF');
+  const [donorColor, setDonorColor] = useState<string>(
+    box?.donorColor || 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)'
+  );
+  const [amountColor, setAmountColor] = useState<string>(
+    box?.amountColor || 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)'
+  );
+  const [fontSearch, setFontSearch] = useState<string>('');
+  const [fontCategory, setFontCategory] = useState<string>('All');
   const [textTemplate, setTextTemplate] = useState<string>(
     box?.textTemplate || '{donator} donated {amount} through superchat!'
   );
@@ -166,6 +196,17 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [activeAudioPreview, setActiveAudioPreview] = useState<string | null>(null);
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const filteredFonts = useMemo(() => {
+    return ALL_FONT_OPTIONS.filter((f) => {
+      const matchCat = fontCategory === 'All' || f.category === fontCategory;
+      const matchSearch =
+        !fontSearch.trim() ||
+        f.name.toLowerCase().includes(fontSearch.toLowerCase()) ||
+        f.family.toLowerCase().includes(fontSearch.toLowerCase());
+      return matchCat && matchSearch;
+    });
+  }, [fontCategory, fontSearch]);
 
   // Overlay Token Resolution
   const [activeOverlayToken, setActiveOverlayToken] = useState(streamerToken || '');
@@ -399,6 +440,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       templateStyle,
       textTemplate,
       textColor,
+      donorColor,
+      amountColor,
       customGifUrl: mediaUrl,
       mediaUrl,
       showImage,
@@ -506,6 +549,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         fontFamily,
         fontSize: Number(fontSize),
         textColor,
+        donorColor,
+        amountColor,
         textTemplate,
         animationStyle,
         ttsEnabled,
@@ -750,7 +795,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
           <div className={`${inlineMode ? 'max-h-[680px]' : 'flex-1'} overflow-y-auto p-3 space-y-2.5 text-xs`}>
             
             {/* -------------------------------------------------------- */}
-            {/* CATEGORY 1: TEXT & MESSAGING                             */}
+            {/* CATEGORY 1: TEXT & STYLING                               */}
             {/* -------------------------------------------------------- */}
             <div
               className={`rounded-2xl border transition-all overflow-hidden ${
@@ -776,10 +821,10 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
-                      <span>1. Text &amp; Messaging Format</span>
+                      <span>1. Text &amp; Styling</span>
                     </div>
                     <div className="text-[11px] text-slate-400 truncate font-mono">
-                      {animationStyle.toUpperCase()} • {durationSeconds}s duration
+                      {fontFamily} ({fontSize}px) • {animationStyle.toUpperCase()}
                     </div>
                   </div>
                 </div>
@@ -794,112 +839,403 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
               {activeTab === 'text' && (
                 <div className="px-4 pb-4 pt-2 border-t border-slate-800/80 space-y-4 animate-fadeIn">
 
-                {/* Headline Template */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-mono font-bold text-slate-300">
-                      Headline Message Template
-                    </label>
-                    <span className="text-[10px] text-slate-500 font-mono">Supports tags</span>
-                  </div>
-                  <input
-                    type="text"
-                    value={textTemplate}
-                    onChange={(e) => setTextTemplate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
-                    placeholder="{donator} donated {amount} through superchat!"
-                  />
-                  
-                  {/* Tag Inserter Pills */}
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <span className="text-[10px] text-slate-500 font-mono">Insert tag:</span>
-                    {['{donator}', '{amount}', '{context}', '{currency}'].map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => setTextTemplate((prev) => `${prev} ${tag}`)}
-                        className="px-2 py-0.5 rounded bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/30 text-[10px] font-mono text-cyan-300 transition-colors"
-                      >
-                        + {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Headline Text Color */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono font-bold text-slate-300 block">
-                    Headline Text Color
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={textColor}
-                      onChange={(e) => setTextColor(e.target.value)}
-                      className="w-8 h-8 rounded-lg cursor-pointer bg-slate-900 border border-slate-800 p-0.5"
-                    />
+                  {/* Headline Template */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-slate-300">
+                        Headline Message Template
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-mono">Supports tags</span>
+                    </div>
                     <input
                       type="text"
-                      value={textColor}
-                      onChange={(e) => setTextColor(e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs uppercase"
+                      value={textTemplate}
+                      onChange={(e) => setTextTemplate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                      placeholder="{donator} donated {amount} through superchat!"
+                    />
+                    
+                    {/* Tag Inserter Pills */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[10px] text-slate-500 font-mono">Insert tag:</span>
+                      {['{donator}', '{amount}', '{context}', '{currency}', '{message}'].map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setTextTemplate((prev) => `${prev} ${tag}`)}
+                          className="px-2 py-0.5 rounded bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/30 text-[10px] font-mono text-cyan-300 transition-colors"
+                        >
+                          + {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Donor Name Custom Color & Gradient */}
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-slate-300">
+                        Donor Name Color &amp; Gradient
+                      </label>
+                      <span
+                        className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800"
+                        style={
+                          donorColor.includes('gradient')
+                            ? {
+                                backgroundImage: donorColor,
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                display: 'inline-block'
+                              }
+                            : { color: donorColor }
+                        }
+                      >
+                        {demoDonorName}
+                      </span>
+                    </div>
+
+                    {/* Gradient presets */}
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {GRADIENT_COLOR_PRESETS.map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setDonorColor(preset.value)}
+                          title={preset.label}
+                          className={`h-7 rounded-lg border transition-all ${
+                            donorColor === preset.value
+                              ? 'border-white scale-105 shadow-[0_0_8px_rgba(255,255,255,0.4)]'
+                              : 'border-slate-800 hover:scale-105'
+                          }`}
+                          style={{ background: preset.value }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Custom Color/Gradient Input */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="color"
+                        value={donorColor.startsWith('#') ? donorColor : '#00F0FF'}
+                        onChange={(e) => setDonorColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer bg-slate-900 border border-slate-800 p-0.5 flex-shrink-0"
+                        title="Pick solid hex color"
+                      />
+                      <input
+                        type="text"
+                        value={donorColor}
+                        onChange={(e) => setDonorColor(e.target.value)}
+                        placeholder="#HEX or linear-gradient(...)"
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono text-[11px] truncate focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Amount Custom Color & Gradient */}
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-slate-300">
+                        Amount Color &amp; Gradient
+                      </label>
+                      <span
+                        className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800"
+                        style={
+                          amountColor.includes('gradient')
+                            ? {
+                                backgroundImage: amountColor,
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                display: 'inline-block'
+                              }
+                            : { color: amountColor }
+                        }
+                      >
+                        ${demoAmount.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Gradient presets */}
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {GRADIENT_COLOR_PRESETS.map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setAmountColor(preset.value)}
+                          title={preset.label}
+                          className={`h-7 rounded-lg border transition-all ${
+                            amountColor === preset.value
+                              ? 'border-white scale-105 shadow-[0_0_8px_rgba(255,255,255,0.4)]'
+                              : 'border-slate-800 hover:scale-105'
+                          }`}
+                          style={{ background: preset.value }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Custom Color/Gradient Input */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="color"
+                        value={amountColor.startsWith('#') ? amountColor : '#FFE600'}
+                        onChange={(e) => setAmountColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer bg-slate-900 border border-slate-800 p-0.5 flex-shrink-0"
+                        title="Pick solid hex color"
+                      />
+                      <input
+                        type="text"
+                        value={amountColor}
+                        onChange={(e) => setAmountColor(e.target.value)}
+                        placeholder="#HEX or linear-gradient(...)"
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono text-[11px] truncate focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Headline Context / Base Text Color */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono font-bold text-slate-300 block">
+                      Headline Context / Base Text Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={textColor.startsWith('#') ? textColor : '#FFFFFF'}
+                        onChange={(e) => setTextColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer bg-slate-900 border border-slate-800 p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={textColor}
+                        onChange={(e) => setTextColor(e.target.value)}
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs uppercase"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Font Family Picker with Khmer 2019 & Stream Fonts */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-slate-300">
+                        Font Family (Khmer 2019 &amp; Streamer Fonts)
+                      </label>
+                      <span className="text-[10px] font-mono text-cyan-400 font-bold">
+                        {ALL_FONT_OPTIONS.length} Fonts
+                      </span>
+                    </div>
+
+                    {/* Search & Category Filter */}
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={fontSearch}
+                        onChange={(e) => setFontSearch(e.target.value)}
+                        placeholder="Search Khmer or English font name..."
+                        className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                      />
+
+                      {/* Category Pills */}
+                      <div className="flex flex-wrap gap-1">
+                        {['All', 'Display & Decorative', 'Handwritten & Script', 'Formal & Traditional', 'Modern Clean', 'English & Display'].map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setFontCategory(cat)}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
+                              fontCategory === cat
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                                : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Font List Scrollbox */}
+                    <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto pr-1">
+                      {filteredFonts.map((f) => {
+                        const isSelected = fontFamily === f.family;
+                        return (
+                          <div
+                            key={f.family}
+                            onClick={() => setFontFamily(f.family)}
+                            className={`px-3 py-2 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                              isSelected
+                                ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                                : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono text-slate-400">{f.name}</span>
+                                {isSelected && (
+                                  <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00F0FF]" />
+                                )}
+                              </div>
+                              <span
+                                className="text-sm font-semibold block truncate mt-0.5 text-white"
+                                style={{ fontFamily: `"${f.family}", sans-serif` }}
+                              >
+                                {f.category === 'English & Display'
+                                  ? 'Thank you for $10.00 tip!'
+                                  : 'សូមអរគុណសម្រាប់ការគាំទ្រ! $10.00'}
+                              </span>
+                            </div>
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-slate-500 flex-shrink-0 ml-2">
+                              {f.category}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {filteredFonts.length === 0 && (
+                        <div className="p-4 text-center text-xs font-mono text-slate-500 bg-slate-950 rounded-xl border border-slate-800">
+                          No fonts matching "{fontSearch}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Headline Font Size Slider */}
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-mono font-bold text-slate-300">Headline Font Size</span>
+                      <span className="font-mono text-cyan-400 font-bold">{fontSize}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="20"
+                      max="48"
+                      step="2"
+                      value={fontSize}
+                      onChange={(e) => setFontSize(Number(e.target.value))}
+                      className="w-full accent-cyan-400 cursor-pointer"
                     />
                   </div>
-                </div>
 
-                {/* Animation Style */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono font-bold text-slate-300 block">
-                    Entrance Animation Style
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'fade', label: 'Smooth Fade In / Out' },
-                      { id: 'pulse', label: 'Cyber Pulse' },
-                      { id: 'glitch', label: 'Glitch Pop' },
-                      { id: 'slide', label: 'Smooth Slide' }
-                    ].map((anim) => (
-                      <button
-                        key={anim.id}
-                        type="button"
-                        onClick={() => setAnimationStyle(anim.id as any)}
-                        className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-semibold transition-all text-left ${
-                          animationStyle === anim.id
-                            ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        {anim.label}
-                      </button>
-                    ))}
+                  {/* Neon Glow Color Palette */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-mono font-bold text-slate-300 block">
+                      Neon Glow &amp; Border Accent
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {GLOW_COLOR_PRESETS.map((preset) => (
+                        <button
+                          key={preset.hex}
+                          type="button"
+                          onClick={() => setGlowColor(preset.hex)}
+                          title={preset.label}
+                          className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center ${
+                            glowColor.toUpperCase() === preset.hex.toUpperCase()
+                              ? 'scale-125 border-white shadow-[0_0_15px_rgba(255,255,255,0.6)]'
+                              : 'border-slate-800 hover:scale-110'
+                          }`}
+                          style={{ backgroundColor: preset.hex }}
+                        >
+                          {glowColor.toUpperCase() === preset.hex.toUpperCase() && (
+                            <Check size={14} className="text-slate-950 font-bold" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="color"
+                        value={glowColor}
+                        onChange={(e) => setGlowColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer bg-slate-900 border border-slate-800 p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={glowColor}
+                        onChange={(e) => setGlowColor(e.target.value)}
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs uppercase"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Card Hologram Frame Style */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono font-bold text-slate-300 block">
+                      Card Hologram Frame Style
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'neon-box', label: 'Neon Cyber Box' },
+                        { id: 'glass-hologram', label: 'Glass Hologram' },
+                        { id: 'cyber-glitch', label: 'Cyber Glitch' },
+                        { id: 'arcade', label: 'Retro 8-Bit Arcade' }
+                      ].map((style) => (
+                        <button
+                          key={style.id}
+                          type="button"
+                          onClick={() => setTemplateStyle(style.id as any)}
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-semibold transition-all text-left ${
+                            templateStyle === style.id
+                              ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {style.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Entrance Animation Style */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono font-bold text-slate-300 block">
+                      Entrance Animation Style
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'fade', label: 'Smooth Fade In / Out' },
+                        { id: 'pulse', label: 'Cyber Pulse' },
+                        { id: 'glitch', label: 'Glitch Pop' },
+                        { id: 'slide', label: 'Smooth Slide' }
+                      ].map((anim) => (
+                        <button
+                          key={anim.id}
+                          type="button"
+                          onClick={() => setAnimationStyle(anim.id as any)}
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-semibold transition-all text-left ${
+                            animationStyle === anim.id
+                              ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {anim.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Display Duration */}
+                  <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-mono font-bold text-slate-300">Display Duration</span>
+                      <span className="font-mono text-cyan-400 font-bold">{durationSeconds}s</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="3"
+                      max="25"
+                      step="1"
+                      value={durationSeconds}
+                      onChange={(e) => setDurationSeconds(Number(e.target.value))}
+                      className="w-full accent-cyan-400 cursor-pointer"
+                    />
+                    <p className="text-[10px] text-slate-500">
+                      How many seconds the alert stays on screen before fading away.
+                    </p>
                   </div>
                 </div>
-
-                {/* Display Duration */}
-                <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-mono font-bold text-slate-300">Display Duration</span>
-                    <span className="font-mono text-cyan-400 font-bold">{durationSeconds}s</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="3"
-                    max="25"
-                    step="1"
-                    value={durationSeconds}
-                    onChange={(e) => setDurationSeconds(Number(e.target.value))}
-                    className="w-full accent-cyan-400 cursor-pointer"
-                  />
-                  <p className="text-[10px] text-slate-500">
-                    How many seconds the alert stays on screen before fading away.
-                  </p>
-                </div>
-              </div>
               )}
             </div>
 
             {/* -------------------------------------------------------- */}
-            {/* CATEGORY 2: REACTION IMAGE & GIF                         */}
+            {/* CATEGORY 2: IMAGE & SOUND                                */}
             {/* -------------------------------------------------------- */}
             <div
               className={`rounded-2xl border transition-all overflow-hidden ${
@@ -925,10 +1261,10 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-white font-['Chakra_Petch']">
-                      2. Reaction Image &amp; GIF
+                      2. Image &amp; Sound
                     </div>
                     <div className="text-[11px] text-slate-400 truncate font-mono">
-                      {showImage ? `Active • Layout: ${layoutMode}` : 'Hidden'}
+                      {showImage ? 'Image Active' : 'Image Hidden'} • {soundUrl.split('/').pop()} ({Math.round(soundVolume * 100)}%)
                     </div>
                   </div>
                 </div>
@@ -941,125 +1277,261 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
               </button>
 
               {activeTab === 'image' && (
-                <div className="px-4 pb-4 pt-2 border-t border-slate-800/80 space-y-4 animate-fadeIn">
-                  {/* Show Image Toggle */}
-                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-mono font-bold text-slate-200">Show Reaction Image</div>
-                      <div className="text-[11px] text-slate-400">Display GIF mascot on donation trigger</div>
+                <div className="px-4 pb-4 pt-2 border-t border-slate-800/80 space-y-5 animate-fadeIn">
+                  
+                  {/* --- SUB-SECTION 1: REACTION MASCOT & IMAGE --- */}
+                  <div className="space-y-4">
+                    <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5 pb-1 border-b border-slate-800/60">
+                      <ImageIcon size={13} />
+                      <span>Reaction Mascot &amp; GIF</span>
                     </div>
-                    <Switch checked={showImage} onChange={setShowImage} />
+
+                    {/* Show Image Toggle */}
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-mono font-bold text-slate-200">Show Reaction Image</div>
+                        <div className="text-[11px] text-slate-400">Display GIF mascot on donation trigger</div>
+                      </div>
+                      <Switch checked={showImage} onChange={setShowImage} />
+                    </div>
+
+                    {showImage && (
+                      <>
+                        {/* Current Media Preview & Quick Actions */}
+                        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono font-bold text-slate-300">Active Media</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openStoragePicker('image')}
+                                className="text-[11px] font-mono font-bold text-cyan-400 hover:underline flex items-center gap-1"
+                              >
+                                <ImageIcon size={12} />
+                                <span>Pick from Storage</span>
+                              </button>
+                              <span className="text-slate-700">•</span>
+                              <label className="text-[11px] font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer">
+                                <Upload size={12} />
+                                <span>Upload Image</span>
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/gif,image/webp"
+                                  onChange={handleDirectUpload}
+                                  className="hidden"
+                                />
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-16 h-16 rounded-xl border-2 overflow-hidden bg-slate-900 flex-shrink-0 relative flex items-center justify-center p-1"
+                              style={{ borderColor: glowColor }}
+                            >
+                              {mediaUrl ? (
+                                <img src={mediaUrl} alt="Mascot preview" className="w-full h-full object-cover rounded-lg" />
+                              ) : (
+                                <ImageIcon size={20} className="text-slate-600" />
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <input
+                                type="text"
+                                value={mediaUrl}
+                                onChange={(e) => setMediaUrl(e.target.value)}
+                                placeholder="https://.../mascot.gif"
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 font-mono text-[11px] focus:outline-none focus:border-cyan-400 truncate"
+                              />
+                              <p className="text-[10px] text-slate-500 font-mono">
+                                Direct GIF, PNG, or WebP URL
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quick GIF Presets */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-mono font-bold text-slate-300 block">
+                            Popular Animated GIF Presets
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {GIF_PRESETS.map((preset) => (
+                              <button
+                                key={preset.url}
+                                type="button"
+                                onClick={() => setMediaUrl(preset.url)}
+                                className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                                  mediaUrl === preset.url
+                                    ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                <img src={preset.url} alt={preset.label} className="w-6 h-6 rounded object-cover flex-shrink-0" />
+                                <span className="text-[11px] font-mono truncate">{preset.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Image Layout Mode */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-mono font-bold text-slate-300 block">
+                            Media Display Layout
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { id: 'top', label: 'Top (Centered)' },
+                              { id: 'left', label: 'Side-by-Side (Left)' },
+                              { id: 'right', label: 'Side-by-Side (Right)' },
+                              { id: 'banner', label: 'Hologram Banner' }
+                            ].map((m) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setLayoutMode(m.id as any)}
+                                className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-semibold transition-all text-left ${
+                                  layoutMode === m.id
+                                    ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                {m.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {showImage && (
-                    <>
-                      {/* Current Media Preview & Quick Actions */}
-                      <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono font-bold text-slate-300">Active Media</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openStoragePicker('image')}
-                              className="text-[11px] font-mono font-bold text-cyan-400 hover:underline flex items-center gap-1"
-                            >
-                              <ImageIcon size={12} />
-                              <span>Pick from Storage</span>
-                            </button>
-                            <span className="text-slate-700">•</span>
-                            <label className="text-[11px] font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer">
-                              <Upload size={12} />
-                              <span>Upload Image</span>
-                              <input
-                                type="file"
-                                accept="image/png,image/jpeg,image/gif,image/webp"
-                                onChange={handleDirectUpload}
-                                className="hidden"
-                              />
-                            </label>
-                          </div>
-                        </div>
+                  {/* --- SUB-SECTION 2: ALERT SOUND & AUDIO TRACK --- */}
+                  <div className="space-y-4 pt-3 border-t border-slate-800/80">
+                    <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5 pb-1 border-b border-slate-800/60">
+                      <Volume2 size={13} />
+                      <span>Alert Sound &amp; Audio Track</span>
+                    </div>
 
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-16 h-16 rounded-xl border-2 overflow-hidden bg-slate-900 flex-shrink-0 relative flex items-center justify-center p-1"
-                            style={{ borderColor: glowColor }}
+                    {/* Active Sound & Storage Picker */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono font-bold text-slate-300">Active Sound</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openStoragePicker('sound')}
+                            className="text-[11px] font-mono font-bold text-cyan-400 hover:underline flex items-center gap-1"
                           >
-                            {mediaUrl ? (
-                              <img src={mediaUrl} alt="Mascot preview" className="w-full h-full object-cover rounded-lg" />
-                            ) : (
-                              <ImageIcon size={20} className="text-slate-600" />
-                            )}
-                          </div>
-
-                          <div className="flex-1 min-w-0 space-y-1">
+                            <Volume2 size={12} />
+                            <span>Pick from Storage</span>
+                          </button>
+                          <span className="text-slate-700">•</span>
+                          <label className="text-[11px] font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer">
+                            <Upload size={12} />
+                            <span>Upload Audio</span>
                             <input
-                              type="text"
-                              value={mediaUrl}
-                              onChange={(e) => setMediaUrl(e.target.value)}
-                              placeholder="https://.../mascot.gif"
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 font-mono text-[11px] focus:outline-none focus:border-cyan-400 truncate"
+                              type="file"
+                              accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/x-m4a"
+                              onChange={handleDirectUpload}
+                              className="hidden"
                             />
-                            <p className="text-[10px] text-slate-500 font-mono">
-                              Direct GIF, PNG, or WebP URL
-                            </p>
-                          </div>
+                          </label>
                         </div>
                       </div>
 
-                      {/* Quick GIF Presets */}
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => playSound(soundUrl, soundVolume)}
+                          className="p-2.5 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25 transition-all flex items-center justify-center flex-shrink-0"
+                          title="Play Current Audio"
+                        >
+                          <Play size={14} fill="currentColor" />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <input
+                            type="text"
+                            value={soundUrl}
+                            onChange={(e) => setSoundUrl(e.target.value)}
+                            placeholder="https://.../sound.mp3 or .wav"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 font-mono text-[11px] focus:outline-none focus:border-cyan-400 truncate"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-mono">
+                        Supports MP3, WAV, OGG, M4A from your Media Library or direct link.
+                      </p>
+                    </div>
+
+                    {/* Sound Preset Picker */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-mono font-bold text-slate-300 block">
+                        Sound Presets
+                      </label>
                       <div className="space-y-1.5">
-                        <label className="text-xs font-mono font-bold text-slate-300 block">
-                          Popular Animated GIF Presets
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {GIF_PRESETS.map((preset) => (
-                            <button
-                              key={preset.url}
-                              type="button"
-                              onClick={() => setMediaUrl(preset.url)}
-                              className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all ${
-                                mediaUrl === preset.url
+                        {SOUND_PRESETS.map((snd) => {
+                          const isSelected = soundUrl === snd.url;
+                          return (
+                            <div
+                              key={snd.url}
+                              onClick={() => {
+                                setSoundUrl(snd.url);
+                                playSound(snd.url, soundVolume);
+                              }}
+                              className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                                isSelected
                                   ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
                                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                               }`}
                             >
-                              <img src={preset.url} alt={preset.label} className="w-6 h-6 rounded object-cover flex-shrink-0" />
-                              <span className="text-[11px] font-mono truncate">{preset.label}</span>
-                            </button>
-                          ))}
-                        </div>
+                              <span className="font-mono text-xs font-bold">{snd.label}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  playSound(snd.url, soundVolume);
+                                }}
+                                className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400"
+                              >
+                                <Play size={12} fill="currentColor" />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
+                    </div>
 
-                      {/* Image Layout Mode */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-mono font-bold text-slate-300 block">
-                          Media Display Layout
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { id: 'top', label: 'Top (Centered)' },
-                            { id: 'left', label: 'Side-by-Side (Left)' },
-                            { id: 'right', label: 'Side-by-Side (Right)' },
-                            { id: 'banner', label: 'Hologram Banner' }
-                          ].map((m) => (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => setLayoutMode(m.id as any)}
-                              className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-semibold transition-all text-left ${
-                                layoutMode === m.id
-                                  ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                              }`}
-                            >
-                              {m.label}
-                            </button>
-                          ))}
-                        </div>
+                    {/* Sound Volume Slider */}
+                    <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-mono font-bold text-slate-300">Sound Volume</span>
+                        <span className="font-mono text-cyan-400 font-bold">{Math.round(soundVolume * 100)}%</span>
                       </div>
-                    </>
-                  )}
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={soundVolume}
+                        onChange={(e) => setSoundVolume(parseFloat(e.target.value))}
+                        className="w-full accent-cyan-400 cursor-pointer"
+                      />
+                      <div className="flex justify-end pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => playSound(soundUrl, soundVolume)}
+                          className="text-[11px] font-mono flex items-center gap-1"
+                        >
+                          <Play size={11} fill="currentColor" />
+                          <span>Test Alert Audio</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               )}
             </div>
@@ -1288,353 +1760,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
             </div>
 
             {/* -------------------------------------------------------- */}
-            {/* CATEGORY 4: CUSTOM FONT & NEON STYLING                   */}
-            {/* -------------------------------------------------------- */}
-            <div
-              className={`rounded-2xl border transition-all overflow-hidden ${
-                activeTab === 'font'
-                  ? 'border-cyan-500/40 bg-[#0B101E] shadow-[0_0_20px_rgba(0,240,255,0.08)]'
-                  : 'border-slate-800/80 bg-slate-950/60 hover:border-slate-700'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setActiveTab(activeTab === 'font' ? null : 'font')}
-                className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left cursor-pointer select-none"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                      activeTab === 'font'
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                        : 'bg-slate-900 text-slate-400 border border-slate-800'
-                    }`}
-                  >
-                    <Palette size={15} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-white font-['Chakra_Petch']">
-                      4. Custom Font &amp; Neon Styling
-                    </div>
-                    <div className="text-[11px] text-slate-400 truncate font-mono flex items-center gap-1.5">
-                      <span>{fontFamily} ({fontSize}px)</span>
-                      <span
-                        className="w-2.5 h-2.5 rounded-full inline-block border border-white/20"
-                        style={{ backgroundColor: glowColor }}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <ChevronDown
-                  size={16}
-                  className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${
-                    activeTab === 'font' ? 'rotate-180 text-cyan-400' : ''
-                  }`}
-                />
-              </button>
-
-              {activeTab === 'font' && (
-                <div className="px-4 pb-4 pt-2 border-t border-slate-800/80 space-y-4 animate-fadeIn">
-                  {/* Font Family Selector with live preview */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-mono font-bold text-slate-300 block">
-                      Font Family
-                    </label>
-                    <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto pr-1">
-                      {FONT_OPTIONS.map((f) => {
-                        const isSelected = fontFamily === f.id;
-                        return (
-                          <div
-                            key={f.id}
-                            onClick={() => setFontFamily(f.id)}
-                            className={`px-3 py-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                              isSelected
-                                ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                                : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
-                            }`}
-                          >
-                            <div className="min-w-0">
-                              <span className="text-sm font-bold block truncate" style={{ fontFamily: `"${f.id}", sans-serif` }}>
-                                {f.label}
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-slate-500">
-                              {f.category}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Font Size Slider */}
-                  <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-mono font-bold text-slate-300">Headline Font Size</span>
-                      <span className="font-mono text-cyan-400 font-bold">{fontSize}px</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="20"
-                      max="48"
-                      step="2"
-                      value={fontSize}
-                      onChange={(e) => setFontSize(Number(e.target.value))}
-                      className="w-full accent-cyan-400 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* Neon Glow Color Palette */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-mono font-bold text-slate-300 block">
-                      Neon Glow & Border Accent
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {GLOW_COLOR_PRESETS.map((preset) => (
-                        <button
-                          key={preset.hex}
-                          type="button"
-                          onClick={() => setGlowColor(preset.hex)}
-                          title={preset.label}
-                          className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center ${
-                            glowColor.toUpperCase() === preset.hex.toUpperCase()
-                              ? 'scale-125 border-white shadow-[0_0_15px_rgba(255,255,255,0.6)]'
-                              : 'border-slate-800 hover:scale-110'
-                          }`}
-                          style={{ backgroundColor: preset.hex }}
-                        >
-                          {glowColor.toUpperCase() === preset.hex.toUpperCase() && (
-                            <Check size={14} className="text-slate-950 font-bold" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <input
-                        type="color"
-                        value={glowColor}
-                        onChange={(e) => setGlowColor(e.target.value)}
-                        className="w-8 h-8 rounded-lg cursor-pointer bg-slate-900 border border-slate-800 p-0.5"
-                      />
-                      <input
-                        type="text"
-                        value={glowColor}
-                        onChange={(e) => setGlowColor(e.target.value)}
-                        className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs uppercase"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Template Frame Style */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-mono font-bold text-slate-300 block">
-                      Card Hologram Frame Style
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { id: 'neon-box', label: 'Neon Cyber Box' },
-                        { id: 'glass-hologram', label: 'Glass Hologram' },
-                        { id: 'cyber-glitch', label: 'Cyber Glitch' },
-                        { id: 'arcade', label: 'Retro 8-Bit Arcade' }
-                      ].map((style) => (
-                        <button
-                          key={style.id}
-                          type="button"
-                          onClick={() => setTemplateStyle(style.id as any)}
-                          className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-semibold transition-all text-left ${
-                            templateStyle === style.id
-                              ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          {style.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* -------------------------------------------------------- */}
-            {/* CATEGORY 5: SOUND & AUDIO EFFECT                         */}
-            {/* -------------------------------------------------------- */}
-            <div
-              className={`rounded-2xl border transition-all overflow-hidden ${
-                activeTab === 'sound'
-                  ? 'border-cyan-500/40 bg-[#0B101E] shadow-[0_0_20px_rgba(0,240,255,0.08)]'
-                  : 'border-slate-800/80 bg-slate-950/60 hover:border-slate-700'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setActiveTab(activeTab === 'sound' ? null : 'sound')}
-                className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left cursor-pointer select-none"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                      activeTab === 'sound'
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                        : 'bg-slate-900 text-slate-400 border border-slate-800'
-                    }`}
-                  >
-                    <Volume2 size={15} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-white font-['Chakra_Petch']">
-                      5. Chime Sound &amp; Audio Effect
-                    </div>
-                    <div className="text-[11px] text-slate-400 truncate font-mono">
-                      Volume: {Math.round(soundVolume * 100)}% • {soundUrl.split('/').pop()}
-                    </div>
-                  </div>
-                </div>
-                <ChevronDown
-                  size={16}
-                  className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${
-                    activeTab === 'sound' ? 'rotate-180 text-cyan-400' : ''
-                  }`}
-                />
-              </button>
-
-              {activeTab === 'sound' && (
-                <div className="px-4 pb-4 pt-2 border-t border-slate-800/80 space-y-4 animate-fadeIn">
-                  {/* Active Audio Chime & Storage Picker */}
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-slate-300">Active Sound</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openStoragePicker('sound')}
-                          className="text-[11px] font-mono font-bold text-cyan-400 hover:underline flex items-center gap-1"
-                        >
-                          <Volume2 size={12} />
-                          <span>Pick from Storage</span>
-                        </button>
-                        <span className="text-slate-700">•</span>
-                        <label className="text-[11px] font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer">
-                          <Upload size={12} />
-                          <span>Upload Audio</span>
-                          <input
-                            type="file"
-                            accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/x-m4a"
-                            onChange={handleDirectUpload}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => playSound(soundUrl, soundVolume)}
-                        className="p-2.5 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25 transition-all flex items-center justify-center flex-shrink-0"
-                        title="Play Current Chime"
-                      >
-                        <Play size={14} fill="currentColor" />
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <input
-                          type="text"
-                          value={soundUrl}
-                          onChange={(e) => setSoundUrl(e.target.value)}
-                          placeholder="https://.../sound.mp3"
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 font-mono text-[11px] focus:outline-none focus:border-cyan-400 truncate"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Sound Preset Picker */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-mono font-bold text-slate-300 block">
-                      Sound Chime Preset
-                    </label>
-                    <div className="space-y-2">
-                      {SOUND_PRESETS.map((snd) => {
-                        const isSelected = soundUrl === snd.url;
-                        return (
-                          <div
-                            key={snd.url}
-                            onClick={() => {
-                              setSoundUrl(snd.url);
-                              playSound(snd.url, soundVolume);
-                            }}
-                            className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                              isSelected
-                                ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            <span className="font-mono text-xs font-bold">{snd.label}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                playSound(snd.url, soundVolume);
-                              }}
-                              className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400"
-                            >
-                              <Play size={12} fill="currentColor" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Custom Sound URL */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-mono font-bold text-slate-300 block">
-                      Or Enter Custom Audio URL (.mp3 / .wav)
-                    </label>
-                    <input
-                      type="text"
-                      value={soundUrl}
-                      onChange={(e) => setSoundUrl(e.target.value)}
-                      placeholder="https://.../sound.mp3"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 truncate"
-                    />
-                  </div>
-
-                  {/* Sound Volume Slider */}
-                  <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-mono font-bold text-slate-300">Volume</span>
-                      <span className="font-mono text-cyan-400 font-bold">{Math.round(soundVolume * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={soundVolume}
-                      onChange={(e) => setSoundVolume(parseFloat(e.target.value))}
-                      className="w-full accent-cyan-400 cursor-pointer"
-                    />
-                    <div className="flex justify-end pt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => playSound(soundUrl, soundVolume)}
-                        className="text-[11px] font-mono"
-                      >
-                        <Play size={11} fill="currentColor" />
-                        <span>Test Chime</span>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* -------------------------------------------------------- */}
-            {/* CATEGORY 6: CONDITION THRESHOLD & RULES                  */}
+            {/* CATEGORY 4: CONDITION THRESHOLD & RULES                  */}
             {/* -------------------------------------------------------- */}
             <div
               className={`rounded-2xl border transition-all overflow-hidden ${
@@ -1660,7 +1786,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-white font-['Chakra_Petch']">
-                      6. Condition Threshold &amp; Rules
+                      4. Condition Threshold &amp; Rules
                     </div>
                     <div className="text-[11px] text-slate-400 truncate font-mono">
                       Trigger ≥ ${minAmountCondition.toFixed(2)} USD • {isEnabled ? 'Active' : 'Muted'}
@@ -1929,6 +2055,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                     templateStyle,
                     textTemplate,
                     textColor,
+                    donorColor,
+                    amountColor,
                     customGifUrl: mediaUrl,
                     mediaUrl,
                     showImage,
