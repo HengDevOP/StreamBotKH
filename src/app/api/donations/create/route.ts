@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/server/database/db';
-import { getTemporaryDonationsCollection, getGatewayConfigCollection } from '@/server/database/mongo';
+import { getTemporaryDonationsCollection, getGatewayConfigCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,29 +63,26 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) {}
 
-    // Use the official Payment Gateway Master KHQR image uploaded by the streamer (no fallback)
+    // Use the official Payment Gateway Master KHQR image uploaded by the streamer (verified & restored)
     let khqrImage = '';
     try {
-      const gatewayCol = await getGatewayConfigCollection();
-      
-      // 1. Look specifically for this streamer's uploaded KHQR image with non-empty URL
-      const streamerConfig = await gatewayCol.findOne({
-        $and: [
-          {
-            $or: [
-              { _id: `khqr_${resolvedStreamerId}` },
-              { streamerId: resolvedStreamerId },
-              { _id: `khqr_${streamerId}` },
-              { streamerId: streamerId },
-              ...(resolvedUsername ? [{ _id: `khqr_${resolvedUsername}` }, { streamerId: resolvedUsername }] : [])
-            ]
-          },
-          { khqrImageUrl: { $exists: true, $ne: '' } }
-        ]
-      });
-
-      if (streamerConfig?.khqrImageUrl) {
-        khqrImage = streamerConfig.khqrImageUrl;
+      const restoreResult = await restoreMasterKhqrImage(resolvedStreamerId, resolvedUsername);
+      if (restoreResult.restored && restoreResult.khqrImageUrl) {
+        khqrImage = restoreResult.khqrImageUrl;
+      } else {
+        const gatewayCol = await getGatewayConfigCollection();
+        const streamerConfig = await gatewayCol.findOne({
+          $or: [
+            { _id: `khqr_${resolvedStreamerId}` },
+            { streamerId: resolvedStreamerId },
+            { _id: `khqr_${streamerId}` },
+            { streamerId: streamerId },
+            ...(resolvedUsername ? [{ _id: `khqr_${resolvedUsername}` }, { streamerId: resolvedUsername }] : [])
+          ]
+        });
+        if (streamerConfig?.khqrImageUrl) {
+          khqrImage = streamerConfig.khqrImageUrl;
+        }
       }
     } catch (gatewayErr) {
       console.warn('[Donation] Could not fetch gateway KHQR image from MongoDB:', gatewayErr);

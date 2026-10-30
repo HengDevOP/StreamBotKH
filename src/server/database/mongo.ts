@@ -1,8 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import path from 'path';
+import fs from 'fs';
 import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import { db } from './db';
 
 export interface UserDoc {
   _id?: ObjectId;
@@ -119,11 +122,14 @@ export interface VoiceCloneDoc {
 }
 
 export interface GatewayConfigDoc {
-  _id: string; // 'master_khqr_config'
+  _id: string; // 'master_khqr_config' or `khqr_${streamerId}`
+  streamerId?: string;
+  streamerUsername?: string;
   khqrImageUrl: string; // e.g. /uploads/payment/khqr-official.png
   khqrFilename: string;
   khqrFileSize: number;
   khqrMimeType: string;
+  khqrBase64?: string; // Persistent base64 backup to withstand server restarts, container redeploys & ephemeral storage
   bankAccountName?: string;
   bakongAccountId?: string;
   uploadedBy?: string;
@@ -660,7 +666,277 @@ export async function initMongo() {
     }
 
     console.log(`⚡ [MongoDB] Collections and indexes verified successfully on database: "${db.databaseName}"`);
+
+    // Restore and synchronize all streamer Master KHQR images across MongoDB Atlas and local disk
+    await restoreAllMasterKhqrImages();
   } catch (err) {
     console.error('❌ [MongoDB] Error during initialization:', err);
+  }
+}
+
+/**
+ * Helper to ensure a streamer's Master KHQR image is verified and restored:
+ * 1. Checks MongoDB gateway_settings and SQLite payment_settings.
+ * 2. If the physical file on disk exists:
+ *    - Backs it up to MongoDB as base64 (if not already backed up).
+ *    - Ensures SQLite and MongoDB point to the correct file path.
+ * 3. If the physical file on disk is missing:
+ *    - Recreates the file on disk from MongoDB's base64 backup.
+ *    - If no base64, searches disk folder /uploads/payment/<streamerId>/ for an existing image.
+ *    - Syncs the working path to both SQLite and MongoDB.
+ */
+export async function restoreMasterKhqrImage(
+  streamerId?: string,
+  username?: string
+): Promise<{
+  restored: boolean;
+  khqrImageUrl?: string;
+  filename?: string;
+  fileSize?: number;
+  mimeType?: string;
+}> {
+  try {
+    const gatewayCol = await getGatewayConfigCollection();
+
+    const queryConditions: any[] = [];
+    if (streamerId) {
+      queryConditions.push({ _id: `khqr_${streamerId}` });
+      queryConditions.push({ streamerId: streamerId });
+    }
+    if (username) {
+      queryConditions.push({ _id: `khqr_${username}` });
+      queryConditions.push({ streamerId: username });
+    }
+    if (queryConditions.length === 0) {
+      queryConditions.push({ _id: 'master_khqr_config' });
+    }
+
+    // Look for document with image or base64
+    let mongoConfig = await gatewayCol.findOne({
+      $and: [
+        { $or: queryConditions },
+        {
+          $or: [
+            { khqrImageUrl: { $exists: true, $ne: '' } },
+            { khqrBase64: { $exists: true, $ne: '' } }
+          ]
+        }
+      ]
+    });
+
+    if (!mongoConfig) {
+      mongoConfig = await gatewayCol.findOne({ $or: queryConditions });
+    }
+
+    let sqliteRow: any = null;
+    if (streamerId) {
+      try {
+        sqliteRow = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(streamerId) as any;
+      } catch (e) {}
+    }
+
+    // Helper to verify if an image file exists on disk and is non-empty
+    const checkFile = (relUrl?: string | null): string | null => {
+      if (!relUrl || typeof relUrl !== 'string' || !relUrl.trim()) return null;
+      const clean = relUrl.trim().replace(/^\//, '');
+      const abs = path.join(process.cwd(), 'public', clean);
+      try {
+        if (fs.existsSync(abs)) {
+          const st = fs.statSync(abs);
+          if (st.isFile() && st.size > 0) return abs;
+        }
+      } catch (e) {}
+      return null;
+    };
+
+    // Helper to find any image in the streamer's upload folder
+    const findFolderImage = (id?: string | null): { url: string; absPath: string } | null => {
+      if (!id) return null;
+      const dir = path.join(process.cwd(), 'public', 'uploads', 'payment', id);
+      try {
+        if (fs.existsSync(dir)) {
+          const files = fs.readdirSync(dir);
+          for (const f of files) {
+            const ext = path.extname(f).toLowerCase();
+            if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
+              const abs = path.join(dir, f);
+              const st = fs.statSync(abs);
+              if (st.isFile() && st.size > 0) {
+                return { url: `/uploads/payment/${id}/${f}`, absPath: abs };
+              }
+            }
+          }
+        }
+      } catch (e) {}
+      return null;
+    };
+
+    // 1. Check if mongoConfig.khqrImageUrl exists on disk
+    let verifiedAbsPath = checkFile(mongoConfig?.khqrImageUrl);
+    let verifiedUrl = verifiedAbsPath ? (mongoConfig?.khqrImageUrl || '').trim() : '';
+
+    // 2. If not on disk, check sqliteRow.master_khqr_image
+    if (!verifiedAbsPath && sqliteRow?.master_khqr_image) {
+      const sqliteAbs = checkFile(sqliteRow.master_khqr_image);
+      if (sqliteAbs) {
+        verifiedAbsPath = sqliteAbs;
+        verifiedUrl = sqliteRow.master_khqr_image.trim();
+      }
+    }
+
+    // 3. If still not found, check the disk folder for any existing payment image
+    if (!verifiedAbsPath) {
+      const folderImg = findFolderImage(streamerId) || (mongoConfig?.streamerId ? findFolderImage(mongoConfig.streamerId) : null);
+      if (folderImg) {
+        verifiedAbsPath = folderImg.absPath;
+        verifiedUrl = folderImg.url;
+      }
+    }
+
+    // CASE A: The image file exists on disk
+    if (verifiedAbsPath && verifiedUrl) {
+      const buffer = fs.readFileSync(verifiedAbsPath);
+      const ext = path.extname(verifiedAbsPath).toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+      const base64 = buffer.toString('base64');
+      const filename = path.basename(verifiedAbsPath);
+      const targetId = streamerId || mongoConfig?.streamerId || 'demo-streamer-id-1001';
+
+      // Always ensure MongoDB has the base64 backup and the active URL
+      if (!mongoConfig?.khqrBase64 || mongoConfig.khqrImageUrl !== verifiedUrl || mongoConfig.khqrFileSize !== buffer.length) {
+        await gatewayCol.updateOne(
+          { _id: `khqr_${targetId}` },
+          {
+            $set: {
+              streamerId: targetId,
+              ...(username ? { streamerUsername: username } : {}),
+              khqrImageUrl: verifiedUrl,
+              khqrFilename: mongoConfig?.khqrFilename || filename,
+              khqrFileSize: buffer.length,
+              khqrMimeType: mongoConfig?.khqrMimeType || mime,
+              khqrBase64: base64,
+              updatedAt: new Date()
+            }
+          },
+          { upsert: true }
+        );
+      }
+
+      // Always ensure SQLite payment_settings is in sync
+      if (targetId) {
+        try {
+          db.prepare(`
+            INSERT INTO payment_settings (streamer_id, master_khqr_image)
+            VALUES (?, ?)
+            ON CONFLICT(streamer_id) DO UPDATE SET master_khqr_image = excluded.master_khqr_image
+          `).run(targetId, verifiedUrl);
+        } catch (e) {}
+      }
+
+      return {
+        restored: true,
+        khqrImageUrl: verifiedUrl,
+        filename: mongoConfig?.khqrFilename || filename,
+        fileSize: buffer.length,
+        mimeType: mongoConfig?.khqrMimeType || mime
+      };
+    }
+
+    // CASE B: The image file is NOT on disk, BUT MongoDB has khqrBase64 backup!
+    if (mongoConfig?.khqrBase64 && mongoConfig.khqrBase64.trim() !== '') {
+      const targetId = streamerId || mongoConfig.streamerId || 'demo-streamer-id-1001';
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'payment', targetId);
+      fs.mkdirSync(uploadDir, { recursive: true });
+
+      const ext = mongoConfig.khqrMimeType?.includes('png') ? '.png' : '.jpg';
+      const origFilename = mongoConfig.khqrFilename || `master-khqr${ext}`;
+      const safeExt = path.extname(origFilename).toLowerCase() || ext;
+      const storedFilename = `khqr-restored-${Date.now()}-${uuidv4().slice(0, 8)}${safeExt}`;
+      const restoredAbs = path.join(uploadDir, storedFilename);
+
+      const buffer = Buffer.from(mongoConfig.khqrBase64, 'base64');
+      fs.writeFileSync(restoredAbs, buffer);
+
+      const restoredUrl = `/uploads/payment/${targetId}/${storedFilename}`;
+
+      await gatewayCol.updateOne(
+        { _id: mongoConfig._id },
+        {
+          $set: {
+            streamerId: targetId,
+            ...(username ? { streamerUsername: username } : {}),
+            khqrImageUrl: restoredUrl,
+            khqrFileSize: buffer.length,
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      if (targetId) {
+        try {
+          db.prepare(`
+            INSERT INTO payment_settings (streamer_id, master_khqr_image)
+            VALUES (?, ?)
+            ON CONFLICT(streamer_id) DO UPDATE SET master_khqr_image = excluded.master_khqr_image
+          `).run(targetId, restoredUrl);
+        } catch (e) {}
+      }
+
+      console.log(`✅ [Master KHQR] Restored physical KHQR file from MongoDB backup for [${targetId}]: ${restoredUrl} (${(buffer.length / 1024).toFixed(1)} KB)`);
+
+      return {
+        restored: true,
+        khqrImageUrl: restoredUrl,
+        filename: origFilename,
+        fileSize: buffer.length,
+        mimeType: mongoConfig.khqrMimeType || (ext === '.png' ? 'image/png' : 'image/jpeg')
+      };
+    }
+
+    return { restored: false };
+  } catch (err: any) {
+    console.error('⚠️ [Master KHQR] restoreMasterKhqrImage error:', err);
+    return { restored: false };
+  }
+}
+
+/**
+ * Startup restoration: verifies and restores Master KHQR images for all streamers
+ */
+export async function restoreAllMasterKhqrImages(): Promise<void> {
+  try {
+    const gatewayCol = await getGatewayConfigCollection();
+    const allConfigs = await gatewayCol.find({
+      $or: [
+        { khqrImageUrl: { $exists: true, $ne: '' } },
+        { khqrBase64: { $exists: true, $ne: '' } }
+      ]
+    }).toArray();
+
+    for (const conf of allConfigs) {
+      const sId = conf.streamerId || (conf._id.startsWith('khqr_') ? conf._id.replace('khqr_', '') : null);
+      if (sId) {
+        await restoreMasterKhqrImage(sId, conf.streamerUsername);
+      }
+    }
+
+    // Also scan SQLite payment_settings for any configured KHQRs
+    try {
+      const sqliteRows = db.prepare(`
+        SELECT streamer_id, master_khqr_image 
+        FROM payment_settings 
+        WHERE master_khqr_image IS NOT NULL AND master_khqr_image != ''
+      `).all() as Array<{ streamer_id: string; master_khqr_image: string }>;
+
+      for (const row of sqliteRows) {
+        if (row.streamer_id) {
+          await restoreMasterKhqrImage(row.streamer_id);
+        }
+      }
+    } catch (e) {}
+
+    console.log('⚡ [Master KHQR] Restored and synchronized all streamer Master KHQRs');
+  } catch (err) {
+    console.warn('⚠️ [Master KHQR] Warning during startup restoration:', err);
   }
 }

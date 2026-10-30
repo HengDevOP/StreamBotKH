@@ -71,11 +71,12 @@ export async function POST(req: NextRequest) {
     // 5. Write file to disk
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const base64Data = buffer.toString('base64');
     await fs.writeFile(filePath, buffer);
 
     const publicUrl = `/uploads/payment/${streamerId}/${storedFilename}`;
 
-    // 6. Update MongoDB gateway_settings for this specific client
+    // 6. Update MongoDB gateway_settings for this specific client with persistent base64 backup
     const gatewayCol = await getGatewayConfigCollection();
     await gatewayCol.updateOne(
       { _id: `khqr_${streamerId}` },
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
           khqrFilename: originalName,
           khqrFileSize: file.size,
           khqrMimeType: mimeType || 'image/png',
+          khqrBase64: base64Data,
           updatedAt: new Date()
         }
       },
@@ -156,6 +158,7 @@ export async function DELETE(req: NextRequest) {
           khqrFilename: '',
           khqrFileSize: 0,
           khqrMimeType: '',
+          khqrBase64: '',
           updatedAt: new Date()
         }
       },

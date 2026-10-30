@@ -1161,6 +1161,13 @@ export const PaymentGatewayAdmin: React.FC = () => {
                       src={gatewayConfig.khqrImageUrl}
                       alt="Active Master KHQR"
                       className="max-h-full max-w-full object-contain"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.dataset.retried) {
+                          target.dataset.retried = 'true';
+                          target.src = `${gatewayConfig.khqrImageUrl}?t=${Date.now()}`;
+                        }
+                      }}
                     />
                   </div>
                 )}

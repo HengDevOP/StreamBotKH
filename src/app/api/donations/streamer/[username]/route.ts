@@ -115,26 +115,26 @@ export async function GET(
 
     const videoAlertEnabled = streamer.video_enabled === 1;
 
-    // Check if streamer has an active uploaded Master KHQR code
+    // Check if streamer has an active uploaded Master KHQR code (verified & restored)
     let khqrImageUrl = '';
     try {
-      const { getGatewayConfigCollection } = await import('@/server/database/mongo');
-      const gatewayCol = await getGatewayConfigCollection();
-      const gatewayDoc = await gatewayCol.findOne({
-        $and: [
-          {
-            $or: [
-              { _id: `khqr_${streamer.id}` },
-              { streamerId: streamer.id },
-              { _id: `khqr_${cleanUsername}` },
-              { streamerId: cleanUsername }
-            ]
-          },
-          { khqrImageUrl: { $exists: true, $ne: '' } }
-        ]
-      });
-      if (gatewayDoc?.khqrImageUrl) {
-        khqrImageUrl = gatewayDoc.khqrImageUrl;
+      const { restoreMasterKhqrImage, getGatewayConfigCollection } = await import('@/server/database/mongo');
+      const restoreResult = await restoreMasterKhqrImage(streamer.id, cleanUsername);
+      if (restoreResult.restored && restoreResult.khqrImageUrl) {
+        khqrImageUrl = restoreResult.khqrImageUrl;
+      } else {
+        const gatewayCol = await getGatewayConfigCollection();
+        const gatewayDoc = await gatewayCol.findOne({
+          $or: [
+            { _id: `khqr_${streamer.id}` },
+            { streamerId: streamer.id },
+            { _id: `khqr_${cleanUsername}` },
+            { streamerId: cleanUsername }
+          ]
+        });
+        if (gatewayDoc?.khqrImageUrl) {
+          khqrImageUrl = gatewayDoc.khqrImageUrl;
+        }
       }
     } catch (e) {}
 

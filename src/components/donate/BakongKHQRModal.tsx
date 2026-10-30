@@ -250,6 +250,13 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
               src={donationData.qrImage || masterKhqrImage || ''}
               alt="Scan To Pay"
               className="w-52 h-52 xs:w-60 xs:h-60 sm:w-64 sm:h-64 object-contain select-none max-w-full"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.dataset.retried) {
+                  target.dataset.retried = 'true';
+                  target.src = `${target.src}?t=${Date.now()}`;
+                }
+              }}
             />
           )}
         </div>

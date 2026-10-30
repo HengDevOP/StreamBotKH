@@ -137,6 +137,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Streamer not found' }, { status: 404 });
   }
 
+  // Ensure payment_settings and Master KHQR are verified and restored from MongoDB backup
+  if (streamer.id) {
+    try {
+      const { restoreMasterKhqrImage } = await import('@/server/database/mongo');
+      await restoreMasterKhqrImage(streamer.id, streamer.username);
+    } catch (e) {}
+  }
+
   // Automatically check 31-day plan expiration
   if (streamer.plan === 'pro' && streamer.plan_expires_at) {
     const expiresTime = new Date(streamer.plan_expires_at).getTime();

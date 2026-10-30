@@ -9,11 +9,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let settings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(user.id);
+    let settings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(user.id) as any;
 
     if (!settings) {
       db.prepare('INSERT INTO payment_settings (streamer_id) VALUES (?)').run(user.id);
       settings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(user.id);
+    }
+
+    // If master_khqr_image is missing in SQLite, restore from MongoDB backup
+    if (!settings?.master_khqr_image) {
+      try {
+        const { restoreMasterKhqrImage } = await import('@/server/database/mongo');
+        const res = await restoreMasterKhqrImage(user.id, user.username);
+        if (res.restored) {
+          settings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(user.id);
+        }
+      } catch (e) {}
     }
 
     return NextResponse.json(settings);

@@ -295,6 +295,9 @@ export async function upsertGoogleStreamer(profile: {
         VALUES (?, ?, ?)
       `).run(streamerId, `${streamerUsername}@abaa`, displayName.toUpperCase());
     }
+    // Restore Master KHQR from persistent MongoDB Atlas backup
+    const { restoreMasterKhqrImage } = await import('@/server/database/mongo');
+    await restoreMasterKhqrImage(streamerId, streamerUsername);
   } catch (e) {}
 
   let streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(streamerId) as any;

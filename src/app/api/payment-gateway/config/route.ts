@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGatewayConfigCollection } from '@/server/database/mongo';
+import { getGatewayConfigCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
 import { db } from '@/server/database/db';
 import { getAuthenticatedUser } from '@/server/auth';
 
@@ -67,6 +67,9 @@ export async function GET(req: NextRequest) {
 
     const effectiveStreamerId = streamerId || 'demo-streamer-id-1001';
 
+    // 0. Automatically restore and verify Master KHQR from persistent backup if file was deleted or server restarted
+    const restoreResult = await restoreMasterKhqrImage(effectiveStreamerId, streamerUsername || undefined);
+
     // 1. Check SQLite payment_settings for this streamer
     let sqliteSettings: any = null;
     try {
@@ -81,35 +84,19 @@ export async function GET(req: NextRequest) {
     let mongoConfig: any = null;
     try {
       const gatewayCol = await getGatewayConfigCollection();
-      // Look for streamer-specific config with non-empty image first
       mongoConfig = await gatewayCol.findOne({
-        $and: [
-          {
-            $or: [
-              { _id: `khqr_${effectiveStreamerId}` },
-              { streamerId: effectiveStreamerId },
-              ...(streamerUsername ? [{ _id: `khqr_${streamerUsername}` }, { streamerId: streamerUsername }] : [])
-            ]
-          },
-          { khqrImageUrl: { $exists: true, $ne: '' } }
+        $or: [
+          { _id: `khqr_${effectiveStreamerId}` },
+          { streamerId: effectiveStreamerId },
+          ...(streamerUsername ? [{ _id: `khqr_${streamerUsername}` }, { streamerId: streamerUsername }] : [])
         ]
       });
-
-      // If not found, find any existing document for this streamer
-      if (!mongoConfig) {
-        mongoConfig = await gatewayCol.findOne({
-          $or: [
-            { _id: `khqr_${effectiveStreamerId}` },
-            { streamerId: effectiveStreamerId },
-            ...(streamerUsername ? [{ _id: `khqr_${streamerUsername}` }, { streamerId: streamerUsername }] : [])
-          ]
-        });
-      }
     } catch (e) {}
 
-    // Combine streamer-scoped settings: MongoDB is primary. If mongoConfig explicitly has khqrImageUrl, respect it (including empty string when removed)
     let khqrImageUrl = '';
-    if (mongoConfig && typeof mongoConfig.khqrImageUrl === 'string' && mongoConfig.khqrImageUrl.trim() !== '') {
+    if (restoreResult.restored && restoreResult.khqrImageUrl) {
+      khqrImageUrl = restoreResult.khqrImageUrl;
+    } else if (mongoConfig && typeof mongoConfig.khqrImageUrl === 'string' && mongoConfig.khqrImageUrl.trim() !== '') {
       khqrImageUrl = mongoConfig.khqrImageUrl.trim();
     } else if (sqliteSettings && typeof sqliteSettings.master_khqr_image === 'string' && sqliteSettings.master_khqr_image.trim() !== '') {
       khqrImageUrl = sqliteSettings.master_khqr_image.trim();
@@ -121,9 +108,9 @@ export async function GET(req: NextRequest) {
       } catch (e) {}
     }
 
-    const khqrFilename = mongoConfig?.khqrFilename || sqliteSettings?.master_khqr_filename || '';
-    const khqrFileSize = mongoConfig?.khqrFileSize || sqliteSettings?.master_khqr_filesize || 0;
-    const khqrMimeType = mongoConfig?.khqrMimeType || sqliteSettings?.master_khqr_mimetype || '';
+    const khqrFilename = restoreResult.filename || mongoConfig?.khqrFilename || sqliteSettings?.master_khqr_filename || '';
+    const khqrFileSize = restoreResult.fileSize || mongoConfig?.khqrFileSize || sqliteSettings?.master_khqr_filesize || 0;
+    const khqrMimeType = restoreResult.mimeType || mongoConfig?.khqrMimeType || sqliteSettings?.master_khqr_mimetype || '';
 
     const bankAccountName =
       sqliteSettings?.bakong_account_name ||
