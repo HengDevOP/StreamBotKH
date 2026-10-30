@@ -110,6 +110,16 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
+    // Notify overlay room that a video alert has finished so donation sources can advance to next queued alert
+    socket.on('overlay:video_finished', (data: { donationId: string; overlayToken: string }) => {
+      const token = data?.overlayToken || 'demo-token';
+      console.log(`[Socket] Video alert finished for donation "${data?.donationId}" (Token: ${token})`);
+      io?.to(`overlay:${token}`).emit('donation:video_finished', data);
+      if (token !== 'demo-token') {
+        io?.to('overlay:demo-token').emit('donation:video_finished', data);
+      }
+    });
+
     // Soundboard event triggers for OBS overlay & stream sync
     socket.on('soundboard:play', (payload: any) => {
       const token = payload?.overlayToken || payload?.token || 'demo-token';

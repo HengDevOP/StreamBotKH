@@ -138,9 +138,8 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
       videoAlertEnabled: true,
       videoMinTipAmount: 0,
       videoMaxDurationSeconds: maxDurationSeconds,
-      durationSeconds: 0, // Instant play for test video without awaiting donation alert
+      durationSeconds: 8, // Plays standard 8s donation alert first on donation source
       isVideoTest: true,
-      directVideo: true,
       isTest: true,
       overlayToken: effectiveToken
     };

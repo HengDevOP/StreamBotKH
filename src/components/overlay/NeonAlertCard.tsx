@@ -180,9 +180,9 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
   const isRightLayout = layoutMode === 'right';
 
   // ==============================================================
-  // 1. CINEMATIC VIDEO ALERT (MEDIA SHARE)
+  // 1. CINEMATIC VIDEO ALERT (MEDIA SHARE - STAGE 2)
   // ==============================================================
-  if (ytId && (isSecondStageVideo || Boolean(videoUrl))) {
+  if (ytId && isSecondStageVideo) {
     return (
       <div
         className={`relative flex flex-col items-center justify-center p-4 text-center transition-all duration-700 ${

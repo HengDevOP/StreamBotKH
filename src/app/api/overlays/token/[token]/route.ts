@@ -18,6 +18,7 @@ export async function GET(
     if (!overlay) {
       // Check if token belongs to a streamer in SQLite database or is a valid overlay token format
       const streamer = db.prepare('SELECT * FROM streamers WHERE overlay_token = ?').get(token) as any;
+      const videoSettings = streamer ? (db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(streamer.id) as any) : null;
       if (streamer || token.startsWith('ovl_') || token === 'demo-token' || token === 'ovl_token_neon_demo_9921') {
         return NextResponse.json({
           success: true,
@@ -32,6 +33,10 @@ export async function GET(
             durationSeconds: 8,
             minAmountAlert: 1.0,
             ttsEnabled: true,
+            videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : true,
+            videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
+            videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
+            videoVolume: videoSettings ? Number(videoSettings.video_volume) : 80,
             width: 1080,
             height: 720
           }
@@ -41,9 +46,18 @@ export async function GET(
       return NextResponse.json({ error: 'Overlay not found' }, { status: 404 });
     }
 
+    const streamer = db.prepare('SELECT * FROM streamers WHERE overlay_token = ?').get(token) as any;
+    const videoSettings = streamer ? (db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(streamer.id) as any) : null;
+
     return NextResponse.json({
       success: true,
-      overlay
+      overlay: {
+        ...overlay,
+        videoAlertEnabled: overlay.videoAlertEnabled !== undefined ? overlay.videoAlertEnabled : (videoSettings ? videoSettings.is_enabled === 1 : true),
+        videoMinTipAmount: overlay.videoMinTipAmount !== undefined ? overlay.videoMinTipAmount : (videoSettings ? Number(videoSettings.min_tip_amount) : 0.25),
+        videoMaxDurationSeconds: overlay.videoMaxDurationSeconds !== undefined ? overlay.videoMaxDurationSeconds : (videoSettings ? Number(videoSettings.max_duration_seconds) : 300),
+        videoVolume: overlay.videoVolume !== undefined ? overlay.videoVolume : (videoSettings ? Number(videoSettings.video_volume) : 80)
+      }
     });
   } catch (err: any) {
     console.error('API /api/overlays/token/[token] error:', err);

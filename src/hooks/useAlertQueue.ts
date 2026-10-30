@@ -9,6 +9,7 @@ export function useAlertQueue() {
   const [currentAlert, setCurrentAlert] = useState<LiveAlertPayload | null>(null);
   const queueRef = useRef<LiveAlertPayload[]>([]);
   const isPlayingRef = useRef<boolean>(false);
+  const isPausedRef = useRef<boolean>(false);
   const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -20,7 +21,7 @@ export function useAlertQueue() {
   }, [queue]);
 
   const playNext = useCallback(() => {
-    if (isPlayingRef.current) return;
+    if (isPlayingRef.current || isPausedRef.current) return;
     if (queueRef.current.length === 0) {
       isPlayingRef.current = false;
       return;
@@ -68,7 +69,9 @@ export function useAlertQueue() {
     }
     transitionTimerRef.current = setTimeout(() => {
       isPlayingRef.current = false;
-      playNext();
+      if (!isPausedRef.current) {
+        playNext();
+      }
     }, 500);
   }, [playNext]);
 
@@ -79,13 +82,26 @@ export function useAlertQueue() {
       return updated;
     });
 
-    // If no alert is currently playing, start immediately
-    if (!isPlayingRef.current) {
+    // If no alert is currently playing and queue is not paused, start immediately
+    if (!isPlayingRef.current && !isPausedRef.current) {
       setTimeout(() => {
-        if (!isPlayingRef.current) {
+        if (!isPlayingRef.current && !isPausedRef.current) {
           playNext();
         }
       }, 50);
+    }
+  }, [playNext]);
+
+  const pauseQueue = useCallback(() => {
+    console.log('⏸️ [Alert Queue] Queue paused: waiting for external video playback to complete...');
+    isPausedRef.current = true;
+  }, []);
+
+  const resumeQueue = useCallback(() => {
+    console.log('▶️ [Alert Queue] Queue resumed! Video playback completed. Checking for next alert...');
+    isPausedRef.current = false;
+    if (!isPlayingRef.current) {
+      playNext();
     }
   }, [playNext]);
 
@@ -101,6 +117,8 @@ export function useAlertQueue() {
     currentAlert,
     pushAlert,
     dismissCurrentAlert,
+    pauseQueue,
+    resumeQueue,
     queueLength: queue.length
   };
 }

@@ -841,6 +841,7 @@ class TelegramUserClientManager {
 
       if (targetStreamer) {
         const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(targetStreamer.id) as any;
+        const videoSettings = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(targetStreamer.id) as any;
 
         // 1. Clean expired sessions (>5m) and gather active candidates within 15 minutes
         let matchedTemp: any = null;
@@ -1117,6 +1118,9 @@ class TelegramUserClientManager {
             videoTitle: effectiveVideoTitle,
             videoStartTime: effectiveVideoStartTime,
             videoEndTime: effectiveVideoEndTime,
+            videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : true,
+            videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
+            videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
             templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
             textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
             textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',

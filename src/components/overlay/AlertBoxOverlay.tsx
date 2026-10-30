@@ -14,12 +14,14 @@ interface AlertBoxOverlayProps {
 
 export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, mode = 'all', boxId }) => {
   const { socket, connected, joinOverlayRoom } = useSocket();
-  const { currentAlert, pushAlert, dismissCurrentAlert, queueLength } = useAlertQueue();
+  const { currentAlert, pushAlert, dismissCurrentAlert, pauseQueue, resumeQueue, queueLength } = useAlertQueue();
   const [ready, setReady] = useState(false);
   const [overlayConfig, setOverlayConfig] = useState<any>(null);
   const [alertBoxes, setAlertBoxes] = useState<any[]>([]);
   const [urlMode, setUrlMode] = useState<string | null>(null);
   const [urlBoxId, setUrlBoxId] = useState<string | null>(null);
+
+  const videoWaitingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -245,36 +247,72 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     }
   }, [currentAlert]);
 
-  // Broadcast signal when a standard donation alert finishes so video sources start immediately
+  // Cross-overlay synchronization: broadcast finished signals and coordinate queue waiting
   const prevAlertRef = useRef<any>(null);
   useEffect(() => {
     if (prevAlertRef.current && !currentAlert) {
       const finished = prevAlertRef.current;
-      if (!finished.isSecondStageVideo) {
-        const finishedId = finished.donationId || `${finished.donorName}-${finished.amount}`;
-        console.log(`⚡ [Overlay] Standard donation alert finished for: "${finishedId}". Broadcasting overlay:alert_finished.`);
+      const finishedId = finished.donationId || `${finished.donorName}-${finished.amount}`;
+
+      if (finished.isSecondStageVideo) {
+        // Video finished on video source or combo! Broadcast so donation source queue can advance
+        console.log(`🎬 [Overlay] Video playback completed for: "${finishedId}". Broadcasting overlay:video_finished.`);
+        if (socket && overlayToken) {
+          socket.emit('overlay:video_finished', {
+            donationId: finishedId,
+            overlayToken
+          });
+        }
+      } else {
+        // Donation alert card finished! Broadcast so video source can immediately start playback
+        console.log(`⚡ [Overlay] Donation alert card finished for: "${finishedId}". Broadcasting overlay:alert_finished.`);
         if (socket && overlayToken) {
           socket.emit('overlay:alert_finished', {
             donationId: finishedId,
             overlayToken
           });
         }
+
+        // On dedicated donation alert source, if a video is attached, pause queue until the video completes on video source
+        if (activeMode === 'alert-only' && (finished.hasAttachedVideo || finished.upcomingVideo)) {
+          console.log(`⏳ [Donation Overlay] Video is now queued to play on video source. Pausing donation queue until video completes...`);
+          pauseQueue();
+
+          if (videoWaitingTimerRef.current) clearTimeout(videoWaitingTimerRef.current);
+          const clipSeconds = Number(finished.videoClipDuration) || 30;
+          // Auto-resume fallback in case video source is not listening or fails
+          videoWaitingTimerRef.current = setTimeout(() => {
+            console.log(`⏱️ [Donation Overlay] Safety buffer elapsed. Auto-resuming donation queue.`);
+            resumeQueue();
+          }, (clipSeconds + 10) * 1000);
+        }
       }
     }
     prevAlertRef.current = currentAlert;
-  }, [currentAlert, socket, overlayToken]);
+  }, [currentAlert, socket, overlayToken, activeMode, pauseQueue, resumeQueue]);
 
   useEffect(() => {
     if (!socket) return;
 
-    // Listen for donation alert finished signals (cross-source coordination)
+    // Listen for donation alert finished signals (starts queued video on dedicated video source)
     const handleAlertFinished = (data: any) => {
       if (!data?.donationId) return;
-      console.log(`⚡ [Video Overlay] Received donation:alert_finished signal for "${data.donationId}"`);
+      console.log(`⚡ [Video Overlay] Received donation:alert_finished signal for "${data.donationId}". Starting video playback now.`);
       startQueuedVideo(data.donationId);
     };
 
+    // Listen for video finished signals (resumes paused queue on donation alert source)
+    const handleVideoFinished = (data: any) => {
+      console.log(`🎬 [Donation Overlay] Received donation:video_finished signal for "${data?.donationId}". Resuming donation queue.`);
+      if (videoWaitingTimerRef.current) {
+        clearTimeout(videoWaitingTimerRef.current);
+        videoWaitingTimerRef.current = null;
+      }
+      resumeQueue();
+    };
+
     socket.on('donation:alert_finished', handleAlertFinished);
+    socket.on('donation:video_finished', handleVideoFinished);
 
     const handleAlert = (payload: any) => {
       if (!payload) return;
@@ -410,15 +448,18 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       const minTipRequired = Number(payload.videoMinTipAmount ?? overlayConfig?.videoMinTipAmount ?? 0.25);
       const videoAlertsEnabled = payload.videoAlertEnabled !== undefined
         ? Boolean(payload.videoAlertEnabled)
-        : Boolean(overlayConfig?.videoAlertEnabled);
+        : (overlayConfig?.videoAlertEnabled !== undefined ? Boolean(overlayConfig.videoAlertEnabled) : true);
 
       const isVideoTest = Boolean(payload.isVideoTest || (isTestAlert && payload.videoUrl));
       // For test video alerts: bypass minimum tip amount & video alert enabled checks!
       const hasValidVideo = Boolean(payload.videoUrl) && (isVideoTest || (tipAmountInUsd >= minTipRequired && videoAlertsEnabled));
+      const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
+      const alertDuration = Number(finalPayload.durationSeconds) || 8;
 
       // ==============================================================
-      // 1. DEDICATED VIDEO ALERT SOURCE (/overlay/video/[token]):
-      // MUST queue until the donation alert finishes, and only then start video!
+      // 1. DEDICATED VIDEO ALERT SOURCE (/overlay/video/[token] or ?mode=video):
+      // Displays the YouTube video clip only.
+      // Queues the video until the donation alert finishes on the donation source URL!
       // ==============================================================
       if (activeMode === 'video-only') {
         if (!hasValidVideo) {
@@ -426,7 +467,6 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
           return;
         }
 
-        const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
         const videoPayload = {
           ...finalPayload,
           isSecondStageVideo: true,
@@ -439,42 +479,52 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
           ttsEnabled: false
         };
 
-        // For test video alerts, play immediately without awaiting any donation alert!
-        if (isVideoTest) {
-          console.log(`🎬 [Video Overlay] Test video alert: playing immediately (no donation alert wait required).`);
-          pushAlert(videoPayload);
-          return;
-        }
-
-        const donationAlertDuration = Number(finalPayload.durationSeconds) || 8;
         const key = payload.donationId || alertId;
+        console.log(`⏳ [Video Overlay] Queuing video for "${key}". Waiting ${alertDuration}s for donation alert to finish on donation source...`);
 
-        console.log(`⏳ [Video Overlay] Queuing video for "${key}". Waiting ${donationAlertDuration}s for donation alert to finish...`);
-
-        // Set fallback timer matching donation alert duration (+0.5s buffer for transition)
+        // Set fallback timer matching donation alert duration (+1.5s buffer for transition)
         const timer = setTimeout(() => {
-          console.log(`⏱️ [Video Overlay] Alert duration (${donationAlertDuration}s) timer elapsed for "${key}". Releasing video to playback.`);
+          console.log(`⏱️ [Video Overlay] Fallback timer elapsed for "${key}". Releasing video to playback.`);
           startQueuedVideo(key);
-        }, (donationAlertDuration + 0.5) * 1000);
+        }, (alertDuration + 1.5) * 1000);
 
         pendingVideosRef.current.set(key, { payload: videoPayload, timer });
         return;
       }
 
       // ==============================================================
-      // 2. INTEGRATED DONATION & VIDEO ALERT QUEUE
+      // 2. DEDICATED DONATION ALERT SOURCE (/overlay/alert/[token] or ?mode=alert):
+      // Displays the donation alert card, plays sound chime, and speaks TTS!
+      // If a video is attached, shows "🎬 Media Share Video Queued Next" badge.
+      // When this card finishes, it signals the video source to start playing the video,
+      // and pauses the donation queue until the video finishes!
+      // ==============================================================
+      if (activeMode === 'alert-only') {
+        console.log(`📢 [Donation Overlay] Received donation alert for "${finalPayload.donorName}" ($${finalPayload.amount}). Video attached: ${hasValidVideo ? 'YES' : 'NO'}`);
+
+        pushAlert({
+          ...finalPayload,
+          isSecondStageVideo: false,
+          upcomingVideo: hasValidVideo,
+          videoUrl: undefined,
+          durationSeconds: alertDuration,
+          hasAttachedVideo: hasValidVideo,
+          videoClipDuration: clipDuration
+        });
+        return;
+      }
+
+      // ==============================================================
+      // 3. SEQUENTIAL COMBO SOURCE (?mode=all or /overlay/[token]):
       // If a video is attached to the donation:
       // Stage 1: Start the Donation Alert FIRST (card, chime & TTS).
       // Stage 2: Put the Video Alert in the queue directly next in line.
       // The queue strictly WAITS until the video finishes before the next incoming alert plays!
       // ==============================================================
       if (hasValidVideo) {
-        const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
-        const alertDuration = Number(finalPayload.durationSeconds) || 8;
-
-        console.log(`🎬 [Integrated Overlay] Tip attached with video alert!`);
-        console.log(`   - Step 1: Starting Donation Alert first (${alertDuration}s) for "${finalPayload.donorName}" ($${finalPayload.amount})`);
-        console.log(`   - Step 2: Queued Video Alert next (${clipDuration}s). Next incoming alerts will wait in queue until video finishes.`);
+        console.log(`🎬 [Integrated Combo Overlay] Tip attached with video alert!`);
+        console.log(`   - Stage 1: Starting Donation Alert first (${alertDuration}s) for "${finalPayload.donorName}" ($${finalPayload.amount})`);
+        console.log(`   - Stage 2: Queued Video Alert next (${clipDuration}s). Next incoming alerts will wait in queue until video finishes.`);
 
         // Stage 1: Standard donation alert card, chime & TTS
         pushAlert({
@@ -502,7 +552,8 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         pushAlert({
           ...finalPayload,
           isSecondStageVideo: false,
-          durationSeconds: finalPayload.durationSeconds || 8,
+          videoUrl: undefined,
+          durationSeconds: alertDuration,
           soundUrl: finalPayload.soundUrl,
           ttsEnabled: finalPayload.ttsEnabled
         });
@@ -522,7 +573,8 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       socket.off('donation:alert', handleAlert);
       socket.off('donation:alert:test', handleTestAlert);
       socket.off('donation:alert_finished', handleAlertFinished);
-      // Clean up any pending timers
+      socket.off('donation:video_finished', handleVideoFinished);
+      if (videoWaitingTimerRef.current) clearTimeout(videoWaitingTimerRef.current);
       pendingVideosRef.current.forEach((item) => clearTimeout(item.timer));
       pendingVideosRef.current.clear();
     };

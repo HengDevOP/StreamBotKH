@@ -445,6 +445,7 @@ export class TelegramGroupListener {
       }
 
       // Fetch current saved condition alert box from MongoDB for this streamer
+      const videoSettings = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(streamer.id) as any;
       let matchingBox: any = null;
       try {
         const alertBoxesCol = await getAlertBoxesCollection();
@@ -490,6 +491,9 @@ export class TelegramGroupListener {
         videoTitle: effectiveVideoTitle,
         videoStartTime: effectiveVideoStartTime,
         videoEndTime: effectiveVideoEndTime,
+        videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : true,
+        videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
+        videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
         templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
         textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
         textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',

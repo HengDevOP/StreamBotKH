@@ -54,6 +54,7 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
   // 3. Fetch streamer & alert settings
   const streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(donation.streamer_id) as any;
   const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(donation.streamer_id) as any;
+  const videoSettings = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(donation.streamer_id) as any;
 
   if (streamer) {
     let matchingBox: any = null;
@@ -99,6 +100,13 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
         amount: donation.amount,
         currency: donation.currency,
         bankingName: donation.banking_name || 'Bakong KHQR',
+        videoUrl: donation.video_url || undefined,
+        videoTitle: donation.video_title || undefined,
+        videoStartTime: Number(donation.video_start_time) || 0,
+        videoEndTime: Number(donation.video_end_time) || 0,
+        videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : true,
+        videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
+        videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
         templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
         textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
         textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
