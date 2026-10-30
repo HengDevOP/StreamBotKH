@@ -17,11 +17,9 @@ interface StreamerData {
   donateUrl: string;
 }
 
-const KHQR_RED = '#E1232E';
-
 /**
  * Tip QR overlay (OBS browser source).
- * Generates a KHQR-styled card whose QR code encodes the streamer's tip page URL,
+ * Generates a plain QR code that encodes the streamer's tip page URL,
  * rendered on a fully transparent background with a "Scan Me" caption underneath.
  */
 export const StreamTipQrOverlay: React.FC<StreamTipQrOverlayProps> = ({ token }) => {
@@ -77,68 +75,11 @@ export const StreamTipQrOverlay: React.FC<StreamTipQrOverlayProps> = ({ token })
 
   if (loading) return null;
 
-  const displayName = streamer?.displayName || streamer?.username || 'Streamer';
-  const cardWidth = qrSize + 48;
-  const badgeSize = Math.round(qrSize * 0.2);
-
   return (
     <div className="flex flex-col items-center justify-center p-3 select-none bg-transparent">
-      {/* Generated KHQR card */}
-      <div
-        className="bg-white rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.45)]"
-        style={{ width: cardWidth }}
-      >
-        {/* Red KHQR header with folded corner */}
-        <div
-          className="relative flex items-center justify-center"
-          style={{ background: KHQR_RED, height: Math.round(cardWidth * 0.18) }}
-        >
-          <span
-            className="text-white font-black tracking-wider"
-            style={{ fontSize: Math.round(cardWidth * 0.095), fontFamily: 'Arial, Helvetica, sans-serif' }}
-          >
-            KHQR
-          </span>
-          <div
-            className="absolute bottom-0 right-0 bg-white"
-            style={{
-              width: Math.round(cardWidth * 0.1),
-              height: Math.round(cardWidth * 0.1),
-              clipPath: 'polygon(100% 0, 100% 100%, 0 100%)'
-            }}
-          />
-        </div>
-
-        {/* Name */}
-        <div className="px-6 pt-4 pb-3">
-          <div
-            className="text-slate-900 font-bold truncate"
-            style={{ fontSize: Math.max(13, Math.round(cardWidth * 0.06)), fontFamily: 'Arial, Helvetica, sans-serif' }}
-          >
-            {displayName}
-          </div>
-        </div>
-
-        {/* Dashed separator */}
-        <div className="border-t-2 border-dashed border-slate-300 mx-0" />
-
-        {/* QR code (encodes the tip page URL) */}
-        <div className="relative flex items-center justify-center px-6 py-5">
-          <QRCodeSVG value={donateUrl} size={qrSize} level="H" includeMargin={false} />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="rounded-full flex items-center justify-center border-[3px] border-white"
-              style={{ width: badgeSize, height: badgeSize, background: KHQR_RED }}
-            >
-              <span
-                className="text-white font-black"
-                style={{ fontSize: Math.round(badgeSize * 0.55), fontFamily: 'Arial, Helvetica, sans-serif' }}
-              >
-                ៛
-              </span>
-            </div>
-          </div>
-        </div>
+      {/* Generated QR (encodes the tip page URL) */}
+      <div className="p-3 rounded-xl bg-white">
+        <QRCodeSVG value={donateUrl} size={qrSize} level="H" includeMargin={false} />
       </div>
 
       <div className="mt-3 text-center">
