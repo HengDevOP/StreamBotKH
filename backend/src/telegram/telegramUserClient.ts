@@ -29,6 +29,7 @@ interface TelegramGlobalState {
   pendingAuth: Map<string, PendingAuth>;
   activeClients: Map<string, TelegramClient>;
   monitoredChats: Map<string, string[]>;
+  connectingPromises: Map<string, Promise<TelegramClient | null>>;
   managerInstance?: TelegramUserClientManager;
 }
 
@@ -42,6 +43,7 @@ if (!g.__telegramGlobalState) {
     pendingAuth: new Map(),
     activeClients: new Map(),
     monitoredChats: new Map(),
+    connectingPromises: new Map(),
   };
 }
 
@@ -56,6 +58,10 @@ class TelegramUserClientManager {
 
   private get monitoredChats(): Map<string, string[]> {
     return g.__telegramGlobalState!.monitoredChats;
+  }
+
+  private get connectingPromises(): Map<string, Promise<TelegramClient | null>> {
+    return g.__telegramGlobalState!.connectingPromises;
   }
 
   constructor() {
@@ -592,14 +598,18 @@ class TelegramUserClientManager {
       if (chat && chat.id) candidateMsgIds.push(chat.id.toString());
 
       const isTarget = targetGroups.some((tg) => {
-        // 1. Match Chat ID (exact string or normalized numeric id)
+        // 1. Match Chat ID (exact string, normalized numeric id, or stripped digits)
         if (tg.chat_id) {
           const normTg = tg.chat_id.replace(/^-100/, '').replace(/^-/, '').trim();
+          const digitsTg = tg.chat_id.replace(/\D/g, '');
           const matchedId = candidateMsgIds.some((cid) => {
             if (!cid) return false;
             if (cid === tg.chat_id) return true;
             const normCid = cid.replace(/^-100/, '').replace(/^-/, '').trim();
-            return Boolean(normCid && normCid === normTg);
+            if (normCid && normCid === normTg) return true;
+            const digitsCid = cid.replace(/\D/g, '');
+            if (digitsTg && digitsCid && digitsTg === digitsCid) return true;
+            return false;
           });
           if (matchedId) return true;
         }
@@ -619,11 +629,6 @@ class TelegramUserClientManager {
         return false;
       });
 
-      if (!isTarget) {
-        // Strictly ignore messages outside target groups
-        return;
-      }
-
       let senderName = 'Telegram Member';
       try {
         const sender = await msg.getSender();
@@ -637,136 +642,168 @@ class TelegramUserClientManager {
         // Safe fallback
       }
 
+      console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`📨 [GramJS Event] New message received from Telegram MTProto:`);
+      console.log(`   Chat IDs: [${candidateMsgIds.join(', ')}]`);
+      console.log(`   Chat Title: "${chatTitle}" ${chatUsername ? `(@${chatUsername})` : ''}`);
+      console.log(`   Sender: "${senderName}"`);
+      console.log(`   Target Groups Configured: [${targetGroups.map(tg => `"${tg.title}" (${tg.chat_id})`).join(', ')}]`);
+      console.log(`   Is Target Group Match: ${isTarget ? '✅ MATCHED' : '❌ NOT MATCHED'}`);
+      console.log(`   Raw Message: "${text.replace(/\r?\n+/g, ' ')}"`);
+
+      if (!isTarget) {
+        console.log(`   ⚠️ [GramJS] Message ignored because it is not from any monitored target group.`);
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        return;
+      }
+
       // Check if message matches any Cambodian banking or donation phrase
       const parsed = PhraseCatcher.parse(text, senderName);
 
-      if (parsed.matched) {
-        console.log(`\n⚡ [TelegramJS Client] Donation detected from target group "${chatTitle || (candidateMsgIds[0] || '')}"!`);
-        console.log(`   Payer: ${parsed.payerName || parsed.donorName}`);
-        console.log(`   Amount: ${parsed.currency === 'KHR' ? `${parsed.amount.toLocaleString()} ៛` : `$${parsed.amount.toFixed(2)}`}`);
-        console.log(`   Bank: ${parsed.bankingName}`);
-        console.log(`   Message: ${parsed.donorMessage || 'None'}`);
-        console.log(`   Raw Text: ${text.replace(/\r?\n+/g, ' ')}`);
+      console.log(`   🔎 [PhraseCatcher Result]: matched = ${parsed.matched ? '✅ YES' : '❌ NO'}`);
+      if (!parsed.matched) {
+        console.log(`   ⚠️ [GramJS] Text did not match any Cambodian bank notification patterns.`);
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        return;
+      }
 
-        // Resolve target streamer:
-        let targetStreamer: any = null;
-        if (parsed.recipient) {
-          const matchedByRecipient = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE OR display_name = ? COLLATE NOCASE').get(parsed.recipient, parsed.recipient) as any;
-          if (matchedByRecipient) {
-            targetStreamer = matchedByRecipient;
-            console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username} via recipient "${parsed.recipient}"`);
+      console.log(`   ⚡ [Bank Detected]: ${parsed.bankingName}`);
+      console.log(`   👤 [Payer / Donor]: ${parsed.payerName || parsed.donorName}`);
+      console.log(`   💰 [Amount]: ${parsed.currency === 'KHR' ? `${parsed.amount.toLocaleString()} ៛` : `$${parsed.amount.toFixed(2)}`}`);
+      console.log(`   💬 [Donor Message]: ${parsed.donorMessage || 'None'}`);
+      console.log(`   🔖 [Transaction Ref]: ${parsed.transactionRef || 'None'}`);
+
+      // Resolve target streamer:
+      let targetStreamer: any = null;
+      if (parsed.recipient) {
+        const matchedByRecipient = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE OR display_name = ? COLLATE NOCASE').get(parsed.recipient, parsed.recipient) as any;
+        if (matchedByRecipient) {
+          targetStreamer = matchedByRecipient;
+          console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username} via recipient "${parsed.recipient}"`);
+        }
+      }
+      if (!targetStreamer) {
+        const usernameMatch = text.match(/@([a-zA-Z0-9_]+)/);
+        if (usernameMatch && usernameMatch[1]) {
+          const matched = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE').get(usernameMatch[1]) as any;
+          if (matched) {
+            targetStreamer = matched;
+            console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username}`);
           }
         }
-        if (!targetStreamer) {
-          const usernameMatch = text.match(/@([a-zA-Z0-9_]+)/);
-          if (usernameMatch && usernameMatch[1]) {
-            const matched = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE').get(usernameMatch[1]) as any;
-            if (matched) {
-              targetStreamer = matched;
-              console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username}`);
-            }
-          }
-        }
-        if (!targetStreamer) {
-          targetStreamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(streamerId) as any;
-        }
-        if (!targetStreamer) {
-          targetStreamer = db.prepare('SELECT * FROM streamers LIMIT 1').get() as any;
-        }
+      }
+      if (!targetStreamer) {
+        targetStreamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(streamerId) as any;
+      }
+      if (!targetStreamer) {
+        targetStreamer = db.prepare('SELECT * FROM streamers LIMIT 1').get() as any;
+      }
 
-        if (targetStreamer) {
-          const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(targetStreamer.id) as any;
+      if (targetStreamer) {
+        const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(targetStreamer.id) as any;
 
-          // 1. Clean expired sessions (>5m) and gather active candidates within 5 minutes
-          let matchedTemp: any = null;
-          let dbDonation: any = null;
+        // 1. Clean expired sessions (>5m) and gather active candidates within 15 minutes
+        let matchedTemp: any = null;
+        let dbDonation: any = null;
+        try {
+          cleanupExpiredPendingDonations();
+
+          // Collect active candidates within 15 minutes window (MongoDB temporary queue + pending donations)
+          const seenIds = new Set<string>();
+          const candidates: any[] = [];
+
+          // A. MongoDB temporary_donations collection
           try {
-            cleanupExpiredPendingDonations();
+            const tempCol = await getTemporaryDonationsCollection();
+            const mongoRecent = await tempCol
+              .find({
+                $or: [
+                  { streamerId: targetStreamer.id },
+                  ...(targetStreamer.username ? [{ streamerUsername: targetStreamer.username }] : []),
+                  ...(targetStreamer.username ? [{ streamerId: targetStreamer.username }] : [])
+                ],
+                createdAt: { $gt: new Date(Date.now() - 15 * 60 * 1000) }
+              })
+              .sort({ createdAt: -1 })
+              .limit(30)
+              .toArray();
 
-            // Collect active candidates within 10 minutes window (MongoDB temporary queue + pending donations)
-            const seenIds = new Set<string>();
-            const candidates: any[] = [];
-
-            // A. MongoDB temporary_donations collection
-            try {
-              const tempCol = await getTemporaryDonationsCollection();
-              const mongoRecent = await tempCol
-                .find({
-                  streamerId: targetStreamer.id,
-                  createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
-                })
-                .sort({ createdAt: -1 })
-                .limit(30)
-                .toArray();
-
-              for (const doc of mongoRecent) {
-                const docId = doc.id || (doc as any).donationId || String(doc._id);
-                if (docId && !seenIds.has(docId)) {
-                  seenIds.add(docId);
-                  const msg = doc.donorMessage || (doc as any).donor_message || '';
-                  candidates.push({
-                    id: docId,
-                    streamer_id: doc.streamerId,
-                    donor_name: doc.donorName || (doc as any).donor_name,
-                    donor_message: msg,
-                    donorMessage: msg,
-                    amount: doc.amount,
-                    currency: doc.currency,
-                    banking_name: doc.bankingName,
-                    video_url: doc.videoUrl,
-                    video_title: doc.videoTitle,
-                    video_start_time: doc.videoStartTime,
-                    video_end_time: doc.videoEndTime,
-                    created_at: doc.createdAt
-                  });
-                }
-              }
-            } catch (e) {}
-
-            // B. SQLite pending donations (for original video & alert metadata)
-            try {
-              const pendingCandidates = db.prepare(`
-                SELECT * FROM donations
-                WHERE streamer_id = ?
-                  AND status = 'PENDING'
-                  AND created_at > datetime('now', '-10 minutes')
-                ORDER BY created_at DESC
-                LIMIT 30
-              `).all(targetStreamer.id) as any[];
-              for (const c of pendingCandidates) {
-                if (c && c.id && !seenIds.has(c.id)) {
-                  seenIds.add(c.id);
-                  candidates.push(c);
-                }
-              }
-            } catch (e) {}
-
-            matchedTemp = findMatchingTemporaryDonation(candidates, {
-              donorName: parsed.donorName,
-              payerName: parsed.payerName || parsed.donorName,
-              bankingName: parsed.bankingName,
-              rawText: text,
-              senderName,
-              amount: parsed.amount
-            });
-
-            if (matchedTemp) {
-              console.log(`🎯 [GramJS Listener Matched] Found active donation session ${matchedTemp.id} in MongoDB (Bank Name: "${matchedTemp.banking_name}", Donor: "${matchedTemp.donor_name}").`);
-              try {
-                const col = await getTemporaryDonationsCollection();
-                await col.deleteMany({
-                  $or: [{ id: matchedTemp.id }, { donationId: matchedTemp.id }]
+            for (const doc of mongoRecent) {
+              const docId = doc.id || (doc as any).donationId || String(doc._id);
+              if (docId && !seenIds.has(docId)) {
+                seenIds.add(docId);
+                const msg = doc.donorMessage || (doc as any).donor_message || '';
+                candidates.push({
+                  id: docId,
+                  streamer_id: doc.streamerId,
+                  donor_name: doc.donorName || (doc as any).donor_name,
+                  donor_message: msg,
+                  donorMessage: msg,
+                  amount: doc.amount,
+                  currency: doc.currency,
+                  banking_name: doc.bankingName,
+                  video_url: doc.videoUrl,
+                  video_title: doc.videoTitle,
+                  video_start_time: doc.videoStartTime,
+                  video_end_time: doc.videoEndTime,
+                  created_at: doc.createdAt
                 });
-              } catch (e) {}
-
-              // Also load full pending record from donations table to preserve all original video & donor data
-              try {
-                dbDonation = db.prepare('SELECT * FROM donations WHERE id = ?').get(matchedTemp.id);
-              } catch (e) {}
+              }
             }
-          } catch (matchErr) {
-            console.warn('[Temporary Listener] Error checking temporary donations in MongoDB:', matchErr);
+          } catch (e) {}
+
+          // B. SQLite pending donations (for original video & alert metadata)
+          try {
+            const pendingCandidates = db.prepare(`
+              SELECT * FROM donations
+              WHERE (streamer_id = ? OR streamer_id = ?)
+                AND status = 'PENDING'
+                AND created_at > datetime('now', '-15 minutes')
+              ORDER BY created_at DESC
+              LIMIT 30
+            `).all(targetStreamer.id, targetStreamer.username || targetStreamer.id) as any[];
+            for (const c of pendingCandidates) {
+              if (c && c.id && !seenIds.has(c.id)) {
+                seenIds.add(c.id);
+                candidates.push(c);
+              }
+            }
+          } catch (e) {}
+
+          console.log(`   📋 [Matching Queue] Found ${candidates.length} active pending donation candidate(s) waiting:`);
+          for (const c of candidates) {
+            console.log(`      - Candidate [${c.id}]: Donor="${c.donor_name}", PayerBankName="${c.banking_name || 'N/A'}", Amount=${c.amount} ${c.currency}`);
           }
+
+          matchedTemp = findMatchingTemporaryDonation(candidates, {
+            donorName: parsed.donorName,
+            payerName: parsed.payerName || parsed.donorName,
+            bankingName: parsed.bankingName,
+            rawText: text,
+            senderName,
+            amount: parsed.amount,
+            currency: parsed.currency
+          });
+
+          if (matchedTemp) {
+            console.log(`   🎯 [MATCH SUCCESS] Bound incoming bank transfer to pending session [${matchedTemp.id}]!`);
+            try {
+              const col = await getTemporaryDonationsCollection();
+              await col.deleteMany({
+                $or: [{ id: matchedTemp.id }, { donationId: matchedTemp.id }]
+              });
+            } catch (e) {}
+
+            // Also load full pending record from donations table to preserve all original video & donor data
+            try {
+              dbDonation = db.prepare('SELECT * FROM donations WHERE id = ?').get(matchedTemp.id);
+            } catch (e) {}
+          } else {
+            console.log(`   ℹ️ [NO PENDING MATCH] No pending session matched. Creating direct standalone live alert.`);
+          }
+        } catch (matchErr) {
+          console.warn('[Temporary Listener] Error checking temporary donations in MongoDB:', matchErr);
+        }
 
           // Preserve the original active session ID so the modal poller receives PAID status
           const activeDonationId = matchedTemp ? matchedTemp.id : uuidv4();
@@ -938,9 +975,15 @@ class TelegramUserClientManager {
             payment_method: parsed.bankingName,
             status: 'PAID'
           });
+
+          console.log(`   📡 [OBS Alert Broadcast] Alert fired to overlay token [${targetStreamer.overlay_token}]!`);
+          console.log(`      - Donor: "${effectiveDonorName}"`);
+          console.log(`      - Amount: ${effectiveCurrency === 'KHR' ? `${effectiveAmount.toLocaleString()} ៛` : `$${effectiveAmount.toFixed(2)}`}`);
+          console.log(`      - Bank: "${effectiveBankingName}"`);
+          console.log(`      - Message: "${effectiveDonorMessage || '(None)'}"`);
+          console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
         }
-      }
-    }, new NewMessage({}));
+      }, new NewMessage({}));
   }
 
   /**
@@ -1003,52 +1046,86 @@ class TelegramUserClientManager {
       return existing;
     }
 
-    // 1. Primary: Check MongoDB
-    try {
-      const sessionsCol = await getTelegramSessionsCollection();
-      const doc = await sessionsCol.findOne({ streamerId, isConnected: true });
-      if (doc && doc.sessionString && !doc.isSimulation && !doc.sessionString.startsWith('sim_session')) {
-        const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
-        const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
-        const client = new TelegramClient(new StringSession(doc.sessionString), apiId, apiHash, {
-          connectionRetries: Infinity
-        });
-        await client.connect();
-        if (await client.isUserAuthorized()) {
-          this.attachMessageListener(streamerId, client);
-          this.activeClients.set(streamerId, client);
-          await this.refreshMonitoredChats(streamerId);
-          console.log(`✅ [MongoDB] ensureClient revived GramJS listener for [${streamerId}]!`);
-          return client;
-        }
-      }
-    } catch (e) {
-      console.warn(`[TelegramJS] ensureClient MongoDB restore failed for [${streamerId}]:`, e);
+    if (this.connectingPromises.has(streamerId)) {
+      return this.connectingPromises.get(streamerId)!;
     }
 
-    // 2. Fallback: Check SQLite
-    try {
-      const row = db.prepare('SELECT id, telegram_phone, telegram_session, telegram_api_id, telegram_api_hash FROM streamers WHERE id = ? AND telegram_session IS NOT NULL').get(streamerId) as any;
-      if (row && row.telegram_session && !row.telegram_session.startsWith('sim_session')) {
-        const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
-        const apiHash = row.telegram_api_hash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
-        const client = new TelegramClient(new StringSession(row.telegram_session), apiId, apiHash, {
-          connectionRetries: Infinity
-        });
-        await client.connect();
-        if (await client.isUserAuthorized()) {
-          this.attachMessageListener(streamerId, client);
-          this.activeClients.set(streamerId, client);
-          await this.refreshMonitoredChats(streamerId);
-          console.log(`✅ [SQLite] ensureClient revived GramJS listener for [${streamerId}]!`);
-          return client;
+    const connectPromise = (async () => {
+      // 1. Primary: Check MongoDB
+      try {
+        const sessionsCol = await getTelegramSessionsCollection();
+        const doc = await sessionsCol.findOne({ streamerId, isConnected: true });
+        if (doc && doc.sessionString && !doc.isSimulation && !doc.sessionString.startsWith('sim_session')) {
+          const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
+          const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
+          const client = new TelegramClient(new StringSession(doc.sessionString), apiId, apiHash, {
+            connectionRetries: Infinity
+          });
+          await client.connect();
+          if (await client.isUserAuthorized()) {
+            this.attachMessageListener(streamerId, client);
+            this.activeClients.set(streamerId, client);
+            await this.refreshMonitoredChats(streamerId);
+            console.log(`✅ [MongoDB] ensureClient revived GramJS listener for [${streamerId}]!`);
+            return client;
+          } else {
+            console.warn(`⚠️ [MongoDB] GramJS session for [${streamerId}] is no longer authorized.`);
+            await sessionsCol.updateOne({ streamerId }, { $set: { isConnected: false } });
+          }
+        }
+      } catch (e: any) {
+        if (e?.errorMessage === 'AUTH_KEY_DUPLICATED' || e?.code === 406 || e?.message?.includes('AUTH_KEY_DUPLICATED')) {
+          console.warn(`❌ [TelegramJS] Auth session for [${streamerId}] was revoked by Telegram (AUTH_KEY_DUPLICATED).`);
+          try {
+            const sessionsCol = await getTelegramSessionsCollection();
+            await sessionsCol.updateOne({ streamerId }, { $set: { isConnected: false, sessionString: '' } });
+          } catch (_) {}
+          try {
+            db.prepare('UPDATE streamers SET telegram_session = NULL WHERE id = ?').run(streamerId);
+          } catch (_) {}
+        } else {
+          console.warn(`[TelegramJS] ensureClient MongoDB restore failed for [${streamerId}]:`, e?.message || e);
         }
       }
-    } catch (e) {
-      console.warn(`[TelegramJS] ensureClient SQLite restore failed for [${streamerId}]:`, e);
-    }
 
-    return null;
+      // 2. Fallback: Check SQLite
+      try {
+        const row = db.prepare('SELECT id, telegram_phone, telegram_session, telegram_api_id, telegram_api_hash FROM streamers WHERE id = ? AND telegram_session IS NOT NULL').get(streamerId) as any;
+        if (row && row.telegram_session && !row.telegram_session.startsWith('sim_session')) {
+          const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
+          const apiHash = row.telegram_api_hash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
+          const client = new TelegramClient(new StringSession(row.telegram_session), apiId, apiHash, {
+            connectionRetries: Infinity
+          });
+          await client.connect();
+          if (await client.isUserAuthorized()) {
+            this.attachMessageListener(streamerId, client);
+            this.activeClients.set(streamerId, client);
+            await this.refreshMonitoredChats(streamerId);
+            console.log(`✅ [SQLite] ensureClient revived GramJS listener for [${streamerId}]!`);
+            return client;
+          } else {
+            db.prepare('UPDATE streamers SET telegram_session = NULL WHERE id = ?').run(streamerId);
+          }
+        }
+      } catch (e: any) {
+        if (e?.errorMessage === 'AUTH_KEY_DUPLICATED' || e?.code === 406 || e?.message?.includes('AUTH_KEY_DUPLICATED')) {
+          console.warn(`❌ [TelegramJS] Auth session in SQLite for [${streamerId}] was revoked by Telegram (AUTH_KEY_DUPLICATED).`);
+          try {
+            db.prepare('UPDATE streamers SET telegram_session = NULL WHERE id = ?').run(streamerId);
+          } catch (_) {}
+        } else {
+          console.warn(`[TelegramJS] ensureClient SQLite restore failed for [${streamerId}]:`, e?.message || e);
+        }
+      }
+
+      return null;
+    })().finally(() => {
+      this.connectingPromises.delete(streamerId);
+    });
+
+    this.connectingPromises.set(streamerId, connectPromise);
+    return connectPromise;
   }
 
   /**
@@ -1166,17 +1243,23 @@ class TelegramUserClientManager {
       } catch (e) {}
     }
 
-    const hasActiveClient = this.activeClients.has(streamerId);
-    const hasSession = Boolean(
+    let hasActiveClient = this.activeClients.has(streamerId);
+    let hasSession = Boolean(
       (mongoSession && mongoSession.isConnected && mongoSession.sessionString) ||
       (sqliteRow && sqliteRow.telegram_session)
     );
 
-    // If session exists but client is not yet restored in memory, revive it in the background
+    // If session exists but client is not yet restored in memory, revive it and check actual health
     if (!hasActiveClient && hasSession) {
-      this.ensureClient(streamerId).catch((err) => {
-        console.warn(`[TelegramJS] ensureClient warm-up error for [${streamerId}]:`, err?.message || err);
-      });
+      try {
+        const client = await this.ensureClient(streamerId);
+        hasActiveClient = Boolean(client);
+        if (!client) {
+          hasSession = false;
+        }
+      } catch (_) {
+        hasSession = false;
+      }
     }
 
     let chats: string[] = [];
@@ -1276,6 +1359,9 @@ class TelegramUserClientManager {
    * Restore all saved sessions on startup (MongoDB Primary & SQLite Migration)
    */
   private async restoreAllSavedSessions() {
+    const seenSessions = new Set<string>();
+    const seenPhones = new Set<string>();
+
     // 1. Primary: Restore active sessions from MongoDB
     try {
       const sessionsCol = await getTelegramSessionsCollection();
@@ -1288,6 +1374,13 @@ class TelegramUserClientManager {
         if (!doc.sessionString || doc.isSimulation || doc.sessionString.startsWith('sim_session')) {
           continue;
         }
+
+        if (seenSessions.has(doc.sessionString) || (doc.phoneNumber && seenPhones.has(doc.phoneNumber))) {
+          console.warn(`⚠️ [MongoDB] Skipping duplicate session for [${doc.streamerId}] to prevent AUTH_KEY_DUPLICATED.`);
+          continue;
+        }
+        seenSessions.add(doc.sessionString);
+        if (doc.phoneNumber) seenPhones.add(doc.phoneNumber);
 
         const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
         const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
@@ -1310,7 +1403,12 @@ class TelegramUserClientManager {
             await sessionsCol.updateOne({ streamerId: doc.streamerId }, { $set: { isConnected: false } });
           }
         } catch (err: any) {
-          console.error(`❌ [MongoDB] Error restoring GramJS client for [${doc.streamerId}]:`, err?.message || err);
+          if (err?.errorMessage === 'AUTH_KEY_DUPLICATED' || err?.code === 406) {
+            console.warn(`❌ [MongoDB] GramJS session for [${doc.streamerId}] revoked by Telegram (AUTH_KEY_DUPLICATED). Resetting status.`);
+            await sessionsCol.updateOne({ streamerId: doc.streamerId }, { $set: { isConnected: false, sessionString: '' } });
+          } else {
+            console.error(`❌ [MongoDB] Error restoring GramJS client for [${doc.streamerId}]:`, err?.message || err);
+          }
         }
       }
     } catch (mongoErr) {
@@ -1328,6 +1426,13 @@ class TelegramUserClientManager {
         if (this.activeClients.has(row.id)) {
           continue; // Already restored from MongoDB
         }
+
+        if (seenSessions.has(row.telegram_session) || (row.telegram_phone && seenPhones.has(row.telegram_phone))) {
+          console.warn(`⚠️ [Migration] Skipping duplicate SQLite session for [${row.id}] to prevent AUTH_KEY_DUPLICATED.`);
+          continue;
+        }
+        seenSessions.add(row.telegram_session);
+        if (row.telegram_phone) seenPhones.add(row.telegram_phone);
 
         const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
         const apiHash = row.telegram_api_hash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';

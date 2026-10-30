@@ -158,6 +158,45 @@ export interface MatchingCriteria {
   rawText?: string | null;
   senderName?: string | null;
   amount?: number | null;
+  currency?: string | null;
+}
+
+/**
+ * Check whether candidate amount matches criteria amount, with support for USD <-> KHR conversions.
+ */
+export function amountsMatch(
+  candAmount: number,
+  candCurrency?: string | null,
+  critAmount?: number | null,
+  critCurrency?: string | null
+): boolean {
+  if (critAmount === undefined || critAmount === null || critAmount <= 0) return true;
+  if (candAmount <= 0) return false;
+
+  const cCurr = (candCurrency || 'USD').toUpperCase().trim();
+  const kCurr = (critCurrency || 'USD').toUpperCase().trim();
+
+  // 1. Direct same-currency match within $0.01 tolerance
+  if (cCurr === kCurr) {
+    return Math.abs(candAmount - critAmount) < 0.01;
+  }
+
+  // 2. Direct numeric match regardless of currency label (e.g. user entered 4000 without unit)
+  if (Math.abs(candAmount - critAmount) < 0.01) {
+    return true;
+  }
+
+  // 3. USD vs KHR conversion tolerance (~4,100 KHR per USD)
+  if (cCurr === 'USD' && kCurr === 'KHR') {
+    const converted = candAmount * 4100;
+    return Math.abs(converted - critAmount) < 200;
+  }
+  if (cCurr === 'KHR' && kCurr === 'USD') {
+    const converted = candAmount / 4100;
+    return Math.abs(converted - critAmount) < 0.05;
+  }
+
+  return false;
 }
 
 /**
@@ -172,37 +211,58 @@ export function findMatchingTemporaryDonation(
   if (!candidates || candidates.length === 0) return null;
 
   const payer = (criteria.payerName || criteria.donorName || '').trim();
-  if (!payer || isGenericBankKeyword(payer)) return null;
+  const hasValidPayer = Boolean(payer && !isGenericBankKeyword(payer));
 
   // 1. Try matching incoming Payer Name against candidate.banking_name (Payer Name / Bank Name entered on form)
-  for (const candidate of candidates) {
-    // If criteria amount is specified, strictly require amount match within $0.01 tolerance
-    if (criteria.amount !== undefined && criteria.amount !== null && criteria.amount > 0) {
-      if (Math.abs(candidate.amount - criteria.amount) >= 0.01) {
+  if (hasValidPayer) {
+    for (const candidate of candidates) {
+      if (!amountsMatch(candidate.amount, candidate.currency, criteria.amount, criteria.currency)) {
         continue;
+      }
+
+      const bankName = candidate.banking_name;
+      if (bankName && matchBankNames(payer, bankName)) {
+        return candidate;
       }
     }
 
-    const bankName = candidate.banking_name;
-    if (bankName && matchBankNames(payer, bankName)) {
-      return candidate;
-    }
-  }
-
-  // 2. Try matching incoming Payer Name against candidate.donor_name (if user entered their real name in display name)
-  for (const candidate of candidates) {
-    if (criteria.amount !== undefined && criteria.amount !== null && criteria.amount > 0) {
-      if (Math.abs(candidate.amount - criteria.amount) >= 0.01) {
+    // 2. Try matching incoming Payer Name against candidate.donor_name (if user entered their real name in display name)
+    for (const candidate of candidates) {
+      if (!amountsMatch(candidate.amount, candidate.currency, criteria.amount, criteria.currency)) {
         continue;
       }
-    }
 
-    const dName = candidate.donor_name;
-    if (dName && matchBankNames(payer, dName)) {
-      return candidate;
+      const dName = candidate.donor_name;
+      if (dName && matchBankNames(payer, dName)) {
+        return candidate;
+      }
     }
   }
 
-  // Strictly no blind fallback! Unmatched payments return null so unrelated pending sessions stay PENDING.
+  // 3. Match candidate's banking_name or donor_name against full raw message text
+  if (criteria.rawText) {
+    for (const candidate of candidates) {
+      if (!amountsMatch(candidate.amount, candidate.currency, criteria.amount, criteria.currency)) {
+        continue;
+      }
+      if (candidate.banking_name && matchesBankNameInText(criteria.rawText, candidate.banking_name)) {
+        return candidate;
+      }
+      if (candidate.donor_name && matchesBankNameInText(criteria.rawText, candidate.donor_name)) {
+        return candidate;
+      }
+    }
+  }
+
+  // 4. Exact amount match for sole active candidate in queue
+  if (criteria.amount !== undefined && criteria.amount !== null && criteria.amount > 0) {
+    const amountMatches = candidates.filter((c) =>
+      amountsMatch(c.amount, c.currency, criteria.amount, criteria.currency)
+    );
+    if (amountMatches.length === 1) {
+      return amountMatches[0];
+    }
+  }
+
   return null;
 }

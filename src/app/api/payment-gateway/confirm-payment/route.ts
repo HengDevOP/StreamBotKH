@@ -102,7 +102,8 @@ export async function POST(req: NextRequest) {
         bankingName,
         rawText: `${bankingName} ${donorName}`,
         senderName: donorName.trim(),
-        amount: numericAmount
+        amount: numericAmount,
+        currency
       });
 
       if (matchedTemp) {

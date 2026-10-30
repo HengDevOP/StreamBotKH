@@ -301,7 +301,8 @@ export class TelegramGroupListener {
           bankingName: parsed.bankingName,
           rawText: parsed.rawText,
           senderName: parsed.donorName,
-          amount: parsed.amount
+          amount: parsed.amount,
+          currency: parsed.currency
         });
 
         if (matchedTemp) {

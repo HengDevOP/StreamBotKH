@@ -294,18 +294,31 @@ export class PhraseCatcher {
    * Generic Payment Catch-all
    */
   private static parseGenericPayment(text: string, fallbackName: string): ParsedDonationPhrase {
-    const paymentKeywords = /received|transferred|tip|donation|paid|sent|forwarded/i;
-    if (!paymentKeywords.test(text)) {
-      return this.emptyResult(text, fallbackName);
-    }
-
     const { amount, currency } = this.extractAmountAndCurrency(text);
     if (amount <= 0) return this.emptyResult(text, fallbackName);
 
+    const paymentKeywords = /received|transferred|transfer|tip|donation|donate|paid|pay|payment|sent|send|forwarded|credit|deposited|deposit|cash\s*in|\+|plus|បានទទួល|ទូទាត់|ផ្ញើ|payer|from|amount|ចំនួន|ប្រាក់|ជោគជ័យ/i;
+    const hasKeyword = paymentKeywords.test(text);
+
     const donorName = this.extractDonorName(text, fallbackName);
+    const hasValidDonor = this.isValidPersonName(donorName);
+
+    // If amount is found and either has a payment keyword or has an identified person name:
+    if (!hasKeyword && !hasValidDonor) {
+      return this.emptyResult(text, fallbackName);
+    }
+
     const donorMessage = this.extractDonorMessage(text);
     const transactionRef = this.extractRef(text);
     const recipient = this.extractRecipient(text);
+
+    // Detect banking provider
+    let bankingName = 'Bakong KHQR';
+    const lower = text.toLowerCase();
+    if (lower.includes('aba')) bankingName = 'ABA Bank';
+    else if (lower.includes('acleda')) bankingName = 'ACLEDA Bank';
+    else if (lower.includes('wing')) bankingName = 'Wing Bank';
+    else if (lower.includes('canadia')) bankingName = 'Canadia Bank';
 
     return {
       matched: true,
@@ -314,10 +327,10 @@ export class PhraseCatcher {
       recipient,
       amount,
       currency,
-      bankingName: 'Bakong KHQR',
+      bankingName,
       donorMessage,
       transactionRef,
-      confidence: 0.85,
+      confidence: 0.90,
       rawText: text
     };
   }
@@ -325,21 +338,35 @@ export class PhraseCatcher {
   // --- Helper extraction utilities ---
 
   private static extractAmountAndCurrency(text: string): { amount: number; currency: 'USD' | 'KHR' } {
-    // 1. Check Khmer Riel (e.g. 40,000 KHR, 40000 ៛)
-    const khrMatch = text.match(/(\d{1,3}(?:,\d{3})+|\d+)\s*(?:KHR|៛|Riel)/i);
+    // 1. Check Khmer Riel (e.g. 40,000 KHR, 40000 ៛, ចំនួន: 4000 KHR, 4000 រៀល)
+    const khrMatch =
+      text.match(/(\d{1,3}(?:,\d{3})+|\d+)\s*(?:KHR|៛|Riel|រៀល)/i) ||
+      text.match(/(?:KHR|៛|រៀល)\s*[:\-–]?\s*(\d{1,3}(?:,\d{3})+|\d+)/i) ||
+      text.match(/(?:ចំនួន|ប្រាក់)\s*[:\-–]?\s*(\d{1,3}(?:,\d{3})+|\d+)\s*(?:KHR|៛|រៀល)/i);
+
     if (khrMatch) {
-      const val = parseFloat(khrMatch[1].replace(/,/g, ''));
-      if (val > 0) return { amount: val, currency: 'KHR' };
+      const rawVal = khrMatch[1] || khrMatch[2];
+      if (rawVal) {
+        const val = parseFloat(rawVal.replace(/,/g, ''));
+        if (val > 0) return { amount: val, currency: 'KHR' };
+      }
     }
 
-    // 2. Check USD (e.g. $5.00, 5.00 USD, $10, 10$)
-    const usdMatch = text.match(/(?:\$|\bUSD\s*)\s*(\d+(?:\.\d{1,2})?)/i) ||
-                     text.match(/(\d+(?:\.\d{1,2})?)\s*(?:\$|\bUSD\b)/i) ||
-                     text.match(/(?:received|transferred|\+)\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+    // 2. Check USD
+    // Matches e.g. $1.00, 1.00 USD, 1.00$, $1,000.50, Amount: $1.00, Amount: 1.00 USD, + 1.00 $, +$0.01
+    const usdPatterns = [
+      /\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)/i,
+      /(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(?:\$|\bUSD\b)/i,
+      /\bUSD\s*[:\-–]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)/i,
+      /(?:amount|total|credit|paid|received|transferred|\+|ចំនួន|ប្រាក់)\s*[:\-–]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(?:\$|\bUSD\b)?/i
+    ];
 
-    if (usdMatch) {
-      const val = parseFloat(usdMatch[1]);
-      if (val > 0) return { amount: val, currency: 'USD' };
+    for (const pat of usdPatterns) {
+      const match = text.match(pat);
+      if (match && match[1]) {
+        const val = parseFloat(match[1].replace(/,/g, ''));
+        if (val > 0) return { amount: val, currency: 'USD' };
+      }
     }
 
     return { amount: 0, currency: 'USD' };
@@ -354,6 +381,7 @@ export class PhraseCatcher {
       .replace(/\s+\bto\b\s+.*$/i, '')
       .replace(/\s+\bat\b\s+.*$/i, '')
       .replace(/\s+\bon\b\s+.*$/i, '')
+      .replace(/\s+(?:តាមរយៈ|ទៅកាន់|ទៅ|នៅ|កាលបរិច្ឆេទ)\s+.*$/i, '')
       .trim();
   }
 
@@ -386,7 +414,7 @@ export class PhraseCatcher {
     // 1. Explicit Payer / Payer Name label (Highest priority in ABA & Bot receipts)
     // Matches e.g. "Payer: SOKHA CHHIM", "Payer Name: SOKHA CHHIM", "Payer / Sender: SOKHA CHHIM", "អ្នកទូទាត់: សុខា"
     const payerMatch = text.match(
-      /(?:payer\s*(?:name|account)?|payer\s*\/\s*sender|អ្នកទូទាត់|ឈ្មោះអ្នកទូទាត់|ឈ្មោះអ្នកផ្ញើ|អ្នកផ្ញើ)\s*[:\-–]\s*([A-Za-z0-9_\s\u1780-\u17FF]+?)(?:\s*(?:\(\*[0-9]+\)|\([^\)]+\)|\bvia\b|\bon\b|\bto\b|\bat\b|Ref|Trx|Trans|Bank|Account|Remark|Message|Note|amount|\s+ចំនួន|ទៅ|[:\-–]|\.|\n|$))/i
+      /(?:payer(?:\s*name|\s*account)?|payer\s*\/\s*sender|sender(?:\s*name)?|customer(?:\s*name)?|account\s*name|អ្នកទូទាត់|ឈ្មោះអ្នកទូទាត់|ឈ្មោះអ្នកផ្ញើ|អ្នកផ្ញើ)\s*[:\-–]\s*([A-Za-z0-9_\s\u1780-\u17FF]+?)(?:\s*(?:\(\*[0-9]+\)|\([^\)]+\)|\bvia\b|\bon\b|\bto\b|\bat\b|\bfor\b|តាមរយៈ|ទៅកាន់|ទៅ|នៅ|Ref|Trx|Trans|Bank|Account|Remark|Message|Note|amount|\s+ចំនួន|[:\-–]|\.|\n|$))/i
     );
     if (payerMatch) {
       const candidate = this.cleanCandidate(payerMatch[1]);
@@ -398,7 +426,7 @@ export class PhraseCatcher {
     // 2. Paid by pattern: checking the phrase after "paid by {payer}"
     // Supported following delimiters: (*1234), to <recipient>, at <time/merchant>, on <date>, via <channel>, for <reason>, Trx/Ref/APV, Message/Note, punctuation [.:-], \n, $
     const paidByMatch = text.match(
-      /paid\s+by\s+([A-Za-z0-9_\s\u1780-\u17FF]+?)(?:\s*(?:\(\*[0-9]+\)|\([^\)]+\)|\bto\b|\bat\b|\bon\b|\bvia\b|\bfor\b|Trx|Trans|Ref|APV|Remark|Message|Note|[:\-–]|\.|\n|$))/i
+      /paid\s+by\s+([A-Za-z0-9_\s\u1780-\u17FF]+?)(?:\s*(?:\(\*[0-9]+\)|\([^\)]+\)|\bto\b|\bat\b|\bon\b|\bvia\b|\bfor\b|តាមរយៈ|ទៅកាន់|ទៅ|នៅ|Trx|Trans|Ref|APV|Remark|Message|Note|[:\-–]|\.|\n|$))/i
     );
     if (paidByMatch) {
       const candidate = this.cleanCandidate(paidByMatch[1]);
@@ -408,8 +436,8 @@ export class PhraseCatcher {
     }
 
     // 3. Sender / From patterns:
-    // e.g. "from SOKHA CHHIM (ABA Bank)", "received from SOKHA CHHIM", "From: SOKHA CHHIM"
-    const fromRegex = /(?:from|received\s+from|sender(?:\s*name)?|sent\s+by|customer(?:\s*name)?|account\s+name|ពី|ពីឈ្មោះ)\s*[:\-–]?\s*([A-Za-z0-9_\s\u1780-\u17FF]+?)(?:\s*(?:\(\*[0-9]+\)|\([^\)]+\)|\bvia\b|\bon\b|\bto\b|\bat\b|Ref|Trx|Trans|Bank|Account|Remark|Message|Note|amount|\s+ចំនួន|ទៅ|[:\-–]|\.|\n|$))/gi;
+    // e.g. "from SOKHA CHHIM (ABA Bank)", "received from SOKHA CHHIM", "From: SOKHA CHHIM", "ពីឈ្មោះ HO CHENHENG តាមរយៈ ABA Mobile"
+    const fromRegex = /(?:from|received\s+from|sender(?:\s*name)?|sent\s+by|customer(?:\s*name)?|account\s+name|ពីឈ្មោះ|ពី)\s*[:\-–]?\s*([A-Za-z0-9_\s\u1780-\u17FF]+?)(?:\s*(?:\(\*[0-9]+\)|\([^\)]+\)|\bvia\b|\bon\b|\bto\b|\bat\b|\bfor\b|តាមរយៈ|ទៅកាន់|ទៅ|នៅ|Ref|Trx|Trans|Bank|Account|Remark|Message|Note|amount|\s+ចំនួន|[:\-–]|\.|\n|$))/gi;
     let match: RegExpExecArray | null;
     while ((match = fromRegex.exec(text)) !== null) {
       const candidate = this.cleanCandidate(match[1]);
@@ -420,10 +448,21 @@ export class PhraseCatcher {
 
     // 4. Natural language receipt: 'received a payment of $X from <Payer>'
     const naturalMatch = text.match(
-      /(?:received(?:\s+a\s+payment)?(?:\s+of)?\s*(?:\$|KHR|៛)?\s*\d+(?:\.\d{1,2})?\s*(?:USD|KHR|៛|\$)?)\s+from\s+([A-Za-z0-9_\s\u1780-\u17FF]+?)(?:\s*(?:\([^\)]+\)|\bvia\b|\bon\b|\bto\b|\bat\b|Ref|Trx|Trans|Bank|[:\-–]|\.|\n|$))/i
+      /(?:received(?:\s+a\s+payment)?(?:\s+of)?\s*(?:\$|KHR|៛)?\s*\d+(?:\.\d{1,2})?\s*(?:USD|KHR|៛|\$)?)\s+from\s+([A-Za-z0-9_\s\u1780-\u17FF]+?)(?:\s*(?:\([^\)]+\)|\bvia\b|\bon\b|\bto\b|\bat\b|តាមរយៈ|ទៅកាន់|ទៅ|នៅ|Ref|Trx|Trans|Bank|[:\-–]|\.|\n|$))/i
     );
     if (naturalMatch) {
       const candidate = this.cleanCandidate(naturalMatch[1]);
+      if (this.isValidPersonName(candidate)) {
+        return candidate;
+      }
+    }
+
+    // 5. Subject action receipt: '<Name> has transferred / sent / paid $X'
+    const subjectMatch = text.match(
+      /^([A-Za-z\s\u1780-\u17FF]{2,40}?)\s+(?:has\s+)?(?:transferred|sent|paid|donated)\s+(?:(?:\$|\bUSD|\bKHR|៛)\s*)?\d/i
+    );
+    if (subjectMatch) {
+      const candidate = this.cleanCandidate(subjectMatch[1]);
       if (this.isValidPersonName(candidate)) {
         return candidate;
       }
