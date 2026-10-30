@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAlertBoxesCollection } from '@/server/database/mongo';
 import { ObjectId } from 'mongodb';
+import { db } from '@/server/database/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       return NextResponse.json({ success: false, error: 'Alert box not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, alertBox: box });
+    let overlayToken = null;
+    try {
+      const streamer = db.prepare('SELECT overlay_token FROM streamers WHERE id = ? OR username = ?').get(box.userId, box.userId) as any;
+      overlayToken = streamer?.overlay_token || null;
+    } catch (e) {}
+
+    return NextResponse.json({ success: true, alertBox: box, overlayToken });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -60,7 +67,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        updateFields[key] = body[key];
+        if (key === 'minAmountCondition') {
+          updateFields[key] = Math.max(0.001, Number(body[key]) >= 0 ? Number(body[key]) : 0.01);
+        } else {
+          updateFields[key] = body[key];
+        }
       }
     }
 

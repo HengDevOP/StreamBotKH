@@ -44,6 +44,7 @@ export interface AlertBox {
 
 export interface LiveAlertPayload {
   donationId: string;
+  boxId?: string;
   donorName: string;
   donorMessage?: string;
   amount: number;

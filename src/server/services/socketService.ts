@@ -6,9 +6,12 @@ const recentOverlayAlerts = new Map<string, { payload: AlertPayload; timestamp: 
 
 export interface AlertPayload {
   id?: string;
+  boxId?: string;
   donationId: string;
   donorName: string;
   donorMessage?: string;
+  donor_message?: string;
+  message?: string;
   amount: number;
   currency: string;
   bankingName?: string;

@@ -8,23 +8,29 @@ import { NeonAlertCard } from './NeonAlertCard';
 interface AlertBoxOverlayProps {
   overlayToken: string;
   mode?: 'all' | 'video-only' | 'alert-only';
+  boxId?: string;
 }
 
-export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, mode = 'all' }) => {
+export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, mode = 'all', boxId }) => {
   const { socket, connected, joinOverlayRoom } = useSocket();
   const { currentAlert, pushAlert, dismissCurrentAlert, queueLength } = useAlertQueue();
   const [ready, setReady] = useState(false);
   const [overlayConfig, setOverlayConfig] = useState<any>(null);
   const [alertBoxes, setAlertBoxes] = useState<any[]>([]);
   const [urlMode, setUrlMode] = useState<string | null>(null);
+  const [urlBoxId, setUrlBoxId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const m = params.get('mode') || params.get('only') || params.get('type');
       if (m) setUrlMode(m.toLowerCase());
+      const b = params.get('boxId') || params.get('box') || params.get('box_id') || params.get('id');
+      if (b) setUrlBoxId(b.trim());
     }
   }, []);
+
+  const activeBoxId = boxId || urlBoxId;
 
   let activeMode: 'all' | 'video-only' | 'alert-only' = mode;
   if (urlMode === 'video') activeMode = 'video-only';
@@ -235,15 +241,43 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
 
       console.log('⚡ [Overlay] Live donation alert accepted:', alertId, payload);
       const tipAmount = Number(payload.amount) || 0;
+      const tipAmountInUsd = payload.currency === 'KHR' ? tipAmount / 4000 : tipAmount;
 
-      // Find highest active matching condition alert box
+      // Find highest active matching condition alert box (sorted descending by condition threshold)
       const activeBoxes = alertBoxes.filter((b) => b.isEnabled);
-      const matchingBox =
-        activeBoxes
-          .filter((b) => tipAmount >= (Number(b.minAmountCondition) || 0))
-          .sort((a, b) => (Number(b.minAmountCondition) || 0) - (Number(a.minAmountCondition) || 0))[0] ||
-        activeBoxes[0] ||
-        overlayConfig;
+      const matchingBoxes = activeBoxes
+        .filter((b) => tipAmountInUsd >= ((Number(b.minAmountCondition) || 0) - 0.0001))
+        .sort((a, b) => (Number(b.minAmountCondition) || 0) - (Number(a.minAmountCondition) || 0));
+
+      // The highest box whose condition threshold is met (e.g. >= 0.10 picks 0.10, >= 0.01 picks 0.01)
+      const conditionMatchedBox =
+        matchingBoxes[0] ||
+        (payload.boxId ? activeBoxes.find((b) => String(b._id) === String(payload.boxId)) : null) ||
+        (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
+
+      const resolvedBoxId = payload.boxId || (conditionMatchedBox?._id ? String(conditionMatchedBox._id) : null);
+
+      // If this overlay is dedicated to a specific box (via ?boxId=... or /overlay/box/...),
+      // verify if this alert belongs to THIS specific box!
+      if (activeBoxId) {
+        if (payload.isTest) {
+          // If this test alert was sent for a different specific box, ignore it
+          if (payload.boxId && String(payload.boxId) !== String(activeBoxId)) {
+            console.log(`⚡ [Overlay] Dedicated box (${activeBoxId}) ignoring test alert for box (${payload.boxId})`);
+            return;
+          }
+        } else {
+          // For real donations: only fire if the condition matched this specific dedicated box!
+          if (resolvedBoxId && String(resolvedBoxId) !== String(activeBoxId)) {
+            console.log(`⚡ [Overlay] Dedicated box (${activeBoxId}) ignoring alert matched to box (${resolvedBoxId})`);
+            return;
+          }
+        }
+      }
+
+      // If activeBoxId is specified on this overlay instance, prioritize its custom appearance & rules
+      const dedicatedBox = activeBoxId ? activeBoxes.find((b) => String(b._id) === String(activeBoxId)) : null;
+      const matchingBox = dedicatedBox || conditionMatchedBox || overlayConfig;
 
       const rawMsg = payload.donorMessage || payload.donor_message || payload.message || '';
       const isMeaningful = Boolean(
@@ -288,7 +322,6 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       };
 
       // Video alert condition checking ($0.25 to $50 minimum tip and enabled toggle)
-      const tipAmountInUsd = payload.currency === 'KHR' ? tipAmount / 4000 : tipAmount;
       const minTipRequired = Number(payload.videoMinTipAmount ?? overlayConfig?.videoMinTipAmount ?? 0.25);
       const videoAlertsEnabled = payload.videoAlertEnabled !== undefined
         ? Boolean(payload.videoAlertEnabled)
@@ -407,7 +440,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       pendingVideosRef.current.forEach((item) => clearTimeout(item.timer));
       pendingVideosRef.current.clear();
     };
-  }, [socket, pushAlert, overlayConfig, alertBoxes, overlayToken]);
+  }, [socket, pushAlert, overlayConfig, alertBoxes, overlayToken, activeBoxId]);
 
   return (
     <div className="w-full h-full min-h-screen bg-transparent flex flex-col items-center justify-center p-4 relative select-none">

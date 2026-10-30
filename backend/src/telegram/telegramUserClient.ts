@@ -949,13 +949,20 @@ class TelegramUserClientManager {
               .sort({ minAmountCondition: -1 })
               .toArray();
 
-            matchingBox = activeBoxes.find((b) => effectiveAmount >= (Number(b.minAmountCondition) || 0)) || activeBoxes[0];
+            const effectiveAmountUsd = effectiveCurrency === 'KHR' ? effectiveAmount / 4000 : effectiveAmount;
+            const matchingBoxes = activeBoxes.filter(
+              (b) => effectiveAmountUsd >= ((Number(b.minAmountCondition) || 0) - 0.0001)
+            );
+            matchingBox = matchingBoxes.length > 0
+              ? matchingBoxes[0]
+              : (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
           } catch (e) {
             console.warn('[TelegramJS] Could not fetch mongo alert boxes, using sqlite fallback:', e);
           }
 
           // Broadcast alert to OBS Studio overlay in real-time with current saved settings
           broadcastAlertToOverlay(targetStreamer.overlay_token, {
+            boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
             donationId: activeDonationId,
             donorName: effectiveDonorName,
             donorMessage: effectiveDonorMessage,

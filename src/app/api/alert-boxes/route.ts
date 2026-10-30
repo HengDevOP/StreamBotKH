@@ -34,7 +34,13 @@ export async function GET(req: NextRequest) {
     const col = await getAlertBoxesCollection();
     const boxes = await col.find({ userId }).sort({ minAmountCondition: 1 }).toArray();
 
-    return NextResponse.json({ success: true, alertBoxes: boxes });
+    let overlayToken = null;
+    try {
+      const streamer = db.prepare('SELECT overlay_token FROM streamers WHERE id = ? OR username = ?').get(userId, userId) as any;
+      overlayToken = streamer?.overlay_token || null;
+    } catch (e) {}
+
+    return NextResponse.json({ success: true, alertBoxes: boxes, overlayToken });
   } catch (err: any) {
     console.error('Error in GET /api/alert-boxes:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -78,7 +84,7 @@ export async function POST(req: NextRequest) {
     const newDoc: AlertBoxDoc = {
       userId,
       name: name.trim(),
-      minAmountCondition: Math.max(0.1, Number(minAmountCondition) || 1.0),
+      minAmountCondition: Math.max(0.001, Number(minAmountCondition) >= 0 ? Number(minAmountCondition) : 0.01),
       isEnabled: Boolean(isEnabled),
       templateStyle: templateStyle || 'neon-box',
       showImage: showImage !== false,

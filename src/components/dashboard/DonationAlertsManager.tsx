@@ -43,6 +43,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
   const [alertBoxes, setAlertBoxes] = useState<AlertBox[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedBoxId, setCopiedBoxId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
 
   // Active target selected for studio management (null = list view)
@@ -114,6 +115,16 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     navigator.clipboard.writeText(obsUrl);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
+  const copyBoxUrl = (box: AlertBox, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const token = streamerToken || 'streamer-token';
+    const url = `${origin}/overlay/${token}?boxId=${box._id}`;
+    navigator.clipboard.writeText(url);
+    setCopiedBoxId(box._id);
+    setTimeout(() => setCopiedBoxId(null), 2000);
   };
 
   // Open Target Alert Box Studio Page
@@ -197,6 +208,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     const effectiveToken = streamerToken || 'demo-token';
     const alertPayload = {
       donationId: 'test-' + Date.now(),
+      boxId: String(box._id),
       donorName: 'Neon Supporter 🔥',
       donorMessage: 'Awesome stream! Keep up the insane energy! ⚡',
       amount: box.minAmountCondition || 5.0,
@@ -289,6 +301,39 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
         >
           Create Donation Box
         </Button>
+      </div>
+
+      {/* Global Universal Overlay Bar */}
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
+            <Monitor size={18} />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
+              <span>Universal OBS Overlay URL</span>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                ALL TIERS IN ONE
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 font-mono truncate max-w-xl">
+              Automatically triggers whichever alert box matches the donation condition (&ge; threshold).
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex-1 md:w-64 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-400 truncate select-all">
+            {obsUrl}
+          </div>
+          <button
+            type="button"
+            onClick={copyObsUrl}
+            className="px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-xs font-mono font-bold text-cyan-300 flex items-center gap-1.5 transition-colors flex-shrink-0"
+          >
+            {copiedUrl ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+            <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Donation Boxes Card Grid */}
@@ -410,6 +455,57 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Dedicated OBS Browser Source URL for this Box */}
+                {(() => {
+                  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                  const token = streamerToken || 'streamer-token';
+                  const boxUrl = `${origin}/overlay/${token}?boxId=${box._id}`;
+                  const isCopied = copiedBoxId === box._id;
+
+                  return (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800/80 flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <Monitor size={12} className="text-cyan-400 flex-shrink-0" />
+                        <span className="text-[10px] font-mono text-slate-400 truncate select-all" title={boxUrl}>
+                          {boxUrl}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => copyBoxUrl(box, e)}
+                          title="Copy Dedicated OBS Browser Source URL"
+                          className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-cyan-950/60 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-500/40 transition-colors flex items-center gap-1 text-[10px] font-mono font-bold"
+                        >
+                          {isCopied ? (
+                            <>
+                              <Check size={11} className="text-emerald-400" />
+                              <span className="text-emerald-400">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={11} />
+                              <span>Copy URL</span>
+                            </>
+                          )}
+                        </button>
+                        <a
+                          href={boxUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open dedicated overlay in new tab"
+                          className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors"
+                        >
+                          <ExternalLink size={11} />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Card Bottom: Test and Edit Buttons */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">

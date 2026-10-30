@@ -364,12 +364,12 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     }
   };
 
-  const obsUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/overlay/${effectiveToken}`
-    : `https://streambotkh.com/overlay/${effectiveToken}`;
+  const dedicatedBoxUrl = box?._id
+    ? (typeof window !== 'undefined' ? `${window.location.origin}/overlay/${effectiveToken}?boxId=${box._id}` : `https://streambotkh.com/overlay/${effectiveToken}?boxId=${box._id}`)
+    : (typeof window !== 'undefined' ? `${window.location.origin}/overlay/${effectiveToken}` : `https://streambotkh.com/overlay/${effectiveToken}`);
 
   const copyObsUrl = () => {
-    navigator.clipboard.writeText(obsUrl);
+    navigator.clipboard.writeText(dedicatedBoxUrl);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
   };
@@ -389,6 +389,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     // Build payload with all active studio configurations
     const alertPayload = {
       donationId: 'test-' + Date.now(),
+      boxId: box?._id ? String(box._id) : undefined,
       donorName: demoDonorName,
       donorMessage: demoMessage,
       amount: demoAmount,
@@ -483,7 +484,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     try {
       const payload = {
         name,
-        minAmountCondition: Number(minAmountCondition) || 1.0,
+        minAmountCondition: Number(minAmountCondition) >= 0 ? Number(minAmountCondition) : 0.01,
         isEnabled,
         templateStyle,
         showImage,
@@ -651,16 +652,16 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
             </button>
           )}
 
-          {/* OBS Studio Browser Source URL with Copy Icon (desktop only) */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono max-w-[320px]">
+          {/* Dedicated OBS Studio Browser Source URL with Copy Icon (desktop only) */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono max-w-[340px]">
             <Monitor size={14} className="text-cyan-400 flex-shrink-0" />
-            <span className="text-[11px] text-slate-400 truncate select-all flex-1" title={obsUrl}>
-              {obsUrl}
+            <span className="text-[11px] text-slate-400 truncate select-all flex-1" title={dedicatedBoxUrl}>
+              {dedicatedBoxUrl}
             </span>
             <button
               type="button"
               onClick={copyObsUrl}
-              title={copiedUrl ? 'Copied OBS URL!' : 'Copy OBS Browser Source URL'}
+              title={copiedUrl ? 'Copied OBS URL!' : 'Copy Dedicated OBS Browser Source URL'}
               className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-colors flex-shrink-0"
             >
               {copiedUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
@@ -1672,15 +1673,44 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono font-bold">$</span>
                       <input
                         type="number"
-                        step="0.5"
-                        min="0.1"
+                        step="0.01"
+                        min="0.001"
                         value={minAmountCondition}
                         onChange={(e) => setMinAmountCondition(parseFloat(e.target.value) || 0)}
                         className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
                       />
                     </div>
                     <p className="text-[10px] text-slate-500 font-mono">
-                      Tips equal to or greater than this amount will display this alert box.
+                      Tips equal to or greater than this amount (≥ ${minAmountCondition.toFixed(2)}) will trigger this alert box.
+                    </p>
+                  </div>
+
+                  {/* Dedicated OBS Browser Source URL Box */}
+                  <div className="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-cyan-300">
+                        <Monitor size={14} className="text-cyan-400" />
+                        Dedicated OBS Source URL
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                        ≥ ${minAmountCondition.toFixed(2)} Only
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-slate-950 p-2 rounded-xl border border-slate-800">
+                      <span className="text-[11px] font-mono text-slate-300 truncate select-all flex-1" title={dedicatedBoxUrl}>
+                        {dedicatedBoxUrl}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={copyObsUrl}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-mono font-bold flex items-center gap-1 transition-colors"
+                      >
+                        {copiedUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                        <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-mono leading-relaxed">
+                      Add this dedicated URL as a Browser Source in OBS Studio (1920x1080) to exclusively capture alerts matching this threshold tier.
                     </p>
                   </div>
 
