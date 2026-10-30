@@ -2,6 +2,8 @@ import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { Api } from 'telegram/tl';
 import { NewMessage } from 'telegram/events';
+import { sleep, returnBigInt, getRandomInt } from 'telegram/Helpers';
+import { UpdateConnectionState } from 'telegram/network';
 import { v4 as uuidv4 } from 'uuid';
 import { db, cleanupExpiredPendingDonations } from '../../../src/server/database/db';
 import { broadcastAlertToOverlay, broadcastDonationToDashboard } from '../../../src/server/services/socketService';
@@ -13,6 +15,105 @@ import {
   getTelegramSessionsCollection,
   getTelegramMonitoredGroupsCollection
 } from '../../../src/server/database/mongo';
+
+// ============================================================================
+// FIX GramJS PING_INTERVAL_TO_WAKE_UP BUG:
+// In gramjs updates.js, PING_INTERVAL_TO_WAKE_UP was set to 5000ms, while the ping
+// interval is 9000ms. Because 9000 > 5000, EVERY ping falsely triggered a 3-second
+// wake-up timeout with no retries, dumping noisy "Error: TIMEOUT" traces and reconnecting.
+// We patch _updateLoop to use 30000ms wake-up threshold and 15s ping timeout with 3 attempts.
+// ============================================================================
+try {
+  const updatesModule = require('telegram/client/updates');
+  const PING_INTERVAL = 9000;
+  const PING_TIMEOUT = 15000;
+  const PING_FAIL_ATTEMPTS = 3;
+  const PING_FAIL_INTERVAL = 300;
+  const PING_DISCONNECT_DELAY = 60000;
+  const PING_INTERVAL_TO_WAKE_UP = 30000; // 30s threshold
+  const PING_WAKE_UP_TIMEOUT = 10000;
+  const PING_WAKE_UP_WARNING_TIMEOUT = 5000;
+
+  function timeout(cb: () => Promise<any>, ms: number) {
+    let isResolved = false;
+    return Promise.race([
+      cb(),
+      sleep(ms).then(() => (isResolved ? undefined : Promise.reject(new Error('TIMEOUT')))),
+    ]).finally(() => {
+      isResolved = true;
+    });
+  }
+
+  async function attempts(cb: () => Promise<any>, times: number, pause: number) {
+    for (let i = 0; i < times; i++) {
+      try {
+        return await cb();
+      } catch (err) {
+        if (i === times - 1) throw err;
+        await sleep(pause);
+      }
+    }
+  }
+
+  updatesModule._updateLoop = async function patchedUpdateLoop(client: any) {
+    let lastPongAt: number | undefined;
+    while (!client._destroyed) {
+      await sleep(PING_INTERVAL, true);
+      if (client._destroyed) break;
+      if (client._sender?.isReconnecting || client._isSwitchingDc) {
+        lastPongAt = undefined;
+        continue;
+      }
+      try {
+        const ping = () => {
+          return client._sender.send(
+            new Api.PingDelayDisconnect({
+              pingId: returnBigInt(getRandomInt(Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)),
+              disconnectDelay: PING_DISCONNECT_DELAY,
+            })
+          );
+        };
+        const pingAt = Date.now();
+        const lastInterval = lastPongAt ? pingAt - lastPongAt : undefined;
+        if (!lastInterval || lastInterval < PING_INTERVAL_TO_WAKE_UP) {
+          await attempts(() => timeout(ping, PING_TIMEOUT), PING_FAIL_ATTEMPTS, PING_FAIL_INTERVAL);
+        } else {
+          let wakeUpWarningTimeout: any = setTimeout(() => {
+            updatesModule._handleUpdate(client, UpdateConnectionState.disconnected);
+            wakeUpWarningTimeout = undefined;
+          }, PING_WAKE_UP_WARNING_TIMEOUT);
+          await timeout(ping, PING_WAKE_UP_TIMEOUT);
+          if (wakeUpWarningTimeout) {
+            clearTimeout(wakeUpWarningTimeout);
+            wakeUpWarningTimeout = undefined;
+          }
+          updatesModule._handleUpdate(client, UpdateConnectionState.connected);
+        }
+        lastPongAt = Date.now();
+      } catch (err: any) {
+        lastPongAt = undefined;
+        if (client._sender?.isReconnecting || client._isSwitchingDc) {
+          continue;
+        }
+        try {
+          client._sender?.reconnect();
+        } catch (_) {}
+      }
+
+      if (Date.now() - (client._lastRequest || 0) > 30 * 60 * 1000) {
+        try {
+          await client.invoke(new Api.updates.GetState());
+        } catch (_) {}
+        lastPongAt = undefined;
+      }
+    }
+    try {
+      await client.disconnect();
+    } catch (_) {}
+  };
+} catch (patchErr) {
+  console.warn('[GramJS] Could not install updateLoop patch:', patchErr);
+}
 
 export interface PendingAuth {
   client?: TelegramClient;
@@ -78,6 +179,28 @@ class TelegramUserClientManager {
     }, 2000);
   }
 
+  public createClient(session: StringSession | string, apiId: number, apiHash: string): TelegramClient {
+    const s = typeof session === 'string' ? new StringSession(session) : session;
+    const client = new TelegramClient(s, apiId, apiHash, {
+      connectionRetries: Infinity,
+      autoReconnect: true,
+      retryDelay: 1000
+    });
+
+    try {
+      client.setLogLevel('warn');
+    } catch (_) {}
+
+    client.onError = (err: any) => {
+      if (err?.message === 'TIMEOUT' || err?.message?.includes('TIMEOUT')) {
+        return;
+      }
+      console.warn('[GramJS Top-Level Error]:', err?.message || err);
+    };
+
+    return client;
+  }
+
   /**
    * Request Telegram verification code via TelegramJS (GramJS)
    */
@@ -125,9 +248,7 @@ class TelegramUserClientManager {
     try {
       console.log(`⚡ [TelegramJS] Connecting to REAL Telegram MTProto for ${cleanPhone} (API ID: ${apiId})...`);
 
-      const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
-        connectionRetries: Infinity,
-      });
+      const client = this.createClient('', apiId, apiHash);
 
       await client.connect();
 
@@ -258,9 +379,7 @@ class TelegramUserClientManager {
           const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
           const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
 
-          const restoredClient = new TelegramClient(new StringSession(doc.sessionString), apiId, apiHash, {
-            connectionRetries: Infinity,
-          });
+          const restoredClient = this.createClient(doc.sessionString, apiId, apiHash);
           await restoredClient.connect();
 
           pending = {
@@ -302,9 +421,7 @@ class TelegramUserClientManager {
           const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
           const apiHash = row.telegram_api_hash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
 
-          const restoredClient = new TelegramClient(new StringSession(row.telegram_pending_session), apiId, apiHash, {
-            connectionRetries: Infinity,
-          });
+          const restoredClient = this.createClient(row.telegram_pending_session, apiId, apiHash);
           await restoredClient.connect();
 
           pending = {
@@ -1130,9 +1247,7 @@ class TelegramUserClientManager {
         if (doc && doc.sessionString && !doc.isSimulation && !doc.sessionString.startsWith('sim_session')) {
           const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
           const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
-          const client = new TelegramClient(new StringSession(doc.sessionString), apiId, apiHash, {
-            connectionRetries: Infinity
-          });
+          const client = this.createClient(doc.sessionString, apiId, apiHash);
           await client.connect();
           if (await client.isUserAuthorized()) {
             this.attachMessageListener(streamerId, client);
@@ -1166,9 +1281,7 @@ class TelegramUserClientManager {
         if (row && row.telegram_session && !row.telegram_session.startsWith('sim_session')) {
           const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
           const apiHash = row.telegram_api_hash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
-          const client = new TelegramClient(new StringSession(row.telegram_session), apiId, apiHash, {
-            connectionRetries: Infinity
-          });
+          const client = this.createClient(row.telegram_session, apiId, apiHash);
           await client.connect();
           if (await client.isUserAuthorized()) {
             this.attachMessageListener(streamerId, client);
@@ -1453,10 +1566,7 @@ class TelegramUserClientManager {
 
         try {
           console.log(`⚡ [MongoDB] Restoring GramJS session for streamer [${doc.streamerId}] (${doc.phoneNumber || ''})...`);
-          const client = new TelegramClient(new StringSession(doc.sessionString), apiId, apiHash, {
-            connectionRetries: Infinity
-          });
-
+          const client = this.createClient(doc.sessionString, apiId, apiHash);
           await client.connect();
 
           if (await client.isUserAuthorized()) {
@@ -1507,10 +1617,7 @@ class TelegramUserClientManager {
 
         try {
           console.log(`⚡ [Migration] Restoring and migrating saved session from SQLite for ${row.telegram_phone}...`);
-          const client = new TelegramClient(new StringSession(row.telegram_session), apiId, apiHash, {
-            connectionRetries: Infinity
-          });
-
+          const client = this.createClient(row.telegram_session, apiId, apiHash);
           await client.connect();
 
           if (await client.isUserAuthorized()) {
