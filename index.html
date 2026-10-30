@@ -13,6 +13,18 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/fonts/khmer-fonts.css" />
+    <script>
+      // Overlay / widget source URLs must be 100% transparent from the very first paint
+      (function () {
+        var p = window.location.pathname.toLowerCase();
+        if (p.indexOf('/overlay') === 0 || p.indexOf('/widget') === 0) {
+          document.documentElement.className += ' obs-transparent';
+          var s = document.createElement('style');
+          s.innerHTML = 'html,body,#root,main{background:transparent !important;background-color:transparent !important;background-image:none !important;}';
+          document.head.appendChild(s);
+        }
+      })();
+    </script>
   </head>
   <body class="bg-[#070A12] text-slate-100 antialiased font-['Inter',sans-serif] selection:bg-cyan-500 selection:text-black">
     <div id="root"></div>

@@ -20,6 +20,14 @@
 }
 
 /* Ensure OBS browser overlay sources remain 100% transparent */
+html.obs-transparent,
+html.obs-transparent body,
+html.obs-transparent #root {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
 html:has(.obs-overlay),
 body:has(.obs-overlay) {
   background: transparent !important;

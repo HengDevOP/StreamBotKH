@@ -193,19 +193,31 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
 
   return (
     <div
-      className={`relative w-full rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl group select-none flex flex-col ${className}`}
-      style={{
-        boxShadow: `0 0 30px ${glowColor}25, 0 8px 32px rgba(0,0,0,0.85)`
-      }}
+      className={`relative w-full overflow-hidden group select-none flex flex-col ${
+        isPreview
+          ? 'rounded-2xl bg-black border border-slate-800 shadow-2xl'
+          : 'bg-transparent'
+      } ${className}`}
+      style={
+        isPreview
+          ? { boxShadow: `0 0 30px ${glowColor}25, 0 8px 32px rgba(0,0,0,0.85)` }
+          : { background: 'transparent' }
+      }
     >
       {/* Top Header: Show ONLY the donor name (No emojis, no "DONOR:") */}
       {donorName && (
-        <div className="w-full px-4 py-2 bg-slate-950/95 border-b border-slate-800/80 flex items-center justify-between text-xs font-mono">
+        <div
+          className={`w-full px-4 py-2 flex items-center justify-between text-xs font-mono ${
+            isPreview ? 'bg-slate-950/95 border-b border-slate-800/80' : 'bg-transparent'
+          }`}
+        >
           <div className="flex items-center">
             <span
               className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] tracking-wide"
               style={{
-                textShadow: glowColor ? `0 0 10px ${glowColor}88` : undefined
+                textShadow: glowColor
+                  ? `0 0 10px ${glowColor}88, 0 2px 4px rgba(0,0,0,0.95)`
+                  : '0 2px 4px rgba(0,0,0,0.95)'
               }}
             >
               {donorName}
@@ -215,7 +227,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       )}
 
       {/* 100% Clean Video Area (No Amount, No Title, No Message) */}
-      <div className="relative w-full aspect-video bg-black overflow-hidden">
+      <div className={`relative w-full aspect-video overflow-hidden ${isPreview ? 'bg-black' : 'bg-transparent'}`}>
         <iframe
           ref={iframeRef}
           key={renderKey}
@@ -245,7 +257,11 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       {/* ============================================================== */}
       {/* SMOOTH RED COUNTDOWN PROGRESS DURATION BAR                      */}
       {/* ============================================================== */}
-      <div className="w-full h-1.5 sm:h-2 bg-slate-950 relative overflow-hidden border-t border-slate-800/80">
+      <div
+        className={`w-full h-1.5 sm:h-2 relative overflow-hidden ${
+          isPreview ? 'bg-slate-950 border-t border-slate-800/80' : 'bg-transparent'
+        }`}
+      >
         <div
           ref={barRef}
           className="h-full rounded-r-sm will-change-[width]"
