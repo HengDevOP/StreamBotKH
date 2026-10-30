@@ -23,6 +23,7 @@ import { StreamGoalOverlay } from './components/overlay/StreamGoalOverlay';
 import { StreamLeaderboardOverlay } from './components/overlay/StreamLeaderboardOverlay';
 import { StreamTimerOverlay } from './components/overlay/StreamTimerOverlay';
 import { PokemonStreamOverlay } from './components/overlay/PokemonStreamOverlay';
+import { StreamTipQrOverlay } from './components/overlay/StreamTipQrOverlay';
 
 // Wrapper for Dashboard Page reading query parameters (?tab=...&id=...)
 function DashboardRouteWrapper() {
@@ -195,6 +196,23 @@ function PokemonOverlayRouteWrapper() {
   );
 }
 
+// Wrapper for Public Tip QR Code OBS Browser Source Overlay
+function TipQrOverlayRouteWrapper() {
+  const { token } = useParams<{ token?: string }>();
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0 flex items-center justify-center">
+      <style>{`
+        html, body, #root, main {
+          background: transparent !important;
+          background-color: transparent !important;
+          background-image: none !important;
+        }
+      `}</style>
+      <StreamTipQrOverlay token={token || ''} />
+    </div>
+  );
+}
+
 // Layout wrapper determining whether to display Navbar and Footer
 function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -294,6 +312,9 @@ function AppRoutes() {
         <Route path="/overlay/timer" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/timer/:token" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
+        <Route path="/overlay/qr" element={<TipQrOverlayRouteWrapper />} />
+        <Route path="/overlay/qr/:token" element={<TipQrOverlayRouteWrapper />} />
+        <Route path="/overlay/tip-qr/:token" element={<TipQrOverlayRouteWrapper />} />
 
         {/* Widget Aliases */}
         <Route path="/widget/soundboard/:token" element={<SoundboardOverlayRouteWrapper />} />
@@ -302,6 +323,9 @@ function AppRoutes() {
         <Route path="/widget/timer" element={<TimerOverlayRouteWrapper />} />
         <Route path="/widget/timer/:token" element={<TimerOverlayRouteWrapper />} />
         <Route path="/widget/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
+        <Route path="/widget/qr" element={<TipQrOverlayRouteWrapper />} />
+        <Route path="/widget/qr/:token" element={<TipQrOverlayRouteWrapper />} />
+        <Route path="/widget/tip-qr/:token" element={<TipQrOverlayRouteWrapper />} />
       </Routes>
     </AppLayout>
   );

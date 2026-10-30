@@ -227,6 +227,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [upgradeFeatureName, setUpgradeFeatureName] = useState<string | undefined>(undefined);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [copiedDonateLink, setCopiedDonateLink] = useState(false);
+  const [copiedQrObsUrl, setCopiedQrObsUrl] = useState(false);
+  const [qrOverlayTheme, setQrOverlayTheme] = useState<'cyber-neon' | 'compact' | 'transparent'>('cyber-neon');
   const [copiedOverlayUrl, setCopiedOverlayUrl] = useState(false);
   const [showOverlayToken, setShowOverlayToken] = useState(false);
   const [testFiring, setTestFiring] = useState(false);
@@ -484,12 +486,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       'soundboard',
       'video-alerts',
       'wheel',
-      'pokemon'
+      'pokemon',
+      'account'
     ] as DashboardTab[]).includes(activeTab);
 
     if (!isAssetCategory) return null;
 
     switch (activeTab) {
+      case 'account':
+        return {
+          featureKey: 'qr',
+          label: 'Tip QR Code OBS',
+          shortLabel: 'Tip QR',
+          url: `${origin}/overlay/qr/${effectiveToken}`,
+          icon: QrCode,
+          color: '#EC4899', // Pink
+          bgGlow: 'hover:border-pink-500/50',
+          copyMessage: 'Copied Tip QR Code OBS URL!'
+        };
       case 'goal':
         return {
           featureKey: 'goal',
@@ -597,6 +611,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     navigator.clipboard.writeText(publicDonateUrl);
     setCopiedDonateLink(true);
     setTimeout(() => setCopiedDonateLink(false), 2000);
+  };
+
+  const qrObsUrl = useMemo(() => {
+    const token = user?.overlayToken || 'demo_token';
+    const themeQuery = qrOverlayTheme !== 'cyber-neon' ? `?theme=${qrOverlayTheme}` : '';
+    return `${origin}/overlay/qr/${token}${themeQuery}`;
+  }, [origin, user?.overlayToken, qrOverlayTheme]);
+
+  const handleCopyQrObsUrl = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(qrObsUrl);
+      setCopiedQrObsUrl(true);
+      setTimeout(() => setCopiedQrObsUrl(false), 2000);
+    }
   };
 
   const handleCopyOverlayUrl = () => {
@@ -2233,42 +2261,165 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </button>
                   </div>
 
-                  {/* Public Tip QR Code Card */}
-                  <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col items-center justify-between text-center space-y-4">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider flex items-center justify-center gap-2">
-                        <QrCode size={16} className="text-pink-400" />
-                        Public Tip QR Code
-                      </h3>
-                      <p className="text-[11px] text-slate-400">Put this QR code on your live stream or banner</p>
+                  {/* Public Tip QR Code & OBS Browser Source Card */}
+                  <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col space-y-4">
+                    <div className="text-center space-y-1">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400 border border-pink-500/20">
+                          <QrCode size={16} />
+                        </span>
+                        <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                          Public Tip QR Code &amp; OBS Overlay
+                        </h3>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Scan with ABA Mobile or any Bakong KHQR banking app, or add to OBS Studio
+                      </p>
                     </div>
 
-                    <div className="p-3.5 rounded-2xl bg-white shadow-xl flex items-center justify-center">
+                    {/* QR Code SVG preview */}
+                    <div className="p-4 rounded-2xl bg-white shadow-2xl flex items-center justify-center mx-auto border-4 border-slate-900 shadow-cyan-500/10 relative group">
                       <QRCodeSVG
                         value={publicDonateUrl}
-                        size={150}
+                        size={155}
                         level="H"
                         includeMargin={false}
                       />
+                      {/* Mini watermark */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-8 h-8 rounded-lg bg-white p-0.5 shadow-md border border-slate-200 overflow-hidden">
+                          <img
+                            src={profileAvatar || user?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.username}`}
+                            alt="Logo"
+                            className="w-full h-full object-cover rounded-md"
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="w-full space-y-2">
-                      <a
-                        href={publicDonateUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-cyan-400 flex items-center justify-center gap-1.5 transition-colors"
-                      >
-                        <span>Open Tip Page</span>
-                        <ExternalLink size={12} />
-                      </a>
+                    {/* OBS Browser Source URL Box */}
+                    <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center justify-between text-[11px] font-mono">
+                        <span className="font-bold text-pink-400 flex items-center gap-1">
+                          <Sparkles size={12} />
+                          <span>OBS BROWSER SOURCE URL</span>
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-normal">
+                          320 × 420 px
+                        </span>
+                      </div>
 
-                      <button
-                        onClick={handleCopyDonateLink}
-                        className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
-                      >
-                        {copiedDonateLink ? 'Copied Tip URL' : 'Copy Tip URL'}
-                      </button>
+                      {/* Theme Selector Pills */}
+                      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono">
+                        <button
+                          type="button"
+                          onClick={() => setQrOverlayTheme('cyber-neon')}
+                          className={`py-1 rounded-lg transition-all font-bold cursor-pointer ${
+                            qrOverlayTheme === 'cyber-neon'
+                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Cyber Neon
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQrOverlayTheme('compact')}
+                          className={`py-1 rounded-lg transition-all font-bold cursor-pointer ${
+                            qrOverlayTheme === 'compact'
+                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Compact
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQrOverlayTheme('transparent')}
+                          className={`py-1 rounded-lg transition-all font-bold cursor-pointer ${
+                            qrOverlayTheme === 'transparent'
+                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Floating
+                        </button>
+                      </div>
+
+                      {/* URL Display */}
+                      <div className="flex items-center rounded-xl bg-slate-950 border border-slate-800 overflow-hidden">
+                        <input
+                          type="text"
+                          readOnly
+                          value={qrObsUrl}
+                          className="w-full px-3 py-2 bg-transparent text-[11px] font-mono text-cyan-300 focus:outline-none select-all"
+                        />
+                      </div>
+
+                      {/* OBS Actions */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCopyQrObsUrl}
+                          className={`py-2 px-3 rounded-xl font-mono text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
+                            copiedQrObsUrl
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-gradient-to-r from-pink-500/20 to-cyan-500/20 hover:from-pink-500/30 hover:to-cyan-500/30 text-white border border-pink-500/30'
+                          }`}
+                        >
+                          {copiedQrObsUrl ? (
+                            <>
+                              <Check size={13} className="text-emerald-400" />
+                              <span>Copied OBS!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} className="text-pink-400" />
+                              <span>Copy OBS URL</span>
+                            </>
+                          )}
+                        </button>
+
+                        <a
+                          href={qrObsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold font-mono text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <span>Preview OBS</span>
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+
+                      <p className="text-[10px] font-mono text-slate-500 text-center pt-0.5">
+                        Add as Browser Source in OBS Studio with transparent background
+                      </p>
+                    </div>
+
+                    {/* Public Web Tip URL Section */}
+                    <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                      <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block text-left">
+                        DIRECT TIP PAGE URL
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <a
+                          href={publicDonateUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-cyan-400 flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <span>Open Tip Page</span>
+                          <ExternalLink size={12} />
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={handleCopyDonateLink}
+                          className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
+                        >
+                          {copiedDonateLink ? 'Copied Tip URL' : 'Copy Tip URL'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
