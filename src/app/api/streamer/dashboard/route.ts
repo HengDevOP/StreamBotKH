@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db, cleanupOlderDonations } from '@/server/database/db';
+import { getDonationsCollection, cleanupOlderDonationsMongo } from '@/server/database/mongo';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,121 +11,186 @@ export async function GET(req: NextRequest) {
 
     const streamerId = user.id;
 
-    // Enforce 6-month retention policy cleanup
+    // Enforce 6-month retention policy cleanup in MongoDB
     try {
-      cleanupOlderDonations(6);
+      await cleanupOlderDonationsMongo(6);
     } catch (e) {}
 
-    // Total earnings USD & KHR (all-time, PAID only)
-    const totalUsdRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'USD'
-    `).get(streamerId) as any;
+    const donationsCol = await getDonationsCollection();
 
-    const totalKhrRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'KHR'
-    `).get(streamerId) as any;
+    // Query all PAID donations for this streamer
+    const allPaid = await donationsCol
+      .find({
+        $or: [
+          { streamerId },
+          { streamer_id: streamerId as any },
+          ...(user.username ? [{ streamerId: user.username }] : [])
+        ],
+        status: 'PAID'
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
 
-    // Today's earnings (PAID only)
-    const todayUsdRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'USD'
-      AND date(paid_at) = date('now')
-    `).get(streamerId) as any;
+    const now = Date.now();
+    const todayStr = new Date().toISOString().slice(0, 10);
 
-    const todayKhrRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'KHR'
-      AND date(paid_at) = date('now')
-    `).get(streamerId) as any;
+    let totalUsd = 0;
+    let totalUsdCount = 0;
+    let totalKhr = 0;
+    let totalKhrCount = 0;
 
-    // Helper to query analytics & earning potential for specific timeframes
-    const queryTimeframeMetrics = (dateCondition: string, daysFactor: number) => {
-      const rowUsd = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-        FROM donations
-        WHERE streamer_id = ? AND status = 'PAID' AND currency = 'USD' AND ${dateCondition}
-      `).get(streamerId) as any;
+    let todayUsd = 0;
+    let todayUsdCount = 0;
+    let todayKhr = 0;
+    let todayKhrCount = 0;
 
-      const rowKhr = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-        FROM donations
-        WHERE streamer_id = ? AND status = 'PAID' AND currency = 'KHR' AND ${dateCondition}
-      `).get(streamerId) as any;
+    const donorTotals = new Map<string, { totalUsdEquiv: number; count: number }>();
+    const trendMap = new Map<string, { amountUsd: number; count: number }>();
 
-      const usd = Number(rowUsd?.total || 0);
-      const khr = Number(rowKhr?.total || 0);
-      const count = Number(rowUsd?.count || 0) + Number(rowKhr?.count || 0);
+    // Timeframe buckets
+    const ms1d = 24 * 60 * 60 * 1000;
+    const ms3d = 3 * ms1d;
+    const ms7d = 7 * ms1d;
+    const ms30d = 30 * ms1d;
 
-      const avgPerDayUsd = daysFactor > 0 ? usd / daysFactor : usd;
-      const avgPerDayKhr = daysFactor > 0 ? khr / daysFactor : khr;
-      const potentialMonthlyUsd = avgPerDayUsd * 30;
-      const potentialMonthlyKhr = avgPerDayKhr * 30;
+    const tf = {
+      today: { usd: 0, khr: 0, count: 0 },
+      '1d': { usd: 0, khr: 0, count: 0 },
+      '3d': { usd: 0, khr: 0, count: 0 },
+      last_week: { usd: 0, khr: 0, count: 0 },
+      last_month: { usd: 0, khr: 0, count: 0 }
+    };
 
+    for (const d of allPaid) {
+      const amt = Number(d.amount) || 0;
+      const isKhr = d.currency === 'KHR';
+      const usdEquiv = isKhr ? amt / 4000.0 : amt;
+      const paidDate = d.paidAt ? new Date(d.paidAt) : (d.createdAt ? new Date(d.createdAt) : new Date());
+      const paidTime = paidDate.getTime();
+      const paidDateStr = paidDate.toISOString().slice(0, 10);
+      const donorName = d.donorName || (d as any).donor_name || 'Generous Supporter';
+
+      // Totals
+      if (isKhr) {
+        totalKhr += amt;
+        totalKhrCount++;
+      } else {
+        totalUsd += amt;
+        totalUsdCount++;
+      }
+
+      // Today
+      if (paidDateStr === todayStr) {
+        if (isKhr) {
+          todayKhr += amt;
+          todayKhrCount++;
+        } else {
+          todayUsd += amt;
+          todayUsdCount++;
+        }
+        tf.today.count++;
+        if (isKhr) tf.today.khr += amt; else tf.today.usd += amt;
+      }
+
+      // Timeframe buckets
+      const age = now - paidTime;
+      if (age <= ms1d) {
+        tf['1d'].count++;
+        if (isKhr) tf['1d'].khr += amt; else tf['1d'].usd += amt;
+      }
+      if (age <= ms3d) {
+        tf['3d'].count++;
+        if (isKhr) tf['3d'].khr += amt; else tf['3d'].usd += amt;
+      }
+      if (age <= ms7d) {
+        tf.last_week.count++;
+        if (isKhr) tf.last_week.khr += amt; else tf.last_week.usd += amt;
+      }
+      if (age <= ms30d) {
+        tf.last_month.count++;
+        if (isKhr) tf.last_month.khr += amt; else tf.last_month.usd += amt;
+      }
+
+      // Top donor
+      const existingDonor = donorTotals.get(donorName) || { totalUsdEquiv: 0, count: 0 };
+      existingDonor.totalUsdEquiv += usdEquiv;
+      existingDonor.count++;
+      donorTotals.set(donorName, existingDonor);
+
+      // Trend (last 7 days)
+      if (age <= ms7d) {
+        const trendBucket = trendMap.get(paidDateStr) || { amountUsd: 0, count: 0 };
+        trendBucket.amountUsd += usdEquiv;
+        trendBucket.count++;
+        trendMap.set(paidDateStr, trendBucket);
+      }
+    }
+
+    const calcTf = (bucket: { usd: number; khr: number; count: number }, daysFactor: number) => {
+      const avgPerDayUsd = daysFactor > 0 ? bucket.usd / daysFactor : bucket.usd;
+      const avgPerDayKhr = daysFactor > 0 ? bucket.khr / daysFactor : bucket.khr;
       return {
-        usd,
-        khr,
-        count,
+        usd: bucket.usd,
+        khr: bucket.khr,
+        count: bucket.count,
         avgPerDayUsd: Number(avgPerDayUsd.toFixed(2)),
         avgPerDayKhr: Math.round(avgPerDayKhr),
-        potentialMonthlyUsd: Number(potentialMonthlyUsd.toFixed(2)),
-        potentialMonthlyKhr: Math.round(potentialMonthlyKhr)
+        potentialMonthlyUsd: Number((avgPerDayUsd * 30).toFixed(2)),
+        potentialMonthlyKhr: Math.round(avgPerDayKhr * 30)
       };
     };
 
     const timeframeAnalytics = {
-      today: queryTimeframeMetrics("date(paid_at) = date('now')", 1),
-      '1d': queryTimeframeMetrics("datetime(paid_at) >= datetime('now', '-1 day')", 1),
-      '3d': queryTimeframeMetrics("datetime(paid_at) >= datetime('now', '-3 days')", 3),
-      'last_week': queryTimeframeMetrics("datetime(paid_at) >= datetime('now', '-7 days')", 7),
-      'last_month': queryTimeframeMetrics("datetime(paid_at) >= datetime('now', '-30 days')", 30)
+      today: calcTf(tf.today, 1),
+      '1d': calcTf(tf['1d'], 1),
+      '3d': calcTf(tf['3d'], 3),
+      last_week: calcTf(tf.last_week, 7),
+      last_month: calcTf(tf.last_month, 30)
     };
 
-    // Top donors (PAID only)
-    const topDonors = db.prepare(`
-      SELECT donor_name, SUM(CASE WHEN currency = 'KHR' THEN amount / 4000.0 ELSE amount END) as total_usd_equiv, COUNT(*) as donations_count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID'
-      GROUP BY donor_name
-      ORDER BY total_usd_equiv DESC
-      LIMIT 5
-    `).all(streamerId);
+    const topDonors = Array.from(donorTotals.entries())
+      .map(([donor_name, data]) => ({
+        donor_name,
+        total_usd_equiv: data.totalUsdEquiv,
+        donations_count: data.count
+      }))
+      .sort((a, b) => b.total_usd_equiv - a.total_usd_equiv)
+      .slice(0, 5);
 
-    // Recent donations (PAID status ONLY, last 50)
-    const recentDonations = db.prepare(`
-      SELECT *
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID'
-      ORDER BY created_at DESC
-      LIMIT 50
-    `).all(streamerId);
+    const trend = Array.from(trendMap.entries())
+      .map(([date, data]) => ({
+        date,
+        amount_usd: data.amountUsd,
+        count: data.count
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Daily revenue trend (last 7 days, PAID only)
-    const trend = db.prepare(`
-      SELECT
-        strftime('%Y-%m-%d', paid_at) as date,
-        SUM(CASE WHEN currency = 'KHR' THEN amount / 4000.0 ELSE amount END) as amount_usd,
-        COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID'
-        AND paid_at >= datetime('now', '-7 days')
-      GROUP BY date
-      ORDER BY date ASC
-    `).all(streamerId);
+    const recentDonations = allPaid.slice(0, 50).map((d) => ({
+      id: d.id,
+      streamer_id: d.streamerId || (d as any).streamer_id,
+      donor_name: d.donorName || (d as any).donor_name,
+      donor_message: d.donorMessage || (d as any).donor_message || '',
+      amount: d.amount,
+      currency: d.currency,
+      banking_name: d.bankingName || (d as any).banking_name,
+      payment_method: d.paymentMethod || (d as any).payment_method,
+      video_url: d.videoUrl || (d as any).video_url,
+      video_title: d.videoTitle || (d as any).video_title,
+      video_start_time: d.videoStartTime ?? (d as any).video_start_time ?? 0,
+      video_end_time: d.videoEndTime ?? (d as any).video_end_time ?? 0,
+      status: d.status,
+      created_at: d.createdAt,
+      paid_at: d.paidAt
+    }));
 
     return NextResponse.json({
       summary: {
-        totalRevenueUsd: totalUsdRow.total,
-        totalRevenueKhr: totalKhrRow.total,
-        totalDonationsCount: (totalUsdRow.count || 0) + (totalKhrRow.count || 0),
-        todayRevenueUsd: todayUsdRow.total,
-        todayRevenueKhr: todayKhrRow.total,
-        todayDonationsCount: (todayUsdRow.count || 0) + (todayKhrRow.count || 0)
+        totalRevenueUsd: totalUsd,
+        totalRevenueKhr: totalKhr,
+        totalDonationsCount: totalUsdCount + totalKhrCount,
+        todayRevenueUsd: todayUsd,
+        todayRevenueKhr: todayKhr,
+        todayDonationsCount: todayUsdCount + todayKhrCount
       },
       timeframeAnalytics,
       topDonors,

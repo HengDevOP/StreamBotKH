@@ -11,8 +11,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { NextRequest } from 'next/server';
-import { initDatabase, cleanupExpiredPendingDonations, cleanupOlderDonations } from '../src/server/database/db';
-import { initMongo } from '../src/server/database/mongo';
+import { initMongo, cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo } from '../src/server/database/mongo';
 import { initSocketServer } from '../src/server/services/socketService';
 
 const app = express();
@@ -182,8 +181,7 @@ function scanAndMountRoutes(dir: string, baseRoute = '/api') {
   }
 }
 
-// 1. Initialize Databases
-initDatabase();
+// 1. Initialize MongoDB Atlas (100% MongoDB)
 initMongo();
 
 // 2. Attach Socket.IO
@@ -193,12 +191,12 @@ initSocketServer(server);
 const apiDirectory = path.resolve(process.cwd(), 'src/app/api');
 scanAndMountRoutes(apiDirectory, '/api');
 
-// 4. Background Expired Pending Donations Cleanup (runs every 30s) & 6-month Retention Cleanup
-cleanupExpiredPendingDonations();
-cleanupOlderDonations(6);
+// 4. Background Expired Pending Donations Cleanup (runs every 30s) & 6-month Retention Cleanup in MongoDB
+cleanupExpiredPendingDonationsMongo();
+cleanupOlderDonationsMongo(6);
 setInterval(() => {
-  cleanupExpiredPendingDonations();
-  cleanupOlderDonations(6);
+  cleanupExpiredPendingDonationsMongo();
+  cleanupOlderDonationsMongo(6);
 }, 30 * 1000);
 
 // Health check endpoint

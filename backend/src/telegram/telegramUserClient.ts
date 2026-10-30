@@ -5,7 +5,6 @@ import { NewMessage } from 'telegram/events';
 import { sleep, returnBigInt, getRandomInt } from 'telegram/Helpers';
 import { UpdateConnectionState } from 'telegram/network';
 import { v4 as uuidv4 } from 'uuid';
-import { db, cleanupExpiredPendingDonations } from '../../../src/server/database/db';
 import { broadcastAlertToOverlay, broadcastDonationToDashboard } from '../../../src/server/services/socketService';
 import { PhraseCatcher } from './phraseCatcher';
 import { findMatchingTemporaryDonation, matchBankNames, isGenericBankKeyword } from '../../../src/server/utils/nameMatching';
@@ -13,8 +12,14 @@ import {
   getTemporaryDonationsCollection,
   getAlertBoxesCollection,
   getTelegramSessionsCollection,
-  getTelegramMonitoredGroupsCollection
+  getTelegramMonitoredGroupsCollection,
+  getUsersCollection,
+  getDonationsCollection,
+  getAlertSettingsCollection,
+  getVideoAlertSettingsCollection,
+  cleanupExpiredPendingDonationsMongo
 } from '../../../src/server/database/mongo';
+import { ObjectId } from 'mongodb';
 
 // ============================================================================
 // FIX GramJS PING_INTERVAL_TO_WAKE_UP BUG:
@@ -133,6 +138,9 @@ interface TelegramGlobalState {
   connectingPromises: Map<string, Promise<TelegramClient | null>>;
   processedMessageKeys: Set<string>;
   processedTxRefs: Set<string>;
+  processedTransactionRefs: Map<string, number>;
+  processedSessionIds: Set<string>;
+  recentSessionMatchedAmounts: Map<string, number>;
   managerInstance?: TelegramUserClientManager;
 }
 
@@ -149,10 +157,16 @@ if (!g.__telegramGlobalState) {
     connectingPromises: new Map(),
     processedMessageKeys: new Set(),
     processedTxRefs: new Set(),
+    processedTransactionRefs: new Map(),
+    processedSessionIds: new Set(),
+    recentSessionMatchedAmounts: new Map()
   };
 } else {
   if (!g.__telegramGlobalState.processedMessageKeys) g.__telegramGlobalState.processedMessageKeys = new Set();
   if (!g.__telegramGlobalState.processedTxRefs) g.__telegramGlobalState.processedTxRefs = new Set();
+  if (!g.__telegramGlobalState.processedTransactionRefs) g.__telegramGlobalState.processedTransactionRefs = new Map();
+  if (!g.__telegramGlobalState.processedSessionIds) g.__telegramGlobalState.processedSessionIds = new Set();
+  if (!g.__telegramGlobalState.recentSessionMatchedAmounts) g.__telegramGlobalState.recentSessionMatchedAmounts = new Map();
 }
 
 class TelegramUserClientManager {
@@ -303,19 +317,6 @@ class TelegramUserClientManager {
         console.error('[MongoDB] Failed saving pending auth:', mongoErr);
       }
 
-      // Safe SQLite backup
-      try {
-        db.prepare(`
-          UPDATE streamers 
-          SET telegram_pending_phone = ?,
-              telegram_pending_hash = ?,
-              telegram_pending_session = ?,
-              telegram_api_id = ?,
-              telegram_api_hash = ?
-          WHERE id = ?
-        `).run(cleanPhone, sendResult.phoneCodeHash, pendingSession, apiId, apiHash, streamerId);
-      } catch (dbErr) {}
-
       console.log(`⚡ [TelegramJS] Official verification code delivered by Telegram to ${cleanPhone}!`);
 
       return {
@@ -401,48 +402,6 @@ class TelegramUserClientManager {
     }
 
     if (!pending) {
-      try {
-        let row: any = db.prepare(`
-          SELECT telegram_pending_phone, telegram_pending_hash, telegram_pending_session, telegram_api_id, telegram_api_hash
-          FROM streamers
-          WHERE id = ? AND telegram_pending_hash IS NOT NULL
-        `).get(streamerId);
-
-        if (!row && phoneCodeHash) {
-          row = db.prepare(`
-            SELECT telegram_pending_phone, telegram_pending_hash, telegram_pending_session, telegram_api_id, telegram_api_hash
-            FROM streamers
-            WHERE telegram_pending_hash = ?
-          `).get(phoneCodeHash);
-        }
-
-        if (row && row.telegram_pending_session && row.telegram_pending_hash) {
-          console.log(`⚡ [TelegramJS] Restoring pending client session from SQLite for ${row.telegram_pending_phone}...`);
-          const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
-          const apiHash = row.telegram_api_hash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
-
-          const restoredClient = this.createClient(row.telegram_pending_session, apiId, apiHash);
-          await restoredClient.connect();
-
-          pending = {
-            client: restoredClient,
-            phoneNumber: row.telegram_pending_phone,
-            phoneCodeHash: row.telegram_pending_hash,
-            apiId,
-            apiHash,
-            isSimulation: false,
-            createdAt: Date.now()
-          };
-
-          this.pendingAuth.set(streamerId, pending);
-          this.pendingAuth.set(row.telegram_pending_hash, pending);
-        }
-      } catch (dbErr) {
-        console.error('[DB] Error restoring pending session from SQLite:', dbErr);
-      }
-    }
-
-    if (!pending) {
       throw new Error('No pending login found. Please enter your phone number and request a code first.');
     }
 
@@ -491,14 +450,25 @@ class TelegramUserClientManager {
       }
 
       try {
-        db.prepare(`
-          UPDATE streamers 
-          SET telegram_phone = ?, telegram_user_name = ?, telegram_session = ?,
-              telegram_pending_phone = NULL, telegram_pending_hash = NULL, telegram_pending_session = NULL
-          WHERE id = ?
-        `).run(pending.phoneNumber, userDisplay, fakeSession, streamerId);
+        const usersCol = await getUsersCollection();
+        await usersCol.updateOne(
+          { $or: [{ userId: streamerId }, { username: streamerId }] },
+          {
+            $set: {
+              telegramPhone: pending.phoneNumber,
+              telegramUserName: userDisplay,
+              telegramSession: fakeSession,
+              updatedAt: new Date()
+            },
+            $unset: {
+              telegramPendingPhone: "",
+              telegramPendingHash: "",
+              telegramPendingSession: ""
+            }
+          }
+        );
       } catch (e) {
-        console.error('[DB] Failed updating telegram user in db:', e);
+        console.error('[MongoDB] Failed updating telegram user in users collection:', e);
       }
 
       this.pendingAuth.delete(streamerId);
@@ -601,20 +571,27 @@ class TelegramUserClientManager {
         console.error('[MongoDB] Failed saving authenticated session:', mongoErr);
       }
 
-      // Safe SQLite backup & clear pending auth state
+      // Clear pending auth state and update user in MongoDB
       try {
-        db.prepare(`
-          UPDATE streamers 
-          SET telegram_phone = ?,
-              telegram_user_name = ?,
-              telegram_session = ?,
-              telegram_api_id = ?,
-              telegram_api_hash = ?,
-              telegram_pending_phone = NULL,
-              telegram_pending_hash = NULL,
-              telegram_pending_session = NULL
-          WHERE id = ?
-        `).run(pending.phoneNumber, displayName, sessionString, pending.apiId, pending.apiHash, streamerId);
+        const usersCol = await getUsersCollection();
+        await usersCol.updateOne(
+          { $or: [{ userId: streamerId }, { username: streamerId }] },
+          {
+            $set: {
+              telegramPhone: pending.phoneNumber,
+              telegramUserName: displayName,
+              telegramSession: sessionString,
+              telegramApiId: pending.apiId,
+              telegramApiHash: pending.apiHash,
+              updatedAt: new Date()
+            },
+            $unset: {
+              telegramPendingPhone: "",
+              telegramPendingHash: "",
+              telegramPendingSession: ""
+            }
+          }
+        );
       } catch (e) {}
 
       // Attach PhraseCatcher message listener for live donations
@@ -686,26 +663,6 @@ class TelegramUserClientManager {
                 chat_id: rawCid,
                 title: g.title,
                 username: g.username
-              });
-            }
-          }
-        }
-      } catch (e) {}
-
-      try {
-        const sqlGroups = db.prepare('SELECT * FROM telegram_monitored_groups WHERE streamer_id = ?').all(streamerId) as any[];
-        if (sqlGroups && sqlGroups.length > 0) {
-          for (const sg of sqlGroups) {
-            const rawCid = String(sg.chat_id || '').trim();
-            const norm = rawCid.replace(/^-100/, '').replace(/^-/, '');
-            if (norm && !seenGroupIds.has(norm)) {
-              seenGroupIds.add(norm);
-              targetGroups.push({
-                id: sg.id,
-                streamer_id: sg.streamer_id,
-                chat_id: rawCid,
-                title: sg.title,
-                username: sg.username
               });
             }
           }
@@ -813,41 +770,82 @@ class TelegramUserClientManager {
       console.log(`   💬 [Donor Message]: ${parsed.donorMessage || 'None'}`);
       console.log(`   🔖 [Transaction Ref]: ${parsed.transactionRef || 'None'}`);
 
-      // Resolve target streamer:
+      // Resolve target streamer from MongoDB users collection:
       let targetStreamer: any = null;
-      if (parsed.recipient) {
-        const matchedByRecipient = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE OR display_name = ? COLLATE NOCASE').get(parsed.recipient, parsed.recipient) as any;
-        if (matchedByRecipient) {
-          targetStreamer = matchedByRecipient;
-          console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username} via recipient "${parsed.recipient}"`);
-        }
-      }
-      if (!targetStreamer) {
-        const usernameMatch = text.match(/@([a-zA-Z0-9_]+)/);
-        if (usernameMatch && usernameMatch[1]) {
-          const matched = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE').get(usernameMatch[1]) as any;
-          if (matched) {
-            targetStreamer = matched;
-            console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username}`);
+      try {
+        const usersCol = await getUsersCollection();
+        if (parsed.recipient) {
+          const cleanRecipient = parsed.recipient.toLowerCase().trim();
+          targetStreamer = await usersCol.findOne({
+            $or: [
+              { username: { $regex: new RegExp(`^${cleanRecipient}$`, 'i') } },
+              { displayName: { $regex: new RegExp(`^${cleanRecipient}$`, 'i') } }
+            ]
+          });
+          if (targetStreamer) {
+            console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username} via recipient "${parsed.recipient}"`);
           }
         }
-      }
-      if (!targetStreamer) {
-        targetStreamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(streamerId) as any;
-      }
-      if (!targetStreamer) {
-        targetStreamer = db.prepare('SELECT * FROM streamers LIMIT 1').get() as any;
+        if (!targetStreamer) {
+          const usernameMatch = text.match(/@([a-zA-Z0-9_]+)/);
+          if (usernameMatch && usernameMatch[1]) {
+            targetStreamer = await usersCol.findOne({
+              username: { $regex: new RegExp(`^${usernameMatch[1]}$`, 'i') }
+            });
+            if (targetStreamer) {
+              console.log(`🎯 [TelegramJS] Routed payment to streamer @${targetStreamer.username}`);
+            }
+          }
+        }
+        if (!targetStreamer && streamerId) {
+          targetStreamer = await usersCol.findOne({
+            $or: [
+              { userId: streamerId },
+              { username: streamerId },
+              ...(ObjectId.isValid(streamerId) && streamerId.length === 24 ? [{ _id: new ObjectId(streamerId) }] : [])
+            ]
+          });
+        }
+        if (!targetStreamer) {
+          targetStreamer = (await usersCol.findOne({ username: 'streambotkh' })) || (await usersCol.findOne({}));
+        }
+      } catch (err) {
+        console.error('[MongoDB] Error finding target streamer:', err);
       }
 
       if (targetStreamer) {
-        const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(targetStreamer.id) as any;
-        const videoSettings = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(targetStreamer.id) as any;
+        const targetStreamerId = targetStreamer.userId || (targetStreamer as any).id || String(targetStreamer._id);
+        const targetOverlayToken = targetStreamer.overlayToken || targetStreamer.overlay_token || 'demo-token';
+
+        let alertSettings: any = null;
+        let videoSettings: any = null;
+        try {
+          const alertSettingsCol = await getAlertSettingsCollection();
+          alertSettings = await alertSettingsCol.findOne({
+            $or: [
+              { streamerId: targetStreamerId },
+              ...(targetStreamer.username ? [{ streamerId: targetStreamer.username }] : [])
+            ]
+          });
+        } catch (e) {}
+
+        try {
+          const videoSettingsCol = await getVideoAlertSettingsCollection();
+          videoSettings = await videoSettingsCol.findOne({
+            $or: [
+              { streamerId: targetStreamerId },
+              ...(targetStreamer.username ? [{ streamerId: targetStreamer.username }] : [])
+            ]
+          });
+        } catch (e) {}
 
         // 1. Clean expired sessions (>5m) and gather active candidates within 15 minutes
         let matchedTemp: any = null;
         let dbDonation: any = null;
+        const donationsCol = await getDonationsCollection();
+
         try {
-          cleanupExpiredPendingDonations();
+          await cleanupExpiredPendingDonationsMongo();
 
           // Collect active candidates within 15 minutes window (MongoDB temporary queue + pending donations)
           const seenIds = new Set<string>();
@@ -859,7 +857,7 @@ class TelegramUserClientManager {
             const mongoRecent = await tempCol
               .find({
                 $or: [
-                  { streamerId: targetStreamer.id },
+                  { streamerId: targetStreamerId },
                   ...(targetStreamer.username ? [{ streamerUsername: targetStreamer.username }] : []),
                   ...(targetStreamer.username ? [{ streamerId: targetStreamer.username }] : [])
                 ],
@@ -893,20 +891,40 @@ class TelegramUserClientManager {
             }
           } catch (e) {}
 
-          // B. SQLite pending donations (for original video & alert metadata)
+          // B. MongoDB pending donations collection
           try {
-            const pendingCandidates = db.prepare(`
-              SELECT * FROM donations
-              WHERE (streamer_id = ? OR streamer_id = ?)
-                AND status = 'PENDING'
-                AND created_at > datetime('now', '-15 minutes')
-              ORDER BY created_at DESC
-              LIMIT 30
-            `).all(targetStreamer.id, targetStreamer.username || targetStreamer.id) as any[];
+            const pendingCandidates = await donationsCol
+              .find({
+                $or: [
+                  { streamerId: targetStreamerId },
+                  ...(targetStreamer.username ? [{ streamerUsername: targetStreamer.username }, { streamerId: targetStreamer.username }] : [])
+                ],
+                status: 'PENDING',
+                createdAt: { $gt: new Date(Date.now() - 15 * 60 * 1000) }
+              })
+              .sort({ createdAt: -1 })
+              .limit(30)
+              .toArray();
+
             for (const c of pendingCandidates) {
               if (c && c.id && !seenIds.has(c.id)) {
                 seenIds.add(c.id);
-                candidates.push(c);
+                const msg = c.donorMessage || (c as any).donor_message || '';
+                candidates.push({
+                  id: c.id,
+                  streamer_id: c.streamerId,
+                  donor_name: c.donorName || (c as any).donor_name,
+                  donor_message: msg,
+                  donorMessage: msg,
+                  amount: c.amount,
+                  currency: c.currency,
+                  banking_name: c.bankingName,
+                  video_url: c.videoUrl,
+                  video_title: c.videoTitle,
+                  video_start_time: c.videoStartTime,
+                  video_end_time: c.videoEndTime,
+                  created_at: c.createdAt
+                });
               }
             }
           } catch (e) {}
@@ -928,6 +946,17 @@ class TelegramUserClientManager {
 
           if (matchedTemp) {
             console.log(`   🎯 [MATCH SUCCESS] Bound incoming bank transfer to pending session [${matchedTemp.id}]!`);
+            // Session-matched tracking: ensure we record this match immediately!
+            if (g.__telegramGlobalState?.processedSessionIds) {
+              g.__telegramGlobalState.processedSessionIds.add(matchedTemp.id);
+            }
+            if (parsed.transactionRef && g.__telegramGlobalState?.processedTransactionRefs) {
+              g.__telegramGlobalState.processedTransactionRefs.set(parsed.transactionRef, Date.now());
+            }
+            if (g.__telegramGlobalState?.recentSessionMatchedAmounts) {
+              g.__telegramGlobalState.recentSessionMatchedAmounts.set(`${targetStreamerId}:${parsed.amount}`, Date.now());
+            }
+
             try {
               const col = await getTemporaryDonationsCollection();
               await col.deleteMany({
@@ -935,12 +964,54 @@ class TelegramUserClientManager {
               });
             } catch (e) {}
 
-            // Also load full pending record from donations table to preserve all original video & donor data
             try {
-              dbDonation = db.prepare('SELECT * FROM donations WHERE id = ?').get(matchedTemp.id);
+              dbDonation = await donationsCol.findOne({ id: matchedTemp.id });
             } catch (e) {}
           } else {
-            console.log(`   ℹ️ [NO PENDING MATCH] No pending session matched. Creating direct standalone live alert.`);
+            // BUG FIX: When an alert is grabbed, ensure we do NOT trigger a fallback default alert if this transfer was already processed or matched!
+            const tranRef = parsed.transactionRef;
+            if (tranRef && g.__telegramGlobalState?.processedTransactionRefs?.has(tranRef)) {
+              console.log(`   ⚠️ [DEDUPLICATION] Transaction ref [${tranRef}] already processed. Suppressing fallback/default alert.`);
+              console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+              return;
+            }
+
+            const lastMatched = g.__telegramGlobalState?.recentSessionMatchedAmounts?.get(`${targetStreamerId}:${parsed.amount}`);
+            if (lastMatched && (Date.now() - lastMatched) < 30000) {
+              console.log(`   ⚠️ [DEDUPLICATION] Matching bank transfer for $${parsed.amount} was already session-matched ${((Date.now() - lastMatched) / 1000).toFixed(1)}s ago. Suppressing fallback/default alert.`);
+              console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+              return;
+            }
+
+            // Check if there is an active candidate with exact amount match:
+            const soleAmountMatch = candidates.find((c) => Math.abs(c.amount - parsed.amount) < 0.01);
+            if (soleAmountMatch) {
+              console.log(`   🎯 [SOLE MATCH RECOVERY] Bound to sole active candidate [${soleAmountMatch.id}] (${soleAmountMatch.donor_name}, $${soleAmountMatch.amount})! Suppressing default alert.`);
+              matchedTemp = soleAmountMatch;
+
+              if (g.__telegramGlobalState?.processedSessionIds) {
+                g.__telegramGlobalState.processedSessionIds.add(matchedTemp.id);
+              }
+              if (parsed.transactionRef && g.__telegramGlobalState?.processedTransactionRefs) {
+                g.__telegramGlobalState.processedTransactionRefs.set(parsed.transactionRef, Date.now());
+              }
+              if (g.__telegramGlobalState?.recentSessionMatchedAmounts) {
+                g.__telegramGlobalState.recentSessionMatchedAmounts.set(`${targetStreamerId}:${parsed.amount}`, Date.now());
+              }
+
+              try {
+                const col = await getTemporaryDonationsCollection();
+                await col.deleteMany({
+                  $or: [{ id: matchedTemp.id }, { donationId: matchedTemp.id }]
+                });
+              } catch (e) {}
+
+              try {
+                dbDonation = await donationsCol.findOne({ id: matchedTemp.id });
+              } catch (e) {}
+            } else {
+              console.log(`   ℹ️ [NO PENDING MATCH] Standalone direct bank transfer without pending session.`);
+            }
           }
         } catch (matchErr) {
           console.warn('[Temporary Listener] Error checking temporary donations in MongoDB:', matchErr);
@@ -992,86 +1063,37 @@ class TelegramUserClientManager {
           const effectiveVideoStartTime = Number(matchedTemp?.video_start_time ?? dbDonation?.video_start_time ?? 0);
           const effectiveVideoEndTime = Number(matchedTemp?.video_end_time ?? dbDonation?.video_end_time ?? 0);
 
+          // Update or insert into MongoDB donations collection (100% MongoDB Atlas)
           try {
-            if (matchedTemp) {
-              // Update the active pending donation to PAID
-              const updateResult = db.prepare(`
-                UPDATE donations SET
-                  donor_name = ?,
-                  donor_message = ?,
-                  amount = ?,
-                  currency = ?,
-                  banking_name = ?,
-                  payment_method = ?,
-                  video_url = ?,
-                  video_title = ?,
-                  video_start_time = ?,
-                  video_end_time = ?,
-                  status = 'PAID',
-                  is_alerted = 1,
-                  paid_at = datetime('now')
-                WHERE id = ?
-              `).run(
-                effectiveDonorName,
-                effectiveDonorMessage,
-                effectiveAmount,
-                effectiveCurrency,
-                effectiveBankingName,
-                parsed.bankingName.toLowerCase().includes('aba') ? 'ABA_PAYWAY' : 'BAKONG_KHQR',
-                effectiveVideoUrl || null,
-                effectiveVideoTitle || null,
-                effectiveVideoStartTime,
-                effectiveVideoEndTime,
-                activeDonationId
-              );
-
-              if (updateResult.changes === 0) {
-                // If not found in donations table, insert directly
-                db.prepare(`
-                  INSERT INTO donations (
-                    id, streamer_id, donor_name, donor_message, amount, currency,
-                    banking_name, payment_method, video_url, video_title,
-                    video_start_time, video_end_time, status, is_alerted, paid_at
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 1, datetime('now'))
-                `).run(
-                  activeDonationId,
-                  targetStreamer.id,
-                  effectiveDonorName,
-                  effectiveDonorMessage,
-                  effectiveAmount,
-                  effectiveCurrency,
-                  effectiveBankingName,
-                  parsed.bankingName.toLowerCase().includes('aba') ? 'ABA_PAYWAY' : 'BAKONG_KHQR',
-                  effectiveVideoUrl || null,
-                  effectiveVideoTitle || null,
-                  effectiveVideoStartTime,
-                  effectiveVideoEndTime
-                );
-              }
-            } else {
-              db.prepare(`
-                INSERT INTO donations (
-                  id, streamer_id, donor_name, donor_message, amount, currency,
-                  banking_name, payment_method, video_url, video_title,
-                  video_start_time, video_end_time, status, is_alerted, paid_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 1, datetime('now'))
-              `).run(
-                activeDonationId,
-                targetStreamer.id,
-                effectiveDonorName,
-                effectiveDonorMessage,
-                effectiveAmount,
-                effectiveCurrency,
-                effectiveBankingName,
-                parsed.bankingName.toLowerCase().includes('aba') ? 'ABA_PAYWAY' : 'BAKONG_KHQR',
-                effectiveVideoUrl || null,
-                effectiveVideoTitle || null,
-                effectiveVideoStartTime,
-                effectiveVideoEndTime
-              );
-            }
+            await donationsCol.updateOne(
+              { id: activeDonationId },
+              {
+                $set: {
+                  id: activeDonationId,
+                  streamerId: targetStreamerId,
+                  streamerUsername: targetStreamer.username || undefined,
+                  donorName: effectiveDonorName,
+                  donorMessage: effectiveDonorMessage,
+                  amount: effectiveAmount,
+                  currency: effectiveCurrency,
+                  bankingName: effectiveBankingName,
+                  paymentMethod: parsed.bankingName.toLowerCase().includes('aba') ? 'ABA_PAYWAY' : 'BAKONG_KHQR',
+                  paywayTranId: parsed.transactionRef || undefined,
+                  videoUrl: effectiveVideoUrl || undefined,
+                  videoTitle: effectiveVideoTitle || undefined,
+                  videoStartTime: effectiveVideoStartTime,
+                  videoEndTime: effectiveVideoEndTime,
+                  status: 'PAID',
+                  isAlerted: true,
+                  paidAt: new Date(),
+                  updatedAt: new Date()
+                },
+                $setOnInsert: { createdAt: new Date() }
+              },
+              { upsert: true }
+            );
           } catch (dbErr) {
-            console.error('[DB] Error updating/inserting telegram donation:', dbErr);
+            console.error('[MongoDB] Error updating/inserting telegram donation:', dbErr);
           }
 
           // Fetch current saved condition alert box from MongoDB for this streamer & amount
@@ -1081,11 +1103,11 @@ class TelegramUserClientManager {
             const activeBoxes = await alertBoxesCol
               .find({
                 $or: [
-                  { userId: targetStreamer.id },
-                  { streamerId: targetStreamer.id },
+                  { userId: targetStreamerId },
+                  { streamerId: targetStreamerId },
                   ...(targetStreamer.username ? [{ userId: targetStreamer.username }, { streamerId: targetStreamer.username }] : []),
                   ...(targetStreamer.email ? [{ userId: targetStreamer.email }, { userEmail: targetStreamer.email }] : []),
-                  ...(targetStreamer.overlay_token ? [{ overlayToken: targetStreamer.overlay_token }, { token: targetStreamer.overlay_token }] : [])
+                  ...(targetOverlayToken ? [{ overlayToken: targetOverlayToken }, { token: targetOverlayToken }] : [])
                 ],
                 isEnabled: true
               })
@@ -1100,11 +1122,11 @@ class TelegramUserClientManager {
               ? matchingBoxes[0]
               : (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
           } catch (e) {
-            console.warn('[TelegramJS] Could not fetch mongo alert boxes, using sqlite fallback:', e);
+            console.warn('[TelegramJS] Could not fetch mongo alert boxes:', e);
           }
 
           // Broadcast alert to OBS Studio overlay in real-time with current saved settings
-          broadcastAlertToOverlay(targetStreamer.overlay_token, {
+          broadcastAlertToOverlay(targetOverlayToken, {
             boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
             donationId: activeDonationId,
             donorName: effectiveDonorName,
@@ -1118,9 +1140,9 @@ class TelegramUserClientManager {
             videoTitle: effectiveVideoTitle,
             videoStartTime: effectiveVideoStartTime,
             videoEndTime: effectiveVideoEndTime,
-            videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : true,
-            videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
-            videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
+            videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
+            videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
+            videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
             templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
             textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
             textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
@@ -1149,7 +1171,7 @@ class TelegramUserClientManager {
           });
 
           // Broadcast to Streamer Dashboard (Updates revenue live)
-          broadcastDonationToDashboard(targetStreamer.id, {
+          broadcastDonationToDashboard(targetStreamerId, {
             id: activeDonationId,
             donor_name: effectiveDonorName,
             donor_message: effectiveDonorMessage,
@@ -1171,7 +1193,7 @@ class TelegramUserClientManager {
             }
           }
 
-          console.log(`   📡 [OBS Alert Broadcast] Alert fired to overlay token [${targetStreamer.overlay_token}]!`);
+          console.log(`   📡 [OBS Alert Broadcast] Alert fired to overlay token [${targetOverlayToken}]!`);
           console.log(`      - Donor: "${effectiveDonorName}"`);
           console.log(`      - Amount: ${effectiveCurrency === 'KHR' ? `${effectiveAmount.toLocaleString()} ៛` : `$${effectiveAmount.toFixed(2)}`}`);
           console.log(`      - Bank: "${effectiveBankingName}"`);
@@ -1195,20 +1217,6 @@ class TelegramUserClientManager {
         if (savedMongo && savedMongo.length > 0) {
           for (const s of savedMongo) {
             const cid = String(s.chatId || (s as any).chat_id || '').trim();
-            const norm = cid.replace(/^-100/, '').replace(/^-/, '');
-            if (norm && !seenChatIds.has(norm)) {
-              seenChatIds.add(norm);
-              chatStrings.push(`${s.title || 'Group'} (${cid})`);
-            }
-          }
-        }
-      } catch (e) {}
-
-      try {
-        const savedSql = db.prepare('SELECT title, chat_id FROM telegram_monitored_groups WHERE streamer_id = ?').all(streamerId) as any[];
-        if (savedSql && savedSql.length > 0) {
-          for (const s of savedSql) {
-            const cid = String(s.chat_id || '').trim();
             const norm = cid.replace(/^-100/, '').replace(/^-/, '');
             if (norm && !seenChatIds.has(norm)) {
               seenChatIds.add(norm);
@@ -1273,40 +1281,8 @@ class TelegramUserClientManager {
             const sessionsCol = await getTelegramSessionsCollection();
             await sessionsCol.updateOne({ streamerId }, { $set: { isConnected: false, sessionString: '' } });
           } catch (_) {}
-          try {
-            db.prepare('UPDATE streamers SET telegram_session = NULL WHERE id = ?').run(streamerId);
-          } catch (_) {}
         } else {
           console.warn(`[TelegramJS] ensureClient MongoDB restore failed for [${streamerId}]:`, e?.message || e);
-        }
-      }
-
-      // 2. Fallback: Check SQLite
-      try {
-        const row = db.prepare('SELECT id, telegram_phone, telegram_session, telegram_api_id, telegram_api_hash FROM streamers WHERE id = ? AND telegram_session IS NOT NULL').get(streamerId) as any;
-        if (row && row.telegram_session && !row.telegram_session.startsWith('sim_session')) {
-          const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
-          const apiHash = row.telegram_api_hash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
-          const client = this.createClient(row.telegram_session, apiId, apiHash);
-          await client.connect();
-          if (await client.isUserAuthorized()) {
-            this.attachMessageListener(streamerId, client);
-            this.activeClients.set(streamerId, client);
-            await this.refreshMonitoredChats(streamerId);
-            console.log(`✅ [SQLite] ensureClient revived GramJS listener for [${streamerId}]!`);
-            return client;
-          } else {
-            db.prepare('UPDATE streamers SET telegram_session = NULL WHERE id = ?').run(streamerId);
-          }
-        }
-      } catch (e: any) {
-        if (e?.errorMessage === 'AUTH_KEY_DUPLICATED' || e?.code === 406 || e?.message?.includes('AUTH_KEY_DUPLICATED')) {
-          console.warn(`❌ [TelegramJS] Auth session in SQLite for [${streamerId}] was revoked by Telegram (AUTH_KEY_DUPLICATED).`);
-          try {
-            db.prepare('UPDATE streamers SET telegram_session = NULL WHERE id = ?').run(streamerId);
-          } catch (_) {}
-        } else {
-          console.warn(`[TelegramJS] ensureClient SQLite restore failed for [${streamerId}]:`, e?.message || e);
         }
       }
 
@@ -1407,7 +1383,7 @@ class TelegramUserClientManager {
   }
 
   /**
-   * Get live connection status (MongoDB Primary with SQLite fallback)
+   * Get live connection status (MongoDB 100%)
    */
   public async getStatus(streamerId: string): Promise<{
     isConnected: boolean;
@@ -1426,19 +1402,8 @@ class TelegramUserClientManager {
       mongoSession = await sessionsCol.findOne({ streamerId });
     } catch (e) {}
 
-    // Fallback: Check SQLite
-    let sqliteRow: any = null;
-    if (!mongoSession) {
-      try {
-        sqliteRow = db.prepare('SELECT telegram_phone, telegram_user_name, telegram_session, telegram_pending_phone, telegram_pending_hash FROM streamers WHERE id = ?').get(streamerId) as any;
-      } catch (e) {}
-    }
-
     let hasActiveClient = this.activeClients.has(streamerId);
-    let hasSession = Boolean(
-      (mongoSession && mongoSession.isConnected && mongoSession.sessionString) ||
-      (sqliteRow && sqliteRow.telegram_session)
-    );
+    let hasSession = Boolean(mongoSession && mongoSession.isConnected && mongoSession.sessionString);
 
     // If session exists but client is not yet restored in memory, revive it and check actual health
     if (!hasActiveClient && hasSession) {
@@ -1459,29 +1424,22 @@ class TelegramUserClientManager {
       const savedMongo = await groupsCol.find({ streamerId }).toArray();
       if (savedMongo && savedMongo.length > 0) {
         chats = savedMongo.map(g => `${g.title} (${g.chatId})`);
-      } else {
-        const savedSql = db.prepare('SELECT title, chat_id FROM telegram_monitored_groups WHERE streamer_id = ?').all(streamerId) as any[];
-        if (savedSql && savedSql.length > 0) {
-          chats = savedSql.map(g => `${g.title} (${g.chat_id})`);
-        }
       }
     } catch (e) {}
 
     const pending = this.pendingAuth.get(streamerId);
     const hasPending = Boolean(
       pending ||
-      mongoSession?.pendingHash ||
-      sqliteRow?.telegram_pending_hash
+      mongoSession?.pendingHash
     );
-    const pendingPhone = pending?.phoneNumber || mongoSession?.pendingPhone || sqliteRow?.telegram_pending_phone || undefined;
-    const pendingHash = pending?.phoneCodeHash || mongoSession?.pendingHash || sqliteRow?.telegram_pending_hash || undefined;
+    const pendingPhone = pending?.phoneNumber || mongoSession?.pendingPhone || undefined;
+    const pendingHash = pending?.phoneCodeHash || mongoSession?.pendingHash || undefined;
 
-    const phoneNumber = mongoSession?.phoneNumber || sqliteRow?.telegram_phone || undefined;
-    const userName = mongoSession?.userName || sqliteRow?.telegram_user_name || undefined;
+    const phoneNumber = mongoSession?.phoneNumber || undefined;
+    const userName = mongoSession?.userName || undefined;
     const isSimulation = Boolean(
       mongoSession?.isSimulation ||
-      mongoSession?.sessionString?.startsWith('sim_session') ||
-      sqliteRow?.telegram_session?.startsWith('sim_session')
+      mongoSession?.sessionString?.startsWith('sim_session')
     );
 
     return {
@@ -1511,7 +1469,7 @@ class TelegramUserClientManager {
     this.pendingAuth.delete(streamerId);
     this.monitoredChats.delete(streamerId);
 
-    // 1. Delete session from MongoDB (preserve monitored target groups so reconnecting does not lose them)
+    // Delete session from MongoDB (preserve monitored target groups so reconnecting does not lose them)
     try {
       const sessionsCol = await getTelegramSessionsCollection();
       await sessionsCol.deleteOne({ streamerId });
@@ -1520,20 +1478,6 @@ class TelegramUserClientManager {
       console.error('[MongoDB] Error removing telegram session on disconnect:', e);
     }
 
-    // 2. Safe SQLite backup cleanup
-    try {
-      db.prepare(`
-        UPDATE streamers 
-        SET telegram_phone = NULL,
-            telegram_user_name = NULL,
-            telegram_session = NULL,
-            telegram_pending_phone = NULL,
-            telegram_pending_hash = NULL,
-            telegram_pending_session = NULL
-        WHERE id = ?
-      `).run(streamerId);
-    } catch (e) {}
-
     return {
       success: true,
       message: 'Telegram account disconnected.'
@@ -1541,13 +1485,12 @@ class TelegramUserClientManager {
   }
 
   /**
-   * Restore all saved sessions on startup (MongoDB Primary & SQLite Migration)
+   * Restore all saved sessions on startup (MongoDB 100%)
    */
   private async restoreAllSavedSessions() {
     const seenSessions = new Set<string>();
     const seenPhones = new Set<string>();
 
-    // 1. Primary: Restore active sessions from MongoDB
     try {
       const sessionsCol = await getTelegramSessionsCollection();
       const docs = await sessionsCol.find({
@@ -1595,70 +1538,6 @@ class TelegramUserClientManager {
       }
     } catch (mongoErr) {
       console.error('[MongoDB] Error during GramJS restoreAllSavedSessions:', mongoErr);
-    }
-
-    // 2. Migration fallback: Check SQLite for any sessions not yet in MongoDB
-    try {
-      const rows = db.prepare('SELECT id, telegram_phone, telegram_session, telegram_api_id, telegram_api_hash FROM streamers WHERE telegram_session IS NOT NULL').all() as any[];
-
-      for (const row of rows) {
-        if (!row.telegram_session || row.telegram_session.startsWith('sim_session')) {
-          continue;
-        }
-        if (this.activeClients.has(row.id)) {
-          continue; // Already restored from MongoDB
-        }
-
-        if (seenSessions.has(row.telegram_session) || (row.telegram_phone && seenPhones.has(row.telegram_phone))) {
-          console.warn(`⚠️ [Migration] Skipping duplicate SQLite session for [${row.id}] to prevent AUTH_KEY_DUPLICATED.`);
-          continue;
-        }
-        seenSessions.add(row.telegram_session);
-        if (row.telegram_phone) seenPhones.add(row.telegram_phone);
-
-        const apiId = row.telegram_api_id || (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
-        const apiHash = row.telegram_api_hash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
-
-        if (!apiId || !apiHash) continue;
-
-        try {
-          console.log(`⚡ [Migration] Restoring and migrating saved session from SQLite for ${row.telegram_phone}...`);
-          const client = this.createClient(row.telegram_session, apiId, apiHash);
-          await client.connect();
-
-          if (await client.isUserAuthorized()) {
-            this.attachMessageListener(row.id, client);
-            this.activeClients.set(row.id, client);
-            await this.refreshMonitoredChats(row.id);
-
-            // Save to MongoDB
-            try {
-              const sessionsCol = await getTelegramSessionsCollection();
-              await sessionsCol.updateOne(
-                { streamerId: row.id },
-                {
-                  $set: {
-                    streamerId: row.id,
-                    phoneNumber: row.telegram_phone,
-                    sessionString: row.telegram_session,
-                    apiId,
-                    apiHash,
-                    isConnected: true,
-                    updatedAt: new Date()
-                  },
-                  $setOnInsert: { createdAt: new Date() }
-                },
-                { upsert: true }
-              );
-              console.log(`✅ [MongoDB] Migrated SQLite GramJS session to MongoDB for [${row.id}]!`);
-            } catch (e) {}
-          }
-        } catch (err) {
-          console.error(`❌ [TelegramJS] Failed restoring session for ${row.telegram_phone}:`, err);
-        }
-      }
-    } catch (e) {
-      // Safe fallback
     }
   }
 }

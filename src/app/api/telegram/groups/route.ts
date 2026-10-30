@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getMonitoredGroups, addMonitoredGroup, deleteMonitoredGroup } from '@/server/database/db';
 import { 
   getMongoMonitoredGroups, 
   addMongoMonitoredGroup, 
@@ -23,50 +22,31 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    let groups: any[] = [];
-    try {
-      const mongoGroups = await getMongoMonitoredGroups(streamerId);
-      const sqlGroups = getMonitoredGroups(streamerId) || [];
-      const seenChatIds = new Set<string>();
+    const mongoGroups = await getMongoMonitoredGroups(streamerId);
+    const seenChatIds = new Set<string>();
+    const groups: any[] = [];
 
-      const addGroup = (g: any) => {
-        const rawCid = String(g.chat_id || g.chatId || '').trim();
-        const norm = rawCid.replace(/^-100/, '').replace(/^-/, '');
-        if (norm && !seenChatIds.has(norm)) {
-          seenChatIds.add(norm);
-          groups.push({
-            id: g.id,
-            streamer_id: g.streamer_id || g.streamerId || streamerId,
-            chat_id: rawCid,
-            title: g.title,
-            username: g.username,
-            created_at: g.created_at || (g.createdAt ? new Date(g.createdAt).toISOString() : new Date().toISOString())
-          });
-        }
-      };
-
-      if (mongoGroups && mongoGroups.length > 0) {
-        mongoGroups.forEach(addGroup);
+    for (const g of mongoGroups || []) {
+      const rawCid = String(g.chat_id || (g as any).chatId || '').trim();
+      const norm = rawCid.replace(/^-100/, '').replace(/^-/, '');
+      if (norm && !seenChatIds.has(norm)) {
+        seenChatIds.add(norm);
+        groups.push({
+          id: g.id,
+          streamer_id: g.streamer_id || streamerId,
+          chat_id: rawCid,
+          title: g.title,
+          username: g.username,
+          created_at: g.created_at || new Date().toISOString()
+        });
       }
-      if (sqlGroups && sqlGroups.length > 0) {
-        sqlGroups.forEach(addGroup);
-      }
-    } catch (e) {
-      const sqlGroups = getMonitoredGroups(streamerId) || [];
-      groups = sqlGroups.map((g: any) => ({
-        id: g.id,
-        streamer_id: g.streamer_id || streamerId,
-        chat_id: String(g.chat_id || '').trim(),
-        title: g.title,
-        username: g.username,
-        created_at: g.created_at || new Date().toISOString()
-      }));
     }
+
     let availableDialogs: any[] = [];
     try {
       availableDialogs = await telegramUserManager.getAvailableDialogs(streamerId);
     } catch (e) {
-      // Ignored if client is not connected
+      console.warn('[Telegram] Failed fetching dialogs:', e);
     }
 
     return NextResponse.json({
@@ -86,45 +66,31 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || req.nextUrl.searchParams.get('streamerId') || req.nextUrl.searchParams.get('streamer_id') || 'demo-streamer-id-1001';
-
-    const status = await telegramUserManager.getStatus(streamerId);
-    if (!status.isConnected) {
-      return NextResponse.json(
-        { error: 'GramJS is not connected. Please connect your Telegram account in Step 1 first.' },
-        { status: 400 }
-      );
-    }
+    const streamerId = authUser?.id || 'demo-streamer-id-1001';
 
     const body = await req.json().catch(() => ({}));
-    let { chatId, title, username, groupLink } = body;
+    const { chatId, title, username } = body;
 
-    const rawTarget = (groupLink || chatId || '').trim();
-
-    if (!rawTarget) {
+    if (!chatId || typeof chatId !== 'string' || !chatId.trim()) {
       return NextResponse.json(
-        { error: 'Telegram group link or Chat ID is required (e.g. https://t.me/yourgroup or -1001234567890).' },
+        { error: 'Group link, Chat ID, or username is required.' },
         { status: 400 }
       );
     }
 
-    let finalChatId = rawTarget;
-    let finalTitle = (title && typeof title === 'string' && title.trim()) ? title.trim() : '';
-    let finalUsername = username && typeof username === 'string' ? username.trim() : undefined;
+    let finalChatId = chatId.trim();
+    let finalTitle = title ? String(title).trim() : '';
+    let finalUsername = username ? String(username).trim() : undefined;
 
-    // Try resolving link / entity via GramJS if active
     try {
-      const resolved = await telegramUserManager.resolveGroupEntity(streamerId, rawTarget);
+      const resolved = await telegramUserManager.resolveGroupEntity(streamerId, finalChatId);
       if (resolved) {
-        if (resolved.id) finalChatId = resolved.id;
+        finalChatId = resolved.id;
         if (!finalTitle && resolved.title) finalTitle = resolved.title;
         if (!finalUsername && resolved.username) finalUsername = resolved.username;
       }
-    } catch (e) {
-      // safe fallback
-    }
+    } catch (e) {}
 
-    // Clean up link if still full URL
     if (finalChatId.startsWith('http://') || finalChatId.startsWith('https://') || finalChatId.startsWith('t.me/')) {
       const cleanHandle = finalChatId.replace(/^https?:\/\/t\.me\//i, '').replace(/^t\.me\//i, '').replace(/^\+/, '');
       if (cleanHandle) {
@@ -137,25 +103,9 @@ export async function POST(req: NextRequest) {
       finalTitle = `Telegram Group (${finalChatId})`;
     }
 
-    // Generate unified ID for both MongoDB and SQLite
     const targetGroupId = uuidv4();
+    const group = await addMongoMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername, targetGroupId);
 
-    // Save to MongoDB Primary
-    let group: any = null;
-    try {
-      group = await addMongoMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername, targetGroupId);
-    } catch (mongoErr) {
-      console.warn('[MongoDB] Failed adding monitored group, using sqlite fallback:', mongoErr);
-    }
-
-    // Safe SQLite backup using the same unified ID
-    try {
-      const unifiedId = group?.id || targetGroupId;
-      const sqlGroup = addMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername, unifiedId);
-      if (!group) group = sqlGroup;
-    } catch (e) {}
-
-    // Send instant notification to streamer Mailbox
     try {
       const { addMongoMailboxMessage } = await import('@/server/database/mongo');
       await addMongoMailboxMessage({
@@ -170,7 +120,6 @@ export async function POST(req: NextRequest) {
       });
     } catch (mailErr) {}
 
-    // Immediately notify GramJS to update target groups filter
     try {
       await telegramUserManager.notifyGroupsChanged(streamerId);
     } catch (e) {
@@ -215,7 +164,6 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Resolve all representations (id, chat_id) across MongoDB & SQLite before deleting
     const allTargets = new Set<string>();
     for (const t of targets) {
       allTargets.add(t);
@@ -227,28 +175,14 @@ export async function DELETE(req: NextRequest) {
           if (matchedMongo.chat_id) allTargets.add(matchedMongo.chat_id);
         }
       } catch (e) {}
-
-      try {
-        const sqlGroups = getMonitoredGroups(streamerId) || [];
-        const matchedSql = sqlGroups.find((g: any) => g.id === t || g.chat_id === t);
-        if (matchedSql) {
-          if (matchedSql.id) allTargets.add(matchedSql.id);
-          if (matchedSql.chat_id) allTargets.add(matchedSql.chat_id);
-        }
-      } catch (e) {}
     }
 
     for (const target of allTargets) {
       try {
         await deleteMongoMonitoredGroup(target, streamerId);
       } catch (e) {}
-
-      try {
-        deleteMonitoredGroup(target, streamerId);
-      } catch (e) {}
     }
 
-    // Immediately notify GramJS to update monitored groups filter
     try {
       await telegramUserManager.notifyGroupsChanged(streamerId);
     } catch (e) {

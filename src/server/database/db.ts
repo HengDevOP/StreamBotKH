@@ -4,14 +4,55 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 
 import { SCHEMA_SQL } from './schema';
+import { seedMemoryDbFromMongo, mirrorSqlWriteToMongo } from './mongoSync';
+import { cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo } from './mongo';
 
-const dbPath = path.resolve(process.cwd(), 'streamneon.db');
-export const db = new Database(dbPath);
+// Remove legacy streamneon.db file from disk to ensure 100% MongoDB Atlas usage
+try {
+  const dbPath = path.resolve(process.cwd(), 'streamneon.db');
+  if (fs.existsSync(dbPath)) {
+    fs.unlinkSync(dbPath);
+    console.log('🗑️ [Database] Removed legacy streamneon.db from disk. Running 100% on MongoDB Atlas!');
+  }
+  const shmPath = path.resolve(process.cwd(), 'streamneon.db-shm');
+  if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
+  const walPath = path.resolve(process.cwd(), 'streamneon.db-wal');
+  if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
+} catch (e) {}
 
-// Enable foreign keys and WAL mode for high concurrency
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-db.pragma('busy_timeout = 10000'); // Prevent SQLITE_BUSY: database is locked during concurrent writes
+// Pure in-memory SQLite instance for zero disk footprint & instant synchronous queries
+const rawDb = new Database(':memory:');
+
+// Wrap rawDb with auto-sync to MongoDB Atlas
+export const db = new Proxy(rawDb, {
+  get(target, prop, receiver) {
+    if (prop === 'prepare') {
+      return (sql: string) => {
+        const stmt = target.prepare(sql);
+        const originalRun = stmt.run.bind(stmt);
+        stmt.run = (...args: any[]) => {
+          const res = originalRun(...args);
+          try {
+            mirrorSqlWriteToMongo(sql, args, target);
+          } catch (_) {}
+          return res;
+        };
+        return stmt;
+      };
+    }
+    const val = Reflect.get(target, prop, receiver);
+    if (typeof val === 'function') {
+      return val.bind(target);
+    }
+    return val;
+  }
+});
+
+// Seed in-memory tables from MongoDB Atlas
+rawDb.exec(SCHEMA_SQL);
+seedMemoryDbFromMongo(rawDb).catch((err) => {
+  console.warn('[DB] Failed initial seed from MongoDB Atlas:', err);
+});
 
 // Immediate safe schema migrations for telegram user client
 try {
@@ -499,39 +540,23 @@ export function initDatabase() {
 /**
  * 5-Minute Cache Duration Expiration:
  * Automatically expires and cleans up pending donation sessions older than 5 minutes (300 seconds)
- * to prevent unknown or lingering alerts from triggering on delayed bank transfers.
+ * to prevent unknown or lingering alerts from triggering on delayed bank transfers (100% MongoDB).
  */
 export function cleanupExpiredPendingDonations(): { expiredDonations: number; clearedTemporary: number } {
   try {
-    const expiredDonations = db.prepare(`
-      UPDATE donations
-      SET status = 'EXPIRED'
-      WHERE status = 'PENDING'
-        AND created_at <= datetime('now', '-5 minutes')
-    `).run().changes;
-
-    let clearedTemporary = 0;
-
-    // Auto-clean expired records from MongoDB temporary_donations
+    let expiredDonations = 0;
     try {
-      const { getTemporaryDonationsCollection } = require('./mongo');
-      getTemporaryDonationsCollection().then((col: any) => {
-        col.deleteMany({
-          createdAt: { $lt: new Date(Date.now() - 5 * 60 * 1000) }
-        }).then((res: any) => {
-          if (res?.deletedCount) {
-            clearedTemporary = res.deletedCount;
-            console.log(`🧹 [MongoDB Cache] Cleared ${clearedTemporary} expired temporary donation sessions (>5 mins).`);
-          }
-        }).catch(() => {});
-      }).catch(() => {});
-    } catch (e) {}
+      expiredDonations = db.prepare(`
+        UPDATE donations
+        SET status = 'EXPIRED'
+        WHERE status = 'PENDING'
+          AND created_at <= datetime('now', '-5 minutes')
+      `).run().changes;
+    } catch (_) {}
 
-    if (expiredDonations > 0) {
-      console.log(`🧹 [Cache Timer] Auto-cleared ${expiredDonations} expired pending donations (>5 mins).`);
-    }
+    cleanupExpiredPendingDonationsMongo().catch(() => {});
 
-    return { expiredDonations, clearedTemporary };
+    return { expiredDonations, clearedTemporary: 0 };
   } catch (e) {
     console.warn('[Cache Timer] Error in cleanupExpiredPendingDonations:', e);
     return { expiredDonations: 0, clearedTemporary: 0 };
@@ -541,32 +566,19 @@ export function cleanupExpiredPendingDonations(): { expiredDonations: number; cl
 /**
  * 6-Month Transaction Donation Retention Policy:
  * Automatically cleans up transaction donations older than 6 months (180 days)
- * to maintain ledger performance and enforce data retention limits.
+ * to maintain ledger performance and enforce data retention limits (100% MongoDB).
  */
 export function cleanupOlderDonations(months = 6): { deletedDonations: number } {
   try {
-    const deletedDonations = db.prepare(`
-      DELETE FROM donations
-      WHERE datetime(created_at) <= datetime('now', '-' || ? || ' months')
-    `).run(months).changes;
-
-    // Auto-clean expired records from MongoDB temporary_donations and donations if older than 6 months
+    let deletedDonations = 0;
     try {
-      const { getMongoDb } = require('./mongo');
-      getMongoDb().then((mongoDb: any) => {
-        const cutoffDate = new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000);
-        mongoDb.collection('donations').deleteMany({
-          createdAt: { $lt: cutoffDate }
-        }).catch(() => {});
-        mongoDb.collection('temporary_donations').deleteMany({
-          createdAt: { $lt: cutoffDate }
-        }).catch(() => {});
-      }).catch(() => {});
-    } catch (e) {}
+      deletedDonations = db.prepare(`
+        DELETE FROM donations
+        WHERE datetime(created_at) <= datetime('now', '-' || ? || ' months')
+      `).run(months).changes;
+    } catch (_) {}
 
-    if (deletedDonations > 0) {
-      console.log(`🧹 [Retention Policy] Auto-deleted ${deletedDonations} donations older than ${months} months.`);
-    }
+    cleanupOlderDonationsMongo(months).catch(() => {});
 
     return { deletedDonations };
   } catch (e) {
@@ -612,6 +624,13 @@ export function addMonitoredGroup(streamerId: string, chatId: string, title: str
   const id = customId || uuidv4();
   db.prepare('INSERT INTO telegram_monitored_groups (id, streamer_id, chat_id, title, username) VALUES (?, ?, ?, ?, ?)')
     .run(id, streamerId, cleanChatId, cleanTitle, cleanUsername);
+
+  // Sync to MongoDB
+  try {
+    const { addMongoMonitoredGroup } = require('./mongo');
+    addMongoMonitoredGroup(streamerId, cleanChatId, cleanTitle, cleanUsername || undefined, id).catch(() => {});
+  } catch (_) {}
+
   return db.prepare('SELECT * FROM telegram_monitored_groups WHERE id = ?').get(id);
 }
 
@@ -622,6 +641,13 @@ export function deleteMonitoredGroup(idOrChatId: string, streamerId: string) {
     const strippedId = cleanId.replace(/^-100/, '').replace(/^-/, '');
     const variants = Array.from(new Set([cleanId, strippedId, `-${strippedId}`, `-100${strippedId}`].filter(Boolean)));
     const placeholders = variants.map(() => '?').join(', ');
+
+    // Sync to MongoDB
+    try {
+      const { deleteMongoMonitoredGroup } = require('./mongo');
+      deleteMongoMonitoredGroup(cleanId, streamerId).catch(() => {});
+    } catch (_) {}
+
     return db.prepare(`DELETE FROM telegram_monitored_groups WHERE streamer_id = ? AND (id IN (${placeholders}) OR chat_id IN (${placeholders}))`)
       .run(streamerId, ...variants, ...variants);
   } catch (e) {
@@ -631,6 +657,12 @@ export function deleteMonitoredGroup(idOrChatId: string, streamerId: string) {
 
 export function clearMonitoredGroups(streamerId: string) {
   try {
+    // Sync to MongoDB
+    try {
+      const { clearMongoMonitoredGroups } = require('./mongo');
+      clearMongoMonitoredGroups(streamerId).catch(() => {});
+    } catch (_) {}
+
     return db.prepare('DELETE FROM telegram_monitored_groups WHERE streamer_id = ?').run(streamerId);
   } catch (e) {
     return null;

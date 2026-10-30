@@ -5,11 +5,10 @@ import path from 'path';
 import fs from 'fs';
 import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from './db';
 
 export interface UserDoc {
   _id?: ObjectId;
-  userId: string; // Login ID (e.g. demo-streamer-id-1001)
+  userId: string; // Login ID (e.g. demo-streamer-id-1001 or UUID)
   username: string;
   displayName: string;
   email?: string;
@@ -28,6 +27,198 @@ export interface UserDoc {
   planStartedAt?: string | null;
   planExpiresAt?: string | null;
   planDurationDays?: number;
+  overlayToken?: string;
+  overlay_token?: string;
+  telegramPhone?: string;
+  telegramSession?: string;
+  telegramUserName?: string;
+  telegramApiId?: number;
+  telegramApiHash?: string;
+  telegramPairingCode?: string;
+  telegramPendingPhone?: string;
+  telegramPendingHash?: string;
+  telegramPendingSession?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DonationDoc {
+  _id?: ObjectId;
+  id: string; // unique UUID
+  streamerId: string;
+  streamerUsername?: string;
+  donorName: string;
+  donorMessage?: string;
+  amount: number;
+  currency: 'USD' | 'KHR';
+  bankingName?: string;
+  paymentMethod?: string;
+  paywayTranId?: string;
+  qrString?: string;
+  videoUrl?: string;
+  videoTitle?: string;
+  videoStartTime?: number;
+  videoEndTime?: number;
+  status: 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED';
+  isAlerted?: boolean | number;
+  paidAt?: Date | string | null;
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+export interface AlertSettingsDoc {
+  _id?: ObjectId;
+  streamerId: string;
+  templateStyle?: string;
+  glowColor?: string;
+  soundUrl?: string;
+  soundVolume?: number;
+  durationSeconds?: number;
+  minAmountAlert?: number;
+  ttsEnabled?: boolean;
+  ttsVoice?: string;
+  ttsType?: string;
+  clonedVoiceSampleUrl?: string;
+  customGifUrl?: string;
+  showImage?: boolean;
+  textTemplate?: string;
+  textColor?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  layoutMode?: string;
+  animationStyle?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface PaymentSettingsDoc {
+  _id?: ObjectId;
+  streamerId: string;
+  bakongAccountId?: string;
+  bankAccountName?: string;
+  abaPaywayApiKey?: string;
+  abaPaywayMerchantId?: string;
+  isLiveMode?: boolean;
+  masterKhqrImage?: string;
+  khqrBase64?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface VideoAlertSettingsDoc {
+  _id?: ObjectId;
+  streamerId: string;
+  isEnabled: boolean;
+  minTipAmount: number;
+  maxDurationSeconds: number;
+  autoPlay?: boolean;
+  showProgressBar?: boolean;
+  allowViewerControl?: boolean;
+  blacklistedKeywords?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface OverlayTokenHistoryDoc {
+  _id?: ObjectId;
+  token: string;
+  streamerId: string;
+  createdAt: Date;
+}
+
+export interface StreamTimerDoc {
+  _id?: ObjectId;
+  streamerId: string;
+  mode: string;
+  title: string;
+  currentSeconds: number;
+  initialSeconds: number;
+  secondsPerUsd: number;
+  maxSeconds: number;
+  isRunning: boolean;
+  theme: string;
+  fontFamily: string;
+  updatedAt: Date;
+}
+
+export interface StreamGoalDoc {
+  _id?: ObjectId;
+  streamerId: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  currency: string;
+  theme: string;
+  fontFamily: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface StreamLeaderboardDoc {
+  _id?: ObjectId;
+  streamerId: string;
+  title: string;
+  timeframe: string;
+  maxEntries: number;
+  theme: string;
+  fontFamily: string;
+  showAmounts: boolean;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface StreamSoundboardDoc {
+  _id?: ObjectId;
+  id: string;
+  streamerId: string;
+  name: string;
+  isActive: boolean;
+  volume: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface StreamSoundboardItemDoc {
+  _id?: ObjectId;
+  id: string;
+  soundboardId: string;
+  streamerId: string;
+  name: string;
+  audioUrl: string;
+  keybind?: string;
+  volume: number;
+  color?: string;
+  icon?: string;
+  orderIndex: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PokemonWidgetSettingsDoc {
+  _id?: ObjectId;
+  streamerId: string;
+  enabled: boolean;
+  selectedPokemon: string;
+  scale: number;
+  position: string;
+  interactive: boolean;
+  animationState: string;
+  customName?: string;
+  showNameTag: boolean;
+  updatedAt: Date;
+}
+
+export interface PlatformPromotionDoc {
+  _id?: ObjectId;
+  id: string;
+  title: string;
+  description: string;
+  bannerUrl: string;
+  actionUrl: string;
+  isActive: boolean;
+  priority: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -353,6 +544,113 @@ export async function getTelegramMonitoredGroupsCollection(): Promise<Collection
 export async function getMailboxMessagesCollection(): Promise<Collection<MailboxMessageDoc>> {
   const db = await getMongoDb();
   return db.collection<MailboxMessageDoc>('mailbox_messages');
+}
+
+export async function getDonationsCollection(): Promise<Collection<DonationDoc>> {
+  const db = await getMongoDb();
+  return db.collection<DonationDoc>('donations');
+}
+
+export async function getAlertSettingsCollection(): Promise<Collection<AlertSettingsDoc>> {
+  const db = await getMongoDb();
+  return db.collection<AlertSettingsDoc>('alert_settings');
+}
+
+export async function getPaymentSettingsCollection(): Promise<Collection<PaymentSettingsDoc>> {
+  const db = await getMongoDb();
+  return db.collection<PaymentSettingsDoc>('payment_settings');
+}
+
+export async function getVideoAlertSettingsCollection(): Promise<Collection<VideoAlertSettingsDoc>> {
+  const db = await getMongoDb();
+  return db.collection<VideoAlertSettingsDoc>('video_alert_settings');
+}
+
+export async function getOverlayTokenHistoryCollection(): Promise<Collection<OverlayTokenHistoryDoc>> {
+  const db = await getMongoDb();
+  return db.collection<OverlayTokenHistoryDoc>('overlay_token_history');
+}
+
+export async function getStreamTimersCollection(): Promise<Collection<StreamTimerDoc>> {
+  const db = await getMongoDb();
+  return db.collection<StreamTimerDoc>('stream_timers');
+}
+
+export async function getStreamGoalsCollection(): Promise<Collection<StreamGoalDoc>> {
+  const db = await getMongoDb();
+  return db.collection<StreamGoalDoc>('stream_goals');
+}
+
+export async function getStreamLeaderboardsCollection(): Promise<Collection<StreamLeaderboardDoc>> {
+  const db = await getMongoDb();
+  return db.collection<StreamLeaderboardDoc>('stream_leaderboards');
+}
+
+export async function getSoundboardsCollection(): Promise<Collection<StreamSoundboardDoc>> {
+  const db = await getMongoDb();
+  return db.collection<StreamSoundboardDoc>('stream_soundboards');
+}
+
+export async function getSoundboardItemsCollection(): Promise<Collection<StreamSoundboardItemDoc>> {
+  const db = await getMongoDb();
+  return db.collection<StreamSoundboardItemDoc>('stream_soundboard_items');
+}
+
+export async function getPokemonSettingsCollection(): Promise<Collection<PokemonWidgetSettingsDoc>> {
+  const db = await getMongoDb();
+  return db.collection<PokemonWidgetSettingsDoc>('pokemon_widget_settings');
+}
+
+export async function getPromotionsCollection(): Promise<Collection<PlatformPromotionDoc>> {
+  const db = await getMongoDb();
+  return db.collection<PlatformPromotionDoc>('platform_promotions');
+}
+
+/**
+ * Cleanup expired pending donations (>5 mins) in MongoDB donations & temporary_donations
+ */
+export async function cleanupExpiredPendingDonationsMongo() {
+  try {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+
+    const donationsCol = await getDonationsCollection();
+    const result = await donationsCol.updateMany(
+      { status: 'PENDING', createdAt: { $lte: fiveMinutesAgo } },
+      { $set: { status: 'EXPIRED' } }
+    );
+    if (result.modifiedCount > 0) {
+      console.log(`🧹 [MongoDB Cleanup] Marked ${result.modifiedCount} expired pending donation(s) as EXPIRED.`);
+    }
+
+    const tempCol = await getTemporaryDonationsCollection();
+    const tempResult = await tempCol.deleteMany({
+      createdAt: { $lte: fifteenMinutesAgo }
+    });
+    if (tempResult.deletedCount > 0) {
+      console.log(`🧹 [MongoDB Cleanup] Pruned ${tempResult.deletedCount} old temporary donation session(s).`);
+    }
+  } catch (err) {
+    console.warn('[MongoDB Cleanup] Warning during expired pending donations cleanup:', err);
+  }
+}
+
+/**
+ * 6-Month Data Retention Cleanup in MongoDB
+ */
+export async function cleanupOlderDonationsMongo(months = 6) {
+  try {
+    const cutoff = new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000);
+    const donationsCol = await getDonationsCollection();
+    const res = await donationsCol.deleteMany({
+      createdAt: { $lt: cutoff }
+    });
+    if (res.deletedCount > 0) {
+      console.log(`🧹 [MongoDB Cleanup] Pruned ${res.deletedCount} donation record(s) older than ${months} month(s).`);
+    }
+  } catch (err) {
+    console.warn('[MongoDB Cleanup] Warning during 6-month retention cleanup:', err);
+  }
 }
 
 export async function getMongoMailboxMessages(streamerId: string) {
@@ -784,10 +1082,13 @@ export async function restoreMasterKhqrImage(
       mongoConfig = await gatewayCol.findOne({ $or: queryConditions });
     }
 
-    let sqliteRow: any = null;
+    let paymentSettingsRow: any = null;
     if (streamerId) {
       try {
-        sqliteRow = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(streamerId) as any;
+        const payCol = await getPaymentSettingsCollection();
+        paymentSettingsRow = await payCol.findOne({
+          $or: [{ streamerId }, { streamer_id: streamerId }]
+        } as any);
       } catch (e) {}
     }
 
@@ -831,12 +1132,13 @@ export async function restoreMasterKhqrImage(
     let verifiedAbsPath = checkFile(mongoConfig?.khqrImageUrl);
     let verifiedUrl = verifiedAbsPath ? (mongoConfig?.khqrImageUrl || '').trim() : '';
 
-    // 2. If not on disk, check sqliteRow.master_khqr_image
-    if (!verifiedAbsPath && sqliteRow?.master_khqr_image) {
-      const sqliteAbs = checkFile(sqliteRow.master_khqr_image);
-      if (sqliteAbs) {
-        verifiedAbsPath = sqliteAbs;
-        verifiedUrl = sqliteRow.master_khqr_image.trim();
+    // 2. If not on disk, check paymentSettingsRow
+    if (!verifiedAbsPath && (paymentSettingsRow?.masterKhqrImage || paymentSettingsRow?.master_khqr_image)) {
+      const payImage = (paymentSettingsRow.masterKhqrImage || paymentSettingsRow.master_khqr_image || '').trim();
+      const payAbs = checkFile(payImage);
+      if (payAbs) {
+        verifiedAbsPath = payAbs;
+        verifiedUrl = payImage;
       }
     }
 
@@ -878,14 +1180,21 @@ export async function restoreMasterKhqrImage(
         );
       }
 
-      // Always ensure SQLite payment_settings is in sync
+      // Sync payment_settings in MongoDB
       if (targetId) {
         try {
-          db.prepare(`
-            INSERT INTO payment_settings (streamer_id, master_khqr_image)
-            VALUES (?, ?)
-            ON CONFLICT(streamer_id) DO UPDATE SET master_khqr_image = excluded.master_khqr_image
-          `).run(targetId, verifiedUrl);
+          const payCol = await getPaymentSettingsCollection();
+          await payCol.updateOne(
+            { streamerId: targetId },
+            {
+              $set: {
+                streamerId: targetId,
+                masterKhqrImage: verifiedUrl,
+                updatedAt: new Date()
+              }
+            },
+            { upsert: true }
+          );
         } catch (e) {}
       }
 
@@ -930,11 +1239,18 @@ export async function restoreMasterKhqrImage(
 
       if (targetId) {
         try {
-          db.prepare(`
-            INSERT INTO payment_settings (streamer_id, master_khqr_image)
-            VALUES (?, ?)
-            ON CONFLICT(streamer_id) DO UPDATE SET master_khqr_image = excluded.master_khqr_image
-          `).run(targetId, restoredUrl);
+          const payCol = await getPaymentSettingsCollection();
+          await payCol.updateOne(
+            { streamerId: targetId },
+            {
+              $set: {
+                streamerId: targetId,
+                masterKhqrImage: restoredUrl,
+                updatedAt: new Date()
+              }
+            },
+            { upsert: true }
+          );
         } catch (e) {}
       }
 
@@ -976,22 +1292,25 @@ export async function restoreAllMasterKhqrImages(): Promise<void> {
       }
     }
 
-    // Also scan SQLite payment_settings for any configured KHQRs
+    // Also scan payment_settings collection in MongoDB
     try {
-      const sqliteRows = db.prepare(`
-        SELECT streamer_id, master_khqr_image 
-        FROM payment_settings 
-        WHERE master_khqr_image IS NOT NULL AND master_khqr_image != ''
-      `).all() as Array<{ streamer_id: string; master_khqr_image: string }>;
+      const payCol = await getPaymentSettingsCollection();
+      const payRows = await payCol.find({
+        $or: [
+          { masterKhqrImage: { $exists: true, $ne: '' } },
+          { master_khqr_image: { $exists: true, $ne: '' } } as any
+        ]
+      }).toArray();
 
-      for (const row of sqliteRows) {
-        if (row.streamer_id) {
-          await restoreMasterKhqrImage(row.streamer_id);
+      for (const row of payRows) {
+        const sId = row.streamerId || (row as any).streamer_id;
+        if (sId) {
+          await restoreMasterKhqrImage(sId);
         }
       }
     } catch (e) {}
 
-    console.log('⚡ [Master KHQR] Restored and synchronized all streamer Master KHQRs');
+    console.log('⚡ [Master KHQR] Restored and synchronized all streamer Master KHQRs from MongoDB');
   } catch (err) {
     console.warn('⚠️ [Master KHQR] Warning during startup restoration:', err);
   }

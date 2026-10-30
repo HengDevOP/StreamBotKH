@@ -26,7 +26,7 @@ import { Card } from '../components/common/Card';
 
 interface DonatePageProps {
   username?: string;
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, params?: any) => void;
 }
 
 export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer', onNavigate }) => {

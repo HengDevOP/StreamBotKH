@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db } from '@/server/database/db';
+import { getUsersCollection, getAlertSettingsCollection } from '@/server/database/mongo';
 import { broadcastAlertToOverlay } from '@/server/services/socketService';
 
 export async function POST(req: NextRequest) {
@@ -10,22 +10,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(user.id) as any;
-    const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id) as any;
+    const usersCol = await getUsersCollection();
+    const streamer = await usersCol.findOne({
+      $or: [{ userId: user.id }, { id: user.id as any }]
+    });
 
     if (!streamer) {
       return NextResponse.json({ error: 'Streamer not found' }, { status: 404 });
     }
 
+    const alertCol = await getAlertSettingsCollection();
+    const alertSettings = await alertCol.findOne({
+      $or: [
+        { streamerId: user.id },
+        ...(user.username ? [{ streamerId: user.username }] : [])
+      ]
+    }) as any;
+
     const body = await req.json().catch(() => ({}));
 
-    const v = (body.ttsType || body.tts_voice || alertSettings?.tts_voice || '').toLowerCase();
+    const v = (body.ttsType || body.tts_voice || alertSettings?.ttsVoice || alertSettings?.tts_voice || '').toLowerCase();
     const resolvedTtsType =
       v === 'google-male' || v.includes('christopher') ? 'google-male'
       : v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
       : v.includes('male') || v.includes('piseth') ? 'kiritts-male'
       : v.includes('cloned') ? 'cloned'
-      : 'google';
+      : (alertSettings?.ttsType || 'google');
+
+    const overlayToken = streamer.overlayToken || streamer.overlay_token;
 
     const testPayload = {
       donationId: 'test-' + Date.now(),
@@ -34,19 +46,21 @@ export async function POST(req: NextRequest) {
       amount: body.amount || 5.0,
       currency: body.currency || 'USD',
       bankingName: body.bankingName || 'ABA Bank',
-      templateStyle: alertSettings?.template_style || 'neon-box',
-      glowColor: alertSettings?.glow_color || '#00F0FF',
-      soundUrl: alertSettings?.sound_url || '/sounds/neon-chime.mp3',
-      soundVolume: alertSettings?.sound_volume ?? 0.8,
-      durationSeconds: alertSettings?.duration_seconds ?? 8,
-      ttsEnabled: alertSettings?.tts_enabled === 1,
+      templateStyle: alertSettings?.templateStyle || alertSettings?.template_style || 'neon-box',
+      glowColor: alertSettings?.glowColor || alertSettings?.glow_color || '#00F0FF',
+      soundUrl: alertSettings?.soundUrl || alertSettings?.sound_url || '/sounds/neon-chime.mp3',
+      soundVolume: alertSettings?.soundVolume ?? alertSettings?.sound_volume ?? 0.8,
+      durationSeconds: alertSettings?.durationSeconds ?? alertSettings?.duration_seconds ?? 8,
+      ttsEnabled: alertSettings ? (alertSettings.ttsEnabled !== undefined ? alertSettings.ttsEnabled : alertSettings.tts_enabled === 1) : true,
       ttsType: resolvedTtsType,
-      ttsVoice: alertSettings?.tts_voice || 'Google US English',
-      customGifUrl: alertSettings?.custom_gif_url,
+      ttsVoice: alertSettings?.ttsVoice || alertSettings?.tts_voice || 'Google US English',
+      customGifUrl: alertSettings?.customGifUrl || alertSettings?.custom_gif_url,
       isTest: true
     };
 
-    broadcastAlertToOverlay(streamer.overlay_token, testPayload);
+    if (overlayToken) {
+      broadcastAlertToOverlay(overlayToken, testPayload);
+    }
 
     return NextResponse.json({ success: true, message: 'Test alert sent to OBS overlay' });
   } catch (err: any) {

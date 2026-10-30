@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db, isAdminEmail } from '@/server/database/db';
+import { getDonationsCollection, getTemporaryDonationsCollection } from '@/server/database/mongo';
+import { isAdminEmail } from '@/server/database/db';
 
 export async function DELETE(
   req: NextRequest,
@@ -17,36 +18,34 @@ export async function DELETE(
       return NextResponse.json({ error: 'Donation ID is required' }, { status: 400 });
     }
 
-    // Find donation in SQLite
-    const donation = db.prepare('SELECT * FROM donations WHERE id = ?').get(donationId) as any;
+    const donationsCol = await getDonationsCollection();
+    const donation = await donationsCol.findOne({
+      $or: [{ id: donationId }, { donationId }]
+    });
+
     if (!donation) {
       return NextResponse.json({ error: 'Donation record not found' }, { status: 404 });
     }
 
     // Ensure the donation belongs to the authenticated streamer (or admin)
-    const isOwner = donation.streamer_id === user.id;
+    const donorStreamerId = donation.streamerId || (donation as any).streamer_id;
+    const isOwner = donorStreamerId === user.id || (user.username && donorStreamerId === user.username);
     const isAdmin = isAdminEmail(user.email);
     if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: 'Forbidden: You can only delete your own donation records' }, { status: 403 });
     }
 
-    // Delete record from SQLite donations table
-    db.prepare('DELETE FROM donations WHERE id = ?').run(donationId);
+    await donationsCol.deleteOne({ _id: donation._id });
 
-    // Also clean up from MongoDB temporary_donations if present
     try {
-      const { getTemporaryDonationsCollection } = require('@/server/database/mongo');
       const tempCol = await getTemporaryDonationsCollection();
       await tempCol.deleteMany({
         $or: [
-          { donationId: donationId },
-          { id: donationId },
-          { md5: donationId }
+          { donationId },
+          { id: donationId }
         ]
       });
-    } catch (mErr) {
-      // Non-fatal if mongo cleanup fails
-    }
+    } catch (mErr) {}
 
     return NextResponse.json({
       success: true,

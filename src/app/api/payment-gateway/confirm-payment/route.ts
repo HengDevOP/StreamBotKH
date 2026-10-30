@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/server/database/db';
 import { broadcastAlertToOverlay, broadcastDonationToDashboard, getIO } from '@/server/services/socketService';
 import { findMatchingTemporaryDonation, isGenericBankKeyword } from '@/server/utils/nameMatching';
-import { getTemporaryDonationsCollection, getAlertBoxesCollection } from '@/server/database/mongo';
+import {
+  getUsersCollection,
+  getDonationsCollection,
+  getTemporaryDonationsCollection,
+  getAlertBoxesCollection,
+  getAlertSettingsCollection,
+  getVideoAlertSettingsCollection,
+  getStreamGoalsCollection
+} from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const {
       streamerUsername,
       streamerId,
@@ -18,18 +25,29 @@ export async function POST(req: NextRequest) {
       bankingName = 'ABA Bank'
     } = body;
 
-    // 1. Resolve streamer
+    // 1. Resolve streamer from MongoDB
+    const usersCol = await getUsersCollection();
     let streamer: any = null;
     if (streamerUsername) {
       const clean = streamerUsername.replace(/^@/, '').trim();
-      streamer = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE').get(clean);
+      const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      streamer = await usersCol.findOne({
+        username: { $regex: new RegExp(`^${escaped}$`, 'i') }
+      });
     }
     if (!streamer && streamerId) {
-      streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(streamerId);
+      streamer = await usersCol.findOne({
+        $or: [{ userId: streamerId }, { id: streamerId as any }]
+      });
     }
     if (!streamer) {
       // Default fallback
-      streamer = db.prepare('SELECT * FROM streamers WHERE username = ?').get('neonstreamer');
+      streamer = await usersCol.findOne({
+        $or: [{ username: 'streambotkh' }, { username: 'neonstreamer' }]
+      });
+      if (!streamer) {
+        streamer = await usersCol.findOne({});
+      }
     }
 
     if (!streamer) {
@@ -39,17 +57,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const resolvedStreamerId = streamer.userId || streamer.id || String(streamer._id);
+    const resolvedOverlayToken = streamer.overlayToken || streamer.overlay_token;
+
     const numericAmount = Math.max(0.01, parseFloat(String(amount)) || 1.0);
 
-    // 1. Check MongoDB temporary_donations listener queue for matching bank name (First/Last name, any case)
+    // Check MongoDB temporary_donations listener queue for matching bank name
     let matchedTemp: any = null;
+    const tempCol = await getTemporaryDonationsCollection();
+    const donationsCol = await getDonationsCollection();
+
     try {
       const seenIds = new Set<string>();
       const candidates: any[] = [];
-      const tempCol = await getTemporaryDonationsCollection();
       const mongoDocs = await tempCol
         .find({
-          streamerId: streamer.id,
+          $or: [
+            { streamerId: resolvedStreamerId },
+            ...(streamer.username ? [{ streamerId: streamer.username }] : [])
+          ],
           createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
         })
         .sort({ createdAt: -1 })
@@ -77,21 +103,39 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Also check SQLite pending donations for this streamer
+      // Also check MongoDB pending donations for this streamer
       try {
-        const pendingSqlite = db.prepare(`
-          SELECT * FROM donations
-          WHERE streamer_id = ?
-            AND status = 'PENDING'
-            AND created_at > datetime('now', '-10 minutes')
-          ORDER BY created_at DESC
-          LIMIT 30
-        `).all(streamer.id) as any[];
+        const pendingMongo = await donationsCol
+          .find({
+            $or: [
+              { streamerId: resolvedStreamerId },
+              { streamer_id: resolvedStreamerId as any }
+            ],
+            status: 'PENDING',
+            createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
+          })
+          .sort({ createdAt: -1 })
+          .limit(30)
+          .toArray();
 
-        for (const doc of pendingSqlite) {
-          if (doc && doc.id && !seenIds.has(doc.id)) {
-            seenIds.add(doc.id);
-            candidates.push(doc);
+        for (const doc of pendingMongo) {
+          const docId = doc.id || String(doc._id);
+          if (docId && !seenIds.has(docId)) {
+            seenIds.add(docId);
+            candidates.push({
+              id: docId,
+              streamer_id: doc.streamerId,
+              donor_name: doc.donorName,
+              donor_message: doc.donorMessage,
+              amount: doc.amount,
+              currency: doc.currency,
+              banking_name: doc.bankingName,
+              video_url: doc.videoUrl,
+              video_title: doc.videoTitle,
+              video_start_time: doc.videoStartTime,
+              video_end_time: doc.videoEndTime,
+              created_at: doc.createdAt
+            });
           }
         }
       } catch (sqlErr) {}
@@ -145,85 +189,37 @@ export async function POST(req: NextRequest) {
     const effectiveVideoStartTime = Number(matchedTemp?.video_start_time) || 0;
     const effectiveVideoEndTime = Number(matchedTemp?.video_end_time) || 0;
 
-    // 2. Update or insert into SQLite donations table with status PAID
-    try {
-      if (matchedTemp) {
-        const updateResult = db.prepare(`
-          UPDATE donations SET
-            donor_name = ?,
-            donor_message = ?,
-            amount = ?,
-            currency = ?,
-            banking_name = ?,
-            payment_method = ?,
-            video_url = ?,
-            video_title = ?,
-            video_start_time = ?,
-            video_end_time = ?,
-            status = 'PAID',
-            is_alerted = 1,
-            paid_at = datetime('now')
-          WHERE id = ?
-        `).run(
-          effectiveDonorName,
-          effectiveDonorMessage,
-          effectiveAmount,
-          effectiveCurrency,
-          effectiveBankingName,
-          bankingName.toLowerCase().includes('aba') ? 'ABA_PAYWAY' : 'BAKONG_KHQR',
-          effectiveVideoUrl || null,
-          effectiveVideoTitle || null,
-          effectiveVideoStartTime,
-          effectiveVideoEndTime,
-          activeDonationId
-        );
+    const now = new Date();
 
-        if (updateResult.changes === 0) {
-          db.prepare(`
-            INSERT INTO donations (
-              id, streamer_id, donor_name, donor_message, amount, currency,
-              banking_name, payment_method, video_url, video_title,
-              video_start_time, video_end_time, status, is_alerted, paid_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 1, datetime('now'))
-          `).run(
-            activeDonationId,
-            streamer.id,
-            effectiveDonorName,
-            effectiveDonorMessage,
-            effectiveAmount,
-            effectiveCurrency,
-            effectiveBankingName,
-            bankingName.toLowerCase().includes('aba') ? 'ABA_PAYWAY' : 'BAKONG_KHQR',
-            effectiveVideoUrl || null,
-            effectiveVideoTitle || null,
-            effectiveVideoStartTime,
-            effectiveVideoEndTime
-          );
-        }
-      } else {
-        db.prepare(`
-          INSERT INTO donations (
-            id, streamer_id, donor_name, donor_message, amount, currency,
-            banking_name, payment_method, video_url, video_title,
-            video_start_time, video_end_time, status, is_alerted, paid_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 1, datetime('now'))
-        `).run(
-          activeDonationId,
-          streamer.id,
-          effectiveDonorName,
-          effectiveDonorMessage,
-          effectiveAmount,
-          effectiveCurrency,
-          effectiveBankingName,
-          bankingName.toLowerCase().includes('aba') ? 'ABA_PAYWAY' : 'BAKONG_KHQR',
-          effectiveVideoUrl || null,
-          effectiveVideoTitle || null,
-          effectiveVideoStartTime,
-          effectiveVideoEndTime
-        );
-      }
+    // 2. Update or insert into MongoDB donations table with status PAID
+    try {
+      await donationsCol.updateOne(
+        { id: activeDonationId },
+        {
+          $set: {
+            id: activeDonationId,
+            streamerId: resolvedStreamerId,
+            donorName: effectiveDonorName,
+            donorMessage: effectiveDonorMessage,
+            amount: effectiveAmount,
+            currency: effectiveCurrency,
+            bankingName: effectiveBankingName,
+            paymentMethod: bankingName.toLowerCase().includes('aba') ? 'ABA_PAYWAY' : 'BAKONG_KHQR',
+            videoUrl: effectiveVideoUrl || null,
+            videoTitle: effectiveVideoTitle || null,
+            videoStartTime: effectiveVideoStartTime,
+            videoEndTime: effectiveVideoEndTime,
+            status: 'PAID',
+            isAlerted: 1,
+            paidAt: now,
+            updatedAt: now
+          },
+          $setOnInsert: { createdAt: now }
+        },
+        { upsert: true }
+      );
     } catch (dbErr) {
-      console.error('[DB] Error updating/inserting confirm-payment donation:', dbErr);
+      console.error('[DB] Error updating/inserting confirm-payment donation in MongoDB:', dbErr);
     }
 
     // 3. Get streamer alert settings from MongoDB alert_boxes
@@ -233,11 +229,11 @@ export async function POST(req: NextRequest) {
       const activeBoxes = await alertBoxesCol
         .find({
           $or: [
-            { userId: streamer.id },
-            { streamerId: streamer.id },
+            { userId: resolvedStreamerId },
+            { streamerId: resolvedStreamerId },
             ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
             ...(streamer.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
-            ...(streamer.overlay_token ? [{ overlayToken: streamer.overlay_token }, { token: streamer.overlay_token }] : [])
+            ...(resolvedOverlayToken ? [{ overlayToken: resolvedOverlayToken }, { token: resolvedOverlayToken }] : [])
           ],
           isEnabled: true
         })
@@ -254,11 +250,30 @@ export async function POST(req: NextRequest) {
       console.warn('[PaymentGateway] Could not fetch mongo alert boxes:', e);
     }
 
-    const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(streamer.id) as any;
-    const videoSettings = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(streamer.id) as any;
+    let alertSettings: any = null;
+    try {
+      const alertSettingsCol = await getAlertSettingsCollection();
+      alertSettings = await alertSettingsCol.findOne({
+        $or: [
+          { streamerId: resolvedStreamerId },
+          ...(streamer.username ? [{ streamerId: streamer.username }] : [])
+        ]
+      });
+    } catch (e) {}
+
+    let videoSettings: any = null;
+    try {
+      const videoSettingsCol = await getVideoAlertSettingsCollection();
+      videoSettings = await videoSettingsCol.findOne({
+        $or: [
+          { streamerId: resolvedStreamerId },
+          ...(streamer.username ? [{ streamerId: streamer.username }] : [])
+        ]
+      });
+    } catch (e) {}
 
     // 4. Trigger Real-Time OBS Studio Overlay Alert with current saved settings
-    broadcastAlertToOverlay(streamer.overlay_token, {
+    broadcastAlertToOverlay(resolvedOverlayToken, {
       boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
       donationId: activeDonationId,
       donorName: effectiveDonorName,
@@ -272,9 +287,9 @@ export async function POST(req: NextRequest) {
       videoTitle: effectiveVideoTitle,
       videoStartTime: effectiveVideoStartTime,
       videoEndTime: effectiveVideoEndTime,
-      videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : false,
-      videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
-      videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
+      videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
+      videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
+      videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
       templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
       textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
       textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
@@ -309,7 +324,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 5. Broadcast to Streamer Live Dashboard (Updates revenue & recent list immediately)
-    broadcastDonationToDashboard(streamer.id, {
+    broadcastDonationToDashboard(resolvedStreamerId, {
       id: activeDonationId,
       donor_name: effectiveDonorName,
       donor_message: effectiveDonorMessage,
@@ -318,34 +333,38 @@ export async function POST(req: NextRequest) {
       banking_name: effectiveBankingName,
       payment_method: bankingName,
       status: 'PAID',
-      created_at: new Date().toISOString(),
-      paid_at: new Date().toISOString()
+      created_at: now.toISOString(),
+      paid_at: now.toISOString()
     });
 
-    // 5b. Update Active Stream Goal in Real Time if active
+    // 5b. Update Active Stream Goal in Real Time if active in MongoDB
     try {
-      const activeGoal = db.prepare(`
-        SELECT * FROM stream_goals 
-        WHERE streamer_token = ? AND is_active = 1
-        LIMIT 1
-      `).get(streamer.overlay_token) as any;
+      const goalsCol = await getStreamGoalsCollection();
+      const activeGoal = await goalsCol.findOne({
+        $or: [
+          { streamerId: resolvedStreamerId },
+          ...(resolvedOverlayToken ? [{ streamerToken: resolvedOverlayToken as any }] : [])
+        ],
+        isActive: true
+      });
 
       if (activeGoal) {
         const addedUsd = effectiveCurrency === 'KHR' ? (effectiveAmount / 4100) : effectiveAmount;
-        const newGoalAmount = activeGoal.current_amount + addedUsd;
-        db.prepare("UPDATE stream_goals SET current_amount = ?, updated_at = datetime('now') WHERE id = ?")
-          .run(newGoalAmount, activeGoal.id);
+        const newGoalAmount = (activeGoal.currentAmount || 0) + addedUsd;
+        await goalsCol.updateOne(
+          { _id: activeGoal._id },
+          { $set: { currentAmount: newGoalAmount, updatedAt: new Date() } }
+        );
 
         const io = getIO();
-        if (io) {
-          io.to(`overlay:${streamer.overlay_token}`).emit('goal:update', {
-            id: activeGoal.id,
-            token: streamer.overlay_token,
+        if (io && resolvedOverlayToken) {
+          io.to(`overlay:${resolvedOverlayToken}`).emit('goal:update', {
+            id: activeGoal._id.toString(),
+            token: resolvedOverlayToken,
             title: activeGoal.title,
-            targetAmount: Number(activeGoal.target_amount),
+            targetAmount: Number(activeGoal.targetAmount),
             currentAmount: newGoalAmount,
-            accentColor: activeGoal.accent_color,
-            endDate: activeGoal.end_date,
+            theme: activeGoal.theme,
             isActive: true,
             donorName: effectiveDonorName,
             addedAmount: addedUsd
@@ -356,14 +375,33 @@ export async function POST(req: NextRequest) {
       console.warn('[PaymentGateway] Could not update active goal:', e);
     }
 
-    // 6. Calculate total updated revenue
-    const revenueRow = db.prepare(`
-      SELECT 
-        COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END), 0) as totalUsd,
-        COALESCE(SUM(CASE WHEN currency = 'KHR' THEN amount ELSE 0 END), 0) as totalKhr
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID'
-    `).get(streamer.id) as any;
+    // 6. Calculate total updated revenue from MongoDB
+    let totalUsd = 0;
+    let totalKhr = 0;
+    try {
+      const revenueAgg = await donationsCol.aggregate([
+        {
+          $match: {
+            $or: [
+              { streamerId: resolvedStreamerId },
+              { streamer_id: resolvedStreamerId as any }
+            ],
+            status: 'PAID'
+          }
+        },
+        {
+          $group: {
+            _id: '$currency',
+            total: { $sum: '$amount' }
+          }
+        }
+      ]).toArray();
+
+      for (const r of revenueAgg) {
+        if (r._id === 'USD') totalUsd = r.total;
+        if (r._id === 'KHR') totalKhr = r.total;
+      }
+    } catch (e) {}
 
     console.log(`✅ [Payment Gateway] Donation confirmed for @${streamer.username}: ${donorName} ($${numericAmount}). Overlay alert fired!`);
 
@@ -372,13 +410,13 @@ export async function POST(req: NextRequest) {
       message: `Payment confirmed for @${streamer.username}! Alert triggered on OBS and revenue updated.`,
       donationId: activeDonationId,
       streamer: {
-        id: streamer.id,
+        id: resolvedStreamerId,
         username: streamer.username,
-        displayName: streamer.display_name
+        displayName: streamer.displayName || streamer.display_name
       },
       updatedRevenue: {
-        usd: revenueRow?.totalUsd || 0,
-        khr: revenueRow?.totalKhr || 0
+        usd: totalUsd,
+        khr: totalKhr
       }
     });
   } catch (err: any) {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/server/database/db';
-import { getTemporaryDonationsCollection } from '@/server/database/mongo';
+import { getDonationsCollection, getTemporaryDonationsCollection } from '@/server/database/mongo';
 
 export async function GET(
   _req: NextRequest,
@@ -8,29 +7,44 @@ export async function GET(
 ) {
   try {
     const { id } = params;
-    const donation = db.prepare(`
-      SELECT id, streamer_id, donor_name, donor_message, amount, currency,
-             banking_name, payment_method, video_url, video_title,
-             video_start_time, video_end_time, status, paid_at, created_at
-      FROM donations WHERE id = ?
-    `).get(id) as any;
+    const donationsCol = await getDonationsCollection();
+    const doc = await donationsCol.findOne({
+      $or: [{ id }, { donationId: id }]
+    });
 
-    if (!donation) {
+    if (!doc) {
       return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
     }
 
+    const donation: any = {
+      id: doc.id,
+      streamer_id: doc.streamerId || (doc as any).streamer_id,
+      donor_name: doc.donorName || (doc as any).donor_name,
+      donor_message: doc.donorMessage || (doc as any).donor_message || '',
+      amount: doc.amount,
+      currency: doc.currency,
+      banking_name: doc.bankingName || (doc as any).banking_name,
+      payment_method: doc.paymentMethod || (doc as any).payment_method,
+      video_url: doc.videoUrl || (doc as any).video_url,
+      video_title: doc.videoTitle || (doc as any).video_title,
+      video_start_time: doc.videoStartTime ?? (doc as any).video_start_time ?? 0,
+      video_end_time: doc.videoEndTime ?? (doc as any).video_end_time ?? 0,
+      status: doc.status,
+      paid_at: doc.paidAt,
+      created_at: doc.createdAt
+    };
+
     // 5-Minute Cache Duration Expiration: Auto-expire pending sessions older than 5 minutes
     if (donation.status === 'PENDING' && donation.created_at) {
-      const isOlderThan5Min = db.prepare(`
-        SELECT 1 FROM donations
-        WHERE id = ? AND status = 'PENDING' AND created_at <= datetime('now', '-5 minutes')
-      `).get(id);
-
-      if (isOlderThan5Min) {
-        db.prepare("UPDATE donations SET status = 'EXPIRED' WHERE id = ?").run(id);
-        getTemporaryDonationsCollection()
-          .then((col) => col.deleteMany({ $or: [{ id }, { donationId: id }] }))
-          .catch(() => {});
+      const createdTime = new Date(donation.created_at).getTime();
+      const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+      if (createdTime <= fiveMinAgo) {
+        await donationsCol.updateOne(
+          { id: doc.id },
+          { $set: { status: 'EXPIRED', updatedAt: new Date() } }
+        );
+        const tempCol = await getTemporaryDonationsCollection();
+        await tempCol.deleteMany({ $or: [{ id }, { donationId: id }] }).catch(() => {});
         donation.status = 'EXPIRED';
       }
     }

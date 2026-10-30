@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { telegramUserManager } from '@backend/telegram/telegramUserClient';
-import { clearMonitoredGroups } from '@/server/database/db';
 import { clearMongoMonitoredGroups } from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
@@ -9,11 +8,10 @@ export async function POST(req: NextRequest) {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
 
-    // Disconnect user client and clear monitored groups
+    // Disconnect user client and clear monitored groups in MongoDB
     const result = await telegramUserManager.disconnect(streamerId);
     try {
       await clearMongoMonitoredGroups(streamerId);
-      clearMonitoredGroups(streamerId);
     } catch (e) {}
 
     return NextResponse.json(result);

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
-import { db } from './database/db';
+import { getUsersCollection } from './database/mongo';
 
 export function getAuthenticatedUser(req: NextRequest) {
   let token: string | null = null;
@@ -25,23 +25,47 @@ export function getAuthenticatedUser(req: NextRequest) {
       return null;
     }
 
-    let user = db.prepare('SELECT id, username, email, display_name FROM streamers WHERE id = ?').get(decoded.id) as any;
-    if (!user && decoded.email) {
-      user = db.prepare('SELECT id, username, email, display_name FROM streamers WHERE LOWER(email) = LOWER(?)').get(decoded.email) as any;
-    }
-
-    // Resilient fallback: If user row temporarily missing in local SQLite cache, preserve identity from verified JWT
-    if (!user && decoded.id) {
-      return {
-        id: decoded.id,
-        username: decoded.username || 'streamer',
-        email: decoded.email || '',
-        display_name: decoded.username || 'Streamer'
-      };
-    }
-
-    return user || null;
+    return {
+      id: decoded.id,
+      userId: decoded.id,
+      username: decoded.username || 'streamer',
+      email: decoded.email || '',
+      display_name: decoded.displayName || decoded.display_name || decoded.username || 'Streamer',
+      displayName: decoded.displayName || decoded.display_name || decoded.username || 'Streamer'
+    };
   } catch (err) {
     return null;
   }
+}
+
+export async function getAuthenticatedUserAsync(req: NextRequest) {
+  const syncUser = getAuthenticatedUser(req);
+  if (!syncUser) return null;
+
+  try {
+    const usersCol = await getUsersCollection();
+    const dbUser = await usersCol.findOne({
+      $or: [
+        { userId: syncUser.id },
+        ...(syncUser.email ? [{ email: syncUser.email }] : [])
+      ]
+    });
+
+    if (dbUser) {
+      return {
+        id: dbUser.userId,
+        userId: dbUser.userId,
+        username: dbUser.username,
+        email: dbUser.email || '',
+        display_name: dbUser.displayName || dbUser.username,
+        displayName: dbUser.displayName || dbUser.username,
+        plan: dbUser.plan,
+        is_verified: dbUser.isVerified ? 1 : 0,
+        avatar_url: dbUser.avatarUrl,
+        custom_thanks_message: dbUser.customThanksMessage
+      };
+    }
+  } catch (e) {}
+
+  return syncUser;
 }

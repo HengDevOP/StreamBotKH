@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/server/database/db';
-import { getTemporaryDonationsCollection, getGatewayConfigCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
+import {
+  getTemporaryDonationsCollection,
+  getDonationsCollection,
+  getUsersCollection,
+  getPaymentSettingsCollection,
+  getGatewayConfigCollection,
+  restoreMasterKhqrImage
+} from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,28 +44,23 @@ export async function POST(req: NextRequest) {
     const cleanVideoStartTime = Number(videoStartTime) || 0;
     const cleanVideoEndTime = Number(videoEndTime) || 0;
 
-    // Resolve target streamer ID and username across SQLite & MongoDB
+    // Resolve target streamer ID and username from MongoDB
     let resolvedStreamerId = streamerId;
     let resolvedUsername = '';
 
     try {
-      const row = db.prepare('SELECT id, username FROM streamers WHERE id = ? OR LOWER(username) = LOWER(?)').get(streamerId, streamerId) as any;
-      if (row?.id) {
-        resolvedStreamerId = row.id;
-        resolvedUsername = row.username || '';
-      } else {
-        const usersCol = await (await import('@/server/database/mongo')).getUsersCollection();
-        const escaped = String(streamerId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const mUser = await usersCol.findOne({
-          $or: [
-            { userId: streamerId },
-            { username: { $regex: new RegExp(`^${escaped}$`, 'i') } }
-          ]
-        });
-        if (mUser?.userId) {
-          resolvedStreamerId = mUser.userId;
-          resolvedUsername = mUser.username || '';
-        }
+      const usersCol = await getUsersCollection();
+      const escaped = String(streamerId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const mUser = await usersCol.findOne({
+        $or: [
+          { userId: streamerId },
+          { id: streamerId as any },
+          { username: { $regex: new RegExp(`^${escaped}$`, 'i') } }
+        ]
+      });
+      if (mUser) {
+        resolvedStreamerId = mUser.userId || (mUser as any).id || String(mUser._id);
+        resolvedUsername = mUser.username || '';
       }
     } catch (e) {}
 
@@ -88,21 +89,22 @@ export async function POST(req: NextRequest) {
       console.warn('[Donation] Could not fetch gateway KHQR image from MongoDB:', gatewayErr);
     }
 
-    // 2. Check SQLite payment_settings table
+    // 2. Check MongoDB payment_settings table
     if (!khqrImage) {
       try {
-        const sqliteSettings = db.prepare(`
-          SELECT master_khqr_image FROM payment_settings 
-          WHERE (streamer_id = ? OR streamer_id = ?) 
-            AND master_khqr_image IS NOT NULL 
-            AND master_khqr_image != ''
-        `).get(resolvedStreamerId, streamerId) as any;
-
-        if (sqliteSettings?.master_khqr_image) {
-          khqrImage = sqliteSettings.master_khqr_image;
+        const paymentSettingsCol = await getPaymentSettingsCollection();
+        const mongoPayment = await paymentSettingsCol.findOne({
+          $or: [
+            { streamerId: resolvedStreamerId },
+            { streamerId: streamerId },
+            ...(resolvedUsername ? [{ streamerId: resolvedUsername }] : [])
+          ]
+        });
+        if (mongoPayment?.masterKhqrImage) {
+          khqrImage = mongoPayment.masterKhqrImage;
         }
       } catch (sqlErr) {
-        console.warn('[Donation] Could not fetch KHQR from SQLite payment_settings:', sqlErr);
+        console.warn('[Donation] Could not fetch KHQR from payment_settings:', sqlErr);
       }
     }
 
@@ -127,28 +129,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Save donation in pending state in SQLite ledger
-    db.prepare(`
-      INSERT INTO donations (
-        id, streamer_id, donor_name, donor_message, amount, currency,
-        banking_name, payment_method, qr_string, video_url, video_title,
-        video_start_time, video_end_time, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
-    `).run(
-      donationId,
-      resolvedStreamerId,
-      donorName.slice(0, 50),
-      (donorMessage || '').slice(0, 250),
-      numAmount,
-      validCurrency,
-      cleanBankingName,
-      'BAKONG_KHQR',
-      khqrImage,
-      cleanVideoUrl,
-      cleanVideoTitle,
-      cleanVideoStartTime,
-      cleanVideoEndTime
-    );
+    const now = new Date();
+
+    // 1. Save donation in pending state in MongoDB donations collection
+    try {
+      const donationsCol = await getDonationsCollection();
+      await donationsCol.insertOne({
+        id: donationId,
+        streamerId: resolvedStreamerId,
+        streamerUsername: resolvedUsername || undefined,
+        donorName: donorName.slice(0, 50),
+        donorMessage: (donorMessage || '').slice(0, 250),
+        amount: numAmount,
+        currency: validCurrency,
+        bankingName: cleanBankingName,
+        paymentMethod: 'BAKONG_KHQR',
+        qrString: khqrImage,
+        videoUrl: cleanVideoUrl || undefined,
+        videoTitle: cleanVideoTitle || undefined,
+        videoStartTime: cleanVideoStartTime,
+        videoEndTime: cleanVideoEndTime,
+        status: 'PENDING',
+        createdAt: now,
+        updatedAt: now
+      });
+    } catch (errDonation) {
+      console.error('[Donation] Error inserting donation into MongoDB:', errDonation);
+    }
 
     // 2. Store in temporary listener collection in MongoDB (100% MongoDB queue)
     try {
@@ -166,7 +173,7 @@ export async function POST(req: NextRequest) {
         videoTitle: cleanVideoTitle || undefined,
         videoStartTime: cleanVideoStartTime,
         videoEndTime: cleanVideoEndTime,
-        createdAt: new Date()
+        createdAt: now
       });
     } catch (mongoErr) {
       console.warn('[Donation] Could not insert temporary MongoDB record:', mongoErr);

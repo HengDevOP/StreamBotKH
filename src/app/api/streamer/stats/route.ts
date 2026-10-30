@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db } from '@/server/database/db';
+import { getDonationsCollection } from '@/server/database/mongo';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,75 +10,127 @@ export async function GET(req: NextRequest) {
     }
 
     const streamerId = user.id;
+    const donationsCol = await getDonationsCollection();
 
-    // Total earnings USD & KHR
-    const totalUsdRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'USD'
-    `).get(streamerId) as any;
+    const allPaid = await donationsCol
+      .find({
+        $or: [
+          { streamerId },
+          { streamer_id: streamerId as any },
+          ...(user.username ? [{ streamerId: user.username }] : [])
+        ],
+        status: 'PAID'
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
 
-    const totalKhrRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'KHR'
-    `).get(streamerId) as any;
+    const now = Date.now();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const ms7d = 7 * 24 * 60 * 60 * 1000;
 
-    // Today's earnings
-    const todayUsdRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'USD'
-      AND date(paid_at) = date('now')
-    `).get(streamerId) as any;
+    let totalUsd = 0;
+    let totalUsdCount = 0;
+    let totalKhr = 0;
+    let totalKhrCount = 0;
 
-    const todayKhrRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'KHR'
-      AND date(paid_at) = date('now')
-    `).get(streamerId) as any;
+    let todayUsd = 0;
+    let todayUsdCount = 0;
+    let todayKhr = 0;
 
-    // Top donors
-    const topDonors = db.prepare(`
-      SELECT donor_name, SUM(CASE WHEN currency = 'KHR' THEN amount / 4000.0 ELSE amount END) as total_usd_equiv, COUNT(*) as donations_count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID'
-      GROUP BY donor_name
-      ORDER BY total_usd_equiv DESC
-      LIMIT 5
-    `).all(streamerId);
+    const donorTotals = new Map<string, { totalUsdEquiv: number; count: number }>();
+    const trendMap = new Map<string, { amountUsd: number; count: number }>();
 
-    // Recent donations (last 20)
-    const recentDonations = db.prepare(`
-      SELECT *
-      FROM donations
-      WHERE streamer_id = ?
-      ORDER BY created_at DESC
-      LIMIT 20
-    `).all(streamerId);
+    for (const d of allPaid) {
+      const amt = Number(d.amount) || 0;
+      const isKhr = d.currency === 'KHR';
+      const usdEquiv = isKhr ? amt / 4000.0 : amt;
+      const paidDate = d.paidAt ? new Date(d.paidAt) : (d.createdAt ? new Date(d.createdAt) : new Date());
+      const paidTime = paidDate.getTime();
+      const paidDateStr = paidDate.toISOString().slice(0, 10);
+      const donorName = d.donorName || (d as any).donor_name || 'Generous Supporter';
 
-    // Daily revenue trend (last 7 days)
-    const trend = db.prepare(`
-      SELECT
-        strftime('%Y-%m-%d', paid_at) as date,
-        SUM(CASE WHEN currency = 'KHR' THEN amount / 4000.0 ELSE amount END) as amount_usd,
-        COUNT(*) as count
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID'
-        AND paid_at >= datetime('now', '-7 days')
-      GROUP BY date
-      ORDER BY date ASC
-    `).all(streamerId);
+      if (isKhr) {
+        totalKhr += amt;
+        totalKhrCount++;
+      } else {
+        totalUsd += amt;
+        totalUsdCount++;
+      }
+
+      if (paidDateStr === todayStr) {
+        if (isKhr) {
+          todayKhr += amt;
+        } else {
+          todayUsd += amt;
+          todayUsdCount++;
+        }
+      }
+
+      const existingDonor = donorTotals.get(donorName) || { totalUsdEquiv: 0, count: 0 };
+      existingDonor.totalUsdEquiv += usdEquiv;
+      existingDonor.count++;
+      donorTotals.set(donorName, existingDonor);
+
+      if (now - paidTime <= ms7d) {
+        const bucket = trendMap.get(paidDateStr) || { amountUsd: 0, count: 0 };
+        bucket.amountUsd += usdEquiv;
+        bucket.count++;
+        trendMap.set(paidDateStr, bucket);
+      }
+    }
+
+    const topDonors = Array.from(donorTotals.entries())
+      .map(([donor_name, data]) => ({
+        donor_name,
+        total_usd_equiv: data.totalUsdEquiv,
+        donations_count: data.count
+      }))
+      .sort((a, b) => b.total_usd_equiv - a.total_usd_equiv)
+      .slice(0, 5);
+
+    const trend = Array.from(trendMap.entries())
+      .map(([date, data]) => ({
+        date,
+        amount_usd: data.amountUsd,
+        count: data.count
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Recent donations (all statuses, last 20)
+    const recentDocs = await donationsCol
+      .find({
+        $or: [
+          { streamerId },
+          { streamer_id: streamerId as any },
+          ...(user.username ? [{ streamerId: user.username }] : [])
+        ]
+      })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .toArray();
+
+    const recentDonations = recentDocs.map((d) => ({
+      id: d.id,
+      streamer_id: d.streamerId || (d as any).streamer_id,
+      donor_name: d.donorName || (d as any).donor_name,
+      donor_message: d.donorMessage || (d as any).donor_message || '',
+      amount: d.amount,
+      currency: d.currency,
+      banking_name: d.bankingName || (d as any).banking_name,
+      payment_method: d.paymentMethod || (d as any).payment_method,
+      status: d.status,
+      created_at: d.createdAt,
+      paid_at: d.paidAt
+    }));
 
     return NextResponse.json({
       summary: {
-        totalRevenueUsd: totalUsdRow.total,
-        totalRevenueKhr: totalKhrRow.total,
-        totalDonationsCount: (totalUsdRow.count || 0) + (totalKhrRow.count || 0),
-        todayRevenueUsd: todayUsdRow.total,
-        todayRevenueKhr: todayKhrRow.total,
-        todayDonationsCount: todayUsdRow.count || 0
+        totalRevenueUsd: totalUsd,
+        totalRevenueKhr: totalKhr,
+        totalDonationsCount: totalUsdCount + totalKhrCount,
+        todayRevenueUsd: todayUsd,
+        todayRevenueKhr: todayKhr,
+        todayDonationsCount: todayUsdCount
       },
       topDonors,
       recentDonations,

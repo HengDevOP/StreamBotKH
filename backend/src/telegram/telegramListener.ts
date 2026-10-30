@@ -1,10 +1,17 @@
 import axios from 'axios';
 import { PhraseCatcher, ParsedDonationPhrase } from './phraseCatcher';
 import { v4 as uuidv4 } from 'uuid';
-import { db, cleanupExpiredPendingDonations } from '../../../src/server/database/db';
 import { broadcastAlertToOverlay, broadcastDonationToDashboard } from '../../../src/server/services/socketService';
 import { findMatchingTemporaryDonation, isGenericBankKeyword } from '../../../src/server/utils/nameMatching';
-import { getTemporaryDonationsCollection, getAlertBoxesCollection } from '../../../src/server/database/mongo';
+import {
+  getUsersCollection,
+  getDonationsCollection,
+  getAlertSettingsCollection,
+  getVideoAlertSettingsCollection,
+  getTemporaryDonationsCollection,
+  getAlertBoxesCollection,
+  cleanupExpiredPendingDonationsMongo
+} from '../../../src/server/database/mongo';
 
 export interface TelegramListenerConfig {
   botToken?: string;
@@ -214,13 +221,18 @@ export class TelegramGroupListener {
   ) {
     try {
       // 1. Locate streamer
-      // Find streamer linked to this chat ID or default to neonstreamer
-      let streamer = db.prepare('SELECT * FROM streamers WHERE telegram_chat_id = ?').get(chatId) as any;
+      const usersCol = await getUsersCollection();
+      let streamer = await usersCol.findOne({
+        $or: [
+          { telegramChatId: chatId },
+          { telegram_chat_id: chatId },
+          { username: targetStreamerUsername },
+          { id: targetStreamerUsername },
+          { userId: targetStreamerUsername }
+        ]
+      });
       if (!streamer) {
-        streamer = db.prepare('SELECT * FROM streamers WHERE username = ?').get(targetStreamerUsername) as any;
-      }
-      if (!streamer) {
-        streamer = db.prepare('SELECT * FROM streamers LIMIT 1').get() as any;
+        streamer = await usersCol.findOne({});
       }
 
       if (!streamer) {
@@ -228,17 +240,40 @@ export class TelegramGroupListener {
         return;
       }
 
-      // 2. Fetch streamer's alert settings
-      const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(streamer.id) as any;
+      const streamerId = (streamer as any).userId || (streamer as any).id || String(streamer._id);
+      const streamerOverlayToken = streamer.overlayToken || (streamer as any).overlay_token;
 
-      const donationId = uuidv4();
+      // 2. Fetch streamer's alert settings
+      let alertSettings: any = null;
+      try {
+        const alertSettingsCol = await getAlertSettingsCollection();
+        alertSettings = await alertSettingsCol.findOne({
+          $or: [
+            { streamerId },
+            ...(streamer.username ? [{ streamerId: streamer.username }] : [])
+          ]
+        });
+      } catch (e) {}
+
+      let videoSettings: any = null;
+      try {
+        const videoSettingsCol = await getVideoAlertSettingsCollection();
+        videoSettings = await videoSettingsCol.findOne({
+          $or: [
+            { streamerId },
+            ...(streamer.username ? [{ streamerId: streamer.username }] : [])
+          ]
+        });
+      } catch (e) {}
+
       const tranId = parsed.transactionRef || `TG-${Date.now().toString().slice(-8)}`;
 
-      // 1. Clean expired sessions (>5m) and gather active candidates within 5 minutes
+      // 1. Clean expired sessions (>5m) and gather active candidates within 10 minutes
       let matchedTemp: any = null;
       let dbDonation: any = null;
+      const donationsCol = await getDonationsCollection();
       try {
-        cleanupExpiredPendingDonations();
+        await cleanupExpiredPendingDonationsMongo();
 
         const seenIds = new Set<string>();
         const candidates: any[] = [];
@@ -248,7 +283,10 @@ export class TelegramGroupListener {
           const tempCol = await getTemporaryDonationsCollection();
           const mongoRecent = await tempCol
             .find({
-              streamerId: streamer.id,
+              $or: [
+                { streamerId },
+                ...(streamer.username ? [{ streamerId: streamer.username }] : [])
+              ],
               createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
             })
             .sort({ createdAt: -1 })
@@ -277,20 +315,39 @@ export class TelegramGroupListener {
           }
         } catch (e) {}
 
-        // B. SQLite pending donations (for original video & alert metadata)
+        // B. MongoDB pending donations
         try {
-          const pendingCandidates = db.prepare(`
-            SELECT * FROM donations
-            WHERE streamer_id = ?
-              AND status = 'PENDING'
-              AND created_at > datetime('now', '-10 minutes')
-            ORDER BY created_at DESC
-            LIMIT 30
-          `).all(streamer.id) as any[];
+          const pendingCandidates = await donationsCol
+            .find({
+              $or: [
+                { streamerId },
+                { streamer_id: streamerId }
+              ],
+              status: 'PENDING',
+              createdAt: { $gt: new Date(Date.now() - 10 * 60 * 1000) }
+            })
+            .sort({ createdAt: -1 })
+            .limit(30)
+            .toArray();
+
           for (const c of pendingCandidates) {
-            if (c && c.id && !seenIds.has(c.id)) {
-              seenIds.add(c.id);
-              candidates.push(c);
+            const cId = c.id || String(c._id);
+            if (cId && !seenIds.has(cId)) {
+              seenIds.add(cId);
+              candidates.push({
+                id: cId,
+                streamer_id: c.streamerId || (c as any).streamer_id,
+                donor_name: c.donorName || (c as any).donor_name,
+                donor_message: c.donorMessage || (c as any).donor_message,
+                amount: c.amount,
+                currency: c.currency,
+                banking_name: c.bankingName || (c as any).banking_name,
+                video_url: c.videoUrl || (c as any).video_url,
+                video_title: c.videoTitle || (c as any).video_title,
+                video_start_time: c.videoStartTime ?? (c as any).video_start_time,
+                video_end_time: c.videoEndTime ?? (c as any).video_end_time,
+                created_at: c.createdAt || (c as any).created_at
+              });
             }
           }
         } catch (e) {}
@@ -315,7 +372,9 @@ export class TelegramGroupListener {
           } catch (e) {}
 
           try {
-            dbDonation = db.prepare('SELECT * FROM donations WHERE id = ?').get(matchedTemp.id);
+            dbDonation = await donationsCol.findOne({
+              $or: [{ id: matchedTemp.id }, { donationId: matchedTemp.id }]
+            });
           } catch (e) {}
         }
       } catch (matchErr) {
@@ -326,8 +385,8 @@ export class TelegramGroupListener {
       const activeDonationId = matchedTemp ? matchedTemp.id : uuidv4();
 
       // Prioritize donor name from username entered on the donation form (fallback to payer bank name)
-      const sessionDonorName = (matchedTemp?.donor_name || dbDonation?.donor_name || '').trim();
-      const payerBankName = (matchedTemp?.banking_name || dbDonation?.banking_name || '').trim();
+      const sessionDonorName = (matchedTemp?.donor_name || dbDonation?.donor_name || dbDonation?.donorName || '').trim();
+      const payerBankName = (matchedTemp?.banking_name || dbDonation?.banking_name || dbDonation?.bankingName || '').trim();
       const parsedPayer = (parsed.payerName || parsed.donorName || '').trim();
 
       let effectiveDonorName = '';
@@ -341,7 +400,7 @@ export class TelegramGroupListener {
         effectiveDonorName = 'Generous Supporter';
       }
 
-      const rawMsg = matchedTemp?.donor_message || dbDonation?.donor_message || (parsed.donorMessage ? parsed.donorMessage.trim() : '');
+      const rawMsg = matchedTemp?.donor_message || dbDonation?.donor_message || dbDonation?.donorMessage || (parsed.donorMessage ? parsed.donorMessage.trim() : '');
       const isMeaningful = Boolean(
         rawMsg &&
         typeof rawMsg === 'string' &&
@@ -354,109 +413,56 @@ export class TelegramGroupListener {
       const effectiveDonorMessage = isMeaningful ? rawMsg.trim() : '';
       const effectiveAmount = parsed.amount > 0 ? parsed.amount : (matchedTemp?.amount || dbDonation?.amount || 1.0);
       const effectiveCurrency = parsed.currency || matchedTemp?.currency || dbDonation?.currency || 'USD';
-      const effectiveBankingName = matchedTemp?.banking_name || dbDonation?.banking_name || parsed.bankingName || 'Bakong KHQR';
-      const effectiveVideoUrl = matchedTemp?.video_url || dbDonation?.video_url || undefined;
-      const effectiveVideoTitle = matchedTemp?.video_title || dbDonation?.video_title || undefined;
-      const effectiveVideoStartTime = Number(matchedTemp?.video_start_time ?? dbDonation?.video_start_time ?? 0);
-      const effectiveVideoEndTime = Number(matchedTemp?.video_end_time ?? dbDonation?.video_end_time ?? 0);
+      const effectiveBankingName = matchedTemp?.banking_name || dbDonation?.banking_name || dbDonation?.bankingName || parsed.bankingName || 'Bakong KHQR';
+      const effectiveVideoUrl = matchedTemp?.video_url || dbDonation?.video_url || dbDonation?.videoUrl || undefined;
+      const effectiveVideoTitle = matchedTemp?.video_title || dbDonation?.video_title || dbDonation?.videoTitle || undefined;
+      const effectiveVideoStartTime = Number(matchedTemp?.video_start_time ?? dbDonation?.video_start_time ?? dbDonation?.videoStartTime ?? 0);
+      const effectiveVideoEndTime = Number(matchedTemp?.video_end_time ?? dbDonation?.video_end_time ?? dbDonation?.videoEndTime ?? 0);
 
-      // 2. Update or insert into SQLite donations ledger
+      // Update or insert into MongoDB donations ledger
       try {
-        if (matchedTemp) {
-          const updateResult = db.prepare(`
-            UPDATE donations SET
-              donor_name = ?,
-              donor_message = ?,
-              amount = ?,
-              currency = ?,
-              banking_name = ?,
-              payment_method = 'TELEGRAM_GROUP_ALERT',
-              payway_tran_id = ?,
-              video_url = ?,
-              video_title = ?,
-              video_start_time = ?,
-              video_end_time = ?,
-              status = 'PAID',
-              is_alerted = 1,
-              paid_at = datetime('now')
-            WHERE id = ?
-          `).run(
-            effectiveDonorName,
-            effectiveDonorMessage,
-            effectiveAmount,
-            effectiveCurrency,
-            effectiveBankingName,
-            tranId,
-            effectiveVideoUrl || null,
-            effectiveVideoTitle || null,
-            effectiveVideoStartTime,
-            effectiveVideoEndTime,
-            activeDonationId
-          );
-
-          if (updateResult.changes === 0) {
-            db.prepare(`
-              INSERT INTO donations (
-                id, streamer_id, donor_name, donor_message, amount, currency,
-                banking_name, payment_method, payway_tran_id, video_url, video_title,
-                video_start_time, video_end_time, status, is_alerted, paid_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 1, datetime('now'))
-            `).run(
-              activeDonationId,
-              streamer.id,
-              effectiveDonorName,
-              effectiveDonorMessage,
-              effectiveAmount,
-              effectiveCurrency,
-              effectiveBankingName,
-              'TELEGRAM_GROUP_ALERT',
-              tranId,
-              effectiveVideoUrl || null,
-              effectiveVideoTitle || null,
-              effectiveVideoStartTime,
-              effectiveVideoEndTime
-            );
-          }
-        } else {
-          db.prepare(`
-            INSERT INTO donations (
-              id, streamer_id, donor_name, donor_message, amount, currency,
-              banking_name, payment_method, payway_tran_id, video_url, video_title,
-              video_start_time, video_end_time, status, is_alerted, paid_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 1, datetime('now'))
-          `).run(
-            activeDonationId,
-            streamer.id,
-            effectiveDonorName,
-            effectiveDonorMessage,
-            effectiveAmount,
-            effectiveCurrency,
-            effectiveBankingName,
-            'TELEGRAM_GROUP_ALERT',
-            tranId,
-            effectiveVideoUrl || null,
-            effectiveVideoTitle || null,
-            effectiveVideoStartTime,
-            effectiveVideoEndTime
-          );
-        }
+        await donationsCol.updateOne(
+          { id: activeDonationId },
+          {
+            $set: {
+              id: activeDonationId,
+              streamerId,
+              donorName: effectiveDonorName,
+              donorMessage: effectiveDonorMessage,
+              amount: effectiveAmount,
+              currency: effectiveCurrency,
+              bankingName: effectiveBankingName,
+              paymentMethod: 'TELEGRAM_GROUP_ALERT',
+              paywayTranId: tranId,
+              videoUrl: effectiveVideoUrl || null,
+              videoTitle: effectiveVideoTitle || null,
+              videoStartTime: effectiveVideoStartTime,
+              videoEndTime: effectiveVideoEndTime,
+              status: 'PAID',
+              isAlerted: 1,
+              paidAt: new Date(),
+              updatedAt: new Date()
+            },
+            $setOnInsert: { createdAt: new Date() }
+          },
+          { upsert: true }
+        );
       } catch (dbErr) {
-        console.error('[DB] Error updating/inserting telegram listener donation:', dbErr);
+        console.error('[DB] Error updating/inserting telegram listener donation in MongoDB:', dbErr);
       }
 
       // Fetch current saved condition alert box from MongoDB for this streamer
-      const videoSettings = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(streamer.id) as any;
       let matchingBox: any = null;
       try {
         const alertBoxesCol = await getAlertBoxesCollection();
         const activeBoxes = await alertBoxesCol
           .find({
             $or: [
-              { userId: streamer.id },
-              { streamerId: streamer.id },
+              { userId: streamerId },
+              { streamerId },
               ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
               ...(streamer.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
-              ...(streamer.overlay_token ? [{ overlayToken: streamer.overlay_token }, { token: streamer.overlay_token }] : [])
+              ...(streamerOverlayToken ? [{ overlayToken: streamerOverlayToken }, { token: streamerOverlayToken }] : [])
             ],
             isEnabled: true
           })
@@ -471,7 +477,7 @@ export class TelegramGroupListener {
           ? matchingBoxes[0]
           : (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
       } catch (e) {
-        console.warn('[TelegramListener] Could not fetch mongo alert boxes, using sqlite fallback:', e);
+        console.warn('[TelegramListener] Could not fetch mongo alert boxes:', e);
       }
 
       // 3. Construct live alert payload for OBS Studio overlay with current saved alert settings
@@ -479,7 +485,7 @@ export class TelegramGroupListener {
         boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
         donationId: activeDonationId,
         id: activeDonationId,
-        streamerId: streamer.id,
+        streamerId,
         donorName: effectiveDonorName,
         donorMessage: effectiveDonorMessage,
         donor_message: effectiveDonorMessage,
@@ -491,9 +497,9 @@ export class TelegramGroupListener {
         videoTitle: effectiveVideoTitle,
         videoStartTime: effectiveVideoStartTime,
         videoEndTime: effectiveVideoEndTime,
-        videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : true,
-        videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
-        videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
+        videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
+        videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
+        videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
         templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
         textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
         textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
@@ -522,8 +528,10 @@ export class TelegramGroupListener {
       };
 
       // 4. Broadcast to OBS Browser Source Overlay & Streamer Dashboard
-      broadcastAlertToOverlay(streamer.overlay_token, alertPayload);
-      broadcastDonationToDashboard(streamer.id, {
+      if (streamerOverlayToken) {
+        broadcastAlertToOverlay(streamerOverlayToken, alertPayload);
+      }
+      broadcastDonationToDashboard(streamerId, {
         id: activeDonationId,
         donor_name: effectiveDonorName,
         donor_message: effectiveDonorMessage,

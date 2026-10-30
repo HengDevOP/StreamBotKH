@@ -1,28 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db } from '@/server/database/db';
-import { getIO } from '@/server/services/socketService';
+import { getUsersCollection, getVideoAlertSettingsCollection } from '@/server/database/mongo';
 
 export const dynamic = 'force-dynamic';
 
-function resolveStreamer(req: NextRequest, bodyToken?: string) {
+async function resolveStreamerMongo(req: NextRequest, bodyToken?: string) {
   const user = getAuthenticatedUser(req);
   if (user) {
-    return { streamerId: user.id, overlayToken: user.overlay_token };
+    return { streamerId: user.id, overlayToken: (user as any).overlay_token || (user as any).overlayToken };
   }
 
   const { searchParams } = new URL(req.url);
   const token = searchParams.get('token') || bodyToken || searchParams.get('username') || '';
 
   if (token) {
-    const streamer = db.prepare(`
-      SELECT id, overlay_token FROM streamers 
-      WHERE overlay_token = ? OR id = ? OR username = ?
-    `).get(token, token, token) as any;
+    try {
+      const usersCol = await getUsersCollection();
+      const escaped = String(token).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const streamer = await usersCol.findOne({
+        $or: [
+          { overlayToken: token },
+          { overlay_token: token },
+          { userId: token },
+          { id: token as any },
+          { username: { $regex: new RegExp(`^${escaped}$`, 'i') } }
+        ]
+      });
 
-    if (streamer) {
-      return { streamerId: streamer.id, overlayToken: streamer.overlay_token };
-    }
+      if (streamer) {
+        return {
+          streamerId: streamer.userId || (streamer as any).id || String(streamer._id),
+          overlayToken: streamer.overlayToken || streamer.overlay_token
+        };
+      }
+    } catch (e) {}
   }
 
   return { streamerId: 'demo-streamer-id-1001', overlayToken: 'ovl_3223c099b5884ff788670103' };
@@ -30,27 +41,37 @@ function resolveStreamer(req: NextRequest, bodyToken?: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { streamerId } = resolveStreamer(req);
+    const { streamerId } = await resolveStreamerMongo(req);
 
-    let row = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(streamerId) as any;
+    const videoCol = await getVideoAlertSettingsCollection();
+    let doc = await videoCol.findOne({
+      $or: [{ streamerId }, { streamer_id: streamerId as any }]
+    });
 
-    if (!row) {
-      db.prepare(`
-        INSERT INTO video_alert_settings (streamer_id, is_enabled, min_tip_amount, max_duration_seconds, video_volume, auto_ducking)
-        VALUES (?, 0, 2.0, 30, 85, 1)
-      `).run(streamerId);
-      row = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(streamerId) as any;
+    if (!doc) {
+      await videoCol.insertOne({
+        streamerId,
+        isEnabled: false,
+        minTipAmount: 2.0,
+        maxDurationSeconds: 30,
+        autoPlay: true,
+        showProgressBar: true,
+        allowViewerControl: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      doc = await videoCol.findOne({ streamerId });
     }
 
     return NextResponse.json({
       success: true,
       settings: {
-        streamerId: row.streamer_id,
-        isEnabled: row.is_enabled === 1,
-        minTipAmount: Number(row.min_tip_amount ?? 2.0),
-        maxDurationSeconds: Number(row.max_duration_seconds ?? 30),
-        videoVolume: Number(row.video_volume ?? 85),
-        autoDucking: row.auto_ducking === 1
+        streamerId,
+        isEnabled: Boolean(doc?.isEnabled ?? (doc as any)?.is_enabled ?? false),
+        minTipAmount: Number(doc?.minTipAmount ?? (doc as any)?.min_tip_amount ?? 2.0),
+        maxDurationSeconds: Number(doc?.maxDurationSeconds ?? (doc as any)?.max_duration_seconds ?? 30),
+        videoVolume: Number((doc as any)?.videoVolume ?? (doc as any)?.video_volume ?? 85),
+        autoDucking: Boolean((doc as any)?.autoDucking ?? (doc as any)?.auto_ducking ?? true)
       }
     });
   } catch (err: any) {
@@ -62,63 +83,55 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { streamerId, overlayToken } = resolveStreamer(req, body.token);
+    const { streamerId } = await resolveStreamerMongo(req, body.token);
 
-    const isEnabled = body.isEnabled !== undefined ? (body.isEnabled ? 1 : 0) : 0;
-    // Allowed minimum tip start from $0.25 to $50
+    const isEnabled = body.isEnabled !== undefined ? Boolean(body.isEnabled) : false;
     const rawMinTip = body.minTipAmount !== undefined ? Number(body.minTipAmount) : 2.0;
     const minTipAmount = Math.max(0.25, Math.min(50.0, isNaN(rawMinTip) ? 2.0 : rawMinTip));
 
-    // Allowed clip duration up to 5 minutes (300 seconds)
     const rawMaxDuration = body.maxDurationSeconds !== undefined ? Number(body.maxDurationSeconds) : 30;
     const maxDurationSeconds = Math.max(10, Math.min(300, isNaN(rawMaxDuration) ? 30 : rawMaxDuration));
 
     const rawVolume = body.videoVolume !== undefined ? Number(body.videoVolume) : 85;
     const videoVolume = Math.max(0, Math.min(100, isNaN(rawVolume) ? 85 : rawVolume));
 
-    const autoDucking = body.autoDucking !== undefined ? (body.autoDucking ? 1 : 0) : 1;
+    const autoDucking = body.autoDucking !== undefined ? Boolean(body.autoDucking) : true;
 
-    db.prepare(`
-      INSERT INTO video_alert_settings (
-        streamer_id, is_enabled, min_tip_amount, max_duration_seconds, video_volume, auto_ducking, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(streamer_id) DO UPDATE SET
-        is_enabled = excluded.is_enabled,
-        min_tip_amount = excluded.min_tip_amount,
-        max_duration_seconds = excluded.max_duration_seconds,
-        video_volume = excluded.video_volume,
-        auto_ducking = excluded.auto_ducking,
-        updated_at = datetime('now')
-    `).run(
-      streamerId,
-      isEnabled,
-      minTipAmount,
-      maxDurationSeconds,
-      videoVolume,
-      autoDucking
+    const now = new Date();
+    const videoCol = await getVideoAlertSettingsCollection();
+    await videoCol.updateOne(
+      { streamerId },
+      {
+        $set: {
+          streamerId,
+          isEnabled,
+          is_enabled: isEnabled ? 1 : 0,
+          minTipAmount,
+          min_tip_amount: minTipAmount,
+          maxDurationSeconds,
+          max_duration_seconds: maxDurationSeconds,
+          videoVolume,
+          video_volume: videoVolume,
+          autoDucking,
+          auto_ducking: autoDucking ? 1 : 0,
+          updatedAt: now
+        },
+        $setOnInsert: { createdAt: now }
+      },
+      { upsert: true }
     );
-
-    const updated = {
-      streamerId,
-      isEnabled: isEnabled === 1,
-      minTipAmount,
-      maxDurationSeconds,
-      videoVolume,
-      autoDucking: autoDucking === 1
-    };
-
-    try {
-      const io = getIO();
-      if (io && overlayToken) {
-        io.to(`overlay:${overlayToken}`).emit('video_settings:update', updated);
-      }
-    } catch (e) {
-      // ignore socket broadcast error if socket not initialized
-    }
 
     return NextResponse.json({
       success: true,
-      settings: updated
+      message: 'Video alert settings saved successfully',
+      settings: {
+        streamerId,
+        isEnabled,
+        minTipAmount,
+        maxDurationSeconds,
+        videoVolume,
+        autoDucking
+      }
     });
   } catch (err: any) {
     console.error('Error in POST /api/streamer/settings/video:', err);

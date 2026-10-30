@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db } from '@/server/database/db';
-import { getAlertBoxesCollection } from '@/server/database/mongo';
+import {
+  getUsersCollection,
+  getDonationsCollection,
+  getAlertSettingsCollection,
+  getVideoAlertSettingsCollection,
+  getAlertBoxesCollection
+} from '@/server/database/mongo';
 import { broadcastAlertToOverlay } from '@/server/services/socketService';
 
 export async function POST(
@@ -15,13 +20,46 @@ export async function POST(
     }
 
     const { id } = params;
-    const donation = db.prepare('SELECT * FROM donations WHERE id = ? AND streamer_id = ?').get(id, user.id) as any;
+    const donationsCol = await getDonationsCollection();
+    const donation = await donationsCol.findOne({
+      $or: [{ id }, { donationId: id }],
+      $and: [
+        {
+          $or: [
+            { streamerId: user.id },
+            { streamer_id: user.id as any },
+            ...(user.username ? [{ streamerId: user.username }] : [])
+          ]
+        }
+      ]
+    }) as any;
+
     if (!donation) {
       return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
     }
 
-    const streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(user.id) as any;
-    const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id) as any;
+    const usersCol = await getUsersCollection();
+    const streamer = await usersCol.findOne({
+      $or: [{ userId: user.id }, { id: user.id as any }]
+    });
+
+    const alertCol = await getAlertSettingsCollection();
+    const alertSettings = await alertCol.findOne({
+      $or: [
+        { streamerId: user.id },
+        ...(user.username ? [{ streamerId: user.username }] : [])
+      ]
+    }) as any;
+
+    const videoCol = await getVideoAlertSettingsCollection();
+    const videoSettings = await videoCol.findOne({
+      $or: [
+        { streamerId: user.id },
+        ...(user.username ? [{ streamerId: user.username }] : [])
+      ]
+    }) as any;
+
+    const overlayToken = streamer?.overlayToken || streamer?.overlay_token;
 
     let matchingBox: any = null;
     try {
@@ -33,7 +71,7 @@ export async function POST(
             { streamerId: user.id },
             ...(streamer?.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
             ...(streamer?.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
-            ...(streamer?.overlay_token ? [{ overlayToken: streamer.overlay_token }, { token: streamer.overlay_token }] : [])
+            ...(overlayToken ? [{ overlayToken }, { token: overlayToken }] : [])
           ],
           isEnabled: true
         })
@@ -51,43 +89,60 @@ export async function POST(
       console.warn('[Replay] Could not fetch mongo alert boxes:', e);
     }
 
+    const donorName = donation.donorName || donation.donor_name || 'Generous Supporter';
+    const donorMessage = donation.donorMessage || donation.donor_message || '';
+    const videoUrl = donation.videoUrl || donation.video_url || undefined;
+    const videoTitle = donation.videoTitle || donation.video_title || undefined;
+    const videoStartTime = Number(donation.videoStartTime ?? donation.video_start_time ?? 0);
+    const videoEndTime = Number(donation.videoEndTime ?? donation.video_end_time ?? 0);
+
     const payload = {
       boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
       donationId: donation.id,
-      donorName: donation.donor_name,
-      donorMessage: donation.donor_message,
-      donor_message: donation.donor_message,
-      message: donation.donor_message,
+      donorName,
+      donorMessage,
+      donor_message: donorMessage,
+      message: donorMessage,
       amount: donation.amount,
       currency: donation.currency,
-      bankingName: donation.banking_name || 'Bakong KHQR',
-      templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
-      textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
-      textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+      bankingName: donation.bankingName || donation.banking_name || 'ABA Bank',
+      videoUrl,
+      videoTitle,
+      videoStartTime,
+      videoEndTime,
+      videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
+      videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
+      videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
+      templateStyle: matchingBox?.templateStyle || alertSettings?.templateStyle || alertSettings?.template_style || 'neon-box',
+      textTemplate: matchingBox?.textTemplate || alertSettings?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
+      textColor: matchingBox?.textColor || alertSettings?.textColor || alertSettings?.text_color || '#FFFFFF',
       donorColor: matchingBox?.donorColor || undefined,
       amountColor: matchingBox?.amountColor || undefined,
-      customGifUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-      mediaUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+      customGifUrl: matchingBox?.mediaUrl || alertSettings?.customGifUrl || alertSettings?.custom_gif_url,
+      mediaUrl: matchingBox?.mediaUrl || alertSettings?.customGifUrl || alertSettings?.custom_gif_url,
       showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0),
-      fontFamily: matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
-      fontSize: matchingBox?.fontSize || alertSettings?.font_size || 28,
-      layoutMode: matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
-      animationStyle: matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
-      glowColor: matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF',
+      fontFamily: matchingBox?.fontFamily || alertSettings?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
+      fontSize: matchingBox?.fontSize || alertSettings?.fontSize || alertSettings?.font_size || 28,
+      layoutMode: matchingBox?.layoutMode || alertSettings?.layoutMode || alertSettings?.layout_mode || 'top',
+      animationStyle: matchingBox?.animationStyle || alertSettings?.animationStyle || alertSettings?.animation_style || 'fade',
+      glowColor: matchingBox?.glowColor || alertSettings?.glowColor || alertSettings?.glow_color || '#00F0FF',
       soundUrl: (matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
         ? matchingBox.soundUrl
-        : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
-            ? alertSettings.sound_url
-            : '/sounds/cash-register-kaching.mp3'),
-      soundVolume: matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85,
-      durationSeconds: matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8,
-      ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (alertSettings?.tts_enabled === 1),
-      ttsType: matchingBox?.ttsType || alertSettings?.tts_voice || 'google',
-      clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url,
-      isTest: false
+        : (alertSettings?.soundUrl && !alertSettings.soundUrl.includes('neon-chime')
+            ? alertSettings.soundUrl
+            : (alertSettings?.sound_url || '/sounds/cash-register-kaching.mp3')),
+      soundVolume: matchingBox?.soundVolume ?? alertSettings?.soundVolume ?? alertSettings?.sound_volume ?? 0.85,
+      durationSeconds: videoEndTime && videoStartTime && (videoEndTime - videoStartTime > 0)
+        ? Math.max(matchingBox?.durationSeconds || alertSettings?.durationSeconds || alertSettings?.duration_seconds || 8, videoEndTime - videoStartTime + 2)
+        : (matchingBox?.durationSeconds || alertSettings?.durationSeconds || alertSettings?.duration_seconds || 8),
+      ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (alertSettings?.tts_enabled !== 0),
+      ttsType: matchingBox?.ttsType || alertSettings?.ttsType || alertSettings?.tts_type || 'google',
+      clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url
     };
 
-    broadcastAlertToOverlay(streamer.overlay_token, payload);
+    if (overlayToken) {
+      broadcastAlertToOverlay(overlayToken, payload);
+    }
 
     return NextResponse.json({ success: true, message: 'Alert replayed to OBS overlay' });
   } catch (err: any) {

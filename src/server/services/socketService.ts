@@ -1,9 +1,77 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { db } from '../database/db';
+import { getUsersCollection, getOverlayTokenHistoryCollection } from '../database/mongo';
 
 let io: SocketIOServer | null = null;
 const recentOverlayAlerts = new Map<string, { payload: AlertPayload; timestamp: number }>();
+
+async function joinStreamerRooms(socket: Socket, token: string) {
+  try {
+    const usersCol = await getUsersCollection();
+    const histCol = await getOverlayTokenHistoryCollection();
+
+    let streamer = await usersCol.findOne({
+      $or: [{ overlayToken: token }, { overlay_token: token } as any]
+    });
+
+    if (!streamer) {
+      const hist = await histCol.findOne({ token });
+      if (hist?.streamerId) {
+        streamer = await usersCol.findOne({
+          $or: [{ userId: hist.streamerId }, { id: hist.streamerId } as any]
+        });
+      }
+    }
+
+    if (streamer) {
+      const sId = streamer.userId || (streamer as any).id;
+      if (sId) socket.join(`streamer_overlay:${sId}`);
+      const activeTok = streamer.overlayToken || streamer.overlay_token;
+      if (activeTok) socket.join(`overlay:${activeTok}`);
+
+      if (sId) {
+        const histories = await histCol.find({ streamerId: sId }).toArray();
+        for (const h of histories) {
+          if (h.token) socket.join(`overlay:${h.token}`);
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+async function broadcastToAllStreamerRooms(token: string, event: string, payload: any) {
+  if (!io) return;
+  try {
+    const usersCol = await getUsersCollection();
+    const histCol = await getOverlayTokenHistoryCollection();
+
+    let streamer = await usersCol.findOne({
+      $or: [{ overlayToken: token }, { overlay_token: token } as any]
+    });
+
+    if (!streamer) {
+      const hist = await histCol.findOne({ token });
+      if (hist?.streamerId) {
+        streamer = await usersCol.findOne({
+          $or: [{ userId: hist.streamerId }, { id: hist.streamerId } as any]
+        });
+      }
+    }
+
+    if (streamer) {
+      const sId = streamer.userId || (streamer as any).id;
+      if (sId) io.to(`streamer_overlay:${sId}`).emit(event, payload);
+      const activeTok = streamer.overlayToken || streamer.overlay_token;
+      if (activeTok && activeTok !== token) io.to(`overlay:${activeTok}`).emit(event, payload);
+      if (sId) {
+        const histories = await histCol.find({ streamerId: sId }).toArray();
+        for (const h of histories) {
+          if (h.token && h.token !== token) io.to(`overlay:${h.token}`).emit(event, payload);
+        }
+      }
+    }
+  } catch (e) {}
+}
 
 export interface AlertPayload {
   id?: string;
@@ -66,24 +134,7 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
         console.log(`[Socket] Overlay connected for token: ${data.overlayToken.slice(0, 10)}... (Socket ID: ${socket.id})`);
 
         // Automatically map legacy or regenerated tokens to the streamer's room so OBS never breaks!
-        try {
-          const streamer = db.prepare(`
-            SELECT id, overlay_token FROM streamers 
-            WHERE overlay_token = ? 
-               OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
-          `).get(data.overlayToken, data.overlayToken) as any;
-
-          if (streamer) {
-            socket.join(`streamer_overlay:${streamer.id}`);
-            if (streamer.overlay_token) {
-              socket.join(`overlay:${streamer.overlay_token}`);
-            }
-            const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
-            for (const h of histories) {
-              if (h.token) socket.join(`overlay:${h.token}`);
-            }
-          }
-        } catch (e) {}
+        joinStreamerRooms(socket, data.overlayToken);
 
         socket.emit('overlay:connected', { status: 'ready', message: 'StreamNeon overlay connected successfully' });
 
@@ -117,24 +168,7 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       io?.to(`overlay:${token}`).emit('donation:alert', testPayload);
 
       // Also broadcast to streamer's master overlay room and active overlay token
-      try {
-        const streamer = db.prepare(`
-          SELECT id, overlay_token FROM streamers 
-          WHERE overlay_token = ? 
-             OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
-        `).get(token, token) as any;
-
-        if (streamer) {
-          io?.to(`streamer_overlay:${streamer.id}`).emit('donation:alert', testPayload);
-          if (streamer.overlay_token) {
-            io?.to(`overlay:${streamer.overlay_token}`).emit('donation:alert', testPayload);
-          }
-          const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
-          for (const h of histories) {
-            if (h.token) io?.to(`overlay:${h.token}`).emit('donation:alert', testPayload);
-          }
-        }
-      } catch (e) {}
+      broadcastToAllStreamerRooms(token, 'donation:alert', testPayload);
 
       // If token is specific, also send to demo-token room in case preview overlay uses demo-token
       if (token !== 'demo-token') {
@@ -148,22 +182,7 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       console.log(`[Socket] Overlay alert finished for donation "${data?.donationId}" (Token: ${token})`);
       io?.to(`overlay:${token}`).emit('donation:alert_finished', data);
 
-      try {
-        const streamer = db.prepare(`
-          SELECT id, overlay_token FROM streamers 
-          WHERE overlay_token = ? 
-             OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
-        `).get(token, token) as any;
-
-        if (streamer) {
-          io?.to(`streamer_overlay:${streamer.id}`).emit('donation:alert_finished', data);
-          if (streamer.overlay_token) io?.to(`overlay:${streamer.overlay_token}`).emit('donation:alert_finished', data);
-          const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
-          for (const h of histories) {
-            if (h.token) io?.to(`overlay:${h.token}`).emit('donation:alert_finished', data);
-          }
-        }
-      } catch (e) {}
+      broadcastToAllStreamerRooms(token, 'donation:alert_finished', data);
 
       if (token !== 'demo-token') {
         io?.to('overlay:demo-token').emit('donation:alert_finished', data);
@@ -176,22 +195,7 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       console.log(`[Socket] Video alert finished for donation "${data?.donationId}" (Token: ${token})`);
       io?.to(`overlay:${token}`).emit('donation:video_finished', data);
 
-      try {
-        const streamer = db.prepare(`
-          SELECT id, overlay_token FROM streamers 
-          WHERE overlay_token = ? 
-             OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
-        `).get(token, token) as any;
-
-        if (streamer) {
-          io?.to(`streamer_overlay:${streamer.id}`).emit('donation:video_finished', data);
-          if (streamer.overlay_token) io?.to(`overlay:${streamer.overlay_token}`).emit('donation:video_finished', data);
-          const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
-          for (const h of histories) {
-            if (h.token) io?.to(`overlay:${h.token}`).emit('donation:video_finished', data);
-          }
-        }
-      } catch (e) {}
+      broadcastToAllStreamerRooms(token, 'donation:video_finished', data);
 
       if (token !== 'demo-token') {
         io?.to('overlay:demo-token').emit('donation:video_finished', data);
@@ -250,25 +254,8 @@ export function broadcastAlertToOverlay(overlayToken: string, payload: AlertPayl
   console.log(`[Socket] Broadcasting donation alert to overlay:${overlayToken.slice(0, 10)}...: ${payload.donorName} ($${payload.amount})`);
   activeIo.to(`overlay:${overlayToken}`).emit('donation:alert', payload);
 
-  // Broadcast to streamer master room and all linked overlay tokens
-  try {
-    const streamer = db.prepare(`
-      SELECT id, overlay_token FROM streamers 
-      WHERE overlay_token = ? 
-         OR id IN (SELECT streamer_id FROM overlay_token_history WHERE token = ?)
-    `).get(overlayToken, overlayToken) as any;
-
-    if (streamer) {
-      activeIo.to(`streamer_overlay:${streamer.id}`).emit('donation:alert', payload);
-      if (streamer.overlay_token) {
-        activeIo.to(`overlay:${streamer.overlay_token}`).emit('donation:alert', payload);
-      }
-      const histories = db.prepare('SELECT token FROM overlay_token_history WHERE streamer_id = ?').all(streamer.id) as any[];
-      for (const h of histories) {
-        if (h.token) activeIo.to(`overlay:${h.token}`).emit('donation:alert', payload);
-      }
-    }
-  } catch (e) {}
+  // Broadcast to streamer master room and all linked overlay tokens via MongoDB
+  broadcastToAllStreamerRooms(overlayToken, 'donation:alert', payload);
 
   activeIo.emit('donation:paid', {
     ...payload,

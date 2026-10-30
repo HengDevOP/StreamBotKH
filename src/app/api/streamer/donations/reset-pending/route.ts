@@ -1,28 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, cleanupExpiredPendingDonations } from '@/server/database/db';
-import { getTemporaryDonationsCollection } from '@/server/database/mongo';
+import {
+  getDonationsCollection,
+  getTemporaryDonationsCollection,
+  cleanupExpiredPendingDonationsMongo
+} from '@/server/database/mongo';
 
 export async function GET(_req: NextRequest) {
   try {
-    // Run 5-minute cleanup first to ensure accurate count
-    cleanupExpiredPendingDonations();
+    // Run 5-minute cleanup first in MongoDB
+    await cleanupExpiredPendingDonationsMongo();
 
-    const pendingRow = db.prepare(`
-      SELECT COUNT(*) as count FROM donations WHERE status = 'PENDING'
-    `).get() as any;
+    const donationsCol = await getDonationsCollection();
+    const count = await donationsCol.countDocuments({ status: 'PENDING' });
 
-    const pendingList = db.prepare(`
-      SELECT id, donor_name, banking_name, amount, currency, created_at
-      FROM donations
-      WHERE status = 'PENDING'
-      ORDER BY created_at DESC
-      LIMIT 10
-    `).all() as any[];
+    const pendingList = await donationsCol
+      .find({ status: 'PENDING' })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .toArray();
+
+    const formattedList = pendingList.map((d) => ({
+      id: d.id,
+      donor_name: d.donorName || (d as any).donor_name,
+      banking_name: d.bankingName || (d as any).banking_name,
+      amount: d.amount,
+      currency: d.currency,
+      created_at: d.createdAt
+    }));
 
     return NextResponse.json({
       success: true,
-      pendingCount: pendingRow?.count || 0,
-      pendingDonations: pendingList
+      pendingCount: count,
+      pendingDonations: formattedList
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -31,34 +40,29 @@ export async function GET(_req: NextRequest) {
 
 export async function POST(_req: NextRequest) {
   try {
-    // 1. Cancel all pending donations in SQLite ledger
-    const updateResult = db.prepare(`
-      UPDATE donations
-      SET status = 'CANCELLED'
-      WHERE status = 'PENDING'
-    `).run();
+    const donationsCol = await getDonationsCollection();
+    const updateResult = await donationsCol.updateMany(
+      { status: 'PENDING' },
+      { $set: { status: 'CANCELLED', updatedAt: new Date() } }
+    );
 
-    // 2. Clear MongoDB temporary queue
     let mongoCleared = 0;
     try {
       const col = await getTemporaryDonationsCollection();
       const res = await col.deleteMany({});
       mongoCleared = res.deletedCount || 0;
-    } catch (e) {
-      // safe fallback
-    }
+    } catch (e) {}
 
-    const totalCleared = (updateResult.changes || 0) + mongoCleared;
-    console.log(`🧹 [Dashboard Reset] Streamer reset all pending sessions. Cleared: ${updateResult.changes} donations, ${mongoCleared} MongoDB temporary records.`);
+    const totalCleared = (updateResult.modifiedCount || 0) + mongoCleared;
+    console.log(`🧹 [Dashboard Reset] Streamer reset all pending sessions in MongoDB. Cleared: ${updateResult.modifiedCount} donations, ${mongoCleared} temporary records.`);
 
     return NextResponse.json({
       success: true,
-      clearedDonations: updateResult.changes || 0,
+      clearedDonations: updateResult.modifiedCount || 0,
       clearedTemporary: mongoCleared,
-      message: `Successfully reset ${updateResult.changes || 0} pending session(s). Unwanted alerts prevented.`
+      message: `Successfully reset ${updateResult.modifiedCount || 0} pending session(s). Unwanted alerts prevented.`
     });
   } catch (err: any) {
-    console.error('Error resetting pending donations:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

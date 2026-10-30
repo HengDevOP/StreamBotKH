@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/server/database/db';
-import { getTemporaryDonationsCollection } from '@/server/database/mongo';
+import { getDonationsCollection, getTemporaryDonationsCollection } from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,11 +8,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'donationId is required' }, { status: 400 });
     }
 
-    // 1. Mark pending donation as CANCELLED
+    // 1. Mark pending donation as CANCELLED in MongoDB
     try {
-      db.prepare("UPDATE donations SET status = 'CANCELLED' WHERE id = ? AND status = 'PENDING'").run(donationId);
+      const donationsCol = await getDonationsCollection();
+      await donationsCol.updateOne(
+        {
+          $or: [{ id: donationId }, { donationId }],
+          status: 'PENDING'
+        },
+        { $set: { status: 'CANCELLED', updatedAt: new Date() } }
+      );
     } catch (e) {
-      console.warn('[Cleanup] SQLite error:', e);
+      console.warn('[Cleanup] Mongo donations error:', e);
     }
 
     // 2. Delete from MongoDB temporary_donations
@@ -23,7 +29,7 @@ export async function POST(req: NextRequest) {
         $or: [{ id: donationId }, { donationId }]
       });
     } catch (e) {
-      console.warn('[Cleanup] Mongo error:', e);
+      console.warn('[Cleanup] Mongo temporary_donations error:', e);
     }
 
     return NextResponse.json({ success: true, message: 'You have cancelled the donation' });

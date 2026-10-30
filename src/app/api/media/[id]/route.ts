@@ -61,8 +61,8 @@ export async function DELETE(
         : { _id: new ObjectId(mediaId), userId };
     } else {
       filter = authUser?.email
-        ? { $or: [{ _id: mediaId as any }, { id: mediaId as any }], $or: [{ userId }, { userEmail: authUser.email }] }
-        : { $or: [{ _id: mediaId as any }, { id: mediaId as any }], userId };
+        ? { $and: [{ $or: [{ _id: mediaId as any }, { id: mediaId as any }] }, { $or: [{ userId }, { userEmail: authUser.email }] }] }
+        : { $and: [{ $or: [{ _id: mediaId as any }, { id: mediaId as any }] }, { userId }] };
     }
 
     let media = await mediaCol.findOne(filter);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db } from '@/server/database/db';
+import { getPaymentSettingsCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,25 +9,48 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let settings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(user.id) as any;
+    const paymentCol = await getPaymentSettingsCollection();
+    let settings = await paymentCol.findOne({
+      $or: [{ streamerId: user.id }, { streamer_id: user.id as any }]
+    }) as any;
 
     if (!settings) {
-      db.prepare('INSERT INTO payment_settings (streamer_id) VALUES (?)').run(user.id);
-      settings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(user.id);
+      const now = new Date();
+      await paymentCol.insertOne({
+        streamerId: user.id,
+        bakongAccountId: 'streamneon@abaa',
+        bankAccountName: 'NEON STREAMER VIP',
+        abaPaywayMerchantId: 'ec439126',
+        abaPaywayApiKey: 'f60b06ca198c61e8601ff7a68393ceee47cb50cb',
+        isLiveMode: false,
+        createdAt: now,
+        updatedAt: now
+      });
+      settings = await paymentCol.findOne({ streamerId: user.id });
     }
 
-    // If master_khqr_image is missing in SQLite, restore from MongoDB backup
-    if (!settings?.master_khqr_image) {
+    // If master_khqr_image is missing, restore from MongoDB backup
+    if (!settings?.masterKhqrImage && !settings?.master_khqr_image) {
       try {
-        const { restoreMasterKhqrImage } = await import('@/server/database/mongo');
         const res = await restoreMasterKhqrImage(user.id, user.username);
         if (res.restored) {
-          settings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(user.id);
+          settings = await paymentCol.findOne({ streamerId: user.id });
         }
       } catch (e) {}
     }
 
-    return NextResponse.json(settings);
+    // Format for frontend
+    const result: any = {
+      streamer_id: user.id,
+      aba_merchant_id: settings?.abaPaywayMerchantId || settings?.aba_merchant_id || 'ec439126',
+      aba_api_key: settings?.abaPaywayApiKey || settings?.aba_api_key || 'f60b06ca198c61e8601ff7a68393ceee47cb50cb',
+      bakong_account_id: settings?.bakongAccountId || settings?.bakong_account_id || 'streamneon@abaa',
+      bakong_account_name: settings?.bankAccountName || settings?.bakong_account_name || 'NEON STREAMER VIP',
+      is_sandbox: settings?.isLiveMode !== undefined ? (settings.isLiveMode ? 0 : 1) : (settings?.is_sandbox ?? 1),
+      master_khqr_image: settings?.masterKhqrImage || settings?.master_khqr_image || ''
+    };
+
+    return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -42,28 +65,36 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const { aba_merchant_id, aba_api_key, bakong_account_id, bakong_account_name, is_sandbox } = body;
+    const now = new Date();
+    const paymentCol = await getPaymentSettingsCollection();
 
-    db.prepare(`
-      INSERT INTO payment_settings (
-        streamer_id, aba_merchant_id, aba_api_key, bakong_account_id, bakong_account_name, is_sandbox
-      ) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(streamer_id) DO UPDATE SET
-        aba_merchant_id = excluded.aba_merchant_id,
-        aba_api_key = excluded.aba_api_key,
-        bakong_account_id = excluded.bakong_account_id,
-        bakong_account_name = excluded.bakong_account_name,
-        is_sandbox = excluded.is_sandbox
-    `).run(
-      user.id,
-      aba_merchant_id || 'ec439126',
-      aba_api_key || 'f60b06ca198c61e8601ff7a68393ceee47cb50cb',
-      bakong_account_id || 'streamneon@abaa',
-      bakong_account_name || 'STREAMNEON VIP',
-      is_sandbox ? 1 : 0
+    await paymentCol.updateOne(
+      { streamerId: user.id },
+      {
+        $set: {
+          streamerId: user.id,
+          abaPaywayMerchantId: aba_merchant_id || 'ec439126',
+          aba_merchant_id: aba_merchant_id || 'ec439126',
+          abaPaywayApiKey: aba_api_key || 'f60b06ca198c61e8601ff7a68393ceee47cb50cb',
+          aba_api_key: aba_api_key || 'f60b06ca198c61e8601ff7a68393ceee47cb50cb',
+          bakongAccountId: bakong_account_id || 'streamneon@abaa',
+          bakong_account_id: bakong_account_id || 'streamneon@abaa',
+          bankAccountName: bakong_account_name || 'NEON STREAMER VIP',
+          bakong_account_name: bakong_account_name || 'NEON STREAMER VIP',
+          isLiveMode: !is_sandbox,
+          is_sandbox: is_sandbox ? 1 : 0,
+          updatedAt: now
+        },
+        $setOnInsert: { createdAt: now }
+      },
+      { upsert: true }
     );
 
-    const updated = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(user.id);
-    return NextResponse.json({ success: true, settings: updated });
+    const updated = await paymentCol.findOne({ streamerId: user.id });
+    return NextResponse.json({
+      success: true,
+      settings: updated
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
