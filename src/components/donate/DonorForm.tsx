@@ -46,7 +46,7 @@ interface DonorFormProps {
   loading?: boolean;
 }
 
-const DEMO_YOUTUBE_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+const DEMO_YOUTUBE_URL = 'https://www.youtube.com/watch?v=HSsGnEOFY6U&list=RDHSsGnEOFY6U&start_radio=1';
 
 export function extractYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -256,8 +256,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
 
   const handleLoadDemoVideo = () => {
     setVideoUrl(DEMO_YOUTUBE_URL);
-    setVideoStartTime(10);
-    setVideoEndTime(40);
+    setVideoStartTime(0);
+    setVideoEndTime(30);
     fetchYoutubeDetails(DEMO_YOUTUBE_URL);
   };
 

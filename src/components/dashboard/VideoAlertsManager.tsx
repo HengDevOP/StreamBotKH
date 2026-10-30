@@ -55,10 +55,10 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   // Live Test Simulation State
-  const [demoVideoUrl, setDemoVideoUrl] = useState('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-  const [demoVideoDuration, setDemoVideoDuration] = useState<number | undefined>(213);
-  const [demoStartTime, setDemoStartTime] = useState(42);
-  const [demoEndTime, setDemoEndTime] = useState(72);
+  const [demoVideoUrl, setDemoVideoUrl] = useState('https://www.youtube.com/watch?v=HSsGnEOFY6U&list=RDHSsGnEOFY6U&start_radio=1');
+  const [demoVideoDuration, setDemoVideoDuration] = useState<number | undefined>(66);
+  const [demoStartTime, setDemoStartTime] = useState(0);
+  const [demoEndTime, setDemoEndTime] = useState(30);
   const [demoDonorName, setDemoDonorName] = useState('CyberValkyrie');
   const [demoAmount, setDemoAmount] = useState(5.0);
   const [demoDonorMessage, setDemoDonorMessage] = useState('Check out this legendary hype moment! 🔥');
@@ -131,14 +131,16 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
       currency: 'USD',
       bankingName: 'ABA Bank',
       videoUrl: demoVideoUrl,
-      videoTitle: 'Never Gonna Give You Up (Live Media Share)',
+      videoTitle: 'បទនគររាជ Nokoraja Part 1 (Live Media Share)',
       videoStartTime: demoStartTime,
       videoEndTime: demoEndTime,
       soundVolume: videoVolume / 100,
-      videoAlertEnabled: isEnabled,
-      videoMinTipAmount: minTipAmount,
+      videoAlertEnabled: true,
+      videoMinTipAmount: 0,
       videoMaxDurationSeconds: maxDurationSeconds,
-      durationSeconds: 7, // 1st donation alert duration
+      durationSeconds: 0, // Instant play for test video without awaiting donation alert
+      isVideoTest: true,
+      directVideo: true,
       isTest: true,
       overlayToken: effectiveToken
     };
@@ -481,7 +483,7 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
                     endTime={demoEndTime}
                     autoplay={true}
                     muted={false}
-                    videoTitle="Never Gonna Give You Up (Live Media Share)"
+                    videoTitle="បទនគររាជ Nokoraja Part 1 (Live Media Share)"
                     donorName={demoDonorName}
                     amount={demoAmount}
                     currency="USD"
@@ -510,26 +512,26 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
               <div className="p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/30 text-[11px] text-slate-300 space-y-1">
                 <span className="font-bold text-cyan-300 flex items-center gap-1.5">
                   <Sparkles size={13} className="text-cyan-400" />
-                  <span>Sequential 2-Stage Alert Trigger Active:</span>
+                  <span>Media Share Playback Modes:</span>
                 </span>
                 <p className="text-slate-400 leading-relaxed">
-                  1st: Donation alert displays first (donor name, cheer message, sound chime, TTS voice).<br />
-                  2nd: If tip meets ${minTipAmount.toFixed(2)}+, the Video Alert plays sequentially with the countdown progress duration bar.
+                  • <strong>Live Donation:</strong> Plays sequentially (Stage 1 Donation Card ➔ Stage 2 Video Clip with progress countdown bar).<br />
+                  • <strong>Test Video:</strong> Plays video clip instantly on OBS screen without awaiting donation alert requirements.
                 </p>
               </div>
 
               <Button
                 variant="secondary"
                 size="md"
-                disabled={isLocked || isSimulating || !isEnabled}
+                disabled={isLocked || isSimulating}
                 onClick={handleTestVideoAlert}
                 className="w-full font-bold flex items-center justify-center gap-2 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10"
               >
                 <Play size={14} className="fill-cyan-400" />
                 <span>
                   {isSimulating
-                    ? 'Playing 2-Stage Alert on OBS Screen...'
-                    : 'Trigger Test Alert (Donation 1st ➔ Video 2nd)'}
+                    ? 'Playing Video Clip on OBS Screen...'
+                    : 'Trigger Test Video Alert (Instant Play)'}
                 </span>
               </Button>
             </div>

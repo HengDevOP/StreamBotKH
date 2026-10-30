@@ -327,7 +327,9 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         ? Boolean(payload.videoAlertEnabled)
         : Boolean(overlayConfig?.videoAlertEnabled);
 
-      const hasValidVideo = Boolean(payload.videoUrl) && tipAmountInUsd >= minTipRequired && videoAlertsEnabled;
+      const isVideoTest = Boolean(payload.isVideoTest || (isTestAlert && payload.videoUrl));
+      // For test video alerts: bypass minimum tip amount & video alert enabled checks!
+      const hasValidVideo = Boolean(payload.videoUrl) && (isVideoTest || (tipAmountInUsd >= minTipRequired && videoAlertsEnabled));
 
       // ==============================================================
       // 1. DEDICATED VIDEO ALERT SOURCE (/overlay/video/[token]):
@@ -352,6 +354,13 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
           ttsEnabled: false
         };
 
+        // For test video alerts, play immediately without awaiting any donation alert!
+        if (isVideoTest) {
+          console.log(`🎬 [Video Overlay] Test video alert: playing immediately (no donation alert wait required).`);
+          pushAlert(videoPayload);
+          return;
+        }
+
         const donationAlertDuration = Number(finalPayload.durationSeconds) || 8;
         const key = payload.donationId || alertId;
 
@@ -371,8 +380,26 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       // 2. DEDICATED DONATION ALERT SOURCE (/overlay/[token] or ?mode=alert):
       // Shows standard donation alert card, chime, and TTS.
       // Does NOT show the video clip because video belongs to the video source!
+      // (Exception: test video alert will show the video directly for easy preview)
       // ==============================================================
       if (activeMode === 'alert-only') {
+        if (isVideoTest && hasValidVideo) {
+          const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
+          console.log(`🎬 [Alert Overlay] Test video alert: playing video directly on overlay.`);
+          pushAlert({
+            ...finalPayload,
+            isSecondStageVideo: true,
+            videoUrl: payload.videoUrl,
+            videoTitle: payload.videoTitle,
+            videoStartTime: Number(payload.videoStartTime) || 0,
+            videoEndTime: Number(payload.videoEndTime) || 30,
+            durationSeconds: clipDuration + 6,
+            soundUrl: '',
+            ttsEnabled: false
+          });
+          return;
+        }
+
         pushAlert({
           ...finalPayload,
           isSecondStageVideo: false,
@@ -390,6 +417,23 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       if (hasValidVideo) {
         const clipDuration = Math.max(5, (Number(payload.videoEndTime || 30) - Number(payload.videoStartTime || 0)));
         const alertDuration = Number(finalPayload.durationSeconds) || 8;
+
+        // If it's a test video alert, don't wait for donation alert requirement - play video immediately!
+        if (isVideoTest) {
+          console.log(`🎬 [Combo Overlay] Test video alert: playing immediately (no donation alert wait required).`);
+          pushAlert({
+            ...finalPayload,
+            isSecondStageVideo: true,
+            videoUrl: payload.videoUrl,
+            videoTitle: payload.videoTitle,
+            videoStartTime: Number(payload.videoStartTime) || 0,
+            videoEndTime: Number(payload.videoEndTime) || 30,
+            durationSeconds: clipDuration + 6,
+            soundUrl: '',
+            ttsEnabled: false
+          });
+          return;
+        }
 
         // Stage 1: Standard donation alert card, chime & TTS
         pushAlert({

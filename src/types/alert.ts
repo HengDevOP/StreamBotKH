@@ -77,5 +77,7 @@ export interface LiveAlertPayload {
   videoAlertEnabled?: boolean;
   videoMinTipAmount?: number;
   videoMaxDurationSeconds?: number;
+  isVideoTest?: boolean;
+  directVideo?: boolean;
   isTest?: boolean;
 }

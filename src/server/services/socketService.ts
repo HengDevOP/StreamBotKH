@@ -42,6 +42,8 @@ export interface AlertPayload {
   videoMaxDurationSeconds?: number;
   isSecondStageVideo?: boolean;
   upcomingVideo?: boolean;
+  isVideoTest?: boolean;
+  directVideo?: boolean;
   isTest?: boolean;
 }
 
