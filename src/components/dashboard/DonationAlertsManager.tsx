@@ -132,7 +132,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setSelectedBoxId(box._id);
     onSelectBoxId?.(box._id);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/dashboard?tab=donation?id=${box._id}`);
+      window.history.pushState(null, '', `/dashboard?tab=donation&id=${box._id}`);
     }
   };
 
@@ -141,7 +141,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setSelectedBoxId('new');
     onSelectBoxId?.('new');
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', '/dashboard?tab=donation?id=new');
+      window.history.pushState(null, '', '/dashboard?tab=donation&id=new');
     }
   };
 
@@ -166,7 +166,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setSelectedBoxId(savedBox._id);
     onSelectBoxId?.(savedBox._id);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/dashboard?tab=donation?id=${savedBox._id}`);
+      window.history.pushState(null, '', `/dashboard?tab=donation&id=${savedBox._id}`);
     }
   };
 
