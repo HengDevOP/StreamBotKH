@@ -231,7 +231,16 @@ export async function POST(req: NextRequest) {
     try {
       const alertBoxesCol = await getAlertBoxesCollection();
       const activeBoxes = await alertBoxesCol
-        .find({ userId: streamer.id, isEnabled: true })
+        .find({
+          $or: [
+            { userId: streamer.id },
+            { streamerId: streamer.id },
+            ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
+            ...(streamer.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
+            ...(streamer.overlay_token ? [{ overlayToken: streamer.overlay_token }, { token: streamer.overlay_token }] : [])
+          ],
+          isEnabled: true
+        })
         .sort({ minAmountCondition: -1 })
         .toArray();
       const effectiveAmountUsd = effectiveCurrency === 'KHR' ? effectiveAmount / 4000 : effectiveAmount;
@@ -279,7 +288,11 @@ export async function POST(req: NextRequest) {
       layoutMode: matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
       animationStyle: matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
       glowColor: matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF',
-      soundUrl: matchingBox?.soundUrl || alertSettings?.sound_url || '/sounds/neon-chime.mp3',
+      soundUrl: (matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+        ? matchingBox.soundUrl
+        : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
+            ? alertSettings.sound_url
+            : '/sounds/cash-register-kaching.mp3'),
       soundVolume: matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85,
       durationSeconds: effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
         ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)

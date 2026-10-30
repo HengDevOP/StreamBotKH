@@ -113,9 +113,9 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
 
   // Dynamic token parsing with gradient & custom color support
   const renderHeadlineElements = () => {
-    if (!donorColor && !amountColor) {
-      return <span style={getGradientOrColorStyle(textColor || '#FFFFFF')}>{formattedHeadline}</span>;
-    }
+    const activeDonorColor = donorColor || '#FFE600';
+    const activeAmountColor = amountColor || '#00F0FF';
+    const activeTextColor = textColor || '#FFFFFF';
 
     const tokenRegex = /(\{(?:donator|name|amount|currency|message|donor_message|context)\})/gi;
     const tokens = headlineTemplate.split(tokenRegex);
@@ -127,7 +127,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
           <span
             key={idx}
             className="font-extrabold"
-            style={getGradientOrColorStyle(donorColor || textColor || '#00F0FF')}
+            style={getGradientOrColorStyle(activeDonorColor)}
           >
             {donorName}
           </span>
@@ -138,7 +138,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
           <span
             key={idx}
             className="font-black"
-            style={getGradientOrColorStyle(amountColor || textColor || '#FFE600')}
+            style={getGradientOrColorStyle(activeAmountColor)}
           >
             {formattedAmount}
           </span>
@@ -148,7 +148,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
         return (
           <span
             key={idx}
-            style={getGradientOrColorStyle(amountColor || textColor || '#FFE600')}
+            style={getGradientOrColorStyle(activeAmountColor)}
           >
             {currency || 'USD'}
           </span>
@@ -156,13 +156,13 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
       }
       if (lower === '{message}' || lower === '{donor_message}' || lower === '{context}') {
         return hasMeaningfulMessage ? (
-          <span key={idx} className="italic" style={getGradientOrColorStyle(textColor)}>
+          <span key={idx} className="italic" style={getGradientOrColorStyle(activeTextColor)}>
             "{cleanDonorMessage}"
           </span>
         ) : null;
       }
       return (
-        <span key={idx} style={getGradientOrColorStyle(textColor)}>
+        <span key={idx} style={getGradientOrColorStyle(activeTextColor)}>
           {part}
         </span>
       );

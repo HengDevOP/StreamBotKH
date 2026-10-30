@@ -116,6 +116,36 @@ export async function POST(req: NextRequest) {
     const result = await col.insertOne(newDoc);
     const created = await col.findOne({ _id: result.insertedId });
 
+    // Synchronize to SQLite alert_settings for consistency
+    try {
+      const streamer = db.prepare('SELECT id FROM streamers WHERE id = ? OR username = ? OR email = ?').get(userId, userId, userId) as any;
+      if (streamer?.id && created) {
+        db.prepare(`
+          INSERT INTO alert_settings (streamer_id, template_style, glow_color, sound_url, sound_volume, duration_seconds, custom_gif_url, text_template)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(streamer_id) DO UPDATE SET
+            template_style = excluded.template_style,
+            glow_color = excluded.glow_color,
+            sound_url = excluded.sound_url,
+            sound_volume = excluded.sound_volume,
+            duration_seconds = excluded.duration_seconds,
+            custom_gif_url = excluded.custom_gif_url,
+            text_template = excluded.text_template
+        `).run(
+          streamer.id,
+          created.templateStyle || 'neon-box',
+          created.glowColor || '#00F0FF',
+          created.soundUrl || '/sounds/cash-register-kaching.mp3',
+          Number(created.soundVolume) || 0.85,
+          Number(created.durationSeconds) || 8,
+          created.mediaUrl || '',
+          created.textTemplate || '{donator} donated {amount} through superchat!'
+        );
+      }
+    } catch (e) {
+      console.warn('[AlertBox] Error syncing to sqlite alert_settings on create:', e);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Donation box created successfully',

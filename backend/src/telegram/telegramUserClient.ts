@@ -975,7 +975,9 @@ class TelegramUserClientManager {
                 $or: [
                   { userId: targetStreamer.id },
                   { streamerId: targetStreamer.id },
-                  ...(targetStreamer.username ? [{ userId: targetStreamer.username }, { streamerId: targetStreamer.username }] : [])
+                  ...(targetStreamer.username ? [{ userId: targetStreamer.username }, { streamerId: targetStreamer.username }] : []),
+                  ...(targetStreamer.email ? [{ userId: targetStreamer.email }, { userEmail: targetStreamer.email }] : []),
+                  ...(targetStreamer.overlay_token ? [{ overlayToken: targetStreamer.overlay_token }, { token: targetStreamer.overlay_token }] : [])
                 ],
                 isEnabled: true
               })
@@ -999,6 +1001,8 @@ class TelegramUserClientManager {
             donationId: activeDonationId,
             donorName: effectiveDonorName,
             donorMessage: effectiveDonorMessage,
+            donor_message: effectiveDonorMessage,
+            message: effectiveDonorMessage,
             amount: effectiveAmount,
             currency: effectiveCurrency,
             bankingName: effectiveBankingName,
@@ -1009,6 +1013,8 @@ class TelegramUserClientManager {
             templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
             textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
             textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+            donorColor: matchingBox?.donorColor || undefined,
+            amountColor: matchingBox?.amountColor || undefined,
             customGifUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
             mediaUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
             showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0),
@@ -1017,7 +1023,11 @@ class TelegramUserClientManager {
             layoutMode: matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
             animationStyle: matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
             glowColor: matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF',
-            soundUrl: matchingBox?.soundUrl || alertSettings?.sound_url || '/sounds/neon-chime.mp3',
+            soundUrl: (matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+              ? matchingBox.soundUrl
+              : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
+                  ? alertSettings.sound_url
+                  : '/sounds/cash-register-kaching.mp3'),
             soundVolume: matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85,
             durationSeconds: effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
               ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)

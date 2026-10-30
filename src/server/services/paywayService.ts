@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import axios from 'axios';
-import { db } from '../database/db';import { broadcastAlertToOverlay, broadcastDonationToDashboard } from './socketService';
+import { db } from '../database/db';
+import { getAlertBoxesCollection } from '../database/mongo';
+import { broadcastAlertToOverlay, broadcastDonationToDashboard } from './socketService';
 import { sendTelegramDonationAlert } from './telegramService';
 
 export interface PayWayCheckoutParams {
@@ -53,24 +55,73 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
   const streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(donation.streamer_id) as any;
   const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(donation.streamer_id) as any;
 
-  if (streamer && alertSettings) {
+  if (streamer) {
+    let matchingBox: any = null;
+    try {
+      const alertBoxesCol = await getAlertBoxesCollection();
+      const activeBoxes = await alertBoxesCol
+        .find({
+          $or: [
+            { userId: streamer.id },
+            { streamerId: streamer.id },
+            ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
+            ...(streamer.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
+            ...(streamer.overlay_token ? [{ overlayToken: streamer.overlay_token }, { token: streamer.overlay_token }] : [])
+          ],
+          isEnabled: true
+        })
+        .sort({ minAmountCondition: -1 })
+        .toArray();
+
+      const effectiveAmountUsd = donation.currency === 'KHR' ? donation.amount / 4000 : donation.amount;
+      const matchingBoxes = activeBoxes.filter(
+        (b) => effectiveAmountUsd >= ((Number(b.minAmountCondition) || 0) - 0.0001)
+      );
+      matchingBox = matchingBoxes.length > 0
+        ? matchingBoxes[0]
+        : (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
+    } catch (e) {
+      console.warn('[PaywayService] Could not fetch mongo alert boxes:', e);
+    }
+
     // Only alert if amount is >= min_amount_alert
-    if (donation.amount >= (alertSettings.min_amount_alert || 0)) {
+    const minAlert = matchingBox ? (Number(matchingBox.minAmountCondition) || 0) : (alertSettings?.min_amount_alert || 0);
+    const donationUsd = donation.currency === 'KHR' ? donation.amount / 4000 : donation.amount;
+
+    if (donationUsd >= minAlert - 0.0001) {
       const alertPayload = {
+        boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
         donationId: donation.id,
         donorName: donation.donor_name,
         donorMessage: donation.donor_message,
+        donor_message: donation.donor_message,
+        message: donation.donor_message,
         amount: donation.amount,
         currency: donation.currency,
         bankingName: donation.banking_name || 'Bakong KHQR',
-        templateStyle: alertSettings.template_style,
-        glowColor: alertSettings.glow_color,
-        soundUrl: alertSettings.sound_url,
-        soundVolume: alertSettings.sound_volume,
-        durationSeconds: alertSettings.duration_seconds,
-        ttsEnabled: alertSettings.tts_enabled === 1 && donation.amount >= (alertSettings.tts_min_amount || 0),
-        ttsVoice: alertSettings.tts_voice,
-        customGifUrl: alertSettings.custom_gif_url
+        templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
+        textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
+        textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+        donorColor: matchingBox?.donorColor || undefined,
+        amountColor: matchingBox?.amountColor || undefined,
+        customGifUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+        mediaUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+        showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0),
+        fontFamily: matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
+        fontSize: matchingBox?.fontSize || alertSettings?.font_size || 28,
+        layoutMode: matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
+        animationStyle: matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
+        glowColor: matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF',
+        soundUrl: (matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+          ? matchingBox.soundUrl
+          : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
+              ? alertSettings.sound_url
+              : '/sounds/cash-register-kaching.mp3'),
+        soundVolume: matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85,
+        durationSeconds: matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8,
+        ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (alertSettings?.tts_enabled === 1 && donation.amount >= (alertSettings?.tts_min_amount || 0)),
+        ttsType: matchingBox?.ttsType || alertSettings?.tts_voice || 'google',
+        clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url
       };
 
       // Real-time broadcast to OBS overlay room

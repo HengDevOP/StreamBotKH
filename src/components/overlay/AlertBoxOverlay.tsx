@@ -264,8 +264,8 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
 
       // The highest box whose condition threshold is met (e.g. >= 0.10 picks 0.10, >= 0.01 picks 0.01)
       const conditionMatchedBox =
-        matchingBoxes[0] ||
         (payload.boxId ? activeBoxes.find((b) => String(b._id) === String(payload.boxId)) : null) ||
+        matchingBoxes[0] ||
         (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
 
       const resolvedBoxId = payload.boxId || (conditionMatchedBox?._id ? String(conditionMatchedBox._id) : null);
@@ -311,24 +311,58 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
 
       const finalPayload = {
         ...payload,
+        templateStyle: (isTestAlert && payload.templateStyle)
+          ? payload.templateStyle
+          : (matchingBox?.templateStyle || payload.templateStyle || overlayConfig?.templateStyle || 'neon-box'),
+        donorColor: (isTestAlert && payload.donorColor)
+          ? payload.donorColor
+          : (matchingBox?.donorColor || payload.donorColor),
+        amountColor: (isTestAlert && payload.amountColor)
+          ? payload.amountColor
+          : (matchingBox?.amountColor || payload.amountColor),
         donorMessage: resolvedDonorMessage,
         donor_message: resolvedDonorMessage,
         message: resolvedDonorMessage,
-        textTemplate: (isTestAlert && payload.textTemplate) ? payload.textTemplate : (matchingBox?.textTemplate || payload.textTemplate),
-        textColor: (isTestAlert && payload.textColor) ? payload.textColor : (matchingBox?.textColor || payload.textColor),
+        textTemplate: (isTestAlert && payload.textTemplate)
+          ? payload.textTemplate
+          : (matchingBox?.textTemplate || payload.textTemplate || '{donator} donated {amount} through superchat!'),
+        textColor: (isTestAlert && payload.textColor)
+          ? payload.textColor
+          : (matchingBox?.textColor || payload.textColor || '#FFFFFF'),
         customGifUrl: matchingBox?.mediaUrl || payload.customGifUrl || payload.mediaUrl || overlayConfig?.mediaUrl,
+        mediaUrl: matchingBox?.mediaUrl || payload.mediaUrl || payload.customGifUrl || overlayConfig?.mediaUrl,
         showImage: matchingBox ? matchingBox.showImage !== false : (payload.showImage !== undefined ? payload.showImage : true),
-        fontFamily: matchingBox?.fontFamily || payload.fontFamily || 'Chakra Petch',
-        fontSize: matchingBox?.fontSize || payload.fontSize || 28,
-        layoutMode: matchingBox?.layoutMode || payload.layoutMode || 'top',
-        animationStyle: matchingBox?.animationStyle || payload.animationStyle || 'fade',
-        glowColor: matchingBox?.glowColor || payload.glowColor || overlayConfig?.glowColor || '#00F0FF',
-        soundUrl: (matchingBox?.soundUrl && matchingBox.soundUrl !== '/sounds/neon-chime.mp3')
-          ? matchingBox.soundUrl
-          : (payload.soundUrl || matchingBox?.soundUrl || overlayConfig?.soundUrl || '/sounds/neon-chime.mp3'),
-        soundVolume: matchingBox?.soundVolume ?? payload.soundVolume ?? overlayConfig?.soundVolume ?? 0.85,
+        fontFamily: (isTestAlert && payload.fontFamily)
+          ? payload.fontFamily
+          : (matchingBox?.fontFamily || payload.fontFamily || 'Chakra Petch'),
+        fontSize: (isTestAlert && payload.fontSize)
+          ? payload.fontSize
+          : (matchingBox?.fontSize || payload.fontSize || 28),
+        layoutMode: (isTestAlert && payload.layoutMode)
+          ? payload.layoutMode
+          : (matchingBox?.layoutMode || payload.layoutMode || 'top'),
+        animationStyle: (isTestAlert && payload.animationStyle)
+          ? payload.animationStyle
+          : (matchingBox?.animationStyle || payload.animationStyle || 'fade'),
+        glowColor: (isTestAlert && payload.glowColor)
+          ? payload.glowColor
+          : (matchingBox?.glowColor || payload.glowColor || overlayConfig?.glowColor || '#00F0FF'),
+        soundUrl: (isTestAlert && payload.soundUrl && !payload.soundUrl.includes('neon-chime'))
+          ? payload.soundUrl
+          : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+              ? matchingBox.soundUrl
+              : (payload.soundUrl && !payload.soundUrl.includes('neon-chime')
+                  ? payload.soundUrl
+                  : (overlayConfig?.soundUrl && !overlayConfig.soundUrl.includes('neon-chime')
+                      ? overlayConfig.soundUrl
+                      : '/sounds/cash-register-kaching.mp3'))),
+        soundVolume: (isTestAlert && payload.soundVolume !== undefined)
+          ? payload.soundVolume
+          : (matchingBox?.soundVolume ?? payload.soundVolume ?? overlayConfig?.soundVolume ?? 0.85),
         durationSeconds:
-          matchingBox?.durationSeconds || payload.durationSeconds || overlayConfig?.durationSeconds || 8,
+          (isTestAlert && payload.durationSeconds)
+            ? payload.durationSeconds
+            : (matchingBox?.durationSeconds || payload.durationSeconds || overlayConfig?.durationSeconds || 8),
         ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (payload.ttsEnabled !== undefined ? payload.ttsEnabled : true),
         ttsType: rawVoice,
         clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || payload.clonedVoiceSampleUrl

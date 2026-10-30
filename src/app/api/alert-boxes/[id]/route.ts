@@ -88,6 +88,36 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ success: false, error: 'Alert box not found' }, { status: 404 });
     }
 
+    // Synchronize to SQLite alert_settings for multi-backend consistency
+    try {
+      const streamer = db.prepare('SELECT id FROM streamers WHERE id = ? OR username = ? OR email = ?').get(result.userId, result.userId, result.userId) as any;
+      if (streamer?.id) {
+        db.prepare(`
+          INSERT INTO alert_settings (streamer_id, template_style, glow_color, sound_url, sound_volume, duration_seconds, custom_gif_url, text_template)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(streamer_id) DO UPDATE SET
+            template_style = excluded.template_style,
+            glow_color = excluded.glow_color,
+            sound_url = excluded.sound_url,
+            sound_volume = excluded.sound_volume,
+            duration_seconds = excluded.duration_seconds,
+            custom_gif_url = excluded.custom_gif_url,
+            text_template = excluded.text_template
+        `).run(
+          streamer.id,
+          result.templateStyle || 'neon-box',
+          result.glowColor || '#00F0FF',
+          result.soundUrl || '/sounds/cash-register-kaching.mp3',
+          Number(result.soundVolume) || 0.85,
+          Number(result.durationSeconds) || 8,
+          result.mediaUrl || '',
+          result.textTemplate || '{donator} donated {amount} through superchat!'
+        );
+      }
+    } catch (e) {
+      console.warn('[AlertBox] Error syncing to sqlite alert_settings:', e);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Donation box updated successfully',
