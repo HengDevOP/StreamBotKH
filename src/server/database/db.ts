@@ -582,27 +582,40 @@ export function getMonitoredGroups(streamerId: string) {
   }
 }
 
-export function addMonitoredGroup(streamerId: string, chatId: string, title: string, username?: string) {
+export function addMonitoredGroup(streamerId: string, chatId: string, title: string, username?: string, customId?: string) {
   const cleanChatId = chatId.trim();
   const cleanTitle = title.trim();
   const cleanUsername = username ? username.trim().replace(/^@/, '') : null;
+  const strippedId = cleanChatId.replace(/^-100/, '').replace(/^-/, '');
+  const variants = Array.from(new Set([cleanChatId, strippedId, `-${strippedId}`, `-100${strippedId}`].filter(Boolean)));
+  const placeholders = variants.map(() => '?').join(', ');
   
   // Check if exists
-  const existing = db.prepare('SELECT id FROM telegram_monitored_groups WHERE streamer_id = ? AND chat_id = ?').get(streamerId, cleanChatId) as any;
+  const existing = db.prepare(`SELECT id FROM telegram_monitored_groups WHERE streamer_id = ? AND chat_id IN (${placeholders})`).get(streamerId, ...variants) as any;
   if (existing) {
-    db.prepare('UPDATE telegram_monitored_groups SET title = ?, username = ? WHERE streamer_id = ? AND chat_id = ?')
-      .run(cleanTitle, cleanUsername, streamerId, cleanChatId);
-    return db.prepare('SELECT * FROM telegram_monitored_groups WHERE streamer_id = ? AND chat_id = ?').get(streamerId, cleanChatId);
+    db.prepare(`UPDATE telegram_monitored_groups SET title = ?, username = ? WHERE streamer_id = ? AND id = ?`)
+      .run(cleanTitle, cleanUsername, streamerId, existing.id);
+    return db.prepare('SELECT * FROM telegram_monitored_groups WHERE id = ?').get(existing.id);
   }
 
-  const id = uuidv4();
+  const id = customId || uuidv4();
   db.prepare('INSERT INTO telegram_monitored_groups (id, streamer_id, chat_id, title, username) VALUES (?, ?, ?, ?, ?)')
     .run(id, streamerId, cleanChatId, cleanTitle, cleanUsername);
   return db.prepare('SELECT * FROM telegram_monitored_groups WHERE id = ?').get(id);
 }
 
-export function deleteMonitoredGroup(id: string, streamerId: string) {
-  return db.prepare('DELETE FROM telegram_monitored_groups WHERE id = ? AND streamer_id = ?').run(id, streamerId);
+export function deleteMonitoredGroup(idOrChatId: string, streamerId: string) {
+  try {
+    const cleanId = String(idOrChatId || '').trim();
+    if (!cleanId) return null;
+    const strippedId = cleanId.replace(/^-100/, '').replace(/^-/, '');
+    const variants = Array.from(new Set([cleanId, strippedId, `-${strippedId}`, `-100${strippedId}`].filter(Boolean)));
+    const placeholders = variants.map(() => '?').join(', ');
+    return db.prepare(`DELETE FROM telegram_monitored_groups WHERE streamer_id = ? AND (id IN (${placeholders}) OR chat_id IN (${placeholders}))`)
+      .run(streamerId, ...variants, ...variants);
+  } catch (e) {
+    return null;
+  }
 }
 
 export function clearMonitoredGroups(streamerId: string) {

@@ -526,13 +526,30 @@ export async function getMongoMonitoredGroups(streamerId: string) {
   }
 }
 
-export async function addMongoMonitoredGroup(streamerId: string, chatId: string, title: string, username?: string) {
+export async function addMongoMonitoredGroup(streamerId: string, chatId: string, title: string, username?: string, customId?: string) {
   const cleanChatId = chatId.trim();
   const cleanTitle = title.trim();
   const cleanUsername = username ? username.trim().replace(/^@/, '') : undefined;
   const col = await getTelegramMonitoredGroupsCollection();
 
-  const existing = await col.findOne({ streamerId, chatId: cleanChatId });
+  const stripped = cleanChatId.replace(/^-100/, '').replace(/^-/, '');
+  const existing = await col.findOne({
+    streamerId,
+    $or: [
+      { chatId: cleanChatId },
+      { chat_id: cleanChatId },
+      { id: cleanChatId },
+      ...(stripped ? [
+        { chatId: stripped },
+        { chatId: `-${stripped}` },
+        { chatId: `-100${stripped}` },
+        { chat_id: stripped },
+        { chat_id: `-${stripped}` },
+        { chat_id: `-100${stripped}` }
+      ] : [])
+    ]
+  });
+
   if (existing) {
     await col.updateOne(
       { _id: existing._id },
@@ -541,14 +558,14 @@ export async function addMongoMonitoredGroup(streamerId: string, chatId: string,
     return {
       id: existing.id,
       streamer_id: streamerId,
-      chat_id: cleanChatId,
+      chat_id: existing.chatId || cleanChatId,
       title: cleanTitle,
       username: cleanUsername,
-      created_at: existing.createdAt.toISOString()
+      created_at: existing.createdAt ? existing.createdAt.toISOString() : new Date().toISOString()
     };
   }
 
-  const id = uuidv4();
+  const id = customId || uuidv4();
   const now = new Date();
   await col.insertOne({
     id,
@@ -570,10 +587,43 @@ export async function addMongoMonitoredGroup(streamerId: string, chatId: string,
   };
 }
 
-export async function deleteMongoMonitoredGroup(id: string, streamerId: string) {
+export async function deleteMongoMonitoredGroup(idOrChatId: string, streamerId: string) {
   try {
     const col = await getTelegramMonitoredGroupsCollection();
-    return await col.deleteOne({ id, streamerId });
+    const cleanId = String(idOrChatId || '').trim();
+    if (!cleanId) return null;
+
+    const strippedId = cleanId.replace(/^-100/, '').replace(/^-/, '');
+    const conditions: any[] = [
+      { id: cleanId },
+      { chatId: cleanId },
+      { chat_id: cleanId }
+    ];
+
+    if (strippedId) {
+      conditions.push(
+        { chatId: strippedId },
+        { chatId: `-${strippedId}` },
+        { chatId: `-100${strippedId}` },
+        { chat_id: strippedId },
+        { chat_id: `-${strippedId}` },
+        { chat_id: `-100${strippedId}` },
+        { id: strippedId },
+        { id: `-${strippedId}` },
+        { id: `-100${strippedId}` }
+      );
+    }
+
+    if (ObjectId.isValid(cleanId) && cleanId.length === 24) {
+      try {
+        conditions.push({ _id: new ObjectId(cleanId) });
+      } catch (_) {}
+    }
+
+    return await col.deleteMany({
+      streamerId,
+      $or: conditions
+    });
   } catch (e) {
     return null;
   }

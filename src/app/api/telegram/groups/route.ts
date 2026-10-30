@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
 import { getMonitoredGroups, addMonitoredGroup, deleteMonitoredGroup } from '@/server/database/db';
 import { 
@@ -25,29 +26,34 @@ export async function GET(req: NextRequest) {
     let groups: any[] = [];
     try {
       const mongoGroups = await getMongoMonitoredGroups(streamerId);
+      const sqlGroups = getMonitoredGroups(streamerId) || [];
+      const seenChatIds = new Set<string>();
+
+      const addGroup = (g: any) => {
+        const rawCid = String(g.chat_id || g.chatId || '').trim();
+        const norm = rawCid.replace(/^-100/, '').replace(/^-/, '');
+        if (norm && !seenChatIds.has(norm)) {
+          seenChatIds.add(norm);
+          groups.push({
+            id: g.id,
+            streamer_id: g.streamer_id || g.streamerId || streamerId,
+            chat_id: rawCid,
+            title: g.title,
+            username: g.username,
+            created_at: g.created_at || (g.createdAt ? new Date(g.createdAt).toISOString() : new Date().toISOString())
+          });
+        }
+      };
+
       if (mongoGroups && mongoGroups.length > 0) {
-        groups = mongoGroups.map((g: any) => ({
-          id: g.id,
-          streamer_id: g.streamer_id || g.streamerId || streamerId,
-          chat_id: String(g.chat_id || g.chatId || '').trim(),
-          title: g.title,
-          username: g.username,
-          created_at: g.created_at || (g.createdAt ? new Date(g.createdAt).toISOString() : new Date().toISOString())
-        }));
-      } else {
-        const sqlGroups = getMonitoredGroups(streamerId);
-        groups = (sqlGroups || []).map((g: any) => ({
-          id: g.id,
-          streamer_id: g.streamer_id || streamerId,
-          chat_id: String(g.chat_id || '').trim(),
-          title: g.title,
-          username: g.username,
-          created_at: g.created_at || new Date().toISOString()
-        }));
+        mongoGroups.forEach(addGroup);
+      }
+      if (sqlGroups && sqlGroups.length > 0) {
+        sqlGroups.forEach(addGroup);
       }
     } catch (e) {
-      const sqlGroups = getMonitoredGroups(streamerId);
-      groups = (sqlGroups || []).map((g: any) => ({
+      const sqlGroups = getMonitoredGroups(streamerId) || [];
+      groups = sqlGroups.map((g: any) => ({
         id: g.id,
         streamer_id: g.streamer_id || streamerId,
         chat_id: String(g.chat_id || '').trim(),
@@ -131,17 +137,21 @@ export async function POST(req: NextRequest) {
       finalTitle = `Telegram Group (${finalChatId})`;
     }
 
+    // Generate unified ID for both MongoDB and SQLite
+    const targetGroupId = uuidv4();
+
     // Save to MongoDB Primary
     let group: any = null;
     try {
-      group = await addMongoMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername);
+      group = await addMongoMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername, targetGroupId);
     } catch (mongoErr) {
       console.warn('[MongoDB] Failed adding monitored group, using sqlite fallback:', mongoErr);
     }
 
-    // Safe SQLite backup
+    // Safe SQLite backup using the same unified ID
     try {
-      const sqlGroup = addMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername);
+      const unifiedId = group?.id || targetGroupId;
+      const sqlGroup = addMonitoredGroup(streamerId, finalChatId, finalTitle, finalUsername, unifiedId);
       if (!group) group = sqlGroup;
     } catch (e) {}
 
@@ -159,6 +169,13 @@ export async function POST(req: NextRequest) {
         priority: 'high'
       });
     } catch (mailErr) {}
+
+    // Immediately notify GramJS to update target groups filter
+    try {
+      await telegramUserManager.notifyGroupsChanged(streamerId);
+    } catch (e) {
+      console.warn('[Telegram] Failed notifying groups changed after POST:', e);
+    }
 
     return NextResponse.json({
       success: true,
@@ -181,26 +198,62 @@ export async function DELETE(req: NextRequest) {
 
     const url = new URL(req.url);
     let id = url.searchParams.get('id');
+    let chatId = url.searchParams.get('chatId') || url.searchParams.get('chat_id');
 
-    if (!id) {
+    if (!id && !chatId) {
       const body = await req.json().catch(() => ({}));
       id = body.id;
+      chatId = body.chatId || body.chat_id;
     }
 
-    if (!id || typeof id !== 'string') {
+    const targets = [id, chatId].filter((v): v is string => Boolean(v && typeof v === 'string' && v.trim()));
+
+    if (targets.length === 0) {
       return NextResponse.json(
-        { error: 'Target group ID is required to remove.' },
+        { error: 'Target group ID or Chat ID is required to remove.' },
         { status: 400 }
       );
     }
 
-    try {
-      await deleteMongoMonitoredGroup(id, streamerId);
-    } catch (e) {}
+    // Resolve all representations (id, chat_id) across MongoDB & SQLite before deleting
+    const allTargets = new Set<string>();
+    for (const t of targets) {
+      allTargets.add(t);
+      try {
+        const mongoGroups = await getMongoMonitoredGroups(streamerId);
+        const matchedMongo = (mongoGroups || []).find((g: any) => g.id === t || g.chat_id === t);
+        if (matchedMongo) {
+          if (matchedMongo.id) allTargets.add(matchedMongo.id);
+          if (matchedMongo.chat_id) allTargets.add(matchedMongo.chat_id);
+        }
+      } catch (e) {}
 
+      try {
+        const sqlGroups = getMonitoredGroups(streamerId) || [];
+        const matchedSql = sqlGroups.find((g: any) => g.id === t || g.chat_id === t);
+        if (matchedSql) {
+          if (matchedSql.id) allTargets.add(matchedSql.id);
+          if (matchedSql.chat_id) allTargets.add(matchedSql.chat_id);
+        }
+      } catch (e) {}
+    }
+
+    for (const target of allTargets) {
+      try {
+        await deleteMongoMonitoredGroup(target, streamerId);
+      } catch (e) {}
+
+      try {
+        deleteMonitoredGroup(target, streamerId);
+      } catch (e) {}
+    }
+
+    // Immediately notify GramJS to update monitored groups filter
     try {
-      deleteMonitoredGroup(id, streamerId);
-    } catch (e) {}
+      await telegramUserManager.notifyGroupsChanged(streamerId);
+    } catch (e) {
+      console.warn('[Telegram] Failed notifying groups changed after DELETE:', e);
+    }
 
     return NextResponse.json({
       success: true,

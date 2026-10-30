@@ -715,7 +715,9 @@ export const PaymentGatewayAdmin: React.FC = () => {
       cancelText: 'Keep Connected',
       onConfirm: async () => {
         try {
-          const res = await authFetch(`/api/telegram/groups?id=${encodeURIComponent(existing.id)}`, {
+          const targetId = existing.id || '';
+          const targetChatId = existing.chat_id || dialog.id || '';
+          const res = await authFetch(`/api/telegram/groups?id=${encodeURIComponent(targetId)}&chatId=${encodeURIComponent(targetChatId)}`, {
             method: 'DELETE'
           });
           const data = await res.json();

@@ -32,6 +32,28 @@ import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useModal } from '../../context/ModalContext';
 
+const isChatIdMatch = (id1?: string, id2?: string) => {
+  if (!id1 || !id2) return false;
+  const s1 = String(id1).trim();
+  const s2 = String(id2).trim();
+  if (s1 === s2) return true;
+  const clean1 = s1.replace(/^-100/, '').replace(/^-/, '');
+  const clean2 = s2.replace(/^-100/, '').replace(/^-/, '');
+  return Boolean(clean1 && clean1 === clean2);
+};
+
+const isGroupMatch = (dialog: { id: string; title?: string; username?: string }, group: { id?: string; chat_id: string; title?: string; username?: string }) => {
+  if (group.chat_id && isChatIdMatch(group.chat_id, dialog.id)) return true;
+  if (group.id && isChatIdMatch(group.id, dialog.id)) return true;
+  if (group.username && dialog.username) {
+    const u1 = group.username.replace(/^@/, '').trim().toLowerCase();
+    const u2 = dialog.username.replace(/^@/, '').trim().toLowerCase();
+    if (u1 && u1 === u2) return true;
+  }
+  if (group.title && dialog.title && group.title.trim().toLowerCase() === dialog.title.trim().toLowerCase()) return true;
+  return false;
+};
+
 interface TelegramBotCardProps {
   pairingCode?: string;
   isLinked?: boolean;
@@ -158,7 +180,7 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
   // ------------------------------------------
   // Delete Target Group
   // ------------------------------------------
-  const handleDeleteTargetGroup = (group: { id: string; title: string; chat_id: string }) => {
+  const handleDeleteTargetGroup = (group: { id?: string; title: string; chat_id: string }) => {
     showConfirm({
       title: 'Remove Target Group?',
       message: `Are you sure you want to remove "${group.title}" (${group.chat_id})? GramJS will stop listening to messages from this group.`,
@@ -166,7 +188,9 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
       confirmText: 'Remove Group',
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/telegram/groups?id=${encodeURIComponent(group.id)}`, {
+          const targetId = group.id || '';
+          const targetChatId = group.chat_id || '';
+          const res = await fetch(`/api/telegram/groups?id=${encodeURIComponent(targetId)}&chatId=${encodeURIComponent(targetChatId)}`, {
             method: 'DELETE'
           });
           const data = await res.json();
@@ -931,16 +955,20 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 {availableDialogs.map((d) => {
-                  const isAlreadyAdded = targetGroups.some((g) => g.chat_id === d.id);
+                  const existing = targetGroups.find((g) => isGroupMatch(d, g));
+                  const isAlreadyAdded = Boolean(existing);
                   return (
                     <button
                       key={d.id}
                       type="button"
                       disabled={addingGroup}
                       onClick={() => {
-                        const existing = targetGroups.find((g) => g.chat_id === d.id);
                         if (existing) {
-                          handleDeleteTargetGroup(existing);
+                          handleDeleteTargetGroup({
+                            id: existing.id,
+                            title: existing.title || d.title,
+                            chat_id: existing.chat_id || d.id
+                          });
                         } else {
                           handleQuickAddDialog(d);
                         }
@@ -987,11 +1015,11 @@ export const TelegramBotCard: React.FC<TelegramBotCardProps> = ({
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowAddForm(true)}
+                  onClick={() => fetchTargetGroups()}
                   className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 transition-colors shadow-md shadow-cyan-500/20"
                 >
-                  <Plus size={14} />
-                  <span>Add First Target Group</span>
+                  <RefreshCw size={14} className={loadingGroups ? 'animate-spin' : ''} />
+                  <span>Refresh Target Groups</span>
                 </button>
               </div>
             ) : (
