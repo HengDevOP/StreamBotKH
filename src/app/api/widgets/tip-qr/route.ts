@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/server/database/db';
-import { getUsersCollection } from '@/server/database/mongo';
+import {
+  getMongoDb,
+  getUsersCollection,
+  getGatewayConfigCollection,
+  getPaymentSettingsCollection,
+  restoreMasterKhqrImage
+} from '@/server/database/mongo';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,80 +15,97 @@ export async function GET(req: NextRequest) {
 
     let streamer: any = null;
 
-    // 1. Try finding by overlay token in SQLite
-    if (token) {
-      streamer = db.prepare(`
-        SELECT s.id, s.username, s.display_name, s.avatar_url, s.bio, s.is_verified, s.overlay_token,
-               a.glow_color, a.template_style
-        FROM streamers s
-        LEFT JOIN alert_settings a ON s.id = a.streamer_id
-        WHERE s.overlay_token = ? OR s.id = ?
-        LIMIT 1
-      `).get(token, token);
-    }
-
-    // 2. If not found by token, try finding by username in SQLite
-    if (!streamer && (username || token)) {
-      const cleanUser = (username || token).replace(/^@/, '').toLowerCase();
-      streamer = db.prepare(`
-        SELECT s.id, s.username, s.display_name, s.avatar_url, s.bio, s.is_verified, s.overlay_token,
-               a.glow_color, a.template_style
-        FROM streamers s
-        LEFT JOIN alert_settings a ON s.id = a.streamer_id
-        WHERE LOWER(s.username) = ?
-        LIMIT 1
-      `).get(cleanUser);
-    }
-
-    // 3. Fallback to MongoDB if not found in SQLite
-    if (!streamer && (token || username)) {
+    // 1. Lookup streamer in MongoDB by overlay token / userId / username
+    if (token || username) {
       try {
         const usersCol = await getUsersCollection();
-        const query: any = {};
+        const or: any[] = [];
         if (token) {
-          query.$or = [{ overlayToken: token }, { userId: token }];
+          or.push({ overlayToken: token }, { userId: token });
         }
-        if (username) {
-          const cleanUser = username.replace(/^@/, '').toLowerCase();
-          query.$or = [
-            ...(query.$or || []),
-            { username: { $regex: new RegExp(`^${cleanUser}$`, 'i') } }
-          ];
+        const cleanUser = (username || token).replace(/^@/, '').toLowerCase();
+        if (cleanUser) {
+          const escaped = cleanUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          or.push({ username: { $regex: new RegExp(`^${escaped}$`, 'i') } });
         }
 
-        const mongoUser = await usersCol.findOne(query);
+        let mongoUser: any = await usersCol.findOne({ $or: or } as any);
+
+        // Per-feature overlay tokens (regenerated from Assets) & historical tokens
+        if (!mongoUser && token) {
+          const db = await getMongoDb();
+          const overlayDoc: any = await db
+            .collection('overlays')
+            .findOne({ $or: [{ overlayToken: token }, { token }] });
+          let ownerId: string | undefined = overlayDoc?.userId;
+          if (!ownerId) {
+            const histDoc: any = await db.collection('overlay_token_history').findOne({ token });
+            ownerId = histDoc?.streamerId;
+          }
+          if (ownerId) {
+            mongoUser = await usersCol.findOne({ $or: [{ userId: ownerId }, { id: ownerId }] } as any);
+          }
+        }
         if (mongoUser) {
           streamer = {
             id: mongoUser.userId || mongoUser._id?.toString(),
             username: mongoUser.username,
             display_name: mongoUser.displayName || mongoUser.username,
             avatar_url: mongoUser.avatarUrl || '',
-            bio: mongoUser.bio || '',
-            is_verified: mongoUser.isVerified ? 1 : 0,
-            overlay_token: mongoUser.overlayToken || token,
-            glow_color: '#00F0FF',
-            template_style: 'neon-box'
+            overlay_token: mongoUser.overlayToken || token
           };
         }
       } catch (e) {
-        console.warn('[Tip QR API] MongoDB fallback lookup error:', e);
+        console.warn('[Tip QR API] MongoDB lookup error:', e);
       }
     }
 
-    // 4. Fallback for demo token or preview
+    // 2. Fallback for demo token or preview
     if (!streamer) {
       const isDemo = !token || token === 'demo-token' || token === 'demo_token';
       streamer = {
         id: 'demo-streamer',
         username: isDemo ? 'neonstreamer' : (username || 'streamer'),
-        display_name: isDemo ? 'Neon Streamer 🔥' : (username || 'Streamer'),
-        avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=neonstreamer',
-        bio: 'Live streaming on StreamBotKH',
-        is_verified: 1,
-        overlay_token: token || 'demo-token',
-        glow_color: '#00F0FF',
-        template_style: 'neon-box'
+        display_name: isDemo ? 'Neon Streamer' : (username || 'Streamer'),
+        avatar_url: '',
+        overlay_token: token || 'demo-token'
       };
+    }
+
+    // 3. Resolve the streamer's uploaded Master KHQR image from MongoDB
+    let khqrImageUrl = '';
+    if (streamer.id !== 'demo-streamer') {
+      const streamerId = streamer.id;
+      const cleanUsername = String(streamer.username || '').toLowerCase();
+      try {
+        const restoreResult = await restoreMasterKhqrImage(streamerId, cleanUsername);
+        if (restoreResult.restored && restoreResult.khqrImageUrl) {
+          khqrImageUrl = restoreResult.khqrImageUrl;
+        } else {
+          const gatewayCol = await getGatewayConfigCollection();
+          const gatewayDoc: any = await gatewayCol.findOne({
+            $or: [
+              { _id: `khqr_${streamerId}` },
+              { streamerId },
+              { _id: `khqr_${cleanUsername}` },
+              { streamerId: cleanUsername }
+            ]
+          } as any);
+          if (gatewayDoc?.khqrImageUrl) khqrImageUrl = gatewayDoc.khqrImageUrl;
+        }
+      } catch (e) {
+        console.warn('[Tip QR API] KHQR gateway lookup error:', e);
+      }
+
+      if (!khqrImageUrl) {
+        try {
+          const paymentCol = await getPaymentSettingsCollection();
+          const ps: any = await paymentCol.findOne({ streamerId });
+          khqrImageUrl = ps?.masterKhqrImage || ps?.master_khqr_image || '';
+        } catch (e) {
+          console.warn('[Tip QR API] Payment settings lookup error:', e);
+        }
+      }
     }
 
     const protocol = req.headers.get('x-forwarded-proto') || 'http';
@@ -97,12 +119,9 @@ export async function GET(req: NextRequest) {
         id: streamer.id,
         username: streamer.username,
         displayName: streamer.display_name || streamer.username,
-        avatarUrl: streamer.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamer.username}`,
-        bio: streamer.bio || '',
-        isVerified: streamer.is_verified === 1,
-        glowColor: streamer.glow_color || '#00F0FF',
-        templateStyle: streamer.template_style || 'neon-box',
+        avatarUrl: streamer.avatar_url || '',
         overlayToken: streamer.overlay_token,
+        khqrImageUrl,
         donateUrl
       }
     });
