@@ -397,58 +397,30 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 <DiscordIcon />
                 <span>Discord</span>
               </Link>
-
-              {/* Streamer Dashboard Link when authenticated */}
-              {user && (
-                <Link
-                  to="/dashboard"
-                  onClick={(e) => {
-                    if (onNavigate) {
-                      e.preventDefault();
-                      onNavigate('dashboard');
-                    }
-                  }}
-                  className={`flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ml-1 ${
-                    active('/dashboard', 'dashboard')
-                      ? 'text-cyan-400 bg-cyan-950/40 border border-cyan-500/40 shadow-sm'
-                      : 'text-slate-400 hover:text-cyan-300 hover:bg-white/[0.04]'
-                  }`}
-                >
-                  <span>Dashboard</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f0ff]" />
-                </Link>
-              )}
             </nav>
           </div>
 
-          {/* Right Section: Sign in with Google / Profile */}
+          {/* Right Section: Sign in with Google / Profile Logo */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            {/* User authenticated or Sign In with Google */}
+            {/* User authenticated: Show ONLY the profile logo */}
             {user ? (
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <Link
                   to="/dashboard"
+                  title="Dashboard"
                   onClick={(e) => {
                     if (onNavigate) {
                       e.preventDefault();
                       onNavigate('dashboard');
                     }
                   }}
-                  className="flex items-center gap-2 p-1.5 pr-2.5 sm:pr-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors"
+                  className="p-1 sm:p-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:shadow-[0_0_12px_rgba(0,240,255,0.2)] transition-all flex items-center justify-center group"
                 >
                   <img
                     src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
-                    alt={user.displayName}
-                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-slate-800 object-cover ring-1 ring-white/10"
+                    alt={user.displayName || 'Profile'}
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 object-cover ring-1 ring-white/10 group-hover:scale-105 transition-transform"
                   />
-                  <div className="hidden sm:block text-left">
-                    <div className="text-xs font-bold text-white leading-tight">
-                      {user.displayName}
-                    </div>
-                    <div className="text-[10px] font-mono text-cyan-400">
-                      @{user.username}
-                    </div>
-                  </div>
                 </Link>
 
                 <button
@@ -460,11 +432,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 </button>
               </div>
             ) : loading ? (
-              /* Sleek Skeleton placeholder while verifying auth - never flash Sign In button */
-              <div className="flex items-center gap-2">
-                <div className="w-24 sm:w-36 h-8 sm:h-9 rounded-xl bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center px-2.5 gap-2">
-                  <div className="w-5 h-5 rounded-full bg-slate-800 animate-pulse flex-shrink-0" />
-                  <div className="w-16 h-2.5 rounded bg-slate-800 animate-pulse hidden sm:block" />
+              /* Sleek Avatar Skeleton while verifying auth */
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center justify-center p-1 sm:p-1.5">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 animate-pulse" />
                 </div>
               </div>
             ) : (
@@ -579,16 +550,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             <DiscordIcon />
             <span>Discord</span>
           </button>
-
-          {user && (
-            <button
-              onClick={() => handleNav('/dashboard', 'dashboard')}
-              className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-cyan-400 hover:bg-cyan-950/30 flex items-center justify-between"
-            >
-              <span>Streamer Dashboard</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-            </button>
-          )}
 
           {!user && !loading && (
             <div className="pt-2 border-t border-slate-800">
