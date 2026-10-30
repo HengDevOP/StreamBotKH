@@ -696,16 +696,6 @@ class TelegramUserClientManager {
       console.log(`   💬 [Donor Message]: ${parsed.donorMessage || 'None'}`);
       console.log(`   🔖 [Transaction Ref]: ${parsed.transactionRef || 'None'}`);
 
-      // 2. Transaction-level deduplication: Skip if this bank transaction ref was already processed
-      if (parsed.transactionRef) {
-        const cleanRef = parsed.transactionRef.toLowerCase().trim();
-        if (g.__telegramGlobalState?.processedTxRefs.has(cleanRef)) {
-          console.log(`   ⚠️ [GramJS] Duplicate transaction ref "${parsed.transactionRef}" already processed. Skipping duplicate alert.`);
-          console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-          return;
-        }
-      }
-
       // Resolve target streamer:
       let targetStreamer: any = null;
       if (parsed.recipient) {
@@ -1049,19 +1039,12 @@ class TelegramUserClientManager {
             status: 'PAID'
           });
 
-          // Cache processed message and transaction keys to prevent duplicates
+          // Cache processed message keys to prevent duplicate socket emissions from MTProto reconnection
           if (msg.id && g.__telegramGlobalState?.processedMessageKeys) {
             g.__telegramGlobalState.processedMessageKeys.add(msgKey);
             if (g.__telegramGlobalState.processedMessageKeys.size > 2000) {
               const firstKey = g.__telegramGlobalState.processedMessageKeys.values().next().value;
               if (firstKey) g.__telegramGlobalState.processedMessageKeys.delete(firstKey);
-            }
-          }
-          if (parsed.transactionRef && g.__telegramGlobalState?.processedTxRefs) {
-            g.__telegramGlobalState.processedTxRefs.add(parsed.transactionRef.toLowerCase().trim());
-            if (g.__telegramGlobalState.processedTxRefs.size > 2000) {
-              const firstTx = g.__telegramGlobalState.processedTxRefs.values().next().value;
-              if (firstTx) g.__telegramGlobalState.processedTxRefs.delete(firstTx);
             }
           }
 

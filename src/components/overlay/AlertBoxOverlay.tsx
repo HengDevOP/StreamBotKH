@@ -41,6 +41,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
   // Deduplication & alert tracking refs
   const processedAlertIdsRef = useRef<Set<string>>(new Set());
   const activeAlertIdRef = useRef<string | null>(null);
+  const currentTtsAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Pending video queue waiting for donation alert to finish
   const pendingVideosRef = useRef<Map<string, { payload: any; timer: NodeJS.Timeout }>>(new Map());
@@ -158,9 +159,19 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       }
 
       if (audioUrl) {
+        // Stop any previous lingering TTS audio
+        if (currentTtsAudioRef.current) {
+          try {
+            currentTtsAudioRef.current.pause();
+            currentTtsAudioRef.current.currentTime = 0;
+          } catch (e) {}
+          currentTtsAudioRef.current = null;
+        }
+
         // Delay 700ms so alert chime sound plays first
         setTimeout(() => {
           const audio = new Audio(audioUrl);
+          currentTtsAudioRef.current = audio;
           audio.volume = Math.min(1, Math.max(0, volume ?? 0.85));
           audio.play().catch((err) => console.warn('[Overlay TTS] Play error:', err));
         }, 700);
@@ -191,6 +202,14 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
   useEffect(() => {
     if (!currentAlert) {
       activeAlertIdRef.current = null;
+      // When alert card disappears, stop any ongoing TTS speech so it never overlaps into next alert
+      if (currentTtsAudioRef.current) {
+        try {
+          currentTtsAudioRef.current.pause();
+          currentTtsAudioRef.current.currentTime = 0;
+        } catch (e) {}
+        currentTtsAudioRef.current = null;
+      }
       return;
     }
 
@@ -245,17 +264,17 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
 
     const handleAlert = (payload: any) => {
       if (!payload) return;
-      const alertId = payload.donationId || `${payload.donorName || 'donor'}-${payload.amount}-${payload.createdAt || Date.now()}`;
+      const alertId = payload.donationId || `${payload.donorName || 'donor'}-${payload.amount}-${payload.createdAt || Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-      // Deduplicate: ignore if this exact alert ID was processed within the last 15 seconds
+      // Deduplicate: ignore if the exact duplicate socket packet was received within 800ms
       if (processedAlertIdsRef.current.has(alertId)) {
-        console.log('⚡ [Overlay] Duplicate alert ignored:', alertId);
+        console.log('⚡ [Overlay] Duplicate socket packet ignored:', alertId);
         return;
       }
       processedAlertIdsRef.current.add(alertId);
       setTimeout(() => {
         processedAlertIdsRef.current.delete(alertId);
-      }, 15000);
+      }, 800);
 
       console.log('⚡ [Overlay] Live donation alert accepted:', alertId, payload);
       const tipAmount = Number(payload.amount) || 0;
@@ -542,7 +561,11 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     <div className="w-full h-full min-h-screen bg-transparent flex flex-col items-center justify-center p-4 relative select-none">
       {/* Active Alert Rendering */}
       {currentAlert ? (
-        <NeonAlertCard alert={currentAlert} onEnded={dismissCurrentAlert} />
+        <NeonAlertCard
+          key={currentAlert.donationId || (currentAlert as any).id || `${currentAlert.donorName}-${currentAlert.amount}-${(currentAlert as any).createdAt || ''}`}
+          alert={currentAlert}
+          onEnded={dismissCurrentAlert}
+        />
       ) : null}
     </div>
   );
