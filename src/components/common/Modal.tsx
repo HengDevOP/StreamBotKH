@@ -7,6 +7,7 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  showDot?: boolean;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
 }
@@ -15,6 +16,7 @@ export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
+  showDot = false,
   children,
   maxWidth = 'md'
 }) => {
@@ -53,7 +55,9 @@ export const Modal: React.FC<ModalProps> = ({
         <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-800/80 mb-4 sm:mb-5">
           {title && (
             <h3 className="text-base sm:text-xl font-bold tracking-wide text-white flex items-center gap-2 truncate">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-neon-cyan animate-pulse flex-shrink-0"></span>
+              {showDot && (
+                <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-neon-cyan animate-pulse flex-shrink-0" />
+              )}
               <span className="truncate">{title}</span>
             </h3>
           )}

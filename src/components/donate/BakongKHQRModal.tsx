@@ -183,7 +183,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
   const formattedTime = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Scan To Pay" maxWidth="sm">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Scan To Pay" maxWidth="sm" showDot={false}>
       <div className="flex flex-col items-center text-center space-y-3.5 py-1">
         {/* Official Bakong KHQR Canvas (Show only the pure QR code, fluidly responsive for small devices) */}
         <div className="p-2 sm:p-3 bg-white border-2 border-slate-700 shadow-2xl rounded-xl max-w-full">
