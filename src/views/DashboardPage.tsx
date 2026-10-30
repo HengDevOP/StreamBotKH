@@ -80,7 +80,7 @@ import { ObsOverlayModal } from '../components/dashboard/ObsOverlayModal';
 import { MediaLibraryManager, MediaItem } from '../components/dashboard/MediaLibraryManager';
 import { mediaService } from '../services/mediaService';
 import { PaymentGatewayAdmin } from '../components/dashboard/PaymentGatewayAdmin';
-import { DashboardSkeleton } from '../components/dashboard/DashboardSkeleton';
+import { DashboardSkeleton, FeatureTabSkeleton } from '../components/dashboard/DashboardSkeleton';
 import { DonationAlertsManager } from '../components/dashboard/DonationAlertsManager';
 import { LeaderboardWidgetManager } from '../components/dashboard/LeaderboardWidgetManager';
 import { GoalWidgetManager } from '../components/dashboard/GoalWidgetManager';
@@ -1393,7 +1393,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         {/* Dynamic Workbench Views */}
         <div className="p-3 xs:p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6 sm:space-y-8 animate-fadeIn pb-16">
           {loading ? (
-            <DashboardSkeleton />
+            <FeatureTabSkeleton tab={activeTab} />
           ) : (
             <>
           {/* ============================================================== */}
