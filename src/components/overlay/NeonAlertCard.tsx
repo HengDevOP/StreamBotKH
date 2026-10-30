@@ -206,6 +206,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
             muted={false}
             videoTitle={videoTitle}
             donorName={donorName}
+            donorColor={donorColor}
             amount={amount}
             currency={currency}
             glowColor={glowColor}

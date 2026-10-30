@@ -12,6 +12,7 @@ export interface VideoPlayerWithProgressBarProps {
   isPaused?: boolean;
   videoTitle?: string;
   donorName?: string;
+  donorColor?: string;
   amount?: number;
   currency?: string;
   glowColor?: string;
@@ -20,6 +21,21 @@ export interface VideoPlayerWithProgressBarProps {
   onEnded?: () => void;
   className?: string;
 }
+
+export const getGradientOrColorStyle = (colorStr?: string): React.CSSProperties => {
+  if (!colorStr) return {};
+  if (colorStr.includes('gradient')) {
+    return {
+      backgroundImage: colorStr,
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
+      color: 'transparent',
+      display: 'inline-block'
+    };
+  }
+  return { color: colorStr };
+};
 
 export function formatTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds || 0));
@@ -37,6 +53,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   isPaused = false,
   videoTitle,
   donorName,
+  donorColor,
   amount,
   currency = 'USD',
   glowColor = '#00F0FF',
@@ -213,8 +230,9 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
         >
           <div className="flex items-center">
             <span
-              className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] tracking-wide"
+              className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] tracking-wide"
               style={{
+                ...getGradientOrColorStyle(donorColor || glowColor || '#00F0FF'),
                 textShadow: glowColor
                   ? `0 0 10px ${glowColor}88, 0 2px 4px rgba(0,0,0,0.95)`
                   : '0 2px 4px rgba(0,0,0,0.95)'
