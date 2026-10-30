@@ -122,6 +122,101 @@ const isGroupConnected = (dialog: AvailableDialog, groups: TargetGroup[]) => {
   });
 };
 
+export const PaymentGatewaySkeleton: React.FC = () => {
+  return (
+    <div className="space-y-6 animate-fadeIn select-none">
+      {/* ============================================================== */}
+      {/* 3-STEP ANIMATED LINE PROGRESS TASK BAR SKELETON                */}
+      {/* ============================================================== */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#090D18] border border-slate-800/90 shadow-2xl relative overflow-hidden">
+        {/* Subtle Ambient Background Gradient Glow */}
+        <div className="absolute top-0 right-1/4 w-96 h-28 bg-cyan-500/5 blur-3xl pointer-events-none rounded-full" />
+        <div className="absolute bottom-0 left-1/4 w-96 h-28 bg-emerald-500/5 blur-3xl pointer-events-none rounded-full" />
+
+        {/* Stepper with Connecting Line */}
+        <div className="relative flex items-center justify-between px-2 sm:px-8">
+          {/* Connector Line 1 -> 2 */}
+          <div className="absolute left-[16%] right-[50%] top-5 -translate-y-1/2 h-1 bg-slate-800/80 rounded-full overflow-hidden" />
+
+          {/* Connector Line 2 -> 3 */}
+          <div className="absolute left-[50%] right-[16%] top-5 -translate-y-1/2 h-1 bg-slate-800/80 rounded-full overflow-hidden" />
+
+          {/* STEP 1: Connect Node */}
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 animate-pulse flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-slate-800 animate-pulse" />
+            </div>
+            <div className="w-14 h-3 rounded bg-slate-800 animate-pulse mt-2.5" />
+          </div>
+
+          {/* STEP 2: KHQR Node */}
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 animate-pulse flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-slate-800 animate-pulse" />
+            </div>
+            <div className="w-12 h-3 rounded bg-slate-800 animate-pulse mt-2.5" />
+          </div>
+
+          {/* STEP 3: GROUP Node */}
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 animate-pulse flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-slate-800 animate-pulse" />
+            </div>
+            <div className="w-14 h-3 rounded bg-slate-800 animate-pulse mt-2.5" />
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* MAIN CARD CONTENT SKELETON                                     */}
+      {/* ============================================================== */}
+      <div className="rounded-2xl bg-[#090D18]/90 border border-slate-800/90 shadow-2xl p-5 sm:p-7 space-y-6 relative overflow-hidden">
+        {/* Subtle Ambient Glow */}
+        <div className="absolute top-0 right-0 w-80 h-32 bg-cyan-500/5 blur-3xl pointer-events-none rounded-full" />
+
+        {/* Header Row */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-5 border-b border-slate-800/80 gap-3">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-5 rounded-full bg-cyan-950/40 border border-cyan-500/20 animate-pulse" />
+              <div className="w-48 h-5 rounded-lg bg-slate-800 animate-pulse" />
+            </div>
+            <div className="w-64 sm:w-96 h-3.5 rounded bg-slate-800/60 animate-pulse" />
+          </div>
+          <div className="w-28 h-8 rounded-xl bg-slate-800/60 animate-pulse" />
+        </div>
+
+        {/* Form Inputs & Content Skeletons */}
+        <div className="space-y-4 pt-1">
+          <div className="space-y-2">
+            <div className="w-32 h-3 rounded bg-slate-800/60 animate-pulse" />
+            <div className="w-full h-12 rounded-xl bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center px-4">
+              <div className="w-10 h-5 rounded bg-slate-800 animate-pulse" />
+              <div className="w-px h-6 bg-slate-800 mx-3" />
+              <div className="w-40 h-4 rounded bg-slate-800/60 animate-pulse" />
+            </div>
+          </div>
+
+          {/* Info Banner Box Skeleton */}
+          <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/60 animate-pulse flex items-start gap-3">
+            <div className="w-5 h-5 rounded-full bg-slate-800 shrink-0 mt-0.5" />
+            <div className="space-y-2 w-full">
+              <div className="w-48 h-3.5 rounded bg-slate-800" />
+              <div className="w-full max-w-md h-2.5 rounded bg-slate-800/50" />
+            </div>
+          </div>
+
+          {/* Action Button Row Skeleton */}
+          <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
+            <div className="w-28 h-10 rounded-xl bg-slate-900/80 border border-slate-800 animate-pulse" />
+            <div className="w-44 h-10 rounded-xl bg-cyan-950/40 border border-cyan-500/30 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const PaymentGatewayAdmin: React.FC = () => {
   const { showConfirm, showAlert } = useModal();
   const { user } = useAuth();
@@ -130,6 +225,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // Active Wizard Step: 1 = Connect (GramJS), 2 = Provide Master KHQR, 3 = Connect Group Listener
   const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
   const [stepDirection, setStepDirection] = useState<'forward' | 'backward'>('forward');
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
 
   const goToStep = (nextStep: 1 | 2 | 3) => {
     if (nextStep === activeStep) return;
@@ -212,19 +308,23 @@ export const PaymentGatewayAdmin: React.FC = () => {
   // ----------------------------------------------------------------
   // Initial Data Fetching
   // ----------------------------------------------------------------
-  const fetchGatewayConfig = async () => {
+  // Initial Data Fetching
+  // ----------------------------------------------------------------
+  const fetchGatewayConfig = async (): Promise<GatewayConfig | null> => {
     try {
       setLoadingConfig(true);
       const res = await authFetch('/api/payment-gateway/config');
       const data = await res.json();
       if (res.ok && data.success) {
         setGatewayConfig(data.config);
+        return data.config as GatewayConfig;
       }
     } catch (e) {
       console.error('Error fetching gateway config:', e);
     } finally {
       setLoadingConfig(false);
     }
+    return null;
   };
 
   const fetchUserClientStatus = async () => {
@@ -251,7 +351,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
     return null;
   };
 
-  const fetchTargetGroups = async () => {
+  const fetchTargetGroups = async (): Promise<TargetGroup[]> => {
     try {
       setLoadingGroups(true);
       const res = await authFetch('/api/telegram/groups');
@@ -267,7 +367,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           if (statusData && !statusData.isConnected) {
             setTargetGroups([]);
             setAvailableDialogs([]);
-            return;
+            return [];
           }
         }
 
@@ -293,6 +393,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
           }
         }
         setAvailableDialogs(combined);
+        return serverGroups;
       } else {
         setTargetGroups([]);
         setAvailableDialogs([]);
@@ -304,18 +405,55 @@ export const PaymentGatewayAdmin: React.FC = () => {
     } finally {
       setLoadingGroups(false);
     }
+    return [];
   };
 
   useEffect(() => {
-    fetchGatewayConfig();
-    fetchUserClientStatus().then((status) => {
-      if (status?.isConnected) {
-        fetchTargetGroups();
-      } else {
-        setTargetGroups([]);
-        setAvailableDialogs([]);
+    let isMounted = true;
+
+    const initializeGateway = async () => {
+      try {
+        const [config, status] = await Promise.all([
+          fetchGatewayConfig(),
+          fetchUserClientStatus()
+        ]);
+
+        if (!isMounted) return;
+
+        let groups: TargetGroup[] = [];
+        if (status?.isConnected) {
+          groups = await fetchTargetGroups();
+          if (!isMounted) return;
+        }
+
+        // Direct smart step selection based on verified backend status
+        if (!status?.isConnected) {
+          setActiveStep(1);
+        } else if (!config?.khqrImageUrl) {
+          setActiveStep(2);
+        } else {
+          setActiveStep(3);
+        }
+      } catch (err) {
+        console.error('Error during payment gateway initial verification:', err);
+      } finally {
+        if (isMounted) {
+          setIsInitialLoading(false);
+        }
       }
-    });
+    };
+
+    initializeGateway();
+
+    // 4s fallback timer so UI never freezes in skeleton state under network drop
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setIsInitialLoading(false);
+    }, 4000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   // Sync groups state whenever GramJS connection state changes
@@ -798,6 +936,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
       }
     });
   };
+
+  if (isInitialLoading) {
+    return <PaymentGatewaySkeleton />;
+  }
 
   return (
     <div className="space-y-6">
