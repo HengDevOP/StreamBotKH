@@ -445,7 +445,20 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
                       {box.ttsEnabled ? (
                         <span className="px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-500/30 text-[10px] font-mono text-cyan-300 flex items-center gap-1">
                           <Mic size={10} />
-                          <span>TTS {box.ttsType === 'cloned' ? 'AI Clone' : box.ttsType}</span>
+                          <span>
+                            TTS{' '}
+                            {box.ttsType === 'cloned'
+                              ? 'AI Clone'
+                              : box.ttsType === 'google-male'
+                              ? 'Google Male'
+                              : box.ttsType === 'google'
+                              ? 'Google Female'
+                              : box.ttsType === 'kiritts-male'
+                              ? 'KiriTTS Male'
+                              : box.ttsType === 'kiritts-female'
+                              ? 'KiriTTS Female'
+                              : box.ttsType}
+                          </span>
                         </span>
                       ) : (
                         <span className="px-1.5 py-0.5 rounded bg-slate-900 text-[10px] font-mono text-slate-500">

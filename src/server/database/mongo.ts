@@ -101,7 +101,7 @@ export interface AlertBoxDoc {
   fontSize?: number;
   ttsEnabled: boolean;
   ttsMinAmount: number;
-  ttsType: 'google' | 'kiritts-male' | 'kiritts-female' | 'cloned';
+  ttsType: 'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned';
   clonedVoiceName?: string;
   clonedVoiceSampleUrl?: string;
   textTemplate?: string;

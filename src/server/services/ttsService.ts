@@ -6,6 +6,9 @@ import axios from 'axios';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
+import { normalizeCurrencyAndSymbols, isKhmerText } from '../../utils/ttsHelper';
+
+export { normalizeCurrencyAndSymbols, isKhmerText };
 
 const execFileAsync = promisify(execFile);
 
@@ -94,7 +97,11 @@ export function resolveVoice(type?: string, text?: string): { voice: string; isK
     return { voice: 'km-KH-SreymomNeural', isKhmer: true };
   }
 
-  if (normType === 'google-male' || normType === 'en-us-christopherneural') {
+  if (
+    normType === 'google-male' ||
+    normType === 'en-us-christopherneural' ||
+    normType.includes('christopher')
+  ) {
     return {
       voice: hasKhmerChars ? 'km-KH-PisethNeural' : 'en-US-ChristopherNeural',
       isKhmer: hasKhmerChars
@@ -253,12 +260,12 @@ export async function synthesizeTTSWithBuffer(params: {
   }
 
   // Clean emoji and surrogate pairs from text
-  const cleanedText = text
+  const rawClean = text
     .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
     .trim()
     .slice(0, 300);
 
-  if (!cleanedText) {
+  if (!rawClean) {
     const fallbackChime = path.join(process.cwd(), 'public', 'sounds', 'neon-chime.mp3');
     return {
       audioUrl: '/sounds/neon-chime.mp3',
@@ -268,7 +275,10 @@ export async function synthesizeTTSWithBuffer(params: {
   }
 
   // Detect voice model accurately - preserves kiritts-male / kiritts-female even if text contains English
-  const { voice, isKhmer } = resolveVoice(type, cleanedText);
+  const { voice, isKhmer } = resolveVoice(type, rawClean);
+
+  // Normalize currency symbols ($ -> dollars/ដុល្លារ, ៛ -> riel/រៀល) and chat symbols
+  const cleanedText = normalizeCurrencyAndSymbols(rawClean, isKhmer).slice(0, 300);
   const cacheKey = `${voice}:${cleanedText}`;
 
   // 1. Check in-memory short-lived cache (prevents redundant synthesis during quick replay)

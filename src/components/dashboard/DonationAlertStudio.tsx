@@ -48,6 +48,7 @@ import { useSocket } from '../../context/SocketContext';
 import { VoiceClonerModal } from './VoiceClonerModal';
 import { MediaItem } from './MediaLibraryManager';
 import { mediaService } from '../../services/mediaService';
+import { normalizeCurrencyAndSymbols } from '../../utils/ttsHelper';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 
 interface DonationAlertStudioProps {
@@ -144,7 +145,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   // TTS State
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(box?.ttsEnabled !== false);
   const [ttsMinAmount, setTtsMinAmount] = useState<number>(box?.ttsMinAmount ?? 1.0);
-  const [ttsType, setTtsType] = useState<'google' | 'kiritts-male' | 'kiritts-female' | 'cloned'>(
+  const [ttsType, setTtsType] = useState<'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned'>(
     box?.ttsType || 'google'
   );
   const [clonedVoiceName, setClonedVoiceName] = useState<string>(box?.clonedVoiceName || '');
@@ -432,18 +433,26 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     }, (durationSeconds || 8) * 1000);
   };
 
-  // Test TTS Audio: Reads BOTH headline announcement text and donor message
+  // Test TTS Audio: Reads BOTH headline announcement text and donor message with $ and ៛ normalization
   const handleTestTtsAudio = () => {
     setIsTtsPlaying(true);
     try {
       const template = textTemplate || '{donator} donated {amount} through superchat!';
-      const formattedAmount = `$${Number(demoAmount).toFixed(2)}`;
+      const isKhmer =
+        /[\u1780-\u17FF]/.test(demoDonorName + ' ' + (demoMessage || '') + ' ' + (textTemplate || '')) ||
+        ttsType.startsWith('kiritts') ||
+        ttsType.includes('piseth') ||
+        ttsType.includes('sreymom');
 
-      const headline = template
+      const formattedAmount = isKhmer
+        ? `${Number(demoAmount)} ដុល្លារ`
+        : `${Number(demoAmount)} ${Number(demoAmount) === 1 ? 'dollar' : 'dollars'}`;
+
+      let headline = template
         .replace(/\{donator\}/gi, demoDonorName)
         .replace(/\{name\}/gi, demoDonorName)
         .replace(/\{amount\}/gi, formattedAmount)
-        .replace(/\{currency\}/gi, 'USD')
+        .replace(/\{currency\}/gi, isKhmer ? 'ដុល្លារ' : (Number(demoAmount) === 1 ? 'dollar' : 'dollars'))
         .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
         .trim();
 
@@ -451,17 +460,17 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
         .trim();
 
-      // Read BOTH headline announcement text AND donor message!
-      const fullSpeech = cleanMsg ? `${headline}. ${cleanMsg}` : headline;
+      headline = normalizeCurrencyAndSymbols(headline, isKhmer);
+      const normalizedMsg = cleanMsg ? normalizeCurrencyAndSymbols(cleanMsg, isKhmer) : '';
 
-      const isKhmer = /[\u1780-\u17FF]/.test(fullSpeech) || ttsType.startsWith('kiritts');
-      const lang = isKhmer ? 'km' : 'en';
+      // Read BOTH headline announcement text AND donor message!
+      const fullSpeech = normalizedMsg ? `${headline}. ${normalizedMsg}` : headline;
 
       let ttsAudioUrl = '';
       if (ttsType === 'cloned' && clonedVoiceSampleUrl) {
         ttsAudioUrl = clonedVoiceSampleUrl;
       } else {
-        // High quality Neural TTS synthesizing Piseth & Sreymom Khmer voices with mixed-language support
+        // High quality Neural TTS synthesizing Piseth, Sreymom, Jenny, Christopher voices
         ttsAudioUrl = `/api/tts?type=${encodeURIComponent(ttsType)}&text=${encodeURIComponent(
           fullSpeech.slice(0, 250)
         )}`;
@@ -1139,18 +1148,23 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                           {[
                             {
                               id: 'google',
-                              name: 'Google Cloud Neural TTS',
-                              desc: 'Universal crisp English & multilingual voice model'
+                              name: 'Google Cloud Neural Female (Jenny)',
+                              desc: 'Crisp English & multilingual neural female voice'
+                            },
+                            {
+                              id: 'google-male',
+                              name: 'Google Cloud Neural Male (Christopher)',
+                              desc: 'Deep English & multilingual neural male voice'
                             },
                             {
                               id: 'kiritts-male',
-                              name: 'KiriTTS Male (Neural Khmer / EN)',
-                              desc: 'Open-source Cambodian male voice for ABA tips'
+                              name: 'KiriTTS Male (Piseth Neural Khmer / EN)',
+                              desc: 'Natural Cambodian male voice for ABA tips & alerts'
                             },
                             {
                               id: 'kiritts-female',
-                              name: 'KiriTTS Female (Neural Khmer / EN)',
-                              desc: 'Open-source Cambodian female voice for ABA tips'
+                              name: 'KiriTTS Female (Sreymom Neural Khmer / EN)',
+                              desc: 'Natural Cambodian female voice for ABA tips & alerts'
                             },
                             {
                               id: 'cloned',
@@ -1183,6 +1197,24 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                               </div>
                             );
                           })}
+                        </div>
+                      </div>
+
+                      {/* Smart Currency Pronunciation Feature Card */}
+                      <div className="p-3.5 rounded-xl bg-cyan-950/20 border border-cyan-500/20 flex items-start gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 text-xs font-mono font-bold tracking-tight">
+                          $៛
+                        </div>
+                        <div className="space-y-1 text-left min-w-0">
+                          <div className="text-xs font-mono font-bold text-cyan-300 flex items-center gap-2">
+                            <span>Smart Currency Voice Engine</span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 font-mono font-bold uppercase">
+                              Active
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            TTS automatically speaks <span className="text-cyan-300 font-mono font-bold">$</span> as <span className="text-white font-medium">"dollars" / "ដុល្លារ"</span> and <span className="text-cyan-300 font-mono font-bold">៛</span> as <span className="text-white font-medium">"riel" / "រៀល"</span> across donation amounts and messages.
+                          </p>
                         </div>
                       </div>
 

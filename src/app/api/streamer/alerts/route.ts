@@ -18,7 +18,9 @@ export async function GET(req: NextRequest) {
 
     if (settings) {
       const v = (settings.tts_voice || '').toLowerCase();
-      settings.ttsType = v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
+      settings.ttsType =
+        v === 'google-male' || v.includes('christopher') ? 'google-male'
+        : v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
         : v.includes('male') || v.includes('piseth') ? 'kiritts-male'
         : v.includes('cloned') ? 'cloned'
         : 'google';
@@ -90,7 +92,9 @@ export async function PUT(req: NextRequest) {
     const updated = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(user.id) as any;
     if (updated) {
       const v = (updated.tts_voice || '').toLowerCase();
-      updated.ttsType = v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
+      updated.ttsType =
+        v === 'google-male' || v.includes('christopher') ? 'google-male'
+        : v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
         : v.includes('male') || v.includes('piseth') ? 'kiritts-male'
         : v.includes('cloned') ? 'cloned'
         : 'google';

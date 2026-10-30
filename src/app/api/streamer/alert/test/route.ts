@@ -20,7 +20,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
 
     const v = (body.ttsType || body.tts_voice || alertSettings?.tts_voice || '').toLowerCase();
-    const resolvedTtsType = v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
+    const resolvedTtsType =
+      v === 'google-male' || v.includes('christopher') ? 'google-male'
+      : v.includes('female') || v.includes('sreymom') ? 'kiritts-female'
       : v.includes('male') || v.includes('piseth') ? 'kiritts-male'
       : v.includes('cloned') ? 'cloned'
       : 'google';

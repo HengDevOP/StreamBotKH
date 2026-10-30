@@ -30,7 +30,7 @@ export interface AlertBox {
   fontSize?: number;
   ttsEnabled: boolean;
   ttsMinAmount: number;
-  ttsType: 'google' | 'kiritts-male' | 'kiritts-female' | 'cloned';
+  ttsType: 'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned';
   clonedVoiceName?: string;
   clonedVoiceSampleUrl?: string;
   textTemplate?: string;
@@ -59,7 +59,7 @@ export interface LiveAlertPayload {
   durationSeconds?: number;
   ttsEnabled?: boolean;
   ttsVoice?: string;
-  ttsType?: 'google' | 'kiritts-male' | 'kiritts-female' | 'cloned';
+  ttsType?: 'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned';
   customGifUrl?: string;
   mediaUrl?: string;
   showImage?: boolean;

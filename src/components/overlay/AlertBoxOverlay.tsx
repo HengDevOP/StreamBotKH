@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../../context/SocketContext';
 import { useAlertQueue } from '../../hooks/useAlertQueue';
 import { NeonAlertCard } from './NeonAlertCard';
+import { normalizeCurrencyAndSymbols } from '../../utils/ttsHelper';
 
 interface AlertBoxOverlayProps {
   overlayToken: string;
@@ -92,16 +93,27 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
   ) => {
     try {
       const template = headlineTemplate || '{donator} donated {amount} through superchat!';
+      const isKhmer =
+        /[\u1780-\u17FF]/.test(donor + ' ' + (msg || '') + ' ' + (headlineTemplate || '')) ||
+        type.startsWith('kiritts') ||
+        type.includes('piseth') ||
+        type.includes('sreymom');
+
       const formattedAmount = currency === 'KHR'
-        ? `${Number(amount).toLocaleString()} Riel`
-        : `${Number(amount)} dollars`;
+        ? (isKhmer ? `${Number(amount).toLocaleString()} រៀល` : `${Number(amount).toLocaleString()} riel`)
+        : (isKhmer ? `${Number(amount)} ដុល្លារ` : `${Number(amount)} ${Number(amount) === 1 ? 'dollar' : 'dollars'}`);
 
       // 1. Format the headline announcement text
-      const headline = template
+      let headline = template
         .replace(/\{donator\}/gi, donor)
         .replace(/\{name\}/gi, donor)
         .replace(/\{amount\}/gi, formattedAmount)
-        .replace(/\{currency\}/gi, currency || 'dollars')
+        .replace(
+          /\{currency\}/gi,
+          isKhmer
+            ? (currency === 'KHR' ? 'រៀល' : 'ដុល្លារ')
+            : (currency === 'KHR' ? 'riel' : (Number(amount) === 1 ? 'dollar' : 'dollars'))
+        )
         .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
         .trim();
 
@@ -122,12 +134,13 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
             .trim()
         : '';
 
-      // 3. If there is no message value, speak ONLY the headline title!
-      const speechText = cleanMsg ? `${headline}. ${cleanMsg}` : headline;
-      if (!speechText) return;
+      // 3. Normalize currency symbols ($ -> dollars/ដុល្លារ, ៛ -> riel/រៀល) on headline and message
+      headline = normalizeCurrencyAndSymbols(headline, isKhmer);
+      const normalizedMsg = cleanMsg ? normalizeCurrencyAndSymbols(cleanMsg, isKhmer) : '';
 
-      const isKhmer = /[\u1780-\u17FF]/.test(speechText) || type.startsWith('kiritts');
-      const lang = isKhmer ? 'km' : 'en';
+      // 4. If there is no message value, speak ONLY the headline title!
+      const speechText = normalizedMsg ? `${headline}. ${normalizedMsg}` : headline;
+      if (!speechText) return;
 
       let audioUrl = '';
       if (type === 'cloned' && clonedUrl) {
