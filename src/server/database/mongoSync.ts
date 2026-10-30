@@ -217,20 +217,49 @@ export async function seedMemoryDbFromMongo(db: any) {
     try {
       const goalCol = await getStreamGoalsCollection();
       const goals = await goalCol.find({}).toArray();
+      const usersCol = await getUsersCollection();
+
+      // Build a streamerId → overlayToken lookup for resolving goals with no streamerToken
+      const streamerTokenMap = new Map<string, string>();
+      const allUsers = await usersCol.find({}, { projection: { userId: 1, overlayToken: 1, overlay_token: 1 } }).toArray();
+      for (const u of allUsers) {
+        const uid = (u as any).userId || (u as any).id;
+        const tok = (u as any).overlayToken || (u as any).overlay_token;
+        if (uid && tok) streamerTokenMap.set(uid, tok);
+      }
+
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO stream_goals (
-          id, streamer_token, title, target_amount, current_amount, is_active, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          id, streamer_token, title, target_amount, current_amount,
+          initial_amount, accent_color, template_style,
+          show_balance, show_background, show_animation,
+          end_date, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
+      const defaultStreamerToken = streamerTokenMap.get('fabfcb4c-6719-42fb-aa74-bfdf5619c6dc') || Array.from(streamerTokenMap.values())[0] || 'demo-token';
       for (const g of goals) {
+        // Resolve the SQLite streamer_token: prefer streamerToken, then look up streamerId → overlayToken
+        const resolvedToken = (g as any).streamerToken
+          || (g.streamerId ? streamerTokenMap.get(g.streamerId) : null)
+          || g.streamerId
+          || defaultStreamerToken;
+        const goalId = (g as any).id || String(g._id);
         stmt.run(
-          String(g._id),
-          (g as any).streamerToken || g.streamerId,
+          goalId,
+          resolvedToken,
           g.title,
-          g.targetAmount,
-          g.currentAmount,
+          g.targetAmount ?? 0,
+          g.currentAmount ?? 0,
+          (g as any).initialAmount ?? 0,
+          (g as any).accentColor || '#10B981',
+          (g as any).templateStyle || g.theme || 'cyber-neon',
+          (g as any).showBalance !== false ? 1 : 0,
+          (g as any).showBackground !== false ? 1 : 0,
+          (g as any).showAnimation !== false ? 1 : 0,
+          (g as any).endDate || null,
           g.isActive ? 1 : 0,
-          g.createdAt ? new Date(g.createdAt).toISOString() : new Date().toISOString()
+          g.createdAt ? new Date(g.createdAt).toISOString() : new Date().toISOString(),
+          g.updatedAt ? new Date(g.updatedAt).toISOString() : new Date().toISOString()
         );
       }
     } catch (e) {}
@@ -509,6 +538,53 @@ export function mirrorSqlWriteToMongo(sql: string, params: any[], memoryDb: any)
                     status: row.status,
                     isAlerted: row.is_alerted,
                     paidAt: row.paid_at ? new Date(row.paid_at) : null,
+                    updatedAt: new Date()
+                  },
+                  $setOnInsert: { createdAt: row.created_at ? new Date(row.created_at) : new Date() }
+                },
+                { upsert: true }
+              );
+            }
+          }
+        }
+      }
+
+      // Stream Goals
+      if (cleanSql.includes('STREAM_GOALS')) {
+        const goalsCol = await getStreamGoalsCollection();
+        if (cleanSql.startsWith('DELETE')) {
+          const id = params[0];
+          if (id) {
+            await goalsCol.deleteMany({ $or: [{ id }, { _id: id as any }] });
+          }
+        } else {
+          const id = params[0] || params[params.length - 2];
+          if (id) {
+            const row = memoryDb.prepare('SELECT * FROM stream_goals WHERE id = ?').get(id) as any;
+            if (row) {
+              const usersCol = await getUsersCollection();
+              const owner = await usersCol.findOne({
+                $or: [{ overlayToken: row.streamer_token }, { overlay_token: row.streamer_token } as any]
+              });
+              await goalsCol.updateOne(
+                { $or: [{ id: row.id }, { _id: row.id as any }] },
+                {
+                  $set: {
+                    id: row.id,
+                    streamerToken: row.streamer_token,
+                    streamerId: owner?.userId || (owner as any)?.id || null,
+                    title: row.title,
+                    targetAmount: Number(row.target_amount),
+                    currentAmount: Number(row.current_amount),
+                    initialAmount: Number(row.initial_amount || 0),
+                    accentColor: row.accent_color,
+                    templateStyle: row.template_style,
+                    theme: row.template_style,
+                    showBalance: row.show_balance === 1,
+                    showBackground: row.show_background === 1,
+                    showAnimation: row.show_animation === 1,
+                    endDate: row.end_date,
+                    isActive: row.is_active === 1,
                     updatedAt: new Date()
                   },
                   $setOnInsert: { createdAt: row.created_at ? new Date(row.created_at) : new Date() }

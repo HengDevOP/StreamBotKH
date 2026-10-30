@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/server/database/db';
 import { getIO } from '@/server/services/socketService';
 import { v4 as uuidv4 } from 'uuid';
+import { getUsersCollection, getOverlayTokenHistoryCollection, getStreamGoalsCollection } from '@/server/database/mongo';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,11 +12,118 @@ export async function GET(req: NextRequest) {
     const token = searchParams.get('token') || 'demo-token';
     const goalId = searchParams.get('goalId');
 
-    const goals = db.prepare(`
+    let goals = db.prepare(`
       SELECT * FROM stream_goals 
       WHERE streamer_token = ? 
       ORDER BY is_active DESC, created_at DESC
     `).all(token) as any[];
+
+    // If no goals found directly under this token, resolve the streamer and check historical tokens or MongoDB
+    if (goals.length === 0 && token !== 'demo-token') {
+      try {
+        const usersCol = await getUsersCollection();
+        const histCol = await getOverlayTokenHistoryCollection();
+
+        let streamer: any = await usersCol.findOne({
+          $or: [{ overlayToken: token }, { overlay_token: token } as any]
+        });
+
+        if (!streamer) {
+          const hist = await histCol.findOne({ token });
+          if (hist?.streamerId) {
+            streamer = await usersCol.findOne({
+              $or: [{ userId: hist.streamerId }, { id: hist.streamerId } as any]
+            });
+          }
+        }
+
+        const sId = streamer?.userId || (streamer as any)?.id;
+        if (sId) {
+          // Collect all known tokens for this streamer
+          const histories = await histCol.find({ streamerId: sId }).toArray();
+          const candidateTokens = new Set<string>();
+          if (streamer.overlayToken) candidateTokens.add(streamer.overlayToken);
+          if (streamer.overlay_token) candidateTokens.add(streamer.overlay_token);
+          candidateTokens.add(sId);
+          for (const h of histories) {
+            if (h.token) candidateTokens.add(h.token);
+          }
+
+          // Check if any goals exist in SQLite under any of these candidate tokens
+          const tokenList = Array.from(candidateTokens);
+          const placeholders = tokenList.map(() => '?').join(',');
+          const existingInSql = db.prepare(`
+            SELECT * FROM stream_goals 
+            WHERE streamer_token IN (${placeholders})
+            ORDER BY is_active DESC, created_at DESC
+          `).all(...tokenList) as any[];
+
+          if (existingInSql.length > 0) {
+            // Migrate these goals to the current active token
+            db.prepare(`
+              UPDATE stream_goals 
+              SET streamer_token = ? 
+              WHERE streamer_token IN (${placeholders})
+            `).run(token, ...tokenList);
+
+            goals = db.prepare(`
+              SELECT * FROM stream_goals 
+              WHERE streamer_token = ? 
+              ORDER BY is_active DESC, created_at DESC
+            `).all(token) as any[];
+          } else {
+            // Check MongoDB stream_goals collection
+            const goalsCol = await getStreamGoalsCollection();
+            const mongoGoals = await goalsCol.find({
+              $or: [
+                { streamerId: sId },
+                { streamerToken: { $in: tokenList } }
+              ]
+            }).toArray();
+
+            if (mongoGoals.length > 0) {
+              const insertStmt = db.prepare(`
+                INSERT OR REPLACE INTO stream_goals (
+                  id, streamer_token, title, target_amount, current_amount,
+                  initial_amount, accent_color, template_style,
+                  show_balance, show_background, show_animation,
+                  end_date, is_active, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `);
+
+              for (const mg of mongoGoals) {
+                const gId = (mg as any).id || String(mg._id);
+                insertStmt.run(
+                  gId,
+                  token,
+                  mg.title || 'Stream Goal',
+                  mg.targetAmount ?? 100,
+                  mg.currentAmount ?? 0,
+                  (mg as any).initialAmount ?? 0,
+                  (mg as any).accentColor || '#10B981',
+                  (mg as any).templateStyle || mg.theme || 'cyber-neon',
+                  (mg as any).showBalance !== false ? 1 : 0,
+                  (mg as any).showBackground !== false ? 1 : 0,
+                  (mg as any).showAnimation !== false ? 1 : 0,
+                  (mg as any).endDate || null,
+                  mg.isActive ? 1 : 0,
+                  mg.createdAt ? new Date(mg.createdAt).toISOString() : new Date().toISOString(),
+                  mg.updatedAt ? new Date(mg.updatedAt).toISOString() : new Date().toISOString()
+                );
+              }
+
+              goals = db.prepare(`
+                SELECT * FROM stream_goals 
+                WHERE streamer_token = ? 
+                ORDER BY is_active DESC, created_at DESC
+              `).all(token) as any[];
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Goals API] Token recovery warning:', err);
+      }
+    }
 
     const activeGoal = goals.find((g) => g.is_active === 1) || goals[0] || null;
     const specificGoal = goalId ? goals.find((g) => g.id === goalId) : null;

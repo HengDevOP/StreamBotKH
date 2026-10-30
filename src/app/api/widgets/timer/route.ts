@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/server/database/db';
 import { getIO } from '@/server/services/socketService';
 import { v4 as uuidv4 } from 'uuid';
+import { getUsersCollection, getOverlayTokenHistoryCollection } from '@/server/database/mongo';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,48 @@ export async function GET(req: NextRequest) {
     const token = searchParams.get('token') || 'demo-token';
 
     let timer = db.prepare('SELECT * FROM stream_timers WHERE streamer_token = ?').get(token) as any;
+
+    if (!timer && token !== 'demo-token') {
+      try {
+        const usersCol = await getUsersCollection();
+        const histCol = await getOverlayTokenHistoryCollection();
+        let streamer: any = await usersCol.findOne({
+          $or: [{ overlayToken: token }, { overlay_token: token } as any]
+        });
+        if (!streamer) {
+          const hist = await histCol.findOne({ token });
+          if (hist?.streamerId) {
+            streamer = await usersCol.findOne({
+              $or: [{ userId: hist.streamerId }, { id: hist.streamerId } as any]
+            });
+          }
+        }
+        const sId = streamer?.userId || (streamer as any)?.id;
+        if (sId) {
+          const histories = await histCol.find({ streamerId: sId }).toArray();
+          const candidateTokens = new Set<string>();
+          if (streamer.overlayToken) candidateTokens.add(streamer.overlayToken);
+          if (streamer.overlay_token) candidateTokens.add(streamer.overlay_token);
+          candidateTokens.add(sId);
+          for (const h of histories) {
+            if (h.token) candidateTokens.add(h.token);
+          }
+          const tokenList = Array.from(candidateTokens);
+          const placeholders = tokenList.map(() => '?').join(',');
+          const existingTimer = db.prepare(`
+            SELECT * FROM stream_timers 
+            WHERE streamer_token IN (${placeholders})
+            ORDER BY last_updated_at DESC
+            LIMIT 1
+          `).get(...tokenList) as any;
+
+          if (existingTimer) {
+            db.prepare('UPDATE stream_timers SET streamer_token = ? WHERE id = ?').run(token, existingTimer.id);
+            timer = db.prepare('SELECT * FROM stream_timers WHERE streamer_token = ?').get(token) as any;
+          }
+        }
+      } catch (e) {}
+    }
 
     if (!timer) {
       const newId = uuidv4();
