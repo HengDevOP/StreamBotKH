@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   LayoutDashboard,
   Sliders,
@@ -57,10 +58,14 @@ import {
   Plus,
   Globe,
   Gamepad2,
-  Mail
+  Mail,
+  Headphones,
+  Youtube,
+  Radio
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
+import { extractYoutubeId } from '../utils/youtube';
 
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
@@ -92,9 +97,12 @@ import { TimerWidgetManager } from '../components/dashboard/TimerWidgetManager';
 import { SoundboardManager } from '../components/dashboard/SoundboardManager';
 import { AdminUsersManager } from '../components/dashboard/AdminUsersManager';
 import { AdminPullRequestsManager } from '../components/dashboard/AdminPullRequestsManager';
+import { TicketSupportManager } from '../components/dashboard/TicketSupportManager';
 import { AdminPromotionManager, PromotionConfig } from '../components/dashboard/AdminPromotionManager';
 import { MediaPickerModal } from '../components/dashboard/MediaPickerModal';
 import { MailboxDrawer } from '../components/dashboard/MailboxDrawer';
+import { MailboxManager } from '../components/dashboard/MailboxManager';
+import { MailboxDropdown } from '../components/dashboard/MailboxDropdown';
 import { request } from '../services/api';
 import { useModal } from '../context/ModalContext';
 import { useAudio } from '../hooks/useAudio';
@@ -123,6 +131,8 @@ export type DashboardTab =
   | 'account'
   | 'billing'
   | 'security'
+  | 'mailbox'
+  | 'support'
   | 'report-issue'
   | 'admin-users'
   | 'admin-requests'
@@ -222,6 +232,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // UI / Action Modals
   const [isOverlayModalOpen, setIsOverlayModalOpen] = useState(false);
   const [isMailboxOpen, setIsMailboxOpen] = useState(false);
+  const [isMailboxDropdownOpen, setIsMailboxDropdownOpen] = useState(false);
   const [unreadMailCount, setUnreadMailCount] = useState(0);
   const [isVideoUpgradeModalOpen, setIsVideoUpgradeModalOpen] = useState(false);
   const [upgradeFeatureName, setUpgradeFeatureName] = useState<string | undefined>(undefined);
@@ -240,6 +251,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [profileBio, setProfileBio] = useState(user?.bio || '');
   const [profileThanksMessage, setProfileThanksMessage] = useState(user?.customThanksMessage || '');
   const [profileAvatar, setProfileAvatar] = useState(user?.avatarUrl || '');
+  const [profileLiveStreamUrl, setProfileLiveStreamUrl] = useState(user?.liveStreamUrl || '');
+  const [savingLiveStreamUrl, setSavingLiveStreamUrl] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [changingUsername, setChangingUsername] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
@@ -292,6 +305,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setProfileBio(user.bio || '');
       setProfileThanksMessage(user.customThanksMessage || '');
       setProfileAvatar(user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`);
+      setProfileLiveStreamUrl(user.liveStreamUrl || '');
       const incomingLinks = (user as any).socialLinks || (user as any).links || [];
       setProfileLinks(Array.isArray(incomingLinks) ? incomingLinks : []);
       if (user.plan) {
@@ -361,6 +375,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     }, 7000);
     return () => clearTimeout(failSafe);
   }, [user]);
+
+  // Subscribe to real-time media & storage updates so storage usage bar reflects uploads/deletions immediately
+  useEffect(() => {
+    const unsubscribe = mediaService.subscribe((data) => {
+      if (data.storage) {
+        setStorageInfo(data.storage);
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Automatically redirect unauthenticated visitors on /dashboard directly to Google Sign-In URL
   useEffect(() => {
@@ -483,7 +509,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       'leaderboard',
       'goal',
       'timer',
-      'soundboard',
       'video-alerts',
       'wheel',
       'pokemon',
@@ -548,17 +573,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           color: '#F97316', // Orange
           bgGlow: 'hover:border-orange-500/50',
           copyMessage: 'Copied Timer OBS URL!'
-        };
-      case 'soundboard':
-        return {
-          featureKey: 'soundboard',
-          label: 'Soundboard OBS',
-          shortLabel: 'Soundboard',
-          url: `${origin}/overlay/soundboard/${effectiveToken}`,
-          icon: Volume2,
-          color: '#10B981', // Emerald
-          bgGlow: 'hover:border-emerald-500/50',
-          copyMessage: 'Copied Soundboard OBS URL!'
         };
       case 'video-alerts':
         return {
@@ -873,6 +887,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         description: profileBio.trim(),
         customThanksMessage: profileThanksMessage.trim(),
         avatarUrl: profileAvatar.trim(),
+        liveStreamUrl: profileLiveStreamUrl.trim(),
         socialLinks: profileLinks
       });
       if (res?.token && typeof window !== 'undefined') {
@@ -886,6 +901,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setProfileErrorMsg(err.message || 'Failed to update profile');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const detectedLiveYoutubeId = useMemo(() => {
+    return extractYoutubeId(profileLiveStreamUrl);
+  }, [profileLiveStreamUrl]);
+
+  const handleSaveLiveStreamUrl = async () => {
+    setSavingLiveStreamUrl(true);
+    setProfileErrorMsg(null);
+    try {
+      await streamerService.updateProfile({
+        liveStreamUrl: profileLiveStreamUrl.trim()
+      });
+      await refreshUser();
+      setProfileSavedMsg(true);
+      setTimeout(() => setProfileSavedMsg(false), 3000);
+      loadData();
+    } catch (err: any) {
+      setProfileErrorMsg(err.message || 'Failed to save live stream URL');
+    } finally {
+      setSavingLiveStreamUrl(false);
     }
   };
 
@@ -1002,8 +1039,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               },
               {
                 id: 'admin-requests' as DashboardTab,
-                label: 'Pull Requests',
-                icon: GitPullRequest,
+                label: 'Support Tickets',
+                icon: Headphones,
                 badge: null
               },
               {
@@ -1126,9 +1163,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           badge: currentPlan === 'free' ? '10% Fee' : '0% Fee'
         },
         {
-          id: 'report-issue' as DashboardTab,
-          label: 'Report Issue',
-          icon: MessageSquare,
+          id: 'support' as DashboardTab,
+          label: 'Ticket Support',
+          icon: Headphones,
           badge: null
         },
         {
@@ -1178,11 +1215,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     if ((item as any).isLocked) {
                       setUpgradeFeatureName(item.label);
                       setIsVideoUpgradeModalOpen(true);
-                      return;
-                    }
-                    if (item.id === ('mailbox' as any)) {
-                      setIsMailboxOpen(true);
-                      setMobileDrawerOpen(false);
                       return;
                     }
                     setActiveTab(item.id);
@@ -1343,17 +1375,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   return (
     <div className="h-full w-full flex flex-row overflow-hidden bg-[#060911] text-slate-100 antialiased relative">
       {/* ============================================================== */}
-      {/* MOBILE DRAWER MODAL (ONLY VISIBLE ON MOBILE WHEN OPENED)       */}
+      {/* MOBILE DRAWER MODAL (PORTALED TO BODY WITH SMOOTH SLIDE ANIMATION) */}
       {/* ============================================================== */}
-      {mobileDrawerOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          {/* Dark Backdrop */}
+      {typeof document !== 'undefined' && createPortal(
+        <div
+          className={`md:hidden fixed inset-0 flex transition-opacity duration-300 ease-in-out ${
+            mobileDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          style={{ zIndex: 99999, isolation: 'isolate' }}
+        >
+          {/* Dark Backdrop with fade transition */}
           <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
+            className={`fixed inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300 ease-in-out ${
+              mobileDrawerOpen ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ zIndex: 99999 }}
             onClick={() => setMobileDrawerOpen(false)}
           />
-          {/* Slide-out Drawer (No Border) */}
-          <aside className="relative w-80 max-w-[85vw] h-full bg-[#0B0F19] z-50 flex flex-col shadow-2xl animate-in slide-in-from-left duration-200 select-text border-0">
+          {/* Slide-out Drawer with smooth hardware-accelerated slide transition */}
+          <aside
+            className={`relative w-80 max-w-[85vw] h-full bg-[#0B0F19] flex flex-col shadow-2xl select-text border-0 transition-transform duration-300 ease-out transform ${
+              mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+            style={{ zIndex: 100000, willChange: 'transform' }}
+          >
             {/* Mobile Header Bar */}
             <div className="h-20 px-5 flex items-center justify-between bg-[#0B0F19] flex-shrink-0">
               <button
@@ -1393,14 +1438,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             {/* Mobile Footer */}
             {renderSidebarFooter(false)}
           </aside>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ============================================================== */}
       {/* DESKTOP PERMANENT SIDEBAR (NO BORDER, SIMPLE & CLEAN)           */}
       {/* ============================================================== */}
       <aside
-        className={`hidden md:flex flex-col h-full bg-[#0B0F19] border-0 flex-shrink-0 z-20 transition-all duration-200 select-text ${
+        className={`hidden md:flex flex-col h-full bg-[#0B0F19] border-0 flex-shrink-0 z-20 transition-[width] duration-300 ease-in-out select-text overflow-hidden ${
           sidebarCollapsed ? 'w-20' : 'w-[260px]'
         }`}
       >
@@ -1433,6 +1479,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               </div>
             )}
           </button>
+          {!sidebarCollapsed && (
+            <button
+              onClick={() => setSidebarCollapsed(true)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
+              title="Collapse Sidebar"
+            >
+              <ChevronLeft size={16} />
+            </button>
+          )}
         </div>
 
         {/* Scrollable Nav Items */}
@@ -1452,10 +1507,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             {/* Mobile Menu Hamburger */}
             <button
               onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white focus:outline-none flex-shrink-0"
+              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white focus:outline-none flex-shrink-0 cursor-pointer"
               aria-label="Toggle Navigation Drawer"
             >
               {mobileDrawerOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+
+            {/* Desktop Sidebar Toggle Hamburger */}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="hidden md:flex p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors focus:outline-none flex-shrink-0 cursor-pointer"
+              aria-label={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            >
+              <Menu size={18} />
             </button>
 
             {/* Active Section Title */}
@@ -1506,22 +1571,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               </div>
             )}
 
-            {/* Streamer Mailbox: Icon only, no text */}
-            <button
-              type="button"
-              onClick={() => setIsMailboxOpen(true)}
-              className="relative p-2 sm:p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-750 hover:border-cyan-500/50 text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer group"
-              title="Open Streamer Mailbox & Notifications"
-            >
-              <div className="relative flex items-center justify-center">
-                <Mail size={16} className="text-cyan-400 group-hover:scale-110 transition-transform" />
-                {unreadMailCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 px-1.5 py-0.2 min-w-[17px] h-[17px] flex items-center justify-center rounded-full text-[10px] font-mono font-black bg-cyan-400 text-slate-950 shadow-[0_0_8px_rgba(0,240,255,0.7)] animate-pulse">
-                    {unreadMailCount > 99 ? '99+' : unreadMailCount}
-                  </span>
-                )}
-              </div>
-            </button>
+            {/* Streamer Mailbox: Dropdown Popover from Navbar Icon */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsMailboxDropdownOpen(!isMailboxDropdownOpen)}
+                className="relative p-2 sm:p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-750 hover:border-cyan-500/50 text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer group"
+                title="Open Streamer Mailbox & Notifications"
+              >
+                <div className="relative flex items-center justify-center">
+                  <Mail size={16} className="text-cyan-400 group-hover:scale-110 transition-transform" />
+                  {unreadMailCount > 0 && (
+                    <span className="absolute -top-1.5 -right-2 px-1.5 py-0.2 min-w-[17px] h-[17px] flex items-center justify-center rounded-full text-[10px] font-mono font-black bg-cyan-400 text-slate-950 shadow-[0_0_8px_rgba(0,240,255,0.7)] animate-pulse">
+                      {unreadMailCount > 99 ? '99+' : unreadMailCount}
+                    </span>
+                  )}
+                </div>
+              </button>
+
+              <MailboxDropdown
+                isOpen={isMailboxDropdownOpen}
+                onClose={() => setIsMailboxDropdownOpen(false)}
+                onOpenFullMailbox={() => {
+                  setIsMailboxDropdownOpen(false);
+                  setActiveTab('mailbox');
+                  if (typeof window !== 'undefined') {
+                    window.history.pushState(null, '', '/dashboard?tab=mailbox');
+                  }
+                }}
+                onUnreadCountChange={setUnreadMailCount}
+              />
+            </div>
           </div>
         </header>
 
@@ -1948,7 +2028,124 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
                   </div>
 
-                  {/* 3. Channel Display Name & Bio Form */}
+                  {/* 3. YouTube Live Stream for /tv Broadcast Card */}
+                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0 shadow-lg shadow-red-500/10">
+                          <Youtube size={22} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                              YouTube Live Stream URL
+                            </h3>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              FOR /TV BROADCAST
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Attach your YouTube Live Stream URL so viewers can watch your live broadcast on{' '}
+                            <span className="font-mono text-cyan-400 font-semibold">/tv?={user.username}</span>.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* View on /tv Link Button */}
+                      <a
+                        href={`/tv?=${user.username}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/50 text-slate-300 hover:text-white text-xs font-mono transition-colors shrink-0 cursor-pointer self-start sm:self-auto"
+                        title="View your channel live on /tv"
+                      >
+                        <Radio size={13} className="text-red-400 animate-pulse" />
+                        <span>Watch on /tv</span>
+                        <ArrowUpRight size={13} className="text-slate-500" />
+                      </a>
+                    </div>
+
+                    {/* Input Field & Save Button */}
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <div className="flex-1 flex items-center rounded-xl bg-slate-950 border border-slate-800 focus-within:border-red-500/60 overflow-hidden">
+                          <span className="px-3.5 py-2.5 bg-slate-900/80 text-slate-400 font-mono text-xs border-r border-slate-800 select-none flex items-center gap-1.5 shrink-0">
+                            <Youtube size={14} className="text-red-400" />
+                            <span className="hidden xs:inline">Stream URL</span>
+                          </span>
+                          <input
+                            type="url"
+                            value={profileLiveStreamUrl}
+                            onChange={(e) => setProfileLiveStreamUrl(e.target.value)}
+                            placeholder="https://www.youtube.com/watch?v=... or https://youtube.com/live/..."
+                            className="w-full px-3.5 py-2.5 bg-transparent text-white font-mono text-xs focus:outline-none placeholder-slate-600"
+                          />
+                          {profileLiveStreamUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setProfileLiveStreamUrl('')}
+                              className="p-2 text-slate-500 hover:text-white transition-colors cursor-pointer mr-1 shrink-0"
+                              title="Clear URL"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleSaveLiveStreamUrl}
+                          disabled={savingLiveStreamUrl}
+                          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white font-extrabold text-xs font-mono uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40 whitespace-nowrap shadow-md shadow-red-500/20 flex items-center justify-center gap-1.5"
+                        >
+                          {savingLiveStreamUrl ? (
+                            <span>Saving...</span>
+                          ) : (
+                            <>
+                              <CheckCircle2 size={13} />
+                              <span>Save Live URL</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Video Validation & Embedded Preview */}
+                      {detectedLiveYoutubeId ? (
+                        <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                          <div className="flex items-center justify-between text-xs font-mono">
+                            <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
+                              <CheckCircle2 size={14} />
+                              <span>Valid YouTube Live Stream Connected (Video ID: {detectedLiveYoutubeId})</span>
+                            </span>
+                            <span className="text-slate-500 text-[11px]">Broadcasting to /tv</span>
+                          </div>
+
+                          {/* Live Video Preview Box */}
+                          <div className="relative w-full aspect-video max-w-md rounded-xl bg-black border border-slate-800 overflow-hidden shadow-2xl">
+                            <iframe
+                              src={`https://www.youtube.com/embed/${detectedLiveYoutubeId}?autoplay=0&playsinline=1`}
+                              title="YouTube Live Stream Preview"
+                              className="w-full h-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
+                        </div>
+                      ) : profileLiveStreamUrl.trim() ? (
+                        <div className="text-xs text-amber-400 font-mono flex items-center gap-1.5 pt-1">
+                          <AlertCircle size={13} />
+                          <span>Could not detect a valid YouTube Video ID. Please paste a standard YouTube watch, live, or short link.</span>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] font-mono text-slate-500">
+                          Paste your YouTube stream link (e.g. <code className="text-slate-400">youtube.com/watch?v=...</code> or <code className="text-slate-400">youtube.com/live/...</code>). This will automatically be used as your video screen on <strong>/tv</strong>.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4. Channel Display Name & Bio Form */}
                   <form
                     onSubmit={handleSaveProfile}
                     className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4"
@@ -2192,7 +2389,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                     <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between">
                       <span className="text-[10px] font-mono text-slate-500">
-                        All changes sync to MongoDB &amp; SQLite
+                        All changes sync to MongoDB Atlas
                       </span>
                       <Button
                         type="submit"
@@ -2235,9 +2432,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         </span>
                         <span className="font-mono text-white font-bold">
                           {storageInfo
-                            ? `${(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB / ${
-                                currentPlan === 'pro' ? '100MB' : '20MB'
-                              }`
+                            ? `${(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB / ${(storageInfo.limitBytes / (1024 * 1024)).toFixed(0)}MB`
                             : currentPlan === 'pro'
                             ? '0 MB / 100MB'
                             : '0 MB / 20MB'}
@@ -2260,7 +2455,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </div>
 
                       <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                        <span>Max 2MB per file</span>
+                        <span>
+                          {storageInfo
+                            ? `${(storageInfo.remainingBytes / (1024 * 1024)).toFixed(1)} MB available`
+                            : currentPlan === 'pro'
+                            ? '100 MB available'
+                            : '20 MB available'}
+                        </span>
                         <span>{storageInfo ? `${storageInfo.percentUsed}% used` : '0% used'}</span>
                       </div>
                     </div>
@@ -2643,15 +2844,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           )}
 
           {/* ============================================================== */}
-          {/* ADMIN PANEL: PULL REQUESTS / CLIENT ISSUE REPORTS              */}
+          {/* TICKET SUPPORT & LIVE DESK (USER & ADMIN)                      */}
           {/* ============================================================== */}
-          {(activeTab === 'admin-requests' || activeTab === 'report-issue') && (
-            <AdminPullRequestsManager
+          {(activeTab === 'admin-requests' || activeTab === 'support' || (activeTab as any) === 'report-issue') && (
+            <TicketSupportManager
               isAdmin={isAdmin && activeTab === 'admin-requests'}
-              onUserPlanUpdated={() => {
-                refreshUser();
-                loadData();
-              }}
             />
           )}
 
@@ -2715,6 +2912,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* TAB: STREAMER MAILBOX WORKBENCH VIEW                           */}
+          {/* ============================================================== */}
+          {activeTab === 'mailbox' && (
+            <MailboxManager
+              onNavigateTab={(tab) => {
+                setActiveTab(tab as any);
+                if (typeof window !== 'undefined') {
+                  window.history.pushState(null, '', `/dashboard?tab=${tab}`);
+                }
+              }}
+              onUnreadCountChange={setUnreadMailCount}
+            />
           )}
             </>
           )}

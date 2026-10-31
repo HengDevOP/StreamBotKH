@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const usersCol = await getUsersCollection();
   const escapedEmail = (user.email || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  let streamer = await usersCol.findOne({
+  const streamer = await usersCol.findOne({
     $or: [
       { userId: user.id },
       { id: user.id as any },
@@ -51,27 +51,25 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const userSocialLinks = Array.isArray(streamer.socialLinks) ? streamer.socialLinks : [];
-
   return NextResponse.json({
-    id: streamer.userId || (streamer as any).id || String(streamer._id),
+    userId: streamer.userId || (streamer as any).id || String(streamer._id),
     email: streamer.email,
     username: streamer.username,
-    displayName: streamer.displayName || streamer.username,
+    displayName: streamer.displayName,
     avatarUrl: streamer.avatarUrl,
     bio: streamer.bio,
-    customThanksMessage: streamer.customThanksMessage || '',
-    socialLinks: userSocialLinks,
-    links: userSocialLinks,
+    customThanksMessage: streamer.customThanksMessage,
     isVerified: Boolean(streamer.isVerified),
     plan: currentPlan,
     planStartedAt,
     planExpiresAt,
     planDurationDays,
-    overlayToken: streamer.overlayToken || streamer.overlay_token,
+    overlayToken: streamer.overlayToken || (streamer as any).overlay_token,
     telegramChatId: (streamer as any).telegramChatId || (streamer as any).telegram_chat_id,
-    telegramPairingCode: streamer.telegramPairingCode || (streamer as any).telegram_pairing_code,
-    isAdmin: isAdminEmail(streamer.email),
-    createdAt: streamer.createdAt
+    telegramPairingCode: (streamer as any).telegramPairingCode || (streamer as any).telegram_pairing_code,
+    liveStreamUrl: streamer.liveStreamUrl || streamer.youtubeLiveUrl || '',
+    socialLinks: Array.isArray(streamer.socialLinks) ? streamer.socialLinks : [],
+    createdAt: streamer.createdAt,
+    isAdmin: isAdminEmail(streamer.email)
   });
 }

@@ -1,5 +1,4 @@
-import { getGatewayConfigCollection, restoreMasterKhqrImage } from '../database/mongo';
-import { db } from '../database/db';
+import { getGatewayConfigCollection, getPaymentSettingsCollection, restoreMasterKhqrImage } from '../database/mongo';
 
 export interface CreateDonationQRParams {
   donationId: string;
@@ -11,7 +10,7 @@ export interface CreateDonationQRParams {
 
 export interface DonationQRResult {
   qrString: string;
-  qrImage: string; // Payment gateway image URL or Base64 Data URL
+  qrImage: string;
   abaDeepLink: string;
   bakongDeepLink: string;
 }
@@ -19,7 +18,7 @@ export interface DonationQRResult {
 export async function createBakongDonationQR(params: CreateDonationQRParams): Promise<DonationQRResult> {
   const { donationId, streamerId, amount, currency, donorName } = params;
 
-  // Use the official Payment Gateway Master KHQR image uploaded by the streamer (verified & restored)
+  // Use the official Payment Gateway Master KHQR image uploaded by the streamer (verified & restored in MongoDB)
   let gatewayImage = '';
   try {
     const restoreResult = await restoreMasterKhqrImage(streamerId);
@@ -37,14 +36,18 @@ export async function createBakongDonationQR(params: CreateDonationQRParams): Pr
       if (config?.khqrImageUrl) {
         gatewayImage = config.khqrImageUrl;
       } else {
-        const sqliteSettings = db.prepare('SELECT master_khqr_image FROM payment_settings WHERE streamer_id = ?').get(streamerId) as any;
-        if (sqliteSettings?.master_khqr_image) {
-          gatewayImage = sqliteSettings.master_khqr_image;
+        const paymentSettingsCol = await getPaymentSettingsCollection();
+        const mongoSettings = await paymentSettingsCol.findOne({
+          $or: [{ streamerId }, { _id: streamerId as any }]
+        });
+        const mSettings = mongoSettings as any;
+        if (mSettings?.khqrImageUrl || mSettings?.masterKhqrImage) {
+          gatewayImage = mSettings.khqrImageUrl || mSettings.masterKhqrImage;
         }
       }
     }
   } catch (e) {
-    console.warn('[Bakong Service] Could not fetch gateway image from database:', e);
+    console.warn('[Bakong Service] Could not fetch gateway image from MongoDB:', e);
   }
 
   return {

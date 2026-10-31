@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Streamer } from '../types/streamer';
 import { authService } from '../services/authService';
+import { request } from '../services/api';
 
 interface AuthContextType {
   user: Streamer | null;
@@ -13,6 +14,11 @@ interface AuthContextType {
   setTokenAndRefresh: (newToken: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  // Admin impersonation controls
+  isImpersonating: boolean;
+  impersonatorAdmin: { id?: string; email: string } | null;
+  impersonateUser: (targetUserId: string) => Promise<void>;
+  stopImpersonating: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +58,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
     return true;
+  });
+
+  const [isImpersonating, setIsImpersonating] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return Boolean(localStorage.getItem('streamneon_impersonator_admin_token'));
+    }
+    return false;
+  });
+
+  const [impersonatorAdmin, setImpersonatorAdmin] = useState<{ id?: string; email: string } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('streamneon_impersonator_admin_user');
+        return stored ? JSON.parse(stored) : null;
+      } catch (_) {}
+    }
+    return null;
   });
 
   const isRefreshingRef = useRef<boolean>(false);
@@ -165,13 +188,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const impersonateUser = async (targetUserId: string) => {
+    setLoading(true);
+    try {
+      const currentAdminToken = localStorage.getItem('streamneon_auth_token') || token;
+      const currentAdminUser = user;
+
+      const res = await request<{
+        success: boolean;
+        token: string;
+        user: Streamer;
+        impersonatorAdmin: { id?: string; email: string };
+      }>('/admin/impersonate', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId })
+      });
+
+      if (res && res.token && res.user) {
+        if (typeof window !== 'undefined') {
+          // Store original admin session only if not already impersonating
+          if (!localStorage.getItem('streamneon_impersonator_admin_token')) {
+            localStorage.setItem('streamneon_impersonator_admin_token', currentAdminToken || '');
+            if (currentAdminUser) {
+              localStorage.setItem(
+                'streamneon_impersonator_admin_user',
+                JSON.stringify({
+                  id: currentAdminUser.id,
+                  email: currentAdminUser.email,
+                  username: currentAdminUser.username,
+                  displayName: currentAdminUser.displayName
+                })
+              );
+            }
+          }
+          localStorage.setItem('streamneon_auth_token', res.token);
+          localStorage.setItem('streamneon_user', JSON.stringify(res.user));
+        }
+
+        setToken(res.token);
+        setUser(res.user);
+        setIsImpersonating(true);
+        setImpersonatorAdmin(res.impersonatorAdmin);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const stopImpersonating = async () => {
+    setLoading(true);
+    try {
+      if (typeof window !== 'undefined') {
+        const storedAdminToken = localStorage.getItem('streamneon_impersonator_admin_token');
+        const storedAdminUser = localStorage.getItem('streamneon_impersonator_admin_user');
+
+        localStorage.removeItem('streamneon_impersonator_admin_token');
+        localStorage.removeItem('streamneon_impersonator_admin_user');
+
+        if (storedAdminToken) {
+          localStorage.setItem('streamneon_auth_token', storedAdminToken);
+          setToken(storedAdminToken);
+          if (storedAdminUser) {
+            try {
+              const parsed = JSON.parse(storedAdminUser);
+              localStorage.setItem('streamneon_user', JSON.stringify(parsed));
+              setUser(parsed);
+            } catch (_) {}
+          }
+          await refreshUser();
+        }
+      }
+      setIsImpersonating(false);
+      setImpersonatorAdmin(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = () => {
     authService.logout();
     if (typeof window !== 'undefined') {
       localStorage.removeItem('streamneon_user');
+      localStorage.removeItem('streamneon_impersonator_admin_token');
+      localStorage.removeItem('streamneon_impersonator_admin_user');
     }
     setToken(null);
     setUser(null);
+    setIsImpersonating(false);
+    setImpersonatorAdmin(null);
   };
 
   return (
@@ -184,7 +288,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithGoogle,
         setTokenAndRefresh,
         logout,
-        refreshUser
+        refreshUser,
+        isImpersonating,
+        impersonatorAdmin,
+        impersonateUser,
+        stopImpersonating
       }}
     >
       {children}

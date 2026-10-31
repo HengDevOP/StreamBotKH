@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/server/database/db';
-import { getUsersCollection, getOverlaysCollection } from '@/server/database/mongo';
+import { getUsersCollection, getOverlaysCollection, getAlertSettingsCollection, getPaymentSettingsCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
 
 function reloadEnv() {
   const savedPort = process.env.PORT;
@@ -69,6 +68,45 @@ export function resolveRedirectUri(frontendOrigin: string): string {
   return `${frontendOrigin}/api/auth/google/callback`;
 }
 
+function generateRandomNumber1to5Digits(): string {
+  // Random number with length 1 to 5 digits (e.g. 1 to 99999)
+  const length = Math.floor(Math.random() * 5) + 1; // 1, 2, 3, 4, or 5
+  const min = length === 1 ? 1 : Math.pow(10, length - 1);
+  const max = Math.pow(10, length) - 1;
+  const num = Math.floor(min + Math.random() * (max - min + 1));
+  return String(num);
+}
+
+export async function resolveUniqueUsername(candidateUsername: string, currentUserId?: string): Promise<string> {
+  const base = candidateUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streambotkh';
+  let candidate = base;
+
+  const isTaken = async (uname: string): Promise<boolean> => {
+    try {
+      const usersCol = await getUsersCollection();
+      const escaped = uname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const mongoQuery: any = { username: { $regex: new RegExp(`^${escaped}$`, 'i') } };
+      if (currentUserId) {
+        mongoQuery.userId = { $ne: currentUserId };
+      }
+      const existingMongo = await usersCol.findOne(mongoQuery);
+      if (existingMongo) return true;
+    } catch (e) {}
+
+    return false;
+  };
+
+  // If candidate username is already taken, append _{randomlynumber} (1 to 5 length)
+  let attempts = 0;
+  while ((await isTaken(candidate)) && attempts < 50) {
+    const randomSuffix = generateRandomNumber1to5Digits();
+    candidate = `${base}_${randomSuffix}`;
+    attempts++;
+  }
+
+  return candidate;
+}
+
 export async function upsertGoogleStreamer(profile: {
   email: string;
   name?: string;
@@ -78,48 +116,35 @@ export async function upsertGoogleStreamer(profile: {
   const name = (profile.name || email.split('@')[0] || 'Streamer').trim();
   const avatarUrl = profile.picture || '';
 
-  // 1. Primary lookup: Check MongoDB Atlas users collection by verified Google email
+  const usersCol = await getUsersCollection();
+  const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matches = await usersCol.find({
+    email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') }
+  }).toArray();
+
   let existingMongoUser: any = null;
-  try {
-    const usersCol = await getUsersCollection();
-    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const matches = await usersCol.find({
-      email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') }
-    }).toArray();
-
-    if (matches.length > 0) {
-      existingMongoUser = matches[0];
-      // If multiple accounts were created by past transient UUID generations, pick the one with media or custom username
-      if (matches.length > 1) {
-        try {
-          const { getMediaCollection } = await import('@/server/database/mongo');
-          const mediaCol = await getMediaCollection();
-          for (const m of matches) {
-            const count = await mediaCol.countDocuments({ userId: m.userId });
-            if (count > 0 || (m.username && !m.username.startsWith('streamer_'))) {
-              existingMongoUser = m;
-              break;
-            }
+  if (matches.length > 0) {
+    existingMongoUser = matches[0];
+    if (matches.length > 1) {
+      try {
+        const { getMediaCollection } = await import('@/server/database/mongo');
+        const mediaCol = await getMediaCollection();
+        for (const m of matches) {
+          const count = await mediaCol.countDocuments({ userId: m.userId });
+          if (count > 0 || (m.username && !m.username.startsWith('streamer_'))) {
+            existingMongoUser = m;
+            break;
           }
-          // Consolidate any duplicate userId records to the primary userId
-          for (const other of matches) {
-            if (other.userId !== existingMongoUser.userId) {
-              await mediaCol.updateMany({ userId: other.userId }, { $set: { userId: existingMongoUser.userId, userEmail: email } });
-              const overlaysCol = await getOverlaysCollection();
-              await overlaysCol.updateMany({ userId: other.userId }, { $set: { userId: existingMongoUser.userId } });
-            }
+        }
+        for (const other of matches) {
+          if (other.userId !== existingMongoUser.userId) {
+            await mediaCol.updateMany({ userId: other.userId }, { $set: { userId: existingMongoUser.userId, userEmail: email } });
+            const overlaysCol = await getOverlaysCollection();
+            await overlaysCol.updateMany({ userId: other.userId }, { $set: { userId: existingMongoUser.userId } });
           }
-        } catch (e) {}
-      }
+        }
+      } catch (e) {}
     }
-  } catch (err) {
-    console.warn('[Auth] Mongo lookup warning in upsertGoogleStreamer:', err);
-  }
-
-  // 2. Secondary lookup: Check local SQLite database by email or userId
-  let sqliteStreamer = db.prepare('SELECT * FROM streamers WHERE LOWER(email) = LOWER(?)').get(email) as any;
-  if (!sqliteStreamer && existingMongoUser?.userId) {
-    sqliteStreamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(existingMongoUser.userId) as any;
   }
 
   let streamerId = '';
@@ -127,211 +152,83 @@ export async function upsertGoogleStreamer(profile: {
   let displayName = name;
   let bio = '';
   let customThanks = '';
-  let isVerified = 0;
+  let isVerified = false;
   let plan = 'free';
   let overlayToken = '';
   let pairingCode = '';
-  let socialLinks = '[]';
+  let socialLinks: any[] = [];
 
   if (existingMongoUser?.userId) {
-    // Preserve permanent Google user ID and customized username
     streamerId = existingMongoUser.userId;
-    streamerUsername = existingMongoUser.username || sqliteStreamer?.username || email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
-    displayName = existingMongoUser.displayName || sqliteStreamer?.display_name || name;
-    bio = existingMongoUser.bio || sqliteStreamer?.bio || '';
-    customThanks = existingMongoUser.customThanksMessage || sqliteStreamer?.custom_thanks_message || '';
-    isVerified = existingMongoUser.isVerified ? 1 : (sqliteStreamer?.is_verified || 0);
-    plan = existingMongoUser.plan || sqliteStreamer?.plan || 'free';
-    socialLinks = JSON.stringify(existingMongoUser.socialLinks || (sqliteStreamer?.social_links ? JSON.parse(sqliteStreamer.social_links) : []));
-  } else if (sqliteStreamer) {
-    // Found in SQLite
-    streamerId = sqliteStreamer.id;
-    streamerUsername = sqliteStreamer.username;
-    displayName = sqliteStreamer.display_name || name;
-    bio = sqliteStreamer.bio || '';
-    customThanks = sqliteStreamer.custom_thanks_message || '';
-    isVerified = sqliteStreamer.is_verified || 0;
-    plan = sqliteStreamer.plan || 'free';
-    socialLinks = sqliteStreamer.social_links || '[]';
+    streamerUsername = existingMongoUser.username || email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
+    displayName = existingMongoUser.displayName || name;
+    bio = existingMongoUser.bio || '';
+    customThanks = existingMongoUser.customThanksMessage || '';
+    isVerified = Boolean(existingMongoUser.isVerified);
+    plan = existingMongoUser.plan || 'free';
+    socialLinks = Array.isArray(existingMongoUser.socialLinks) ? existingMongoUser.socialLinks : [];
+    overlayToken = existingMongoUser.overlayToken || '';
+    pairingCode = existingMongoUser.telegramPairingCode || '';
   } else {
-    // Brand new user: anchor to Google account with a persistent ID
     streamerId = 'streamer_' + uuidv4().replace(/-/g, '').slice(0, 16);
-    const baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
-    streamerUsername = baseUsername;
-
-    const existingSqlite = db.prepare('SELECT id FROM streamers WHERE LOWER(username) = LOWER(?)').get(streamerUsername);
-    let existingMongo: any = null;
-    try {
-      const usersCol = await getUsersCollection();
-      existingMongo = await usersCol.findOne({ username: { $regex: new RegExp(`^${streamerUsername}$`, 'i') } });
-    } catch (e) {}
-
-    if (existingSqlite || existingMongo) {
-      streamerUsername = `${baseUsername}${Math.floor(100 + Math.random() * 900)}`;
-    }
+    const baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streambotkh';
+    streamerUsername = await resolveUniqueUsername(baseUsername);
   }
 
-  // 3. Reconcile any duplicate or conflicting rows in SQLite before inserting
-  try {
-    const conflictingSqlite = db.prepare(
-      'SELECT id FROM streamers WHERE (LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)) AND id != ?'
-    ).all(email, streamerUsername, streamerId) as Array<{ id: string }>;
-
-    for (const conflict of conflictingSqlite) {
-      const oldId = conflict.id;
-      try {
-        db.prepare('UPDATE alert_settings SET streamer_id = ? WHERE streamer_id = ?').run(streamerId, oldId);
-      } catch (e) {
-        db.prepare('DELETE FROM alert_settings WHERE streamer_id = ?').run(oldId);
-      }
-      try {
-        db.prepare('UPDATE payment_settings SET streamer_id = ? WHERE streamer_id = ?').run(streamerId, oldId);
-      } catch (e) {
-        db.prepare('DELETE FROM payment_settings WHERE streamer_id = ?').run(oldId);
-      }
-      try {
-        db.prepare('UPDATE donations SET streamer_id = ? WHERE streamer_id = ?').run(streamerId, oldId);
-      } catch (e) {}
-      try {
-        db.prepare('UPDATE telegram_monitored_groups SET streamer_id = ? WHERE streamer_id = ?').run(streamerId, oldId);
-      } catch (e) {}
-      // Delete old conflicting row to free up UNIQUE constraints (telegram_pairing_code, email, username, overlay_token)
-      db.prepare('DELETE FROM streamers WHERE id = ?').run(oldId);
-    }
-  } catch (migErr) {
-    console.warn('[Auth] Error reconciling duplicate SQLite rows:', migErr);
+  // Ensure unique overlayToken
+  if (!overlayToken) {
+    overlayToken = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
   }
 
-  // 4. Preserve or safely generate guaranteed-unique tokens
-  let candidateOverlay = sqliteStreamer?.overlay_token || existingMongoUser?.overlayToken;
-  if (candidateOverlay) {
-    const inUse = db.prepare('SELECT id FROM streamers WHERE overlay_token = ? AND id != ?').get(candidateOverlay, streamerId);
-    if (inUse) candidateOverlay = null;
-  }
-  overlayToken = candidateOverlay || ('ovl_' + uuidv4().replace(/-/g, '').slice(0, 24));
-
-  let candidatePairing = sqliteStreamer?.telegram_pairing_code || existingMongoUser?.telegramPairingCode;
-  if (candidatePairing) {
-    const inUse = db.prepare('SELECT id FROM streamers WHERE telegram_pairing_code = ? AND id != ?').get(candidatePairing, streamerId);
-    if (inUse) candidatePairing = null;
-  }
-  if (!candidatePairing) {
+  // Ensure unique pairingCode
+  if (!pairingCode) {
     for (let i = 0; i < 100; i++) {
       const candidate = 'NEON-' + Math.floor(100000 + Math.random() * 900000);
-      const existing = db.prepare('SELECT id FROM streamers WHERE telegram_pairing_code = ?').get(candidate);
-      if (!existing) {
-        candidatePairing = candidate;
+      const inUse = await usersCol.findOne({ telegramPairingCode: candidate, userId: { $ne: streamerId } });
+      if (!inUse) {
+        pairingCode = candidate;
         break;
       }
     }
-    if (!candidatePairing) {
-      candidatePairing = 'NEON-' + uuidv4().replace(/-/g, '').slice(0, 8).toUpperCase();
+    if (!pairingCode) {
+      pairingCode = 'NEON-' + uuidv4().replace(/-/g, '').slice(0, 8).toUpperCase();
     }
   }
-  pairingCode = candidatePairing;
 
-  // Verify username uniqueness in SQLite
-  const usernameConflict = db.prepare('SELECT id FROM streamers WHERE LOWER(username) = LOWER(?) AND id != ?').get(streamerUsername, streamerId);
-  if (usernameConflict) {
-    streamerUsername = `${streamerUsername.slice(0, 16)}_${Math.floor(100 + Math.random() * 900)}`;
-  }
+  // Verify username uniqueness
+  streamerUsername = await resolveUniqueUsername(streamerUsername, streamerId);
 
-  // Preserve custom uploaded avatar/logo across Google OAuth sign-in sessions!
-  // If user previously set a custom avatar in SQLite or MongoDB, ALWAYS KEEP IT.
-  // Only fall back to Google picture (or DiceBear) for brand new streamers without any avatar.
-  const existingAvatar = (sqliteStreamer?.avatar_url || existingMongoUser?.avatarUrl || '').trim();
-  const resolvedAvatar = existingAvatar || avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamerUsername}`;
+  const existingAvatar = (existingMongoUser?.avatarUrl || '').trim();
+  const finalAvatar = existingAvatar || avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamerUsername}`;
 
-  // 5. Upsert into SQLite streamers table
-  db.prepare(`
-    INSERT INTO streamers (
-      id, email, username, display_name, avatar_url, bio, custom_thanks_message,
-      is_verified, plan, overlay_token, telegram_pairing_code, social_links
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      email = excluded.email,
-      username = excluded.username,
-      display_name = excluded.display_name,
-      avatar_url = CASE
-        WHEN streamers.avatar_url IS NOT NULL AND streamers.avatar_url != '' THEN streamers.avatar_url
-        WHEN excluded.avatar_url IS NOT NULL AND excluded.avatar_url != '' THEN excluded.avatar_url
-        ELSE streamers.avatar_url
-      END,
-      bio = COALESCE(excluded.bio, streamers.bio),
-      plan = COALESCE(excluded.plan, streamers.plan),
-      overlay_token = COALESCE(streamers.overlay_token, excluded.overlay_token),
-      telegram_pairing_code = COALESCE(streamers.telegram_pairing_code, excluded.telegram_pairing_code)
-  `).run(
-    streamerId,
-    email,
-    streamerUsername,
-    displayName,
-    resolvedAvatar,
-    bio,
-    customThanks,
-    isVerified,
-    plan,
-    overlayToken,
-    pairingCode,
-    socialLinks
+  // Upsert user into MongoDB
+  await usersCol.updateOne(
+    { userId: streamerId },
+    {
+      $set: {
+        username: streamerUsername,
+        displayName,
+        email,
+        avatarUrl: finalAvatar,
+        overlayToken,
+        telegramPairingCode: pairingCode,
+        updatedAt: new Date()
+      },
+      $setOnInsert: {
+        userId: streamerId,
+        bio,
+        customThanksMessage: customThanks,
+        isVerified,
+        plan,
+        socialLinks,
+        createdAt: new Date()
+      }
+    },
+    { upsert: true }
   );
 
-  // Ensure default alert & payment settings in SQLite
+  // Ensure default overlay
   try {
-    const existingAlert = db.prepare('SELECT streamer_id FROM alert_settings WHERE streamer_id = ?').get(streamerId);
-    if (!existingAlert) {
-      db.prepare(`
-        INSERT INTO alert_settings (streamer_id, glow_color, sound_url)
-        VALUES (?, '#00F0FF', '/sounds/neon-chime.mp3')
-      `).run(streamerId);
-    }
-  } catch (e) {}
-
-  try {
-    const existingPay = db.prepare('SELECT streamer_id FROM payment_settings WHERE streamer_id = ?').get(streamerId);
-    if (!existingPay) {
-      db.prepare(`
-        INSERT INTO payment_settings (streamer_id, bakong_account_id, bakong_account_name)
-        VALUES (?, ?, ?)
-      `).run(streamerId, `${streamerUsername}@abaa`, displayName.toUpperCase());
-    }
-    // Restore Master KHQR from persistent MongoDB Atlas backup
-    const { restoreMasterKhqrImage } = await import('@/server/database/mongo');
-    await restoreMasterKhqrImage(streamerId, streamerUsername);
-  } catch (e) {}
-
-  let streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(streamerId) as any;
-
-  // 4. Synchronize user and assets to MongoDB Atlas
-  try {
-    const usersCol = await getUsersCollection();
-    const finalMongoAvatar = (streamer?.avatar_url || existingMongoUser?.avatarUrl || existingAvatar || resolvedAvatar).trim();
-    const mongoUpdate: any = {
-      username: streamerUsername,
-      displayName,
-      email,
-      updatedAt: new Date()
-    };
-    if (finalMongoAvatar) {
-      mongoUpdate.avatarUrl = finalMongoAvatar;
-    }
-
-    await usersCol.updateOne(
-      { userId: streamerId },
-      {
-        $set: mongoUpdate,
-        $setOnInsert: {
-          userId: streamerId,
-          bio,
-          customThanksMessage: customThanks,
-          isVerified: isVerified === 1,
-          plan,
-          createdAt: new Date()
-        }
-      },
-      { upsert: true }
-    );
-
     const overlaysCol = await getOverlaysCollection();
     const existingOverlay = await overlaysCol.findOne({ userId: streamerId });
     if (!existingOverlay && overlayToken) {
@@ -352,21 +249,71 @@ export async function upsertGoogleStreamer(profile: {
         updatedAt: new Date()
       });
     }
+  } catch (e) {}
 
-    // Auto-rescue any media files uploaded under this Google email
-    try {
-      const { getMediaCollection } = await import('@/server/database/mongo');
-      const mediaCol = await getMediaCollection();
-      await mediaCol.updateMany(
-        { userEmail: email, userId: { $ne: streamerId } },
-        { $set: { userId: streamerId } }
-      );
-    } catch (e) {}
-  } catch (mongoErr) {
-    console.warn('[Auth] Non-fatal MongoDB user sync warning:', mongoErr);
-  }
+  // Ensure default alert settings
+  try {
+    const alertSettingsCol = await getAlertSettingsCollection();
+    const existingAlert = await alertSettingsCol.findOne({ streamerId });
+    if (!existingAlert) {
+      await alertSettingsCol.insertOne({
+        streamerId,
+        glowColor: '#00F0FF',
+        soundUrl: '/sounds/neon-chime.mp3',
+        soundVolume: 0.85,
+        durationSeconds: 5,
+        ttsEnabled: true,
+        ttsVoice: 'female',
+        minAmountAlert: 0.5,
+        updatedAt: new Date()
+      });
+    }
+  } catch (e) {}
 
-  return streamer;
+  // Ensure default payment settings
+  try {
+    const paymentSettingsCol = await getPaymentSettingsCollection();
+    const existingPay = await paymentSettingsCol.findOne({ streamerId });
+    if (!existingPay) {
+      await paymentSettingsCol.insertOne({
+        streamerId,
+        bakongAccountId: `${streamerUsername}@abaa`,
+        bankAccountName: displayName.toUpperCase(),
+        allowUsd: true,
+        allowKhr: true,
+        usdMinAmount: 0.5,
+        khrMinAmount: 2000,
+        exchangeRate: 4100,
+        updatedAt: new Date()
+      });
+    }
+    await restoreMasterKhqrImage(streamerId, streamerUsername);
+  } catch (e) {}
+
+  // Auto-rescue any media files uploaded under this Google email
+  try {
+    const { getMediaCollection } = await import('@/server/database/mongo');
+    const mediaCol = await getMediaCollection();
+    await mediaCol.updateMany(
+      { userEmail: email, userId: { $ne: streamerId } },
+      { $set: { userId: streamerId } }
+    );
+  } catch (e) {}
+
+  return {
+    id: streamerId,
+    email,
+    username: streamerUsername,
+    display_name: displayName,
+    avatar_url: finalAvatar,
+    bio,
+    custom_thanks_message: customThanks,
+    is_verified: isVerified ? 1 : 0,
+    plan,
+    overlay_token: overlayToken,
+    telegram_pairing_code: pairingCode,
+    social_links: JSON.stringify(socialLinks)
+  };
 }
 
 /**

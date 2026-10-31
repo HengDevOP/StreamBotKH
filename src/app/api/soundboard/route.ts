@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/server/database/db';
+import { getSoundboardsCollection, getSoundboardItemsCollection } from '@/server/database/mongo';
 import { getIO } from '@/server/services/socketService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -537,88 +537,81 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token') || 'demo-token';
 
+    const sbCol = await getSoundboardsCollection();
+    const sbiCol = await getSoundboardItemsCollection();
+
     // 1. Get or create Soundboard Settings
-    let settings = db.prepare('SELECT * FROM stream_soundboards WHERE streamer_token = ?').get(token) as any;
+    let settings = await sbCol.findOne({ streamerToken: token }) as any;
     if (!settings) {
       const newSettingsId = uuidv4();
-      db.prepare(`
-        INSERT INTO stream_soundboards (
-          id, streamer_token, master_volume, is_listening, output_mode, playback_mode,
-          show_visual_alert, stop_keybind, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `).run(
-        newSettingsId,
-        token,
-        0.8,
-        1,
-        'both',
-        'overlap',
-        1,
-        'Escape'
-      );
-      settings = db.prepare('SELECT * FROM stream_soundboards WHERE id = ?').get(newSettingsId) as any;
+      const defaultDoc = {
+        id: newSettingsId,
+        streamerToken: token,
+        masterVolume: 0.8,
+        isListening: true,
+        outputMode: 'both',
+        playbackMode: 'overlap',
+        showVisualAlert: true,
+        stopKeybind: 'Escape',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      await sbCol.insertOne(defaultDoc as any);
+      settings = defaultDoc;
     }
 
-    // 2. Get or seed Soundboard Items
-    let items = db.prepare('SELECT * FROM stream_soundboard_items WHERE streamer_token = ? ORDER BY sort_order ASC, created_at ASC').all(token) as any[];
+    // 2. Get or seed Soundboard Items (up to 9 pads maximum)
+    let items = await sbiCol.find({ streamerToken: token }).sort({ sortOrder: 1, createdAt: 1 }).limit(9).toArray();
 
     if (!items || items.length === 0) {
-      const insertStmt = db.prepare(`
-        INSERT INTO stream_soundboard_items (
-          id, streamer_token, title, category, sound_url, keybind, keybind_code,
-          keybind_display, volume, color, icon_name, duration_seconds, is_loop, sort_order, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      `);
+      const docsToInsert = DEFAULT_SOUNDBOARD_ITEMS.slice(0, 9).map((def, index) => ({
+        id: uuidv4(),
+        streamerToken: token,
+        title: def.title,
+        category: def.category,
+        soundUrl: def.soundUrl,
+        keybind: def.keybind,
+        keybindCode: def.keybindCode,
+        keybindDisplay: def.keybindDisplay,
+        volume: def.volume,
+        color: def.color,
+        iconName: def.iconName,
+        durationSeconds: def.durationSeconds,
+        isLoop: def.isLoop === 1,
+        sortOrder: index + 1,
+        createdAt: new Date()
+      }));
 
-      DEFAULT_SOUNDBOARD_ITEMS.forEach((def, index) => {
-        insertStmt.run(
-          uuidv4(),
-          token,
-          def.title,
-          def.category,
-          def.soundUrl,
-          def.keybind,
-          def.keybindCode,
-          def.keybindDisplay,
-          def.volume,
-          def.color,
-          def.iconName,
-          def.durationSeconds,
-          def.isLoop,
-          index + 1
-        );
-      });
-
-      items = db.prepare('SELECT * FROM stream_soundboard_items WHERE streamer_token = ? ORDER BY sort_order ASC, created_at ASC').all(token) as any[];
+      await sbiCol.insertMany(docsToInsert as any);
+      items = await sbiCol.find({ streamerToken: token }).sort({ sortOrder: 1, createdAt: 1 }).limit(9).toArray();
     }
 
-    // Map database snake_case to camelCase
     const formattedSettings = {
-      id: settings.id,
-      token: settings.streamer_token,
-      masterVolume: settings.master_volume ?? 0.8,
-      isListening: Boolean(settings.is_listening ?? 1),
-      outputMode: settings.output_mode || 'both',
-      playbackMode: settings.playback_mode || 'overlap',
-      showVisualAlert: Boolean(settings.show_visual_alert ?? 1),
-      stopKeybind: settings.stop_keybind || 'Escape'
+      id: settings.id || String(settings._id),
+      token: settings.streamerToken || token,
+      masterVolume: settings.masterVolume ?? settings.master_volume ?? 0.8,
+      isListening: Boolean(settings.isListening ?? (settings.is_listening ?? 1)),
+      outputMode: settings.outputMode || settings.output_mode || 'both',
+      playbackMode: settings.playbackMode || settings.playback_mode || 'overlap',
+      showVisualAlert: Boolean(settings.showVisualAlert ?? (settings.show_visual_alert ?? 1)),
+      stopKeybind: settings.stopKeybind || settings.stop_keybind || 'Escape'
     };
 
-    const formattedItems = (items || []).map((it) => ({
-      id: it.id,
-      streamerToken: it.streamer_token,
+    const formattedItems = (items || []).map((it: any) => ({
+      id: it.id || String(it._id),
+      streamerToken: it.streamerToken || it.streamer_token,
       title: it.title,
       category: it.category || 'Memes',
-      soundUrl: it.sound_url,
+      soundUrl: it.soundUrl || it.sound_url,
       keybind: it.keybind || '',
-      keybindCode: it.keybind_code || '',
-      keybindDisplay: it.keybind_display || '',
+      keybindCode: it.keybindCode || it.keybind_code || '',
+      keybindDisplay: it.keybindDisplay || it.keybind_display || '',
       volume: it.volume ?? 0.8,
       color: it.color || '#00F0FF',
-      iconName: it.icon_name || 'Volume2',
-      durationSeconds: it.duration_seconds ?? 2.0,
-      isLoop: Boolean(it.is_loop ?? 0),
-      sortOrder: it.sort_order ?? 0
+      iconName: it.iconName || it.icon_name || 'Volume2',
+      durationSeconds: it.durationSeconds ?? it.duration_seconds ?? 2.0,
+      isLoop: Boolean(it.isLoop ?? (it.is_loop ?? 0)),
+      sortOrder: it.sortOrder ?? it.sort_order ?? 0
     }));
 
     return NextResponse.json({
@@ -641,75 +634,98 @@ export async function POST(req: NextRequest) {
     const token = body.token || 'demo-token';
     const action = body.action || 'update_settings';
 
-    // ACTION: Reset to default sounds
+    const sbCol = await getSoundboardsCollection();
+    const sbiCol = await getSoundboardItemsCollection();
+
+    // ACTION: Reset to default sounds (up to 9 original sounds)
     if (action === 'reset_defaults') {
-      db.prepare('DELETE FROM stream_soundboard_items WHERE streamer_token = ?').run(token);
+      await sbiCol.deleteMany({ streamerToken: token });
 
-      const insertStmt = db.prepare(`
-        INSERT INTO stream_soundboard_items (
-          id, streamer_token, title, category, sound_url, keybind, keybind_code,
-          keybind_display, volume, color, icon_name, duration_seconds, is_loop, sort_order, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      `);
+      const docsToInsert = DEFAULT_SOUNDBOARD_ITEMS.slice(0, 9).map((def, index) => ({
+        id: uuidv4(),
+        streamerToken: token,
+        title: def.title,
+        category: def.category,
+        soundUrl: def.soundUrl,
+        keybind: def.keybind,
+        keybindCode: def.keybindCode,
+        keybindDisplay: def.keybindDisplay,
+        volume: def.volume,
+        color: def.color,
+        iconName: def.iconName,
+        durationSeconds: def.durationSeconds,
+        isLoop: def.isLoop === 1,
+        sortOrder: index + 1,
+        createdAt: new Date()
+      }));
 
-      DEFAULT_SOUNDBOARD_ITEMS.forEach((def, index) => {
-        insertStmt.run(
-          uuidv4(),
-          token,
-          def.title,
-          def.category,
-          def.soundUrl,
-          def.keybind,
-          def.keybindCode,
-          def.keybindDisplay,
-          def.volume,
-          def.color,
-          def.iconName,
-          def.durationSeconds,
-          def.isLoop,
-          index + 1
-        );
-      });
+      await sbiCol.insertMany(docsToInsert as any);
 
       const io = getIO();
       if (io) {
         io.to(`overlay:${token}`).emit('soundboard:update', { token, type: 'reset' });
       }
 
-      return NextResponse.json({ success: true, message: 'Soundboard reset to default sounds' });
+      return NextResponse.json({ success: true, message: 'Soundboard reset to 9 default sounds' });
     }
 
-    // ACTION: Add new sound pad
+    // ACTION: Reorder sound pads by index (drag & drop)
+    if (action === 'reorder_items') {
+      const itemIds = (body.itemIds || []) as string[];
+      if (!Array.isArray(itemIds) || itemIds.length === 0) {
+        return NextResponse.json({ success: false, error: 'itemIds array is required' }, { status: 400 });
+      }
+
+      for (let idx = 0; idx < Math.min(itemIds.length, 9); idx++) {
+        const id = itemIds[idx];
+        await sbiCol.updateOne(
+          { streamerToken: token, $or: [{ id }, { _id: id as any }] },
+          { $set: { sortOrder: idx + 1 } }
+        );
+      }
+
+      const io = getIO();
+      if (io) {
+        io.to(`overlay:${token}`).emit('soundboard:update', { token, type: 'reorder' });
+      }
+
+      return NextResponse.json({ success: true, message: 'Soundboard pads reordered successfully' });
+    }
+
+    // ACTION: Add new sound pad (max 9 sound pads allowed)
     if (action === 'add_item') {
       const item = body.item;
       if (!item || !item.title) {
         return NextResponse.json({ success: false, error: 'Sound title is required' }, { status: 400 });
       }
 
-      const id = item.id || uuidv4();
-      const count = (db.prepare('SELECT COUNT(*) as c FROM stream_soundboard_items WHERE streamer_token = ?').get(token) as any)?.c || 0;
+      const count = await sbiCol.countDocuments({ streamerToken: token });
+      if (count >= 9) {
+        return NextResponse.json(
+          { success: false, error: 'Maximum limit of 9 soundboard pads reached. Delete or edit an existing pad.' },
+          { status: 400 }
+        );
+      }
 
-      db.prepare(`
-        INSERT INTO stream_soundboard_items (
-          id, streamer_token, title, category, sound_url, keybind, keybind_code,
-          keybind_display, volume, color, icon_name, duration_seconds, is_loop, sort_order, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(
+      const id = item.id || uuidv4();
+
+      await sbiCol.insertOne({
         id,
-        token,
-        item.title,
-        item.category || 'Custom',
-        item.soundUrl || 'synth:airhorn',
-        item.keybind || '',
-        item.keybindCode || '',
-        item.keybindDisplay || '',
-        item.volume ?? 0.8,
-        item.color || '#00F0FF',
-        item.iconName || 'Volume2',
-        item.durationSeconds ?? 2.0,
-        item.isLoop ? 1 : 0,
-        count + 1
-      );
+        streamerToken: token,
+        title: item.title,
+        category: item.category || 'Custom',
+        soundUrl: item.soundUrl || 'synth:airhorn',
+        keybind: item.keybind || '',
+        keybindCode: item.keybindCode || '',
+        keybindDisplay: item.keybindDisplay || '',
+        volume: item.volume ?? 0.8,
+        color: item.color || '#00F0FF',
+        iconName: item.iconName || 'Volume2',
+        durationSeconds: item.durationSeconds ?? 2.0,
+        isLoop: Boolean(item.isLoop),
+        sortOrder: count + 1,
+        createdAt: new Date()
+      } as any);
 
       const io = getIO();
       if (io) {
@@ -719,41 +735,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, id, message: 'Sound added successfully' });
     }
 
-    // ACTION: Update a specific sound pad (e.g. keybind change, rename, volume)
+    // ACTION: Update a specific sound pad
     if (action === 'update_item') {
       const item = body.item;
       if (!item || !item.id) {
         return NextResponse.json({ success: false, error: 'Item ID is required' }, { status: 400 });
       }
 
-      db.prepare(`
-        UPDATE stream_soundboard_items SET
-          title = COALESCE(?, title),
-          category = COALESCE(?, category),
-          sound_url = COALESCE(?, sound_url),
-          keybind = COALESCE(?, keybind),
-          keybind_code = COALESCE(?, keybind_code),
-          keybind_display = COALESCE(?, keybind_display),
-          volume = COALESCE(?, volume),
-          color = COALESCE(?, color),
-          icon_name = COALESCE(?, icon_name),
-          duration_seconds = COALESCE(?, duration_seconds),
-          is_loop = COALESCE(?, is_loop)
-        WHERE id = ? AND streamer_token = ?
-      `).run(
-        item.title,
-        item.category,
-        item.soundUrl,
-        item.keybind !== undefined ? item.keybind : null,
-        item.keybindCode !== undefined ? item.keybindCode : null,
-        item.keybindDisplay !== undefined ? item.keybindDisplay : null,
-        item.volume,
-        item.color,
-        item.iconName,
-        item.durationSeconds,
-        item.isLoop !== undefined ? (item.isLoop ? 1 : 0) : null,
-        item.id,
-        token
+      const updateFields: any = {};
+      if (item.title !== undefined) updateFields.title = item.title;
+      if (item.category !== undefined) updateFields.category = item.category;
+      if (item.soundUrl !== undefined) updateFields.soundUrl = item.soundUrl;
+      if (item.keybind !== undefined) updateFields.keybind = item.keybind;
+      if (item.keybindCode !== undefined) updateFields.keybindCode = item.keybindCode;
+      if (item.keybindDisplay !== undefined) updateFields.keybindDisplay = item.keybindDisplay;
+      if (item.volume !== undefined) updateFields.volume = item.volume;
+      if (item.color !== undefined) updateFields.color = item.color;
+      if (item.iconName !== undefined) updateFields.iconName = item.iconName;
+      if (item.durationSeconds !== undefined) updateFields.durationSeconds = item.durationSeconds;
+      if (item.isLoop !== undefined) updateFields.isLoop = Boolean(item.isLoop);
+
+      await sbiCol.updateOne(
+        { streamerToken: token, $or: [{ id: item.id }, { _id: item.id as any }] },
+        { $set: updateFields }
       );
 
       const io = getIO();
@@ -771,7 +775,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: 'Item ID is required' }, { status: 400 });
       }
 
-      db.prepare('DELETE FROM stream_soundboard_items WHERE id = ? AND streamer_token = ?').run(itemId, token);
+      await sbiCol.deleteOne({ streamerToken: token, $or: [{ id: itemId }, { _id: itemId as any }] });
 
       const io = getIO();
       if (io) {
@@ -791,45 +795,26 @@ export async function POST(req: NextRequest) {
       stopKeybind
     } = body;
 
-    let existing = db.prepare('SELECT id FROM stream_soundboards WHERE streamer_token = ?').get(token) as any;
+    const setFields: any = { updatedAt: new Date() };
+    if (masterVolume !== undefined) setFields.masterVolume = masterVolume;
+    if (isListening !== undefined) setFields.isListening = Boolean(isListening);
+    if (outputMode !== undefined) setFields.outputMode = outputMode;
+    if (playbackMode !== undefined) setFields.playbackMode = playbackMode;
+    if (showVisualAlert !== undefined) setFields.showVisualAlert = Boolean(showVisualAlert);
+    if (stopKeybind !== undefined) setFields.stopKeybind = stopKeybind;
 
-    if (existing) {
-      db.prepare(`
-        UPDATE stream_soundboards SET
-          master_volume = COALESCE(?, master_volume),
-          is_listening = COALESCE(?, is_listening),
-          output_mode = COALESCE(?, output_mode),
-          playback_mode = COALESCE(?, playback_mode),
-          show_visual_alert = COALESCE(?, show_visual_alert),
-          stop_keybind = COALESCE(?, stop_keybind),
-          updated_at = datetime('now')
-        WHERE streamer_token = ?
-      `).run(
-        masterVolume !== undefined ? masterVolume : null,
-        isListening !== undefined ? (isListening ? 1 : 0) : null,
-        outputMode || null,
-        playbackMode || null,
-        showVisualAlert !== undefined ? (showVisualAlert ? 1 : 0) : null,
-        stopKeybind || null,
-        token
-      );
-    } else {
-      db.prepare(`
-        INSERT INTO stream_soundboards (
-          id, streamer_token, master_volume, is_listening, output_mode, playback_mode,
-          show_visual_alert, stop_keybind, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-      `).run(
-        uuidv4(),
-        token,
-        masterVolume ?? 0.8,
-        isListening !== undefined ? (isListening ? 1 : 0) : 1,
-        outputMode || 'both',
-        playbackMode || 'overlap',
-        showVisualAlert !== undefined ? (showVisualAlert ? 1 : 0) : 1,
-        stopKeybind || 'Escape'
-      );
-    }
+    await sbCol.updateOne(
+      { streamerToken: token },
+      {
+        $set: setFields,
+        $setOnInsert: {
+          id: uuidv4(),
+          streamerToken: token,
+          createdAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
 
     const io = getIO();
     if (io) {

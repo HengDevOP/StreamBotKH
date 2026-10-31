@@ -223,6 +223,61 @@ export interface PlatformPromotionDoc {
   updatedAt: Date;
 }
 
+export interface SystemIncidentDoc {
+  _id?: ObjectId;
+  id: string;
+  title: string;
+  description?: string;
+  severity: 'minor' | 'major' | 'critical';
+  status: 'investigating' | 'fixing' | 'resolved';
+  affectedComponents: string[];
+  updates: Array<{
+    id: string;
+    status: 'investigating' | 'fixing' | 'resolved';
+    message: string;
+    authorEmail?: string;
+    createdAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string | null;
+}
+
+export interface SupportTicketDoc {
+  _id?: ObjectId;
+  id: string;
+  ticketNumber?: number;
+  streamerId: string;
+  streamerUsername?: string;
+  streamerDisplayName?: string;
+  streamerEmail?: string;
+  streamerAvatar?: string;
+  title: string;
+  category: string;
+  priority: string;
+  status: 'open' | 'claimed' | 'resolved' | 'closed';
+  claimedById?: string;
+  claimedByName?: string;
+  claimedByAvatar?: string;
+  claimedAt?: string;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketMessageDoc {
+  _id?: ObjectId;
+  id: string;
+  ticketId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'user' | 'admin' | 'system';
+  senderAvatar?: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface IssueReportDoc {
   _id?: ObjectId;
   id: string;
@@ -526,6 +581,36 @@ export async function getTemporaryDonationsCollection(): Promise<Collection<Temp
   return db.collection<TemporaryDonationDoc>('temporary_donations');
 }
 
+export async function getSupportTicketsCollection(): Promise<Collection<SupportTicketDoc>> {
+  const db = await getMongoDb();
+  return db.collection<SupportTicketDoc>('support_tickets');
+}
+
+export async function getTicketMessagesCollection(): Promise<Collection<TicketMessageDoc>> {
+  const db = await getMongoDb();
+  return db.collection<TicketMessageDoc>('ticket_messages');
+}
+
+export async function getSystemIncidentsCollection(): Promise<Collection<SystemIncidentDoc>> {
+  const db = await getMongoDb();
+  return db.collection<SystemIncidentDoc>('system_incidents');
+}
+
+export async function purgeOldSystemIncidentsMongo(days = 30) {
+  try {
+    const col = await getSystemIncidentsCollection();
+    const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const result = await col.deleteMany({
+      createdAt: { $lt: cutoffDate }
+    });
+    if (result.deletedCount && result.deletedCount > 0) {
+      console.log(`🧹 [MongoDB] Purged ${result.deletedCount} system incidents older than ${days} days`);
+    }
+  } catch (e) {
+    console.warn('[MongoDB] Purge old incidents warning:', e);
+  }
+}
+
 export async function getIssueReportsCollection(): Promise<Collection<IssueReportDoc>> {
   const db = await getMongoDb();
   return db.collection<IssueReportDoc>('issue_reports');
@@ -760,7 +845,7 @@ export async function seedDefaultMailboxMessages(streamerId: string) {
         senderName: 'StreamBotKH Team',
         senderAvatar: '',
         category: 'system',
-        content: `Welcome to StreamBotKH! We are thrilled to empower your live streaming journey across Cambodia and beyond.\n\nHere are a few quick tips to get set up:\n1. Payment Gateway: Connect your Telegram bank notification group to receive instant Bakong KHQR alerts with 0% platform fee.\n2. Overlays: Copy your donation alert or goal overlay URL and paste it as a Browser Source in OBS Studio.\n3. Interactive Widgets: Engage your audience with the Subathon Timer, Spinning Wheel, and 2D Pokémon overlays.\n\nIf you ever need help or encounter an issue, visit the Report Issue tab. Happy Streaming!`,
+        content: `Welcome to StreamBotKH! We are thrilled to empower your live streaming journey across Cambodia and beyond.\n\nHere are a few quick tips to get set up:\n1. Payment Gateway: Connect your Telegram bank notification group to receive instant Bakong KHQR alerts with 0% platform fee.\n2. Overlays: Copy your donation alert or goal overlay URL and paste it as a Browser Source in OBS Studio.\n3. Interactive Widgets: Engage your audience with the Subathon Timer, Spinning Wheel, and 2D Pokémon overlays.\n\nIf you ever need help or encounter an issue, visit the Ticket Support tab. Happy Streaming!`,
         preview: 'Welcome to StreamBotKH! We are thrilled to empower your live streaming journey...',
         isRead: false,
         actionUrl: '/dashboard?tab=overview',
@@ -1043,14 +1128,14 @@ export async function initMongo() {
 
 /**
  * Helper to ensure a streamer's Master KHQR image is verified and restored:
- * 1. Checks MongoDB gateway_settings and SQLite payment_settings.
+ * 1. Checks MongoDB gateway_settings and payment_settings.
  * 2. If the physical file on disk exists:
  *    - Backs it up to MongoDB as base64 (if not already backed up).
- *    - Ensures SQLite and MongoDB point to the correct file path.
+ *    - Ensures MongoDB points to the correct file path.
  * 3. If the physical file on disk is missing:
  *    - Recreates the file on disk from MongoDB's base64 backup.
  *    - If no base64, searches disk folder /uploads/payment/<streamerId>/ for an existing image.
- *    - Syncs the working path to both SQLite and MongoDB.
+ *    - Syncs the working path in MongoDB.
  */
 export async function restoreMasterKhqrImage(
   streamerId?: string,

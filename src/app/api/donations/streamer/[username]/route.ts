@@ -7,6 +7,7 @@ import {
   getGatewayConfigCollection,
   restoreMasterKhqrImage
 } from '@/server/database/mongo';
+import { extractYoutubeId } from '@/utils/youtube';
 
 export async function GET(
   _req: NextRequest,
@@ -124,6 +125,8 @@ export async function GET(
       socialLinks: userSocialLinks,
       links: userSocialLinks,
       isVerified: Boolean(mongoUser.isVerified),
+      liveStreamUrl: mongoUser.liveStreamUrl || mongoUser.youtubeLiveUrl || '',
+      youtubeId: extractYoutubeId(mongoUser.liveStreamUrl || mongoUser.youtubeLiveUrl) || undefined,
       plan: currentPlan,
       glowColor: alertSettings?.glowColor || alertSettings?.glow_color || '#00F0FF',
       minAmountAlert: Number(alertSettings?.minAmountAlert ?? alertSettings?.min_amount_alert ?? 1.0),

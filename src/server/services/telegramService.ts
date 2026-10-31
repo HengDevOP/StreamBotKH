@@ -1,67 +1,80 @@
 import axios from 'axios';
-import { db } from '../database/db';
+import {
+  getUsersCollection,
+  getDonationsCollection,
+  getAlertSettingsCollection
+} from '../database/mongo';
 import { broadcastAlertToOverlay } from './socketService';
 
-export interface TelegramDonationNotification {
+export interface TelegramDonationAlertParams {
   chatId: string;
   streamerName: string;
   donorName: string;
   donorMessage?: string;
   amount: number;
-  currency: string;
-  tranId: string;
+  currency: 'USD' | 'KHR';
   bankingName?: string;
+  tranId: string;
 }
 
-export async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTML' | 'Markdown' = 'HTML') {
+/**
+ * Sends formatted Telegram message via Bot API
+ */
+export async function sendTelegramMessage(chatId: string, text: string): Promise<boolean> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (!botToken) {
-    console.log(`[Telegram] [MOCK BOT] Would send to Chat ID ${chatId}:\n${text}`);
-    return;
-  }
+  if (!botToken || !chatId) return false;
 
   try {
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
     await axios.post(url, {
       chat_id: chatId,
       text,
-      parse_mode: parseMode
-    });
-  } catch (error: any) {
-    console.error('[Telegram] Failed to send message:', error?.response?.data || error.message);
+      parse_mode: 'HTML',
+      disable_web_page_preview: true
+    }, { timeout: 6000 });
+    return true;
+  } catch (err: any) {
+    console.error('[Telegram Bot] Send message error:', err.response?.data || err.message);
+    return false;
   }
 }
 
-export async function sendTelegramDonationAlert(params: TelegramDonationNotification) {
-  const { chatId, streamerName, donorName, donorMessage, amount, currency, tranId, bankingName } = params;
+/**
+ * Sends real-time tip alert to streamer's private Telegram chat
+ */
+export async function sendTelegramDonationAlert(params: TelegramDonationAlertParams): Promise<boolean> {
+  const { chatId, streamerName, donorName, donorMessage, amount, currency, bankingName, tranId } = params;
 
   const formattedAmount = currency === 'KHR'
-    ? `${amount.toLocaleString()} ៛`
-    : `$${amount.toFixed(2)}`;
+    ? `${Number(amount).toLocaleString()} ៛`
+    : `$${Number(amount).toFixed(2)}`;
 
   const messageText = `
-⚡ <b>StreamNeon VIP Alert!</b> ⚡
+⚡ <b>NEW BAKONG KHQR DONATION!</b> ⚡
 ━━━━━━━━━━━━━━━━━━━━
-🎉 <b>New Donation Received!</b>
-👤 <b>Donor:</b> <code>${donorName}</code>
-💰 <b>Amount:</b> <b>${formattedAmount}</b>
-${bankingName ? `🏦 <b>Bank App:</b> <code>${bankingName}</code>\n` : ''}${donorMessage ? `💬 <b>Message:</b> <i>"${donorMessage}"</i>\n` : ''}🔖 <b>Ref:</b> <code>${tranId}</code>
+👤 <b>Supporter:</b> ${donorName}
+💰 <b>Amount:</b> <code>${formattedAmount}</code>
+🏦 <b>Via:</b> ${bankingName || 'Bakong KHQR'}
+${donorMessage ? `💬 <b>Message:</b> <i>"${donorMessage}"</i>` : ''}
 ━━━━━━━━━━━━━━━━━━━━
-<i>Live alert dispatched to your OBS overlay screen!</i> 🚀
-`.trim();
+🆔 <b>Tran ID:</b> <code>${tranId}</code>
+🎉 Alert broadcasted live to your OBS overlay!
+  `.trim();
 
-  await sendTelegramMessage(chatId, messageText);
+  return sendTelegramMessage(chatId, messageText);
 }
 
 /**
- * Handle incoming Telegram bot messages (via webhook or polling)
+ * Handles incoming Telegram bot webhook updates (/start, /balance, /recent, /unlink)
  */
-export async function handleTelegramUpdate(update: any) {
-  const message = update?.message;
+export async function handleTelegramWebhookUpdate(body: any) {
+  const message = body?.message;
   if (!message || !message.text) return;
 
-  const chatId = message.chat.id.toString();
+  const chatId = String(message.chat.id);
   const text = message.text.trim();
+  const usersCol = await getUsersCollection();
+  const donationsCol = await getDonationsCollection();
 
   // 1. /start [code]
   if (text.startsWith('/start')) {
@@ -69,20 +82,32 @@ export async function handleTelegramUpdate(update: any) {
     const code = parts[1]?.trim();
 
     if (code) {
-      // Find streamer by pairing code or overlay token
-      const streamer = db.prepare(`
-        SELECT id, display_name, overlay_token
-        FROM streamers
-        WHERE telegram_pairing_code = ? OR overlay_token = ?
-      `).get(code, code) as any;
+      // Find streamer by pairing code or overlay token in MongoDB
+      const streamer = await usersCol.findOne({
+        $or: [
+          { telegramPairingCode: code },
+          { overlayToken: code },
+          { ['overlay_token']: code } as any,
+          { ['telegram_pairing_code']: code } as any
+        ]
+      });
 
       if (streamer) {
-        db.prepare('UPDATE streamers SET telegram_chat_id = ? WHERE id = ?').run(chatId, streamer.id);
+        await usersCol.updateOne(
+          { _id: streamer._id },
+          {
+            $set: {
+              telegramChatId: chatId,
+              telegram_chat_id: chatId,
+              updatedAt: new Date()
+            }
+          }
+        );
 
         const welcomeText = `
 ✅ <b>Connected Successfully to StreamNeon.vip!</b>
 
-Welcome, <b>${streamer.display_name}</b>!
+Welcome, <b>${streamer.displayName || streamer.username}</b>!
 Your Telegram account is now linked. You will receive instant notifications whenever a fan tips you via ABA PayWay or Bakong KHQR.
 
 <b>Available Commands:</b>
@@ -109,46 +134,55 @@ To connect your streamer account:
     return;
   }
 
-  // Find linked streamer for this chat
-  const streamer = db.prepare('SELECT * FROM streamers WHERE telegram_chat_id = ?').get(chatId) as any;
+  // Find linked streamer for this chat in MongoDB
+  const streamer = await usersCol.findOne({
+    $or: [{ telegramChatId: chatId }, { ['telegram_chat_id']: chatId } as any]
+  });
 
   if (!streamer) {
     await sendTelegramMessage(chatId, '⚠️ This Telegram chat is not linked to any StreamNeon account yet. Please send <code>/start &lt;PAIRING_CODE&gt;</code>.');
     return;
   }
 
+  const streamerKey = streamer.userId || (streamer as any).id || String(streamer._id);
+
   // 2. /balance
   if (text === '/balance') {
-    const statsToday = db.prepare(`
-      SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total_usd
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'USD'
-      AND date(paid_at) = date('now')
-    `).get(streamer.id) as any;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
-    const statsTodayKhr = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total_khr
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'KHR'
-      AND date(paid_at) = date('now')
-    `).get(streamer.id) as any;
+    const paidDonations = await donationsCol.find({
+      $or: [{ streamerId: streamerKey }, ...(streamer.username ? [{ streamerUsername: streamer.username }] : [])],
+      status: 'PAID'
+    }).toArray();
 
-    const allTimeUsd = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID' AND currency = 'USD'
-    `).get(streamer.id) as any;
+    const todayDonations = paidDonations.filter((d) => {
+      const dt = d.paidAt || d.createdAt;
+      return dt && new Date(dt) >= startOfToday;
+    });
+
+    const todayUsd = todayDonations
+      .filter((d) => d.currency === 'USD')
+      .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+    const todayKhr = todayDonations
+      .filter((d) => d.currency === 'KHR')
+      .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+    const allTimeUsd = paidDonations
+      .filter((d) => d.currency === 'USD')
+      .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
     const balText = `
-📊 <b>Donation Summary for ${streamer.display_name}</b>
+📊 <b>Donation Summary for ${streamer.displayName || streamer.username}</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>Today's Tips:</b>
-• Total Donors: <b>${statsToday.count}</b>
-• Revenue USD: <b>$${Number(statsToday.total_usd).toFixed(2)}</b>
-• Revenue KHR: <b>${Number(statsTodayKhr.total_khr).toLocaleString()} ៛</b>
+• Total Donors: <b>${todayDonations.length}</b>
+• Revenue USD: <b>$${todayUsd.toFixed(2)}</b>
+• Revenue KHR: <b>${todayKhr.toLocaleString()} ៛</b>
 
 <b>All-Time Revenue:</b>
-• Total USD: <b>$${Number(allTimeUsd.total).toFixed(2)}</b>
+• Total USD: <b>$${allTimeUsd.toFixed(2)}</b>
 ━━━━━━━━━━━━━━━━━━━━
     `.trim();
     await sendTelegramMessage(chatId, balText);
@@ -157,23 +191,23 @@ To connect your streamer account:
 
   // 3. /recent
   if (text === '/recent') {
-    const recent = db.prepare(`
-      SELECT donor_name, amount, currency, donor_message, paid_at
-      FROM donations
-      WHERE streamer_id = ? AND status = 'PAID'
-      ORDER BY paid_at DESC
-      LIMIT 5
-    `).all(streamer.id) as any[];
+    const recent = await donationsCol.find({
+      $or: [{ streamerId: streamerKey }, ...(streamer.username ? [{ streamerUsername: streamer.username }] : [])],
+      status: 'PAID'
+    })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .toArray();
 
     if (recent.length === 0) {
       await sendTelegramMessage(chatId, '📭 No donations recorded yet. Share your stream link to start receiving tips!');
       return;
     }
 
-    let listText = `<b>Recent 5 Donations for ${streamer.display_name}:</b>\n\n`;
+    let listText = `<b>Recent 5 Donations for ${streamer.displayName || streamer.username}:</b>\n\n`;
     for (const d of recent) {
-      const amt = d.currency === 'KHR' ? `${d.amount.toLocaleString()} ៛` : `$${d.amount.toFixed(2)}`;
-      listText += `• <b>${d.donor_name}</b>: <b>${amt}</b>\n  <i>"${d.donor_message || 'No message'}"</i>\n`;
+      const amt = d.currency === 'KHR' ? `${Number(d.amount).toLocaleString()} ៛` : `$${Number(d.amount).toFixed(2)}`;
+      listText += `• <b>${d.donorName}</b>: <b>${amt}</b>\n  <i>"${d.donorMessage || 'No message'}"</i>\n`;
     }
     await sendTelegramMessage(chatId, listText);
     return;
@@ -181,30 +215,46 @@ To connect your streamer account:
 
   // 4. /testalert
   if (text === '/testalert') {
-    const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(streamer.id) as any;
-    broadcastAlertToOverlay(streamer.overlay_token, {
-      donationId: 'tg-test-' + Date.now(),
-      donorName: 'Telegram Bot',
-      donorMessage: 'Test alert sent directly from Telegram! 🚀',
-      amount: 10.0,
-      currency: 'USD',
-      templateStyle: alertSettings?.template_style || 'neon-box',
-      glowColor: alertSettings?.glow_color || '#00F0FF',
-      soundUrl: alertSettings?.sound_url || '/sounds/neon-chime.mp3',
-      soundVolume: alertSettings?.sound_volume || 0.8,
-      durationSeconds: alertSettings?.duration_seconds || 8,
-      ttsEnabled: true,
-      ttsVoice: 'Google US English',
-      isTest: true
+    const alertSettingsCol = await getAlertSettingsCollection();
+    const alertSettings = await alertSettingsCol.findOne({
+      $or: [{ streamerId: streamerKey }, ...(streamer.username ? [{ streamerId: streamer.username }] : [])]
     });
 
-    await sendTelegramMessage(chatId, '⚡ <b>Test alert fired!</b> Check your OBS overlay screen.');
+    const overlayToken = streamer.overlayToken || (streamer as any).overlay_token;
+    if (overlayToken) {
+      broadcastAlertToOverlay(overlayToken, {
+        donationId: 'tg-test-' + Date.now(),
+        donorName: 'Telegram Bot',
+        donorMessage: 'Test alert sent directly from Telegram! 🚀',
+        amount: 10.0,
+        currency: 'USD',
+        templateStyle: alertSettings?.templateStyle || 'neon-box',
+        glowColor: alertSettings?.glowColor || '#00F0FF',
+        soundUrl: alertSettings?.soundUrl || '/sounds/neon-chime.mp3',
+        soundVolume: alertSettings?.soundVolume ?? 0.8,
+        durationSeconds: alertSettings?.durationSeconds || 8,
+        ttsEnabled: true,
+        ttsVoice: 'Google US English',
+        isTest: true
+      });
+      await sendTelegramMessage(chatId, '⚡ <b>Test alert fired!</b> Check your OBS overlay screen.');
+    } else {
+      await sendTelegramMessage(chatId, '⚠️ Could not find active overlay token.');
+    }
     return;
   }
 
   // 5. /unlink
   if (text === '/unlink') {
-    db.prepare('UPDATE streamers SET telegram_chat_id = NULL WHERE id = ?').run(streamer.id);
+    await usersCol.updateOne(
+      { _id: streamer._id },
+      {
+        $unset: {
+          telegramChatId: '',
+          telegram_chat_id: ''
+        }
+      }
+    );
     await sendTelegramMessage(chatId, '🔌 Disconnected. This Telegram account will no longer receive alerts.');
     return;
   }

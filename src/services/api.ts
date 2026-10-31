@@ -12,12 +12,21 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     headers.set('Authorization', `Bearer ${token}`);
   }
 
+  // Normalize endpoint: avoid double /api/ prefix if caller passed /api/...
+  const cleanEndpoint = endpoint.startsWith('/api/')
+    ? endpoint
+    : endpoint === '/api'
+    ? '/api'
+    : endpoint.startsWith('/')
+    ? `${API_BASE}${endpoint}`
+    : `${API_BASE}/${endpoint}`;
+
   // 12-second timeout to prevent fetch from hanging the window forever
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000);
 
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(cleanEndpoint, {
       ...options,
       headers,
       signal: options.signal || controller.signal

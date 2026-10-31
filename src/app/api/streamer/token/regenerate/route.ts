@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getUsersCollection, getOverlayTokenHistoryCollection, getStreamGoalsCollection } from '@/server/database/mongo';
-import { db } from '@/server/database/db';
+import {
+  getUsersCollection,
+  getOverlayTokenHistoryCollection,
+  getStreamGoalsCollection,
+  getStreamTimersCollection,
+  getStreamLeaderboardsCollection,
+  getSoundboardsCollection,
+  getSoundboardItemsCollection,
+  getPokemonSettingsCollection
+} from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,41 +57,50 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    // Migrate all in-memory SQLite tables from old token → new token so goal/timer/widget data is preserved
+    // Migrate all widget collections in MongoDB from old token → new token
     if (oldToken) {
-      const tablesToMigrate = [
-        'stream_goals',
-        'stream_timers',
-        'stream_leaderboards',
-        'stream_soundboards',
-        'stream_soundboard_items',
-        'pokemon_widget_settings'
-      ];
-
-      for (const table of tablesToMigrate) {
-        try {
-          db.prepare(`UPDATE ${table} SET streamer_token = ? WHERE streamer_token = ?`).run(newToken, oldToken);
-        } catch (e) {}
-      }
-
-      console.log(`🔄 [Token Regenerate] Migrated SQLite widget data from ${oldToken.slice(0, 10)}... → ${newToken.slice(0, 10)}...`);
-    }
-
-    // Also migrate MongoDB stream_goals that reference the old token or this streamer
-    try {
-      const goalsCol = await getStreamGoalsCollection();
-      if (oldToken) {
+      try {
+        const goalsCol = await getStreamGoalsCollection();
         await goalsCol.updateMany(
           { $or: [{ streamerToken: oldToken }, { streamerId: user.id }] },
           { $set: { streamerToken: newToken, streamerId: user.id, updatedAt: new Date() } }
         );
-      } else {
-        await goalsCol.updateMany(
-          { streamerId: user.id },
+
+        const timersCol = await getStreamTimersCollection();
+        await timersCol.updateMany(
+          { $or: [{ streamerToken: oldToken }, { streamerId: user.id }] },
+          { $set: { streamerToken: newToken, streamerId: user.id, updatedAt: new Date() } }
+        );
+
+        const lbCol = await getStreamLeaderboardsCollection();
+        await lbCol.updateMany(
+          { $or: [{ streamerToken: oldToken }, { streamerId: user.id }] },
+          { $set: { streamerToken: newToken, streamerId: user.id, updatedAt: new Date() } }
+        );
+
+        const sbCol = await getSoundboardsCollection();
+        await sbCol.updateMany(
+          { $or: [{ streamerToken: oldToken }, { streamerId: user.id }] },
+          { $set: { streamerToken: newToken, streamerId: user.id, updatedAt: new Date() } }
+        );
+
+        const sbiCol = await getSoundboardItemsCollection();
+        await sbiCol.updateMany(
+          { streamerToken: oldToken },
           { $set: { streamerToken: newToken, updatedAt: new Date() } }
         );
+
+        const pokeCol = await getPokemonSettingsCollection();
+        await pokeCol.updateMany(
+          { $or: [{ streamerToken: oldToken }, { streamerId: user.id }] },
+          { $set: { streamerToken: newToken, streamerId: user.id, updatedAt: new Date() } }
+        );
+
+        console.log(`🔄 [Token Regenerate] Migrated MongoDB widget data from ${oldToken.slice(0, 10)}... → ${newToken.slice(0, 10)}...`);
+      } catch (e) {
+        console.warn('[Token Regenerate] Widget migration warning:', e);
       }
-    } catch (e) {}
+    }
 
     return NextResponse.json({ success: true, overlayToken: newToken });
   } catch (err: any) {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGatewayConfigCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
-import { db } from '@/server/database/db';
+import { getGatewayConfigCollection, getPaymentSettingsCollection, getUsersCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
 import { getAuthenticatedUser } from '@/server/auth';
 
 export async function GET(req: NextRequest) {
@@ -12,49 +11,39 @@ export async function GET(req: NextRequest) {
     let streamerId: string | null = null;
     let streamerUsername: string | null = null;
 
+    const usersCol = await getUsersCollection();
+
     if (paramStreamerId) {
       streamerId = paramStreamerId;
       try {
-        const row = db.prepare('SELECT id, username FROM streamers WHERE id = ? OR LOWER(username) = LOWER(?)').get(paramStreamerId, paramStreamerId) as any;
-        if (row?.username) streamerUsername = row.username;
-        if (row?.id) streamerId = row.id;
+        const mUser = await usersCol.findOne({
+          $or: [
+            { userId: paramStreamerId },
+            { id: paramStreamerId },
+            { username: { $regex: new RegExp(`^${paramStreamerId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+          ]
+        }) as any;
+        if (mUser?.username) streamerUsername = mUser.username;
+        if (mUser?.userId || mUser?.id) streamerId = mUser.userId || mUser.id;
       } catch (e) {}
-
-      if (!streamerUsername) {
-        try {
-          const usersCol = await (await import('@/server/database/mongo')).getUsersCollection();
-          const mUser = await usersCol.findOne({
-            $or: [{ userId: paramStreamerId }, { username: { $regex: new RegExp(`^${paramStreamerId}$`, 'i') } }]
-          });
-          if (mUser?.username) streamerUsername = mUser.username;
-          if (mUser?.userId) streamerId = mUser.userId;
-        } catch (e) {}
-      }
     }
 
     if (paramUsername) {
       const clean = paramUsername.replace(/^@/, '').trim();
       try {
-        const row = db.prepare('SELECT id, username FROM streamers WHERE LOWER(username) = LOWER(?) OR id = ?').get(clean, clean) as any;
-        if (row?.id) {
-          streamerId = row.id;
-          streamerUsername = row.username;
+        const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const mUser = await usersCol.findOne({
+          $or: [
+            { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+            { userId: clean },
+            { id: clean }
+          ]
+        }) as any;
+        if (mUser?.userId || mUser?.id) {
+          streamerId = mUser.userId || mUser.id;
+          streamerUsername = mUser.username;
         }
       } catch (e) {}
-
-      if (!streamerId) {
-        try {
-          const usersCol = await (await import('@/server/database/mongo')).getUsersCollection();
-          const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const mUser = await usersCol.findOne({
-            $or: [{ username: { $regex: new RegExp(`^${escaped}$`, 'i') } }, { userId: clean }]
-          });
-          if (mUser?.userId) {
-            streamerId = mUser.userId;
-            streamerUsername = mUser.username;
-          }
-        } catch (e) {}
-      }
     }
 
     if (!streamerId) {
@@ -70,17 +59,14 @@ export async function GET(req: NextRequest) {
     // 0. Automatically restore and verify Master KHQR from persistent backup if file was deleted or server restarted
     const restoreResult = await restoreMasterKhqrImage(effectiveStreamerId, streamerUsername || undefined);
 
-    // 1. Check SQLite payment_settings for this streamer
-    let sqliteSettings: any = null;
+    // 1. Check MongoDB payment_settings for this streamer
+    let mongoPaymentSettings: any = null;
     try {
-      sqliteSettings = db.prepare(`
-        SELECT * FROM payment_settings 
-        WHERE streamer_id = ? 
-           OR streamer_id = ?
-      `).get(effectiveStreamerId, streamerId || '') as any;
+      const payCol = await getPaymentSettingsCollection();
+      mongoPaymentSettings = await payCol.findOne({ streamerId: effectiveStreamerId });
     } catch (e) {}
 
-    // 2. Check MongoDB for this streamer
+    // 2. Check MongoDB gateway_settings for this streamer
     let mongoConfig: any = null;
     try {
       const gatewayCol = await getGatewayConfigCollection();
@@ -98,27 +84,29 @@ export async function GET(req: NextRequest) {
       khqrImageUrl = restoreResult.khqrImageUrl;
     } else if (mongoConfig && typeof mongoConfig.khqrImageUrl === 'string' && mongoConfig.khqrImageUrl.trim() !== '') {
       khqrImageUrl = mongoConfig.khqrImageUrl.trim();
-    } else if (sqliteSettings && typeof sqliteSettings.master_khqr_image === 'string' && sqliteSettings.master_khqr_image.trim() !== '') {
-      khqrImageUrl = sqliteSettings.master_khqr_image.trim();
+    } else if (mongoPaymentSettings && typeof mongoPaymentSettings.masterKhqrImage === 'string' && mongoPaymentSettings.masterKhqrImage.trim() !== '') {
+      khqrImageUrl = mongoPaymentSettings.masterKhqrImage.trim();
     } else if (effectiveStreamerId === 'demo-streamer-id-1001') {
       try {
         const gatewayCol = await getGatewayConfigCollection();
-        const globalConfig = await gatewayCol.findOne({ _id: 'master_khqr_config', khqrImageUrl: { $exists: true, $ne: '' } });
+        const globalConfig = await gatewayCol.findOne({ _id: 'master_khqr_config', khqrImageUrl: { $exists: true, $ne: '' } }) as any;
         if (globalConfig?.khqrImageUrl) khqrImageUrl = globalConfig.khqrImageUrl;
       } catch (e) {}
     }
 
-    const khqrFilename = restoreResult.filename || mongoConfig?.khqrFilename || sqliteSettings?.master_khqr_filename || '';
-    const khqrFileSize = restoreResult.fileSize || mongoConfig?.khqrFileSize || sqliteSettings?.master_khqr_filesize || 0;
-    const khqrMimeType = restoreResult.mimeType || mongoConfig?.khqrMimeType || sqliteSettings?.master_khqr_mimetype || '';
+    const khqrFilename = restoreResult.filename || mongoConfig?.khqrFilename || mongoPaymentSettings?.masterKhqrFilename || '';
+    const khqrFileSize = restoreResult.fileSize || mongoConfig?.khqrFileSize || mongoPaymentSettings?.masterKhqrFileSize || 0;
+    const khqrMimeType = restoreResult.mimeType || mongoConfig?.khqrMimeType || mongoPaymentSettings?.masterKhqrMimeType || '';
 
     const bankAccountName =
-      sqliteSettings?.bakong_account_name ||
+      mongoPaymentSettings?.bakongAccountName ||
+      mongoPaymentSettings?.bakong_account_name ||
       mongoConfig?.bankAccountName ||
       (streamerUsername ? `${streamerUsername.toUpperCase()} OFFICIAL KHQR` : 'STREAMBOTKH OFFICIAL KHQR');
 
     const bakongAccountId =
-      sqliteSettings?.bakong_account_id ||
+      mongoPaymentSettings?.bakongAccountId ||
+      mongoPaymentSettings?.bakong_account_id ||
       mongoConfig?.bakongAccountId ||
       (streamerUsername ? `${streamerUsername.toLowerCase()}@abaa` : 'streambotkh@abaa');
 
@@ -131,7 +119,7 @@ export async function GET(req: NextRequest) {
       khqrMimeType,
       bankAccountName,
       bakongAccountId,
-      updatedAt: mongoConfig?.updatedAt || sqliteSettings?.master_khqr_updated_at || new Date()
+      updatedAt: mongoConfig?.updatedAt || mongoPaymentSettings?.updatedAt || new Date()
     };
 
     return NextResponse.json({

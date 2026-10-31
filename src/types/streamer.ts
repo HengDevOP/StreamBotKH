@@ -25,7 +25,42 @@ export interface Streamer {
   telegramPairingCode?: string;
   customThanksMessage?: string;
   isVerified?: boolean;
+  liveStreamUrl?: string;
+  youtubeLiveUrl?: string;
   createdAt?: string;
+}
+
+export interface TicketMessage {
+  id: string;
+  ticketId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'user' | 'admin' | 'system';
+  senderAvatar?: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  ticketNumber?: number;
+  streamerId: string;
+  streamerUsername?: string;
+  streamerDisplayName?: string;
+  streamerEmail?: string;
+  streamerAvatar?: string;
+  title: string;
+  category: 'general' | 'technical' | 'payment' | 'overlay' | 'feature' | 'other' | string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'open' | 'claimed' | 'resolved' | 'closed';
+  claimedById?: string | null;
+  claimedByName?: string | null;
+  claimedByAvatar?: string | null;
+  claimedAt?: string | null;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface IssueReport {

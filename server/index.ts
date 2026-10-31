@@ -34,7 +34,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Static Assets
 const publicDir = path.resolve(process.cwd(), 'public');
-app.use('/sounds', express.static(path.join(publicDir, 'sounds')));
+app.use('/sounds', express.static(path.join(publicDir, 'sounds'), { maxAge: '7d' })); // long-lived cache for fast soundboard playback
 app.use('/fonts', express.static(path.join(publicDir, 'fonts')));
 app.use('/uploads', express.static(path.join(publicDir, 'uploads')));
 app.use('/assets', express.static(path.join(publicDir, 'assets')));
@@ -223,7 +223,7 @@ if (distDir) {
   // SPA fallback for all non-API routes
   app.use((req, res, next) => {
     if (
-      req.method !== 'GET' ||
+      (req.method !== 'GET' && req.method !== 'HEAD') ||
       req.path.startsWith('/api') ||
       req.path.startsWith('/sounds') ||
       req.path.startsWith('/uploads') ||

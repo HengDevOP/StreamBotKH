@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleSuccessfulPayment } from '@/server/services/paywayService';
-import { db } from '@/server/database/db';
+import { getDonationsCollection } from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,11 +9,18 @@ export async function POST(req: NextRequest) {
     console.log('[PayWay Webhook] Received callback:', body);
 
     if (status === 0 || status === '0' || payment_status === 'APPROVED') {
-      const donation = db.prepare('SELECT id FROM donations WHERE id = ? OR payway_tran_id = ?').get(tran_id, tran_id) as any;
+      const donationsCol = await getDonationsCollection();
+      const donation = await donationsCol.findOne({
+        $or: [
+          { id: tran_id },
+          { paywayTranId: tran_id },
+          { payway_tran_id: tran_id as any }
+        ]
+      }) as any;
 
       if (donation) {
         await handleSuccessfulPayment({
-          donationId: donation.id,
+          donationId: donation.id || String(donation._id),
           paywayTranId: tran_id,
           bakongHash: apv || `ABA-APV-${Date.now()}`
         });

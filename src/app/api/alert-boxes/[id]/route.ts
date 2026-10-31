@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAlertBoxesCollection } from '@/server/database/mongo';
+import { getAlertBoxesCollection, getUsersCollection, getAlertSettingsCollection } from '@/server/database/mongo';
 import { ObjectId } from 'mongodb';
-import { db } from '@/server/database/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,8 +19,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
     let overlayToken = null;
     try {
-      const streamer = db.prepare('SELECT overlay_token FROM streamers WHERE id = ? OR username = ?').get(box.userId, box.userId) as any;
-      overlayToken = streamer?.overlay_token || null;
+      const usersCol = await getUsersCollection();
+      const streamer = await usersCol.findOne({ $or: [{ userId: box.userId }, { id: box.userId }, { username: box.userId }] }) as any;
+      overlayToken = streamer?.overlayToken || streamer?.overlay_token || null;
     } catch (e) {}
 
     return NextResponse.json({ success: true, alertBox: box, overlayToken });
@@ -88,34 +88,27 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ success: false, error: 'Alert box not found' }, { status: 404 });
     }
 
-    // Synchronize to SQLite alert_settings for multi-backend consistency
+    // Synchronize to MongoDB alert_settings
     try {
-      const streamer = db.prepare('SELECT id FROM streamers WHERE id = ? OR username = ? OR email = ?').get(result.userId, result.userId, result.userId) as any;
-      if (streamer?.id) {
-        db.prepare(`
-          INSERT INTO alert_settings (streamer_id, template_style, glow_color, sound_url, sound_volume, duration_seconds, custom_gif_url, text_template)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(streamer_id) DO UPDATE SET
-            template_style = excluded.template_style,
-            glow_color = excluded.glow_color,
-            sound_url = excluded.sound_url,
-            sound_volume = excluded.sound_volume,
-            duration_seconds = excluded.duration_seconds,
-            custom_gif_url = excluded.custom_gif_url,
-            text_template = excluded.text_template
-        `).run(
-          streamer.id,
-          result.templateStyle || 'neon-box',
-          result.glowColor || '#00F0FF',
-          result.soundUrl || '/sounds/cash-register-kaching.mp3',
-          Number(result.soundVolume) || 0.85,
-          Number(result.durationSeconds) || 8,
-          result.mediaUrl || '',
-          result.textTemplate || '{donator} donated {amount} through superchat!'
-        );
-      }
+      const alertSettingsCol = await getAlertSettingsCollection();
+      await alertSettingsCol.updateOne(
+        { streamerId: result.userId },
+        {
+          $set: {
+            templateStyle: result.templateStyle || 'neon-box',
+            glowColor: result.glowColor || '#00F0FF',
+            soundUrl: result.soundUrl || '/sounds/cash-register-kaching.mp3',
+            soundVolume: Number(result.soundVolume) || 0.85,
+            duration: Number(result.durationSeconds) || 8,
+            customGifUrl: result.mediaUrl || '',
+            textTemplate: result.textTemplate || '{donator} donated {amount} through superchat!',
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
     } catch (e) {
-      console.warn('[AlertBox] Error syncing to sqlite alert_settings:', e);
+      console.warn('[AlertBox] Error syncing to alert_settings on update:', e);
     }
 
     return NextResponse.json({

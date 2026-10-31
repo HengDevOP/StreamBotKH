@@ -1,9 +1,11 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams, useNavigate, useLocation, useSearchParams, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ModalProvider } from './context/ModalContext';
 import { Navbar } from './components/common/Navbar';
+import { Footer } from './components/common/Footer';
+import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 import { authService } from './services/authService';
 
 // Page Views
@@ -16,6 +18,8 @@ import { ResourcesPage } from './views/ResourcesPage';
 import { ResourceFeaturePage } from './views/ResourceFeaturePage';
 import { PricingPage } from './views/PricingPage';
 import { DiscordPage } from './views/DiscordPage';
+import { StatusPage } from './views/StatusPage';
+import { MultiStreamPage } from './views/MultiStreamPage';
 
 // Overlay Widgets
 import { StreamSoundboardOverlay } from './components/overlay/StreamSoundboardOverlay';
@@ -50,6 +54,12 @@ function DashboardRouteWrapper() {
   let tab: DashboardTab = (rawTab as DashboardTab) || 'overview';
   if (rawTab === 'alerts' || rawTab === 'donations') {
     tab = 'donation';
+  } else if (rawTab === 'users' || rawTab === 'admin-users') {
+    tab = 'admin-users';
+  } else if (rawTab === 'report-issue' || rawTab === 'support' || rawTab === 'tickets' || rawTab === 'ticket' || rawTab === 'support-tickets') {
+    tab = 'support';
+  } else if (rawTab === 'mailbox' || rawTab === 'mail' || rawTab === 'inbox') {
+    tab = 'mailbox';
   }
 
   const handleNav = (page: string, params?: any) => {
@@ -222,14 +232,16 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const isOverlay = pathname.startsWith('/overlay') || pathname.startsWith('/widget');
   const isDashboard = pathname.startsWith('/dashboard');
   const isDonate = pathname.startsWith('/@') || pathname.startsWith('/donate');
+  const isMultiStream = pathname === '/tv' || pathname.startsWith('/tv/') || pathname.startsWith('/tv?') || pathname === '/muti-stream' || pathname === '/multi-stream';
 
-  if (isOverlay) {
+  if (isOverlay || isMultiStream) {
     return <main className="w-screen h-screen overflow-hidden bg-transparent m-0 p-0">{children}</main>;
   }
 
   if (isDashboard) {
     return (
       <main className="w-full h-screen h-[100dvh] overflow-hidden bg-[#060911] text-slate-100 flex flex-col">
+        <ImpersonationBanner />
         {children}
       </main>
     );
@@ -238,6 +250,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   if (isDonate) {
     return (
       <main className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col">
+        <ImpersonationBanner />
         {children}
       </main>
     );
@@ -245,6 +258,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#070A12] text-slate-100">
+      <ImpersonationBanner />
       <Navbar
         onNavigate={(page, params) => {
           if (page === 'home') navigate('/');
@@ -254,21 +268,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         }}
       />
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-slate-800/80 bg-[#06080F] py-6 sm:py-8 px-4 text-center text-xs text-slate-400 space-y-2 font-mono">
-        <div className="flex flex-wrap items-center justify-center gap-2 text-center">
-          <img
-            src="/images/logo-64.png"
-            alt="streambotkh.com"
-            className="w-4 h-4 sm:w-5 sm:h-5 object-contain"
-          />
-          <span className="font-bold text-slate-200">STREAMBOTKH.COM</span>
-          <span className="hidden xxs:inline">•</span>
-          <span className="text-[10px] sm:text-xs text-slate-400">ABA PAYWAY &amp; BAKONG KHQR OVERLAY ENGINE</span>
-        </div>
-        <p className="text-slate-400 text-[10px] sm:text-[11px] max-w-lg mx-auto">
-          Empowering live streamers across Cambodia with zero-latency tip alerts and Telegram notifications.
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 }
@@ -293,7 +293,12 @@ function AppRoutes() {
         <Route path="/docs" element={<ResourcesPage onNavigate={handleNav} />} />
         <Route path="/resources" element={<ResourcesPage onNavigate={handleNav} />} />
         <Route path="/resources/:featureSlug" element={<ResourceFeaturePage onNavigate={handleNav} />} />
+        <Route path="/status" element={<StatusPage />} />
         <Route path="/discord" element={<DiscordPage onNavigate={handleNav} />} />
+        <Route path="/tv" element={<MultiStreamPage />} />
+        <Route path="/tv/:username" element={<MultiStreamPage />} />
+        <Route path="/muti-stream" element={<Navigate to="/tv" replace />} />
+        <Route path="/multi-stream" element={<Navigate to="/tv" replace />} />
         <Route path="/dashboard" element={<DashboardRouteWrapper />} />
         <Route path="/dashboard/*" element={<DashboardRouteWrapper />} />
         <Route path="/login" element={<LoginPage onSuccess={() => navigate('/dashboard')} />} />

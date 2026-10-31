@@ -22,7 +22,7 @@ import {
   Mic,
   Music
 } from 'lucide-react';
-import { triggerSoundEffect, stopAllActiveSounds } from '@/utils/soundboardSynth';
+import { triggerSoundEffect, stopAllActiveSounds, preloadAudioBatch } from '@/utils/soundboardSynth';
 
 interface StreamSoundboardOverlayProps {
   token: string;
@@ -42,55 +42,23 @@ export const StreamSoundboardOverlay: React.FC<StreamSoundboardOverlayProps> = (
   const [outputMode, setOutputMode] = useState<string>('both'); // 'local', 'overlay', 'both'
   const activeAlertTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to render matching icon
-  const renderIcon = (name: string, size = 28) => {
-    switch (name) {
-      case 'Megaphone':
-        return <Megaphone size={size} />;
-      case 'Smile':
-        return <Smile size={size} />;
-      case 'DollarSign':
-        return <DollarSign size={size} />;
-      case 'Trophy':
-        return <Trophy size={size} />;
-      case 'Frown':
-        return <Frown size={size} />;
-      case 'Sparkles':
-        return <Sparkles size={size} />;
-      case 'Flame':
-        return <Flame size={size} />;
-      case 'Zap':
-        return <Zap size={size} />;
-      case 'Bell':
-        return <Bell size={size} />;
-      case 'AlertCircle':
-        return <AlertCircle size={size} />;
-      case 'Skull':
-        return <Skull size={size} />;
-      case 'TrendingUp':
-        return <TrendingUp size={size} />;
-      case 'Radio':
-        return <Radio size={size} />;
-      case 'Crosshair':
-        return <Crosshair size={size} />;
-      case 'Activity':
-        return <Activity size={size} />;
-      case 'Mic':
-        return <Mic size={size} />;
-      default:
-        return <Volume2 size={size} />;
-    }
+  // Helper to render matching icon - Volume icon used for all soundboards
+  const renderIcon = (_name?: string, size = 28) => {
+    return <Volume2 size={size} />;
   };
 
   useEffect(() => {
     const effectiveToken = token || 'demo-token';
 
-    // Fetch initial settings to know output mode
+    // Fetch initial settings to know output mode + pre-cache all pad audio for instant playback
     fetch(`/api/soundboard?token=${effectiveToken}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.settings) {
           setOutputMode(data.settings.outputMode || 'both');
+        }
+        if (data.success && Array.isArray(data.items)) {
+          preloadAudioBatch(data.items.map((it: any) => it.soundUrl));
         }
       })
       .catch(() => {});
@@ -111,6 +79,9 @@ export const StreamSoundboardOverlay: React.FC<StreamSoundboardOverlayProps> = (
         .then((data) => {
           if (data.success && data.settings) {
             setOutputMode(data.settings.outputMode || 'both');
+          }
+          if (data.success && Array.isArray(data.items)) {
+            preloadAudioBatch(data.items.map((it: any) => it.soundUrl));
           }
         })
         .catch(() => {});

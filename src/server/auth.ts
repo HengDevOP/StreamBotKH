@@ -2,6 +2,15 @@ import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { getUsersCollection } from './database/mongo';
 
+export function generateToken(user: { id: string; username: string; email: string }) {
+  const jwtSecret = process.env.JWT_SECRET || 'streamneon_super_secret_jwt_key_2026';
+  return jwt.sign(
+    { id: user.id, username: user.username, email: user.email },
+    jwtSecret,
+    { expiresIn: '30d' }
+  );
+}
+
 export function getAuthenticatedUser(req: NextRequest) {
   let token: string | null = null;
   const authHeader = req.headers.get('authorization');

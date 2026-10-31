@@ -1,0 +1,15 @@
+# robots.txt for StreamBotKH / dashcord
+User-agent: *
+Allow: /
+Allow: /tv
+Allow: /donate
+Allow: /pricing
+Allow: /leaderboard
+Allow: /resources
+
+# Disallow overlay routes from search engine cache
+Disallow: /overlay/
+Disallow: /widget/
+Disallow: /api/
+
+Sitemap: https://streambotkh.com/sitemap.xml

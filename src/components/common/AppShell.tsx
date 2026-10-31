@@ -3,6 +3,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Navbar } from './Navbar';
+import { Footer } from './Footer';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -55,17 +56,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     <div className="min-h-screen flex flex-col bg-[#070A12] text-slate-100">
       <Navbar />
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-slate-800/80 bg-[#06080F] py-8 text-center text-xs text-slate-400 space-y-2 font-mono">
-        <div className="flex items-center justify-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-cyan-400" />
-          <span className="font-bold text-slate-200">STREAMBOTKH.COM</span>
-          <span>•</span>
-          <span>ABA PAYWAY & BAKONG KHQR OVERLAY ENGINE</span>
-        </div>
-        <p className="text-slate-400 text-[11px]">
-          Empowering live streamers across Cambodia with zero-latency tip alerts and Telegram notifications.
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 };

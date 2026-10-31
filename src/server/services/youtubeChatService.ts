@@ -1,6 +1,5 @@
 import { getIO } from './socketService';
 import axios from 'axios';
-import { db } from '../database/db';
 
 export interface PokemonCommentEvent {
   id: string;

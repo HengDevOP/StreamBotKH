@@ -249,13 +249,22 @@ export const PokemonWidgetManager: React.FC<PokemonWidgetManagerProps> = ({ stre
         </div>
 
         {/* Live Scaled Preview Stage (Aspect ratio: wide 16:3 / 16:4) */}
-        <div className="relative w-full rounded-2xl border-2 border-slate-800 bg-[#060911] overflow-hidden shadow-2xl">
+        <div
+          className="relative w-full rounded-2xl border-2 border-slate-800 bg-[#060911] overflow-hidden shadow-2xl isolate z-0"
+          style={{
+            contain: 'paint',
+            transform: 'translateZ(0)',
+            WebkitMaskImage: '-webkit-radial-gradient(white, black)'
+          }}
+        >
           <div
-            className="w-full relative"
+            className="w-full relative isolate z-0 overflow-hidden"
             style={{
               aspectRatio: `${overlayWidth} / ${overlayHeight}`,
               minHeight: '260px',
-              maxHeight: '400px'
+              maxHeight: '400px',
+              contain: 'paint',
+              transform: 'translateZ(0)'
             }}
           >
             {/* Live Pokémon Component (Real-Time Custom Settings Preview) */}

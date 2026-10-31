@@ -19,6 +19,8 @@ export interface PublicStreamerInfo {
   videoMaxDurationSeconds?: number;
   customThanksMessage?: string;
   isVerified?: boolean;
+  liveStreamUrl?: string;
+  youtubeId?: string;
   hasMasterKhqr?: boolean;
   khqrImageUrl?: string;
   socialLinks?: Array<{

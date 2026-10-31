@@ -40,6 +40,8 @@ export type DashboardTab =
   | 'account'
   | 'settings'
   | 'security'
+  | 'mailbox'
+  | 'support'
   | 'report-issue'
   | 'admin-users'
   | 'admin-requests'

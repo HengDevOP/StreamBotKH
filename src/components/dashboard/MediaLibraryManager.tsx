@@ -202,9 +202,12 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   }, []);
 
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    const b = Number(bytes);
+    if (!Number.isFinite(b) || b <= 0) return '0 MB';
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    const mb = b / (1024 * 1024);
+    return mb % 1 === 0 ? `${mb.toFixed(0)} MB` : `${mb.toFixed(1)} MB`;
   };
 
   const handleFileProcess = async (file: File) => {
@@ -212,10 +215,11 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     setSuccessMsg(null);
 
     // Bounded only by total remaining storage quota (no per-upload size restriction)
-    if (storageInfo && file.size > storageInfo.remainingBytes) {
-      const totalMb = ((storageInfo.usedBytes + file.size) / (1024 * 1024)).toFixed(1);
+    const incomingSize = Number(file.size) || 0;
+    if (storageInfo && (storageInfo.usedBytes + incomingSize > storageInfo.limitBytes || incomingSize > storageInfo.remainingBytes)) {
+      const totalMb = ((storageInfo.usedBytes + incomingSize) / (1024 * 1024)).toFixed(1);
       const usedMb = (storageInfo.usedBytes / (1024 * 1024)).toFixed(1);
-      const fileMb = (file.size / (1024 * 1024)).toFixed(1);
+      const fileMb = (incomingSize / (1024 * 1024)).toFixed(1);
       const limitMb = (storageInfo.limitBytes / (1024 * 1024)).toFixed(0);
       setErrorMsg(
         `Total storage limit reached: ${totalMb} MB attempted (${usedMb} MB used + ${fileMb} MB file) of ${limitMb} MB max quota. Delete older files or upgrade plan.`
@@ -316,7 +320,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
             Media Library
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Upload MP4, GIF, MP3, WAV, PNG, JPG, WEBP, and all formatted files for your live OBS overlays &amp; soundboard.
+            Upload MP4, GIF, MP3, WAV, PNG, JPG, WEBP for your live OBS overlays &amp; soundboard.
           </p>
         </div>
 
@@ -330,38 +334,34 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
         </div>
       </div>
 
-      {/* Section Switcher Tabs: My Uploads vs Online Media */}
-      <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 w-full sm:w-fit">
+      {/* Section Switcher Tabs: Icon-only for My Uploads and Online Media */}
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-800 w-fit">
         <button
           type="button"
           onClick={() => setActiveSection('uploads')}
-          className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
+          title={`My Uploads (${mediaList.length})`}
+          aria-label={`My Uploads (${mediaList.length})`}
+          className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
             activeSection === 'uploads'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Layers size={14} />
-          <span className="hidden xs:inline">My Uploads ({mediaList.length})</span>
-          <span className="xs:hidden">Uploads ({mediaList.length})</span>
+          <Layers size={16} />
         </button>
 
         <button
           type="button"
           onClick={() => setActiveSection('online')}
-          className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
+          title="Online Media Library"
+          aria-label="Online Media Library"
+          className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
             activeSection === 'online'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Globe size={14} />
-          <span className="hidden sm:inline">Online Media (20 Popular Sounds)</span>
-          <span className="hidden xs:inline sm:hidden">Online (20 Sounds)</span>
-          <span className="xs:hidden">Online (20)</span>
-          <span className="px-1.5 py-0.2 rounded bg-pink-500 text-white text-[8px] sm:text-[9px] font-bold uppercase tracking-wider animate-pulse flex-shrink-0">
-            HOT
-          </span>
+          <Globe size={16} />
         </button>
       </div>
 
@@ -474,7 +474,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                 {uploading ? 'Uploading Into Cloud...' : 'Click to upload or drag and drop'}
               </div>
               <p className="text-xs text-slate-400">
-                Supports <strong className="text-slate-300">MP4</strong>, <strong className="text-slate-300">GIF</strong>, <strong className="text-slate-300">MP3</strong>, <strong className="text-slate-300">WAV</strong>, <strong className="text-slate-300">PNG</strong>, <strong className="text-slate-300">JPG</strong>, <strong className="text-slate-300">WEBP</strong> &amp; all formatted files (Free: <strong className="text-cyan-400">20MB</strong> • Pro: <strong className="text-purple-400">100MB</strong>).
+                Supports <strong className="text-slate-300">MP4</strong>, <strong className="text-slate-300">GIF</strong>, <strong className="text-slate-300">MP3</strong>, <strong className="text-slate-300">WAV</strong>, <strong className="text-slate-300">PNG</strong>, <strong className="text-slate-300">JPG</strong>, <strong className="text-slate-300">WEBP</strong>.
               </p>
             </div>
           </div>
@@ -614,29 +614,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
       {/* Online Media Section */}
       {activeSection === 'online' && (
         <div className="space-y-6 animate-fadeIn">
-          {/* Banner / Introduction */}
-          <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-cyan-950/30 to-slate-900 border border-cyan-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono text-[10px] font-bold uppercase tracking-wider border border-cyan-500/40">
-                  Pre-configured Audio Library
-                </span>
-                <span className="text-xs text-slate-400 font-mono">• 0 MB quota used</span>
-              </div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkles size={18} className="text-cyan-400" />
-                20 Most Popular Stream Alert Sounds
-              </h3>
-              <p className="text-xs text-slate-300 max-w-2xl">
-                Ready-to-use audio clips tested for high-energy livestreaming. Click preview to listen, copy the direct URL, or apply directly to your OBS alert overlays with zero upload storage required!
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-950/60 px-3 py-2 rounded-xl border border-slate-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{filteredOnlineMedia.length} / {POPULAR_ALERT_SOUNDS.length} Available</span>
-            </div>
-          </div>
-
           {/* Search & Category Filter Toolbar */}
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">

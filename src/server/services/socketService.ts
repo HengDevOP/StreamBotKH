@@ -361,6 +361,21 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
+    // Support Ticket live chat rooms
+    socket.on('join:ticket', (data: { ticketId: string }) => {
+      if (data?.ticketId) {
+        socket.join(`ticket:${data.ticketId}`);
+        console.log(`[Socket] Client joined live ticket room: ticket:${data.ticketId}`);
+      }
+    });
+
+    socket.on('leave:ticket', (data: { ticketId: string }) => {
+      if (data?.ticketId) {
+        socket.leave(`ticket:${data.ticketId}`);
+        console.log(`[Socket] Client left live ticket room: ticket:${data.ticketId}`);
+      }
+    });
+
     socket.on('disconnect', () => {
       // Clean disconnect
     });
@@ -436,4 +451,25 @@ export function broadcastMediaDelete(userId: string, mediaId: string) {
   activeIo.to(`dashboard:${userId}`).emit('media:deleted', { mediaId, userId });
   activeIo.emit(`media:${userId}:deleted`, { mediaId });
   activeIo.emit('media:deleted', { mediaId, userId });
+}
+
+export function broadcastTicketMessage(ticketId: string, message: any) {
+  const activeIo = getIO();
+  if (!activeIo) return;
+  activeIo.to(`ticket:${ticketId}`).emit('ticket:message', { ticketId, message });
+  activeIo.emit('ticket:updated', { ticketId, lastMessage: message });
+}
+
+export function broadcastTicketClaimed(ticketId: string, claimedData: any) {
+  const activeIo = getIO();
+  if (!activeIo) return;
+  activeIo.to(`ticket:${ticketId}`).emit('ticket:claimed', claimedData);
+  activeIo.emit('ticket:updated', { ticketId, ...claimedData });
+}
+
+export function broadcastTicketStatusChanged(ticketId: string, statusData: any) {
+  const activeIo = getIO();
+  if (!activeIo) return;
+  activeIo.to(`ticket:${ticketId}`).emit('ticket:status_changed', statusData);
+  activeIo.emit('ticket:updated', { ticketId, ...statusData });
 }

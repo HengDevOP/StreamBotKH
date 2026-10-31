@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
-import { getGatewayConfigCollection } from '@/server/database/mongo';
-import { db } from '@/server/database/db';
+import { getGatewayConfigCollection, getPaymentSettingsCollection } from '@/server/database/mongo';
 import { getAuthenticatedUser } from '@/server/auth';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -95,16 +94,24 @@ export async function POST(req: NextRequest) {
       { upsert: true }
     );
 
-    // 7. Safe SQLite update
+    // 7. Update payment_settings in MongoDB
     try {
-      db.prepare(`
-        INSERT INTO payment_settings (streamer_id, master_khqr_image)
-        VALUES (?, ?)
-        ON CONFLICT(streamer_id) DO UPDATE SET
-          master_khqr_image = excluded.master_khqr_image
-      `).run(streamerId, publicUrl);
+      const paymentCol = await getPaymentSettingsCollection();
+      await paymentCol.updateOne(
+        { streamerId },
+        {
+          $set: {
+            masterKhqrImage: publicUrl,
+            masterKhqrFilename: originalName,
+            masterKhqrFileSize: file.size,
+            masterKhqrMimeType: mimeType || 'image/png',
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
     } catch (e) {
-      console.warn('[upload-khqr POST] SQLite update error:', e);
+      console.warn('[upload-khqr POST] MongoDB payment settings update warning:', e);
     }
 
     console.log(`✅ [Payment Gateway] Master KHQR image uploaded for client [${streamerId}]: ${publicUrl} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
@@ -130,7 +137,6 @@ export async function DELETE(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
     const streamerId = authUser?.id || 'demo-streamer-id-1001';
-    const streamerUsername = authUser?.username || '';
 
     const gatewayCol = await getGatewayConfigCollection();
     const config = await gatewayCol.findOne({
@@ -166,24 +172,19 @@ export async function DELETE(req: NextRequest) {
     );
 
     try {
-      db.prepare(`
-        UPDATE payment_settings
-        SET master_khqr_image = ''
-        WHERE streamer_id = ?
-      `).run(streamerId);
+      const paymentCol = await getPaymentSettingsCollection();
+      await paymentCol.updateOne(
+        { streamerId },
+        {
+          $set: {
+            masterKhqrImage: '',
+            updatedAt: new Date()
+          }
+        }
+      );
     } catch (e) {
-      console.warn('[upload-khqr DELETE] SQLite update error:', e);
+      console.warn('[upload-khqr DELETE] MongoDB payment settings update warning:', e);
     }
-
-    // Clean up demo-streamer-id-1001 if removing for demo or admin
-    try {
-      if (streamerId === 'demo-streamer-id-1001') {
-        db.prepare(`
-          UPDATE payment_settings
-          SET master_khqr_image = ''
-        `).run();
-      }
-    } catch (e) {}
 
     return NextResponse.json({
       success: true,

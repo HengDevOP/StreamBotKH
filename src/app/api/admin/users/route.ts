@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db, isAdminEmail } from '@/server/database/db';
+import { isAdminEmail } from '@/server/database/db';
 import { getUsersCollection } from '@/server/database/mongo';
 
 const DEFAULT_PAGE_LIMIT = 20;
-const CACHE_TTL_MS = 30 * 1000; // 30s server-side cache to prevent DB overload
+const CACHE_TTL_MS = 30 * 1000;
 
 interface CachedResponse {
   timestamp: number;
@@ -17,11 +17,16 @@ export function clearAdminUsersCache() {
   adminUsersCache.clear();
 }
 
-function checkAdmin(req: NextRequest) {
+async function checkAdmin(req: NextRequest) {
   const authUser = getAuthenticatedUser(req);
   if (!authUser) return null;
 
-  const row = db.prepare('SELECT id, email, username FROM streamers WHERE id = ?').get(authUser.id) as any;
+  let row: any = null;
+  try {
+    const usersCol = await getUsersCollection();
+    row = await usersCol.findOne({ userId: authUser.id });
+  } catch (e) {}
+
   const email = row?.email || authUser.email;
   if (!isAdminEmail(email)) return null;
   return { ...authUser, email };
@@ -29,7 +34,7 @@ function checkAdmin(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const admin = checkAdmin(req);
+    const admin = await checkAdmin(req);
     if (!admin) {
       return NextResponse.json({ error: 'Forbidden: Admin access required (hchenheng@gmail.com)' }, { status: 403 });
     }
@@ -49,20 +54,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const rows = db.prepare(`
-      SELECT id, email, username, display_name, avatar_url, bio, plan,
-             plan_started_at, plan_expires_at, plan_duration_days,
-             overlay_token, telegram_chat_id, is_verified, created_at
-      FROM streamers
-      ORDER BY datetime(created_at) DESC
-    `).all() as any[];
+    const usersCol = await getUsersCollection();
+    const rows = await usersCol.find({}).sort({ createdAt: -1 }).toArray();
 
     const now = Date.now();
-    const allUsers = rows.map((r) => {
+    const allUsers = rows.map((r: any) => {
       let currentPlan = (r.plan || 'free').toLowerCase();
-      let planStartedAt = r.plan_started_at || null;
-      let planExpiresAt = r.plan_expires_at || null;
-      let planDurationDays = r.plan_duration_days || 0;
+      let planStartedAt = r.planStartedAt || r.plan_started_at || null;
+      let planExpiresAt = r.planExpiresAt || r.plan_expires_at || null;
+      let planDurationDays = r.planDurationDays || r.plan_duration_days || 0;
       let remainingDays = 0;
 
       if (currentPlan === 'pro' && planExpiresAt) {
@@ -70,11 +70,10 @@ export async function GET(req: NextRequest) {
         if (!isNaN(expMs)) {
           if (expMs < now) {
             // Expired -> revert to free
-            db.prepare(`
-              UPDATE streamers
-              SET plan = 'free', plan_started_at = NULL, plan_expires_at = NULL, plan_duration_days = 0
-              WHERE id = ?
-            `).run(r.id);
+            usersCol.updateOne(
+              { userId: r.userId || r.id },
+              { $set: { plan: 'free', planStartedAt: null, planExpiresAt: null, planDurationDays: 0, updatedAt: new Date() } }
+            ).catch(() => {});
             currentPlan = 'free';
             planStartedAt = null;
             planExpiresAt = null;
@@ -88,27 +87,26 @@ export async function GET(req: NextRequest) {
       }
 
       return {
-        id: r.id,
+        id: r.userId || r.id,
         email: r.email,
         username: r.username,
-        displayName: r.display_name,
-        avatarUrl: r.avatar_url,
+        displayName: r.displayName || r.display_name || r.username,
+        avatarUrl: r.avatarUrl || r.avatar_url,
         bio: r.bio,
         plan: currentPlan,
         planStartedAt,
         planExpiresAt,
         planDurationDays,
         remainingDays,
-        isVerified: r.is_verified === 1,
+        isVerified: Boolean(r.isVerified || r.is_verified),
         isAdmin: isAdminEmail(r.email),
-        createdAt: r.created_at
+        createdAt: r.createdAt || r.created_at
       };
     });
 
     const proUsers = allUsers.filter((u) => u.plan === 'pro').length;
     const freeUsers = allUsers.length - proUsers;
 
-    // Filter by search query & plan filter
     const filteredUsers = allUsers.filter((u) => {
       const matchesSearch =
         !q ||
@@ -156,7 +154,7 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const admin = checkAdmin(req);
+    const admin = await checkAdmin(req);
     if (!admin) {
       return NextResponse.json({ error: 'Forbidden: Admin access required (hchenheng@gmail.com)' }, { status: 403 });
     }
@@ -172,48 +170,35 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    let target: any = null;
-    if (userId || id) {
-      target = db.prepare('SELECT * FROM streamers WHERE id = ?').get(userId || id);
-    }
-    if (!target && username) {
-      target = db.prepare('SELECT * FROM streamers WHERE username = ? COLLATE NOCASE').get(username);
-    }
-    if (!target && email) {
-      target = db.prepare('SELECT * FROM streamers WHERE email = ? COLLATE NOCASE').get(email);
-    }
-    if (!target) {
-      target = db
-        .prepare('SELECT * FROM streamers WHERE id = ? OR username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE')
-        .get(lookupKey, lookupKey, lookupKey);
-    }
+    const usersCol = await getUsersCollection();
+    const escaped = String(lookupKey).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    let target = await usersCol.findOne({
+      $or: [
+        { userId: lookupKey },
+        { id: lookupKey },
+        { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+        { email: { $regex: new RegExp(`^${escaped}$`, 'i') } }
+      ]
+    }) as any;
 
     if (!target) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const resolvedUserId = target.id;
+    const resolvedUserId = target.userId || target.id;
     let successMessage = '';
+    const updateFields: any = { updatedAt: new Date() };
 
-    // 1. Handle verified badge toggle if provided (bypasses plan requirement - works for free & pro)
+    // 1. Handle verified badge toggle if provided
     if (isVerified !== undefined) {
-      const verifiedVal = isVerified ? 1 : 0;
-      db.prepare('UPDATE streamers SET is_verified = ? WHERE id = ?').run(verifiedVal, resolvedUserId);
-      try {
-        const usersCol = await getUsersCollection();
-        await usersCol.updateOne(
-          { userId: resolvedUserId },
-          { $set: { isVerified: Boolean(isVerified), updatedAt: new Date() } }
-        );
-      } catch (mongoErr) {
-        console.warn('[Admin Users PUT] Mongo verified sync warning:', mongoErr);
-      }
+      updateFields.isVerified = Boolean(isVerified);
       successMessage = isVerified
         ? `Creator @${target.username} has been granted the Verified Creator badge!`
         : `Verified Creator badge removed from @${target.username}`;
     }
 
-    // 2. Handle plan change if plan is provided (optional)
+    // 2. Handle plan change if plan is provided
     if (plan !== undefined) {
       const normalizedPlan = String(plan).toLowerCase() === 'pro' ? 'pro' : 'free';
       const days = Math.max(1, Number(durationDays) || 31);
@@ -226,42 +211,22 @@ export async function PUT(req: NextRequest) {
         const now = new Date();
         let baseTime = now.getTime();
 
-        if (action === 'extend' && target.plan === 'pro' && target.plan_expires_at) {
-          const existingExp = new Date(target.plan_expires_at).getTime();
+        if (action === 'extend' && target.plan === 'pro' && (target.planExpiresAt || target.plan_expires_at)) {
+          const existingExp = new Date(target.planExpiresAt || target.plan_expires_at).getTime();
           if (!isNaN(existingExp) && existingExp > baseTime) {
             baseTime = existingExp;
           }
         }
 
-        planStartedAt = target.plan_started_at && action === 'extend' ? target.plan_started_at : now.toISOString();
+        planStartedAt = target.planStartedAt && action === 'extend' ? target.planStartedAt : now.toISOString();
         planExpiresAt = new Date(baseTime + days * 24 * 60 * 60 * 1000).toISOString();
         planDurationDays = days;
       }
 
-      db.prepare(`
-        UPDATE streamers
-        SET plan = ?, plan_started_at = ?, plan_expires_at = ?, plan_duration_days = ?
-        WHERE id = ?
-      `).run(normalizedPlan, planStartedAt, planExpiresAt, planDurationDays, resolvedUserId);
-
-      // Sync to MongoDB Atlas
-      try {
-        const usersCol = await getUsersCollection();
-        await usersCol.updateOne(
-          { userId: resolvedUserId },
-          {
-            $set: {
-              plan: normalizedPlan,
-              planStartedAt,
-              planExpiresAt,
-              planDurationDays,
-              updatedAt: new Date()
-            }
-          }
-        );
-      } catch (mongoErr) {
-        console.warn('[Admin Users PUT] Non-fatal MongoDB sync warning:', mongoErr);
-      }
+      updateFields.plan = normalizedPlan;
+      updateFields.planStartedAt = planStartedAt;
+      updateFields.planExpiresAt = planExpiresAt;
+      updateFields.planDurationDays = planDurationDays;
 
       successMessage =
         normalizedPlan === 'pro'
@@ -269,32 +234,36 @@ export async function PUT(req: NextRequest) {
           : `Updated @${target.username} to Free Plan`;
     }
 
-    // Clear server cache when user is updated
+    await usersCol.updateOne(
+      { $or: [{ userId: resolvedUserId }, { id: resolvedUserId }] },
+      { $set: updateFields }
+    );
+
     clearAdminUsersCache();
 
-    const updated = db.prepare('SELECT * FROM streamers WHERE id = ?').get(resolvedUserId) as any;
+    const updated = await usersCol.findOne({ $or: [{ userId: resolvedUserId }, { id: resolvedUserId }] }) as any;
     const remainingDays =
-      updated.plan === 'pro' && updated.plan_expires_at
-        ? Math.max(1, Math.ceil((new Date(updated.plan_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      updated.plan === 'pro' && updated.planExpiresAt
+        ? Math.max(1, Math.ceil((new Date(updated.planExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
         : 0;
 
     return NextResponse.json({
       success: true,
       message: successMessage || 'User updated successfully',
       user: {
-        id: updated.id,
+        id: updated.userId || updated.id,
         email: updated.email,
         username: updated.username,
-        displayName: updated.display_name,
-        avatarUrl: updated.avatar_url,
+        displayName: updated.displayName || updated.username,
+        avatarUrl: updated.avatarUrl,
         plan: updated.plan || 'free',
-        planStartedAt: updated.plan_started_at,
-        planExpiresAt: updated.plan_expires_at,
-        planDurationDays: updated.plan_duration_days || 0,
+        planStartedAt: updated.planStartedAt,
+        planExpiresAt: updated.planExpiresAt,
+        planDurationDays: updated.planDurationDays || 0,
         remainingDays,
-        isVerified: updated.is_verified === 1,
+        isVerified: Boolean(updated.isVerified),
         isAdmin: isAdminEmail(updated.email),
-        createdAt: updated.created_at
+        createdAt: updated.createdAt
       }
     });
   } catch (err: any) {

@@ -172,9 +172,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   if (!isOpen) return null;
 
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    const b = Number(bytes);
+    if (!Number.isFinite(b) || b <= 0) return '0 MB';
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    const mb = b / (1024 * 1024);
+    return mb % 1 === 0 ? `${mb.toFixed(0)} MB` : `${mb.toFixed(1)} MB`;
   };
 
   const handleUploadFile = async (file: File) => {
@@ -182,10 +185,11 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     setSuccessMsg(null);
 
     // Bounded only by total remaining storage quota (no per-upload size restriction)
-    if (storageInfo && file.size > storageInfo.remainingBytes) {
-      const totalMb = ((storageInfo.usedBytes + file.size) / (1024 * 1024)).toFixed(1);
+    const incomingSize = Number(file.size) || 0;
+    if (storageInfo && (storageInfo.usedBytes + incomingSize > storageInfo.limitBytes || incomingSize > storageInfo.remainingBytes)) {
+      const totalMb = ((storageInfo.usedBytes + incomingSize) / (1024 * 1024)).toFixed(1);
       const usedMb = (storageInfo.usedBytes / (1024 * 1024)).toFixed(1);
-      const fileMb = (file.size / (1024 * 1024)).toFixed(1);
+      const fileMb = (incomingSize / (1024 * 1024)).toFixed(1);
       const limitMb = (storageInfo.limitBytes / (1024 * 1024)).toFixed(0);
       setErrorMsg(
         `Total storage limit reached: ${totalMb} MB attempted (${usedMb} MB used + ${fileMb} MB file) of ${limitMb} MB max quota. Delete older files or upgrade plan.`
@@ -371,12 +375,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                 <div className="flex items-center gap-2.5 self-end sm:self-auto">
                   {storageInfo && (
                     <span className="text-[11px] font-mono text-slate-400 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-                      {(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB used ({storageInfo.planLabel})
+                      {(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB / {(storageInfo.limitBytes / (1024 * 1024)).toFixed(0)} MB used ({storageInfo.planLabel})
                     </span>
                   )}
                   <button
                     type="button"
-                    onClick={fetchMedia}
+                    onClick={() => fetchMedia(true)}
                     disabled={loading}
                     title="Refresh Library"
                     className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"

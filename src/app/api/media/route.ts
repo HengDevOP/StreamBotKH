@@ -3,8 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getMediaCollection, MediaDoc, restoreMediaFile } from '@/server/database/mongo';
-import { db } from '@/server/database/db';
+import { getMediaCollection, getUsersCollection, MediaDoc, restoreMediaFile } from '@/server/database/mongo';
 
 function safeBroadcastMediaUpdate(userId: string, data: { media: any[]; storage: any }) {
   try {
@@ -23,7 +22,7 @@ function safeBroadcastMediaUpdate(userId: string, data: { media: any[]; storage:
 // Media storage limits per user plan (no per-upload limit, only bounded by total remaining plan quota)
 export const PLAN_STORAGE_LIMITS: Record<string, { label: string; limitBytes: number }> = {
   free: { label: 'Free (20MB)', limitBytes: 20 * 1024 * 1024 }, // 20MB
-  starter: { label: 'Starter (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
+  starter: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
   pro: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
   studio: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 } // backwards compatibility
 };
@@ -111,12 +110,58 @@ export function detectMimeType(mimeType: string, ext: string): string {
 }
 
 /**
+ * Resolve user plan with priority: MongoDB users collection -> SQLite streamers table
+ */
+export async function resolveUserPlan(
+  userId: string,
+  email?: string
+): Promise<{ plan: string; quota: { label: string; limitBytes: number } }> {
+  let resolvedPlan = 'free';
+
+  // 1. Check MongoDB users collection first (primary source of truth)
+  try {
+    const usersCol = await getUsersCollection();
+    const escapedEmail = email ? email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : null;
+    const mongoUser = await usersCol.findOne({
+      $or: [
+        { userId },
+        { id: userId as any },
+        ...(escapedEmail ? [{ email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } }] : [])
+      ]
+    });
+
+    if (mongoUser?.plan) {
+      const p = String(mongoUser.plan).toLowerCase().trim();
+      let activePlan = p;
+      if (activePlan === 'pro' && mongoUser.planExpiresAt) {
+        const expTime = new Date(mongoUser.planExpiresAt).getTime();
+        if (!isNaN(expTime) && expTime < Date.now()) {
+          activePlan = 'free';
+        }
+      }
+      resolvedPlan = activePlan;
+    }
+  } catch (err) {
+    console.warn('[resolveUserPlan] MongoDB query warning:', err);
+  }
+
+  const quota = PLAN_STORAGE_LIMITS[resolvedPlan] || PLAN_STORAGE_LIMITS.free;
+  return { plan: resolvedPlan, quota };
+}
+
+/**
  * Fetch and synchronize media files for a user from MongoDB and disk
  */
 export async function fetchUserMediaData(userId: string, email?: string): Promise<CachedMediaResult> {
   const mediaCol = await getMediaCollection();
-  const filter = email
-    ? { $or: [{ userId }, { userEmail: email }] }
+  const escapedEmail = email ? email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : null;
+  const filter = escapedEmail
+    ? {
+        $or: [
+          { userId },
+          { userEmail: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } }
+        ]
+      }
     : { userId };
   const mediaList = await mediaCol.find(filter).sort({ createdAt: -1 }).toArray();
 
@@ -149,19 +194,23 @@ export async function fetchUserMediaData(userId: string, email?: string): Promis
     console.log(`🧹 [Media Storage] Auto-pruned ${prunedCount} ghost/unrecoverable media items to free storage space.`);
   }
 
-  // Get user plan
-  const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ? OR LOWER(email) = LOWER(?)').get(userId, email || '') as any;
-  const userPlan = (streamerRow?.plan || 'free').toLowerCase();
-  const quota = PLAN_STORAGE_LIMITS[userPlan] || PLAN_STORAGE_LIMITS.free;
+  // Get user plan and corresponding quota
+  const { plan: userPlan, quota } = await resolveUserPlan(userId, email);
 
-  const usedBytes = validMediaList.reduce((acc, item) => acc + (item.fileSize || 0), 0);
+  const usedBytes = validMediaList.reduce((acc, item) => {
+    const s = Number(item.fileSize);
+    return acc + (Number.isFinite(s) && s > 0 ? s : 0);
+  }, 0);
+
   const storage = {
     plan: userPlan,
     planLabel: quota.label,
     usedBytes,
     limitBytes: quota.limitBytes,
     remainingBytes: Math.max(0, quota.limitBytes - usedBytes),
-    percentUsed: Math.min(100, parseFloat(((usedBytes / quota.limitBytes) * 100).toFixed(1)))
+    percentUsed: quota.limitBytes > 0
+      ? Math.min(100, Math.max(0, parseFloat(((usedBytes / quota.limitBytes) * 100).toFixed(1))))
+      : 0
   };
 
   const latestTime = validMediaList[0]?.createdAt ? new Date(validMediaList[0].createdAt).getTime() : 0;
@@ -281,31 +330,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Check User's Total Plan Storage Quota (No per-file size limit; only total remaining plan storage)
-    const mediaCol = await getMediaCollection();
-    const quotaFilter = authUser?.email
-      ? { $or: [{ userId }, { userEmail: authUser.email }] }
-      : { userId };
-    const existingMedia = await mediaCol.find(quotaFilter).toArray();
-    const usedBytes = existingMedia.reduce((acc, item) => acc + (item.fileSize || 0), 0);
+    const rawFileSize = Number(file.size);
+    const incomingBytes = Number.isFinite(rawFileSize) && rawFileSize > 0 ? rawFileSize : 0;
 
-    const streamerRow = db.prepare('SELECT plan FROM streamers WHERE id = ? OR LOWER(email) = LOWER(?)').get(userId, authUser?.email || '') as any;
-    const userPlan = (streamerRow?.plan || 'free').toLowerCase();
-    const quota = PLAN_STORAGE_LIMITS[userPlan] || PLAN_STORAGE_LIMITS.free;
+    // 1. Fetch current verified media and storage calculations
+    const currentData = await fetchUserMediaData(userId, email);
+    const { plan: userPlan, quota } = await resolveUserPlan(userId, email);
+    const currentUsedBytes = currentData.storage.usedBytes;
 
-    if (usedBytes + file.size > quota.limitBytes) {
-      const usedMb = (usedBytes / (1024 * 1024)).toFixed(1);
-      const fileMb = (file.size / (1024 * 1024)).toFixed(1);
-      const totalAttemptedMb = ((usedBytes + file.size) / (1024 * 1024)).toFixed(1);
+    // Check if new file would exceed total quota
+    if (currentUsedBytes + incomingBytes > quota.limitBytes) {
+      const usedMb = (currentUsedBytes / (1024 * 1024)).toFixed(2);
+      const fileMb = (incomingBytes / (1024 * 1024)).toFixed(2);
+      const totalAttemptedMb = ((currentUsedBytes + incomingBytes) / (1024 * 1024)).toFixed(2);
       const limitMb = (quota.limitBytes / (1024 * 1024)).toFixed(0);
       return NextResponse.json(
         {
-          error: `Storage Limit Exceeded: ${totalAttemptedMb} MB attempted (${usedMb} MB used + ${fileMb} MB file) exceeds max ${limitMb} MB limit. Delete existing media or upgrade plan.`,
+          error: `Storage Limit Exceeded: ${totalAttemptedMb} MB attempted (${usedMb} MB used + ${fileMb} MB file) exceeds max ${limitMb} MB limit (${quota.label}). Delete existing media or upgrade plan.`,
           storageLimitExceeded: true,
-          usedBytes,
-          attemptedBytes: file.size,
-          totalAttemptedBytes: usedBytes + file.size,
-          limitBytes: quota.limitBytes
+          usedBytes: currentUsedBytes,
+          attemptedBytes: incomingBytes,
+          totalAttemptedBytes: currentUsedBytes + incomingBytes,
+          limitBytes: quota.limitBytes,
+          remainingBytes: currentData.storage.remainingBytes
         },
         { status: 400 }
       );
@@ -344,11 +391,13 @@ export async function POST(req: NextRequest) {
     await fs.writeFile(filePath, buffer);
     verifiedFilesOnDisk.add(storedFilename);
 
+    const actualWrittenBytes = buffer.length > 0 ? buffer.length : incomingBytes;
     const publicUrl = `/uploads/media/${storedFilename}`;
     const detectedMime = detectMimeType(mimeType, safeExt);
     const base64Data = buffer.toString('base64');
 
     // 5. Save media document to MongoDB with persistent Cloud backup
+    const mediaCol = await getMediaCollection();
     const mediaDoc: MediaDoc = {
       userId,
       userEmail: authUser?.email || '',
@@ -356,8 +405,8 @@ export async function POST(req: NextRequest) {
       storedFilename,
       url: publicUrl,
       fileType: detectedMime,
-      fileSize: file.size,
-      fileBase64: file.size <= 15 * 1024 * 1024 ? base64Data : undefined,
+      fileSize: actualWrittenBytes,
+      fileBase64: actualWrittenBytes <= 15 * 1024 * 1024 ? base64Data : undefined,
       createdAt: new Date()
     };
 

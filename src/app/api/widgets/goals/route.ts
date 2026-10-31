@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/server/database/db';
 import { getIO } from '@/server/services/socketService';
 import { v4 as uuidv4 } from 'uuid';
 import { getUsersCollection, getOverlayTokenHistoryCollection, getStreamGoalsCollection } from '@/server/database/mongo';
@@ -12,13 +11,10 @@ export async function GET(req: NextRequest) {
     const token = searchParams.get('token') || 'demo-token';
     const goalId = searchParams.get('goalId');
 
-    let goals = db.prepare(`
-      SELECT * FROM stream_goals 
-      WHERE streamer_token = ? 
-      ORDER BY is_active DESC, created_at DESC
-    `).all(token) as any[];
+    const goalsCol = await getStreamGoalsCollection();
+    let goals = await goalsCol.find({ streamerToken: token }).sort({ isActive: -1, createdAt: -1 }).toArray();
 
-    // If no goals found directly under this token, resolve the streamer and check historical tokens or MongoDB
+    // If no goals found directly under this token, resolve the streamer and check historical tokens
     if (goals.length === 0 && token !== 'demo-token') {
       try {
         const usersCol = await getUsersCollection();
@@ -39,7 +35,6 @@ export async function GET(req: NextRequest) {
 
         const sId = streamer?.userId || (streamer as any)?.id;
         if (sId) {
-          // Collect all known tokens for this streamer
           const histories = await histCol.find({ streamerId: sId }).toArray();
           const candidateTokens = new Set<string>();
           if (streamer.overlayToken) candidateTokens.add(streamer.overlayToken);
@@ -49,75 +44,19 @@ export async function GET(req: NextRequest) {
             if (h.token) candidateTokens.add(h.token);
           }
 
-          // Check if any goals exist in SQLite under any of these candidate tokens
           const tokenList = Array.from(candidateTokens);
-          const placeholders = tokenList.map(() => '?').join(',');
-          const existingInSql = db.prepare(`
-            SELECT * FROM stream_goals 
-            WHERE streamer_token IN (${placeholders})
-            ORDER BY is_active DESC, created_at DESC
-          `).all(...tokenList) as any[];
+          goals = await goalsCol.find({
+            $or: [
+              { streamerId: sId },
+              { streamerToken: { $in: tokenList } }
+            ]
+          }).sort({ isActive: -1, createdAt: -1 }).toArray();
 
-          if (existingInSql.length > 0) {
-            // Migrate these goals to the current active token
-            db.prepare(`
-              UPDATE stream_goals 
-              SET streamer_token = ? 
-              WHERE streamer_token IN (${placeholders})
-            `).run(token, ...tokenList);
-
-            goals = db.prepare(`
-              SELECT * FROM stream_goals 
-              WHERE streamer_token = ? 
-              ORDER BY is_active DESC, created_at DESC
-            `).all(token) as any[];
-          } else {
-            // Check MongoDB stream_goals collection
-            const goalsCol = await getStreamGoalsCollection();
-            const mongoGoals = await goalsCol.find({
-              $or: [
-                { streamerId: sId },
-                { streamerToken: { $in: tokenList } }
-              ]
-            }).toArray();
-
-            if (mongoGoals.length > 0) {
-              const insertStmt = db.prepare(`
-                INSERT OR REPLACE INTO stream_goals (
-                  id, streamer_token, title, target_amount, current_amount,
-                  initial_amount, accent_color, template_style,
-                  show_balance, show_background, show_animation,
-                  end_date, is_active, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-              `);
-
-              for (const mg of mongoGoals) {
-                const gId = (mg as any).id || String(mg._id);
-                insertStmt.run(
-                  gId,
-                  token,
-                  mg.title || 'Stream Goal',
-                  mg.targetAmount ?? 100,
-                  mg.currentAmount ?? 0,
-                  (mg as any).initialAmount ?? 0,
-                  (mg as any).accentColor || '#10B981',
-                  (mg as any).templateStyle || mg.theme || 'cyber-neon',
-                  (mg as any).showBalance !== false ? 1 : 0,
-                  (mg as any).showBackground !== false ? 1 : 0,
-                  (mg as any).showAnimation !== false ? 1 : 0,
-                  (mg as any).endDate || null,
-                  mg.isActive ? 1 : 0,
-                  mg.createdAt ? new Date(mg.createdAt).toISOString() : new Date().toISOString(),
-                  mg.updatedAt ? new Date(mg.updatedAt).toISOString() : new Date().toISOString()
-                );
-              }
-
-              goals = db.prepare(`
-                SELECT * FROM stream_goals 
-                WHERE streamer_token = ? 
-                ORDER BY is_active DESC, created_at DESC
-              `).all(token) as any[];
-            }
+          if (goals.length > 0) {
+            await goalsCol.updateMany(
+              { _id: { $in: goals.map((g: any) => g._id) } },
+              { $set: { streamerToken: token, streamerId: sId, updatedAt: new Date() } }
+            );
           }
         }
       } catch (err) {
@@ -125,60 +64,32 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const activeGoal = goals.find((g) => g.is_active === 1) || goals[0] || null;
-    const specificGoal = goalId ? goals.find((g) => g.id === goalId) : null;
+    const activeGoal = goals.find((g: any) => g.isActive || g.is_active === 1) || goals[0] || null;
+    const specificGoal = goalId ? goals.find((g: any) => g.id === goalId || String(g._id) === goalId) : null;
+
+    const mapGoal = (g: any) => ({
+      id: g.id || String(g._id),
+      token: g.streamerToken || g.streamer_token,
+      title: g.title,
+      targetAmount: Number(g.targetAmount ?? g.target_amount ?? 100),
+      currentAmount: Number(g.currentAmount ?? g.current_amount ?? 0),
+      initialAmount: Number(g.initialAmount ?? g.initial_amount ?? 0),
+      accentColor: g.accentColor || g.accent_color || '#10B981',
+      templateStyle: g.templateStyle || g.template_style || 'cyber-neon',
+      showBalance: g.showBalance !== false && g.show_balance !== 0,
+      showBackground: g.showBackground !== false && g.show_background !== 0,
+      showAnimation: g.showAnimation !== false && g.show_animation !== 0,
+      endDate: g.endDate || g.end_date || null,
+      isActive: Boolean(g.isActive || g.is_active === 1),
+      createdAt: g.createdAt || g.created_at,
+      updatedAt: g.updatedAt || g.updated_at
+    });
 
     return NextResponse.json({
       success: true,
-      goals: goals.map((g) => ({
-        id: g.id,
-        token: g.streamer_token,
-        title: g.title,
-        targetAmount: Number(g.target_amount),
-        currentAmount: Number(g.current_amount),
-        initialAmount: Number(g.initial_amount || 0),
-        accentColor: g.accent_color || '#10B981',
-        templateStyle: g.template_style || 'cyber-neon',
-        showBalance: g.show_balance !== 0,
-        showBackground: g.show_background !== 0,
-        showAnimation: g.show_animation !== 0,
-        endDate: g.end_date || null,
-        isActive: g.is_active === 1,
-        createdAt: g.created_at,
-        updatedAt: g.updated_at
-      })),
-      activeGoal: activeGoal ? {
-        id: activeGoal.id,
-        token: activeGoal.streamer_token,
-        title: activeGoal.title,
-        targetAmount: Number(activeGoal.target_amount),
-        currentAmount: Number(activeGoal.current_amount),
-        initialAmount: Number(activeGoal.initial_amount || 0),
-        accentColor: activeGoal.accent_color || '#10B981',
-        templateStyle: activeGoal.template_style || 'cyber-neon',
-        showBalance: activeGoal.show_balance !== 0,
-        showBackground: activeGoal.show_background !== 0,
-        showAnimation: activeGoal.show_animation !== 0,
-        endDate: activeGoal.end_date || null,
-        isActive: activeGoal.is_active === 1,
-        createdAt: activeGoal.created_at,
-        updatedAt: activeGoal.updated_at
-      } : null,
-      goal: specificGoal ? {
-        id: specificGoal.id,
-        token: specificGoal.streamer_token,
-        title: specificGoal.title,
-        targetAmount: Number(specificGoal.target_amount),
-        currentAmount: Number(specificGoal.current_amount),
-        initialAmount: Number(specificGoal.initial_amount || 0),
-        accentColor: specificGoal.accent_color || '#10B981',
-        templateStyle: specificGoal.template_style || 'cyber-neon',
-        showBalance: specificGoal.show_balance !== 0,
-        showBackground: specificGoal.show_background !== 0,
-        showAnimation: specificGoal.show_animation !== 0,
-        endDate: specificGoal.end_date || null,
-        isActive: specificGoal.is_active === 1
-      } : null
+      goals: goals.map(mapGoal),
+      activeGoal: activeGoal ? mapGoal(activeGoal) : null,
+      goal: specificGoal ? mapGoal(specificGoal) : null
     });
   } catch (err: any) {
     console.error('Error in GET /api/widgets/goals:', err);
@@ -196,25 +107,44 @@ export async function POST(req: NextRequest) {
     const initialAmount = Math.max(0, parseFloat(body.initialAmount) || currentAmount);
     const accentColor = body.accentColor || '#10B981';
     const templateStyle = body.templateStyle || 'cyber-neon';
-    const showBalance = body.showBalance !== undefined ? (body.showBalance ? 1 : 0) : 1;
-    const showBackground = body.showBackground !== undefined ? (body.showBackground ? 1 : 0) : 1;
-    const showAnimation = body.showAnimation !== undefined ? (body.showAnimation ? 1 : 0) : 1;
+    const showBalance = body.showBalance !== undefined ? Boolean(body.showBalance) : true;
+    const showBackground = body.showBackground !== undefined ? Boolean(body.showBackground) : true;
+    const showAnimation = body.showAnimation !== undefined ? Boolean(body.showAnimation) : true;
     const endDate = body.endDate || null;
-    const isActive = body.isActive !== undefined ? (body.isActive ? 1 : 0) : 1;
+    const isActive = body.isActive !== undefined ? Boolean(body.isActive) : true;
+
+    const goalsCol = await getStreamGoalsCollection();
 
     // If marked active, deactivate other goals for this streamer
-    if (isActive === 1) {
-      db.prepare('UPDATE stream_goals SET is_active = 0 WHERE streamer_token = ?').run(token);
+    if (isActive) {
+      await goalsCol.updateMany({ streamerToken: token }, { $set: { isActive: false } });
     }
 
     const newId = uuidv4();
-    db.prepare(`
-      INSERT INTO stream_goals (
-        id, streamer_token, title, target_amount, current_amount,
-        initial_amount, accent_color, template_style, show_balance, show_background, show_animation, end_date, is_active, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `).run(
-      newId,
+    const now = new Date();
+
+    const newDoc = {
+      id: newId,
+      streamerToken: token,
+      title,
+      targetAmount,
+      currentAmount,
+      initialAmount,
+      accentColor,
+      templateStyle,
+      showBalance,
+      showBackground,
+      showAnimation,
+      endDate,
+      isActive,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await goalsCol.insertOne(newDoc);
+
+    const created = {
+      id: newId,
       token,
       title,
       targetAmount,
@@ -227,25 +157,8 @@ export async function POST(req: NextRequest) {
       showAnimation,
       endDate,
       isActive
-    );
-
-    const created = {
-      id: newId,
-      token,
-      title,
-      targetAmount,
-      currentAmount,
-      initialAmount,
-      accentColor,
-      templateStyle,
-      showBalance: showBalance === 1,
-      showBackground: showBackground === 1,
-      showAnimation: showAnimation === 1,
-      endDate,
-      isActive: isActive === 1
     };
 
-    // Broadcast goal update to OBS overlay in real time
     const io = getIO();
     if (io) {
       io.to(`overlay:${token}`).emit('goal:update', created);
@@ -274,50 +187,62 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Missing goal id' }, { status: 400 });
     }
 
-    const existing = db.prepare('SELECT * FROM stream_goals WHERE id = ? AND streamer_token = ?').get(id, token) as any;
+    const goalsCol = await getStreamGoalsCollection();
+    const existing = await goalsCol.findOne({
+      $and: [
+        { $or: [{ id }, { _id: id as any }] },
+        { streamerToken: token }
+      ]
+    }) as any;
+
     if (!existing) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
 
-    // Check if activating this goal
-    const willBeActive = body.isActive !== undefined ? (body.isActive ? 1 : 0) : existing.is_active;
-    if (willBeActive === 1) {
-      db.prepare('UPDATE stream_goals SET is_active = 0 WHERE streamer_token = ?').run(token);
+    const willBeActive = body.isActive !== undefined ? Boolean(body.isActive) : Boolean(existing.isActive);
+    if (willBeActive) {
+      await goalsCol.updateMany({ streamerToken: token }, { $set: { isActive: false } });
     }
 
     const title = body.title !== undefined ? body.title.trim() : existing.title;
-    const targetAmount = body.targetAmount !== undefined ? Math.max(1, parseFloat(body.targetAmount) || 1) : existing.target_amount;
-    
-    // Support adding amount (e.g. +$10 from donation) or setting explicitly
-    let currentAmount = existing.current_amount;
+    const targetAmount = body.targetAmount !== undefined ? Math.max(1, parseFloat(body.targetAmount) || 1) : existing.targetAmount;
+
+    let currentAmount = existing.currentAmount ?? existing.current_amount ?? 0;
     if (body.addAmount !== undefined) {
       currentAmount = Math.max(0, currentAmount + parseFloat(body.addAmount));
     } else if (body.currentAmount !== undefined) {
       currentAmount = Math.max(0, parseFloat(body.currentAmount) || 0);
     }
 
-    const accentColor = body.accentColor || existing.accent_color || '#10B981';
-    const templateStyle = body.templateStyle || existing.template_style || 'cyber-neon';
-    const showBalance = body.showBalance !== undefined ? (body.showBalance ? 1 : 0) : (existing.show_balance !== undefined ? existing.show_balance : 1);
-    const showBackground = body.showBackground !== undefined ? (body.showBackground ? 1 : 0) : (existing.show_background !== undefined ? existing.show_background : 1);
-    const showAnimation = body.showAnimation !== undefined ? (body.showAnimation ? 1 : 0) : (existing.show_animation !== undefined ? existing.show_animation : 1);
-    const endDate = body.endDate !== undefined ? body.endDate : existing.end_date;
+    const accentColor = body.accentColor || existing.accentColor || '#10B981';
+    const templateStyle = body.templateStyle || existing.templateStyle || 'cyber-neon';
+    const showBalance = body.showBalance !== undefined ? Boolean(body.showBalance) : (existing.showBalance !== undefined ? Boolean(existing.showBalance) : true);
+    const showBackground = body.showBackground !== undefined ? Boolean(body.showBackground) : (existing.showBackground !== undefined ? Boolean(existing.showBackground) : true);
+    const showAnimation = body.showAnimation !== undefined ? Boolean(body.showAnimation) : (existing.showAnimation !== undefined ? Boolean(existing.showAnimation) : true);
+    const endDate = body.endDate !== undefined ? body.endDate : existing.endDate;
 
-    db.prepare(`
-      UPDATE stream_goals SET
-        title = ?,
-        target_amount = ?,
-        current_amount = ?,
-        accent_color = ?,
-        template_style = ?,
-        show_balance = ?,
-        show_background = ?,
-        show_animation = ?,
-        end_date = ?,
-        is_active = ?,
-        updated_at = datetime('now')
-      WHERE id = ? AND streamer_token = ?
-    `).run(
+    await goalsCol.updateOne(
+      { _id: existing._id },
+      {
+        $set: {
+          title,
+          targetAmount,
+          currentAmount,
+          accentColor,
+          templateStyle,
+          showBalance,
+          showBackground,
+          showAnimation,
+          endDate,
+          isActive: willBeActive,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    const updated = {
+      id: existing.id || String(existing._id),
+      token,
       title,
       targetAmount,
       currentAmount,
@@ -327,27 +252,9 @@ export async function PUT(req: NextRequest) {
       showBackground,
       showAnimation,
       endDate,
-      willBeActive,
-      id,
-      token
-    );
-
-    const updated = {
-      id,
-      token,
-      title,
-      targetAmount,
-      currentAmount,
-      accentColor,
-      templateStyle,
-      showBalance: showBalance === 1,
-      showBackground: showBackground === 1,
-      showAnimation: showAnimation === 1,
-      endDate,
-      isActive: willBeActive === 1
+      isActive: willBeActive
     };
 
-    // Broadcast goal update to OBS overlay
     const io = getIO();
     if (io) {
       io.to(`overlay:${token}`).emit('goal:update', updated);
@@ -376,35 +283,35 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Missing goal id' }, { status: 400 });
     }
 
-    const goal = db.prepare('SELECT * FROM stream_goals WHERE id = ? AND streamer_token = ?').get(id, token) as any;
+    const goalsCol = await getStreamGoalsCollection();
+    const goal = await goalsCol.findOne({
+      $and: [
+        { $or: [{ id }, { _id: id as any }] },
+        { streamerToken: token }
+      ]
+    }) as any;
+
     if (!goal) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
 
-    db.prepare('DELETE FROM stream_goals WHERE id = ? AND streamer_token = ?').run(id, token);
+    await goalsCol.deleteOne({ _id: goal._id });
 
     // If deleted goal was active, promote the newest remaining goal
-    if (goal.is_active === 1) {
-      const nextActive = db.prepare(`
-        SELECT id FROM stream_goals 
-        WHERE streamer_token = ? 
-        ORDER BY created_at DESC 
-        LIMIT 1
-      `).get(token) as any;
-
-      if (nextActive) {
-        db.prepare('UPDATE stream_goals SET is_active = 1 WHERE id = ?').run(nextActive.id);
-        const promoted = db.prepare('SELECT * FROM stream_goals WHERE id = ?').get(nextActive.id) as any;
+    if (goal.isActive) {
+      const nextActive = await goalsCol.find({ streamerToken: token }).sort({ createdAt: -1 }).limit(1).toArray();
+      if (nextActive.length > 0) {
+        await goalsCol.updateOne({ _id: nextActive[0]._id }, { $set: { isActive: true } });
         const io = getIO();
-        if (io && promoted) {
+        if (io) {
           io.to(`overlay:${token}`).emit('goal:update', {
-            id: promoted.id,
+            id: nextActive[0].id || String(nextActive[0]._id),
             token,
-            title: promoted.title,
-            targetAmount: Number(promoted.target_amount),
-            currentAmount: Number(promoted.current_amount),
-            accentColor: promoted.accent_color,
-            endDate: promoted.end_date,
+            title: nextActive[0].title,
+            targetAmount: Number(nextActive[0].targetAmount),
+            currentAmount: Number(nextActive[0].currentAmount),
+            accentColor: nextActive[0].accentColor,
+            endDate: nextActive[0].endDate,
             isActive: true
           });
         }

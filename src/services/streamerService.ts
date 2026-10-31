@@ -55,6 +55,8 @@ export const streamerService = {
     displayName?: string;
     avatarUrl?: string;
     customThanksMessage?: string;
+    liveStreamUrl?: string;
+    youtubeLiveUrl?: string;
     plan?: string;
     socialLinks?: any[];
     links?: any[];

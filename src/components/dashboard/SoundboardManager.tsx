@@ -36,10 +36,11 @@ import {
   Crosshair,
   Activity,
   Mic,
-  Music
+  Music,
+  GripVertical
 } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
-import { triggerSoundEffect, stopAllActiveSounds } from '../../utils/soundboardSynth';
+import { triggerSoundEffect, stopAllActiveSounds, preloadAudioBatch } from '../../utils/soundboardSynth';
 
 export interface SoundboardItem {
   id: string;
@@ -194,6 +195,9 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
 
   // Active playing sound tracker
   const [playingSoundIds, setPlayingSoundIds] = useState<Set<string>>(new Set());
+  // Synchronous single-playback guard (avoids stale state when spamming clicks / hotkeys)
+  const currentPlayingIdRef = useRef<string | null>(null);
+  const playbackClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Key recording state
   const [recordingItemId, setRecordingItemId] = useState<string | null>(null);
@@ -226,7 +230,11 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const obsUrl = `${origin}/overlay/soundboard/${effectiveToken}`;
 
-  // Fetch data
+  // Drag & Drop Reordering State
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Fetch data (strictly capped to 9 sound pads maximum)
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -234,7 +242,10 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
       const data = await res.json();
       if (data.success) {
         if (data.settings) setSettings(data.settings);
-        if (data.items) setItems(data.items);
+        if (data.items) {
+          const limitedItems = (data.items as SoundboardItem[]).slice(0, 9);
+          setItems(limitedItems);
+        }
       }
     } catch (err) {
       console.error('[Soundboard] Fetch error:', err);
@@ -247,45 +258,137 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
     fetchData();
   }, [fetchData]);
 
+  // Pre-cache all pad audio into memory for instant, zero-latency playback
+  useEffect(() => {
+    if (items.length > 0) {
+      preloadAudioBatch(items.map((it) => it.soundUrl));
+    }
+  }, [items]);
+
+  // Drag & Drop Handlers for Pad Index Reordering
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (recordingItemId) {
+      e.preventDefault();
+      return;
+    }
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+
+    const fromIndex = draggedIndex;
+    setDraggedIndex(null);
+
+    if (fromIndex === null || fromIndex === dropIndex) return;
+
+    // Reorder items in state
+    const updated = [...items];
+    const [moved] = updated.splice(fromIndex, 1);
+    updated.splice(dropIndex, 0, moved);
+
+    const reordered = updated.slice(0, 9).map((it, idx) => ({
+      ...it,
+      sortOrder: idx + 1
+    }));
+
+    setItems(reordered);
+
+    // Persist new ordering to database
+    try {
+      await fetch('/api/soundboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: effectiveToken,
+          action: 'reorder_items',
+          itemIds: reordered.map((it) => it.id)
+        })
+      });
+    } catch (err) {
+      console.error('[Soundboard] Failed to save pad order:', err);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const clearPlaybackState = useCallback((soundId?: string) => {
+    if (soundId && currentPlayingIdRef.current !== soundId) return;
+    currentPlayingIdRef.current = null;
+    if (playbackClearTimerRef.current) {
+      clearTimeout(playbackClearTimerRef.current);
+      playbackClearTimerRef.current = null;
+    }
+    setPlayingSoundIds(new Set());
+  }, []);
+
+  // Stop the currently playing sound (local + OBS overlay)
+  const stopCurrentSound = useCallback(() => {
+    stopAllActiveSounds();
+    clearPlaybackState();
+    fetch('/api/soundboard/play', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: effectiveToken, action: 'stop' })
+    }).catch(() => {});
+  }, [effectiveToken, clearPlaybackState]);
+
   // Trigger Play Sound (from UI click or Keybind)
+  // Single playback only: never overlap sounds.
+  //  - Triggering the pad that is already playing stops it (toggle).
+  //  - Triggering a different pad cuts off the current sound and plays the new one.
   const handlePlaySound = useCallback(
     (item: SoundboardItem) => {
-      // 1. If Solo playback mode, stop previous sounds first
-      if (settings.playbackMode === 'solo') {
-        stopAllActiveSounds();
-        setPlayingSoundIds(new Set([item.id]));
-      } else {
-        setPlayingSoundIds((prev) => new Set(prev).add(item.id));
+      // 1. Same pad already playing -> toggle stop, do NOT play again
+      if (currentPlayingIdRef.current === item.id) {
+        stopCurrentSound();
+        return;
       }
 
-      // 2. Local PC sound playback if enabled
+      // 2. Cut off anything currently playing before starting the new sound
+      stopAllActiveSounds();
+      if (playbackClearTimerRef.current) {
+        clearTimeout(playbackClearTimerRef.current);
+        playbackClearTimerRef.current = null;
+      }
+      currentPlayingIdRef.current = item.id;
+      setPlayingSoundIds(new Set([item.id]));
+
+      // 3. Local PC sound playback if enabled
       if (settings.outputMode === 'local' || settings.outputMode === 'both') {
         triggerSoundEffect(
           item.id,
           item.soundUrl,
           item.volume,
           settings.masterVolume,
-          () => {
-            // Callback when sound finishes
-            setPlayingSoundIds((prev) => {
-              const next = new Set(prev);
-              next.delete(item.id);
-              return next;
-            });
-          }
+          () => clearPlaybackState(item.id)
         );
       } else {
-        // Just clear playing state after duration if local audio disabled
-        setTimeout(() => {
-          setPlayingSoundIds((prev) => {
-            const next = new Set(prev);
-            next.delete(item.id);
-            return next;
-          });
+        // Local audio disabled: clear playing state after the pad duration
+        playbackClearTimerRef.current = setTimeout(() => {
+          clearPlaybackState(item.id);
         }, Math.max(1000, item.durationSeconds * 1000));
       }
 
-      // 3. Emit / Send to OBS Browser Source if overlay enabled
+      // 4. Emit / Send to OBS Browser Source if overlay enabled
       if (settings.outputMode === 'overlay' || settings.outputMode === 'both') {
         fetch('/api/soundboard/play', {
           method: 'POST',
@@ -307,23 +410,13 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
         }).catch(() => {});
       }
     },
-    [effectiveToken, settings]
+    [effectiveToken, settings, stopCurrentSound, clearPlaybackState]
   );
 
   // Stop All Sounds (Panic Button)
   const handleStopAll = useCallback(() => {
-    stopAllActiveSounds();
-    setPlayingSoundIds(new Set());
-
-    fetch('/api/soundboard/play', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token: effectiveToken,
-        action: 'stop'
-      })
-    }).catch(() => {});
-  }, [effectiveToken]);
+    stopCurrentSound();
+  }, [stopCurrentSound]);
 
   // Global PC Keybind Listener Engine
   useEffect(() => {
@@ -419,6 +512,8 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
         if (['Space', 'F1', 'F3', 'F4', 'F5', 'F6', 'F7', 'Tab'].includes(e.code)) {
           e.preventDefault();
         }
+        // Ignore OS key auto-repeat while a hotkey is held down (prevents spam re-triggers)
+        if (e.repeat) return;
         handlePlaySound(matchingItem);
       }
     };
@@ -459,7 +554,7 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
 
   // Reset to Default Sounds
   const handleResetDefaults = async () => {
-    if (!confirm('Reset soundboard to the 16 original stream sounds? Your custom sound pads will be replaced.')) {
+    if (!confirm('Reset soundboard to the 9 original stream sounds? Your custom sound pads will be replaced.')) {
       return;
     }
 
@@ -632,6 +727,10 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
 
   // Open Add Modal
   const openAddModal = () => {
+    if (items.length >= 9) {
+      alert('Soundboard is limited to 9 pads maximum. Please delete or edit an existing pad.');
+      return;
+    }
     setEditingItem(null);
     setFormData({
       title: '',
@@ -657,129 +756,107 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
     return matchesCat && matchesQuery;
   });
 
-  // Render Icon helper
-  const renderIcon = (name: string, size = 20) => {
-    switch (name) {
-      case 'Megaphone':
-        return <Megaphone size={size} />;
-      case 'Smile':
-        return <Smile size={size} />;
-      case 'DollarSign':
-        return <DollarSign size={size} />;
-      case 'Trophy':
-        return <Trophy size={size} />;
-      case 'Frown':
-        return <Frown size={size} />;
-      case 'Sparkles':
-        return <Sparkles size={size} />;
-      case 'Flame':
-        return <Flame size={size} />;
-      case 'Zap':
-        return <Zap size={size} />;
-      case 'Bell':
-        return <Bell size={size} />;
-      case 'AlertCircle':
-        return <AlertCircle size={size} />;
-      case 'Skull':
-        return <Skull size={size} />;
-      case 'TrendingUp':
-        return <TrendingUp size={size} />;
-      case 'Radio':
-        return <Radio size={size} />;
-      case 'Crosshair':
-        return <Crosshair size={size} />;
-      case 'Activity':
-        return <Activity size={size} />;
-      case 'Mic':
-        return <Mic size={size} />;
-      default:
-        return <Volume2 size={size} />;
-    }
+  // Render Icon helper - Volume icon used for all soundboards
+  const renderIcon = (_name?: string, size = 20) => {
+    return <Volume2 size={size} />;
   };
 
   return (
     <div className="space-y-6">
-      {/* 1. Header & Live Keybind Listener Bar */}
-      <div className="p-6 rounded-3xl bg-[#090D18] border border-slate-800 shadow-xl relative overflow-hidden">
+      {/* 1. Header & Live Keybind Listener Bar (Fully Responsive) */}
+      <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-[#090D18] border border-slate-800 shadow-xl relative overflow-hidden">
         {/* Glow accent */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+        <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-5 sm:gap-6">
+          <div className="space-y-3 min-w-0">
+            {/* Title & Badge */}
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2 sm:p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex-shrink-0 shadow-inner">
                 <Volume2 size={24} />
               </div>
-              <div>
-                <h1 className="text-xl font-black text-white tracking-wide font-sans flex items-center gap-2">
-                  <span>STREAM SOUNDBOARD & HOTKEY ENGINE</span>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-base sm:text-lg md:text-xl font-black text-white tracking-wide font-sans">
+                    STREAM SOUNDBOARD & HOTKEY ENGINE
+                  </h1>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex-shrink-0">
                     PC KEYBIND
                   </span>
-                </h1>
-                <p className="text-xs text-slate-400">
+                </div>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                   Assign keyboard hotkeys to play sound effects instantly on your PC and broadcast to OBS Studio.
                 </p>
               </div>
             </div>
 
-            {/* Listener Status Badge */}
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            {/* Listener Status Badge & Quick Tools */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 pt-1">
               <button
                 onClick={handleToggleListening}
-                className={`flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all ${
                   settings.isListening
                     ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300 shadow-lg shadow-emerald-500/10'
                     : 'bg-amber-500/10 border-amber-500/40 text-amber-300'
                 }`}
               >
                 <div
-                  className={`w-2.5 h-2.5 rounded-full ${
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
                     settings.isListening ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                   }`}
                 />
-                <span>
+                <span className="truncate">
                   {settings.isListening ? 'PC KEYBOARD LISTENER: ARMED & ACTIVE' : 'KEYBOARD LISTENER: PAUSED'}
                 </span>
-                <span className="text-[10px] underline ml-1 opacity-70">
+                <span className="text-[10px] underline opacity-70 hidden sm:inline flex-shrink-0">
                   {settings.isListening ? '(Click to Pause)' : '(Click to Enable)'}
                 </span>
               </button>
 
               <button
                 onClick={() => setIsCheatSheetOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs text-slate-300 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs text-slate-300 hover:text-white transition-colors flex-shrink-0"
               >
-                <Keyboard size={14} className="text-cyan-400" />
+                <Keyboard size={14} className="text-cyan-400 flex-shrink-0" />
                 <span>Hotkey Cheat Sheet</span>
               </button>
 
               <button
                 onClick={() => setIsSettingsModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs text-slate-300 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-500 text-xs text-slate-300 hover:text-white transition-colors flex-shrink-0"
               >
-                <Sliders size={14} className="text-purple-400" />
+                <Sliders size={14} className="text-purple-400 flex-shrink-0" />
                 <span>Output & Audio Routing</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Actions & Panic Button */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Quick Actions & Panic Button (Responsive Grid on Mobile / Flex on Tablet & Desktop) */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 w-full xl:w-auto xl:justify-end pt-3 xl:pt-0 border-t border-slate-800/80 xl:border-t-0">
             {/* Master Volume Slider */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800">
-              <Volume2 size={16} className="text-slate-400" />
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={settings.masterVolume}
-                onChange={(e) => handleMasterVolumeChange(parseFloat(e.target.value))}
-                className="w-24 accent-cyan-400 cursor-pointer h-1.5 rounded-lg bg-slate-700"
-              />
-              <span className="text-xs font-mono text-slate-300 w-10 text-right">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 flex-1 sm:flex-initial justify-between sm:justify-start min-w-[150px]">
+              <div className="flex items-center gap-2 min-w-0">
+                <Volume2 size={16} className="text-slate-400 flex-shrink-0" />
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={settings.masterVolume}
+                  onChange={(e) => handleMasterVolumeChange(parseFloat(e.target.value))}
+                  className="w-16 sm:w-20 md:w-24 accent-cyan-400 cursor-pointer h-1.5 rounded-lg bg-slate-700"
+                />
+              </div>
+              <span className="text-xs font-mono text-slate-300 w-9 text-right font-bold flex-shrink-0">
                 {Math.round(settings.masterVolume * 100)}%
+              </span>
+            </div>
+
+            {/* Pad Counter Badge */}
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-mono flex-shrink-0">
+              <span className="text-slate-400">Pads:</span>
+              <span className={items.length >= 9 ? 'text-amber-400 font-bold' : 'text-cyan-400 font-bold'}>
+                {items.length}/9
               </span>
             </div>
 
@@ -787,22 +864,28 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
             <button
               onClick={handleStopAll}
               title="Stop all currently playing sounds immediately"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 font-mono font-bold text-xs transition-all shadow-lg shadow-rose-500/10"
+              className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 font-mono font-bold text-xs transition-all shadow-lg shadow-rose-500/10 flex-1 sm:flex-initial whitespace-nowrap"
             >
-              <Square size={14} className="fill-rose-400 text-rose-400" />
+              <Square size={13} className="fill-rose-400 text-rose-400 flex-shrink-0" />
               <span>STOP ALL</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 font-bold">
                 ESC
               </span>
             </button>
 
-            {/* Add Sound Button */}
+            {/* Add Sound Button (Max 9 Pads) */}
             <button
               onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors shadow-lg shadow-cyan-500/20"
+              disabled={items.length >= 9}
+              title={items.length >= 9 ? 'Maximum limit of 9 soundboard pads reached' : 'Add new sound pad'}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all w-full sm:w-auto flex-shrink-0 whitespace-nowrap ${
+                items.length >= 9
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                  : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 cursor-pointer'
+              }`}
             >
-              <Plus size={16} />
-              <span>Add Sound Pad</span>
+              <Plus size={16} className="flex-shrink-0" />
+              <span>{items.length >= 9 ? 'Max 9 Pads Reached' : 'Add Sound Pad'}</span>
             </button>
           </div>
         </div>
@@ -842,7 +925,7 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
 
           <button
             onClick={handleResetDefaults}
-            title="Restore default 16 sounds"
+            title="Restore default 9 sounds"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-400 hover:text-white transition-colors whitespace-nowrap"
           >
             <RefreshCw size={13} />
@@ -893,66 +976,104 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
           </p>
           <button
             onClick={openAddModal}
-            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs inline-flex items-center gap-2"
+            disabled={items.length >= 9}
+            className={`px-4 py-2 rounded-xl font-bold text-xs inline-flex items-center gap-2 ${
+              items.length >= 9
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 cursor-pointer'
+            }`}
           >
             <Plus size={14} />
-            <span>Add Sound Pad</span>
+            <span>{items.length >= 9 ? 'Max 9 Pads Reached' : 'Add Sound Pad'}</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredItems.map((item) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {filteredItems.map((item, index) => {
             const isPlaying = playingSoundIds.has(item.id);
             const isRecordingThis = recordingItemId === item.id;
             const itemColor = item.color || '#00F0FF';
+            const isBeingDragged = draggedIndex === index;
+            const isDraggedOver = dragOverIndex === index;
 
             return (
               <div
                 key={item.id}
-                className={`relative group rounded-2xl p-4 transition-all duration-200 border flex flex-col justify-between select-none ${
-                  isPlaying
-                    ? 'shadow-2xl scale-[1.02]'
+                draggable={!recordingItemId}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`relative group rounded-3xl p-4 sm:p-5 transition-all duration-300 border flex flex-col justify-between select-none cursor-default backdrop-blur-md overflow-hidden ${
+                  isBeingDragged
+                    ? 'opacity-30 scale-95 border-dashed border-cyan-400 bg-cyan-950/30'
+                    : isDraggedOver
+                    ? 'border-cyan-400 ring-2 ring-cyan-400/80 scale-[1.03] bg-[#0c182e] shadow-2xl shadow-cyan-500/20'
+                    : isPlaying
+                    ? 'scale-[1.02] bg-gradient-to-b from-[#131d33] to-[#0b101e]'
                     : isRecordingThis
-                    ? 'border-cyan-400 ring-2 ring-cyan-400/50 bg-[#0E1526]'
-                    : 'hover:border-slate-700 bg-[#090D18] border-slate-800/80 hover:bg-[#0c1222]'
+                    ? 'border-cyan-400 ring-2 ring-cyan-400/60 bg-[#0E1526]'
+                    : 'bg-gradient-to-b from-[#0f1527] to-[#080c18] border-slate-800/90 hover:border-slate-700 hover:from-[#131b31] hover:to-[#0a0f1e] hover:-translate-y-0.5 hover:shadow-xl'
                 }`}
                 style={{
                   borderColor: isPlaying ? itemColor : isRecordingThis ? '#00F0FF' : undefined,
-                  boxShadow: isPlaying ? `0 0 25px ${itemColor}40, 0 10px 30px rgba(0,0,0,0.5)` : undefined
+                  boxShadow: isPlaying
+                    ? `0 0 35px ${itemColor}45, 0 10px 30px rgba(0,0,0,0.7)`
+                    : isBeingDragged
+                    ? undefined
+                    : `0 4px 20px rgba(0,0,0,0.35)`
                 }}
               >
-                {/* Playing Sound Wave Overlay Glow */}
-                {isPlaying && (
-                  <div
-                    className="absolute inset-0 rounded-2xl pointer-events-none opacity-20"
-                    style={{ backgroundColor: itemColor }}
-                  />
-                )}
+                {/* Subtle Top-Edge Bevel Highlight */}
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
 
-                {/* Top Row: Keybind Badge + Category */}
-                <div className="flex items-center justify-between gap-2 relative z-10 mb-3">
-                  {/* Hotkey Badge Button */}
-                  <div className="flex items-center gap-1">
+                {/* Subtle Ambient Color Glow inside the card */}
+                <div
+                  className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-2xl pointer-events-none transition-opacity duration-500"
+                  style={{
+                    backgroundColor: itemColor,
+                    opacity: isPlaying ? 0.35 : 0.08
+                  }}
+                />
+
+                {/* Top Row: Drag Handle + Index Badge + Keybind Keycap + Category */}
+                <div className="flex items-center justify-between gap-2 relative z-10 mb-4">
+                  {/* Left: Drag Handle & Index Badge */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div
+                      title="Drag to change soundboard pad index / position"
+                      className="cursor-grab active:cursor-grabbing p-1 -ml-1 rounded-lg hover:bg-slate-800/80 text-slate-500 hover:text-cyan-400 transition-colors"
+                    >
+                      <GripVertical size={14} />
+                    </div>
+                    <span className="font-mono text-[10px] font-black text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-md shadow-inner">
+                      #{index + 1}
+                    </span>
+                  </div>
+
+                  {/* Center: Tactile Mechanical Hotkey Keycap */}
+                  <div className="flex items-center gap-1 min-w-0">
                     <button
                       onClick={() => setRecordingItemId(item.id)}
                       title="Click to bind a new key from your PC keyboard"
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-black transition-all truncate shadow-[0_2px_0_rgba(0,0,0,0.6)] active:translate-y-0.5 ${
                         isRecordingThis
-                          ? 'bg-cyan-500 text-slate-950 animate-pulse'
+                          ? 'bg-cyan-500 text-slate-950 ring-2 ring-cyan-400/80 shadow-[0_0_15px_rgba(0,240,255,0.6)] animate-pulse'
                           : item.keybindDisplay
-                          ? 'bg-slate-900 border border-slate-700 hover:border-cyan-400/70 text-slate-200 group-hover:text-white'
-                          : 'bg-slate-900/60 border border-dashed border-slate-700 hover:border-cyan-400 text-slate-500 hover:text-cyan-400'
+                          ? 'bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 hover:border-cyan-400/70 text-slate-100 group-hover:text-white'
+                          : 'bg-slate-900/70 border border-dashed border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-400'
                       }`}
                     >
-                      <Keyboard size={12} className={item.keybindDisplay ? 'text-cyan-400' : 'text-slate-500'} />
-                      <span>{isRecordingThis ? 'PRESS KEY...' : item.keybindDisplay || '+ BIND KEY'}</span>
+                      <Keyboard size={12} className={item.keybindDisplay ? 'text-cyan-400 flex-shrink-0' : 'text-slate-500 flex-shrink-0'} />
+                      <span className="truncate tracking-wider">{isRecordingThis ? 'PRESS KEY...' : item.keybindDisplay || '+ KEY'}</span>
                     </button>
 
                     {item.keybindDisplay && (
                       <button
                         onClick={(e) => handleClearKeybind(item.id, e)}
                         title="Clear keybind"
-                        className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-rose-400 transition-colors"
+                        className="p-1 rounded-md hover:bg-slate-800 text-slate-500 hover:text-rose-400 transition-colors flex-shrink-0"
                       >
                         <X size={12} />
                       </button>
@@ -960,74 +1081,102 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                   </div>
 
                   {/* Category Pill */}
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
+                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-900/90 border border-slate-800 text-slate-400 flex-shrink-0 truncate max-w-[84px]">
                     {item.category}
                   </span>
                 </div>
 
-                {/* Center: Pad Icon + Title + Waveform */}
+                {/* Center: Tactile Pad Icon + Title + Audio Spectrum */}
                 <div
                   onClick={() => handlePlaySound(item)}
-                  className="cursor-pointer flex flex-col items-center justify-center text-center py-4 px-2 rounded-xl hover:bg-white/[0.02] transition-colors relative z-10 group/btn"
+                  className="cursor-pointer flex flex-col items-center justify-center text-center py-4 px-2 rounded-2xl hover:bg-white/[0.03] transition-all relative z-10 group/btn active:scale-[0.98]"
                 >
-                  <div
-                    className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform mb-3 ${
-                      isPlaying ? 'scale-110' : 'group-hover/btn:scale-105'
-                    }`}
-                    style={{
-                      backgroundColor: `${itemColor}15`,
-                      border: `1.5px solid ${itemColor}60`,
-                      color: itemColor,
-                      boxShadow: isPlaying ? `0 0 20px ${itemColor}60` : undefined
-                    }}
-                  >
-                    {isPlaying ? (
-                      <div className="flex items-end gap-1 h-6">
-                        {[0.4, 1.0, 0.7, 0.9].map((h, i) => (
-                          <div
-                            key={i}
-                            className="w-1 rounded-full animate-pulse"
-                            style={{
-                              backgroundColor: itemColor,
-                              height: `${h * 100}%`,
-                              animationDelay: `${i * 0.15}s`
-                            }}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      renderIcon(item.iconName, 26)
+                  {/* Glowing Tactile Disc */}
+                  <div className="relative mb-3.5">
+                    {/* Pulsing ring when playing */}
+                    {isPlaying && (
+                      <div
+                        className="absolute -inset-2 rounded-3xl opacity-40 animate-ping pointer-events-none"
+                        style={{ backgroundColor: itemColor }}
+                      />
                     )}
+
+                    <div
+                      className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300 relative z-10 shadow-lg ${
+                        isPlaying ? 'scale-110' : 'group-hover/btn:scale-105'
+                      }`}
+                      style={{
+                        backgroundColor: `${itemColor}15`,
+                        border: `1.5px solid ${itemColor}${isPlaying ? 'CC' : '50'}`,
+                        color: itemColor,
+                        boxShadow: isPlaying
+                          ? `0 0 25px ${itemColor}80, inset 0 0 15px ${itemColor}40`
+                          : `0 4px 15px rgba(0,0,0,0.4)`
+                      }}
+                    >
+                      {isPlaying ? (
+                        <div className="flex items-end gap-1 h-7">
+                          {[0.4, 0.9, 0.6, 1.0, 0.7].map((h, i) => (
+                            <div
+                              key={i}
+                              className="w-1.5 rounded-full animate-pulse"
+                              style={{
+                                backgroundColor: itemColor,
+                                height: `${h * 100}%`,
+                                animationDuration: `${0.4 + i * 0.15}s`
+                              }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <Volume2 size={28} className="transition-transform group-hover/btn:scale-110" />
+                      )}
+                    </div>
                   </div>
 
-                  <div className="text-sm font-bold text-white tracking-wide truncate max-w-full">
+                  {/* Sound Title */}
+                  <div className="text-sm sm:text-base font-extrabold text-white tracking-wide truncate max-w-full font-sans group-hover/btn:text-cyan-300 transition-colors">
                     {item.title}
                   </div>
 
-                  <div className="text-[11px] font-mono text-slate-400 mt-0.5">
-                    {item.durationSeconds.toFixed(1)}s • Vol {Math.round(item.volume * 100)}%
+                  {/* Audio Metadata Pill */}
+                  <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 mt-1">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-900/90 border border-slate-800/80">
+                      ⏱ {item.durationSeconds.toFixed(1)}s
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-900/90 border border-slate-800/80">
+                      Vol {Math.round(item.volume * 100)}%
+                    </span>
                   </div>
                 </div>
 
                 {/* Bottom Row Controls: Play/Stop + Edit + Delete */}
-                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 relative z-10 mt-2">
+                <div className="pt-3.5 border-t border-slate-800/80 flex items-center justify-between gap-2 relative z-10 mt-3">
                   <button
                     onClick={() => handlePlaySound(item)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all"
-                    style={{
-                      backgroundColor: isPlaying ? itemColor : `${itemColor}15`,
-                      color: isPlaying ? '#090D18' : itemColor,
-                      border: `1px solid ${itemColor}40`
-                    }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-md active:scale-95 ${
+                      isPlaying
+                        ? 'bg-rose-500/20 border border-rose-500 text-rose-300 shadow-rose-500/20'
+                        : 'bg-slate-900/90 hover:bg-slate-850 text-slate-200 hover:text-white border border-slate-700/80 hover:border-cyan-500/50'
+                    }`}
                   >
-                    {isPlaying ? <Square size={13} className="fill-current" /> : <Play size={13} />}
-                    <span>{isPlaying ? 'PLAYING...' : 'PLAY'}</span>
+                    {isPlaying ? (
+                      <>
+                        <Square size={13} className="fill-rose-400 text-rose-400" />
+                        <span>STOP</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play size={13} style={{ color: itemColor }} className="fill-current" />
+                        <span>PLAY</span>
+                      </>
+                    )}
                   </button>
 
                   <button
                     onClick={() => openEditModal(item)}
                     title="Edit sound settings"
-                    className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors"
+                    className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 text-slate-400 hover:text-cyan-300 transition-colors"
                   >
                     <Edit3 size={13} />
                   </button>
@@ -1035,7 +1184,7 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                   <button
                     onClick={() => handleDeleteItem(item.id)}
                     title="Delete pad"
-                    className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors"
+                    className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 transition-colors"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -1153,33 +1302,14 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                 </div>
               </div>
 
-              {/* Playback Mode: Overlap vs Solo */}
+              {/* Playback Mode: Single playback enforced (no overlapping sounds) */}
               <div className="space-y-2">
                 <label className="font-bold text-slate-300">Playback Mode</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setSettings((prev) => ({ ...prev, playbackMode: 'overlap' }))}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      settings.playbackMode === 'overlap'
-                        ? 'bg-cyan-500/20 border-cyan-500 text-white'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="font-bold">Polyphonic (Overlap)</div>
-                    <div className="text-[10px] opacity-70 mt-1">Spamming keys plays multiple sounds simultaneously</div>
-                  </button>
-
-                  <button
-                    onClick={() => setSettings((prev) => ({ ...prev, playbackMode: 'solo' }))}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      settings.playbackMode === 'solo'
-                        ? 'bg-cyan-500/20 border-cyan-500 text-white'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="font-bold">Solo (Cutoff)</div>
-                    <div className="text-[10px] opacity-70 mt-1">Pressing a new sound cuts off the previous sound</div>
-                  </button>
+                <div className="p-3 rounded-xl border bg-cyan-500/10 border-cyan-500/50 text-white">
+                  <div className="font-bold">Single Playback (No Overlap)</div>
+                  <div className="text-[10px] opacity-70 mt-1">
+                    Only one sound plays at a time. Pressing the same pad again stops it; pressing a different pad cuts off the current sound.
+                  </div>
                 </div>
               </div>
 
@@ -1242,48 +1372,117 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
         </div>
       )}
 
-      {/* 6. Add / Edit Sound Pad Modal */}
+      {/* 6. Add / Edit Sound Pad Modal (Redesigned Studio Modal) */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-xl bg-[#0B101E] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <Plus size={20} className="text-cyan-400" />
-                <h3 className="text-base font-bold text-white font-sans">
-                  {editingItem ? 'EDIT SOUND PAD' : 'ADD NEW SOUND PAD'}
-                </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-xl bg-[#0B101E] border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 relative overflow-hidden max-h-[92vh] flex flex-col">
+            {/* Top Glow Accent responding to selected color */}
+            <div
+              className="absolute top-0 inset-x-0 h-1 transition-colors duration-300 pointer-events-none"
+              style={{
+                background: `linear-gradient(90deg, transparent, ${formData.color}, transparent)`
+              }}
+            />
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 sm:pb-4 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2.5 rounded-2xl transition-colors duration-300 flex-shrink-0"
+                  style={{
+                    backgroundColor: `${formData.color}15`,
+                    border: `1.5px solid ${formData.color}40`,
+                    color: formData.color,
+                    boxShadow: `0 0 15px ${formData.color}25`
+                  }}
+                >
+                  <Volume2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white font-sans tracking-wide">
+                    {editingItem ? 'EDIT SOUND PAD' : 'NEW SOUNDBOARD PAD'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Configure sound audio source, category, volume & visual styling
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
-              {/* Title & Category */}
+            {/* Scrollable Modal Content */}
+            <div className="space-y-4 text-xs overflow-y-auto pr-1 flex-1 scrollbar-thin scrollbar-thumb-slate-800">
+              {/* Real-time Interactive Mini Pad Preview */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800/90 flex items-center justify-between gap-3 shadow-inner">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all duration-300"
+                    style={{
+                      backgroundColor: `${formData.color}20`,
+                      border: `1.5px solid ${formData.color}60`,
+                      color: formData.color,
+                      boxShadow: `0 0 18px ${formData.color}35`
+                    }}
+                  >
+                    <Volume2 size={22} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-sm font-extrabold text-white truncate font-sans">
+                      {formData.title.trim() || 'Untitled Sound Pad'}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400 mt-0.5">
+                      <span className="uppercase font-bold text-cyan-400 bg-cyan-950/60 px-1.5 py-0.2 rounded border border-cyan-800/40">
+                        {formData.category}
+                      </span>
+                      <span>•</span>
+                      <span>⏱ {formData.durationSeconds}s</span>
+                      <span>•</span>
+                      <span>Vol {Math.round(formData.volume * 100)}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => triggerSoundEffect('preview', formData.soundUrl, formData.volume, 0.8)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono font-bold text-cyan-400 flex items-center gap-1.5 flex-shrink-0 cursor-pointer shadow-sm active:scale-95 transition-all"
+                >
+                  <Play size={12} className="fill-cyan-400 text-cyan-400" />
+                  <span>Preview</span>
+                </button>
+              </div>
+
+              {/* Title & Category Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-300">Sound Title</label>
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-300 flex items-center justify-between">
+                    <span>Sound Title</span>
+                    <span className="text-[10px] font-mono text-slate-500 font-normal">Max 25 chars</span>
+                  </label>
                   <input
                     type="text"
+                    maxLength={30}
                     value={formData.title}
                     onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                    placeholder="e.g. Airhorn Blast, Bruh..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-500 text-white outline-none"
+                    placeholder="e.g. Airhorn Blast, Bruh, GG..."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-white outline-none font-sans text-xs transition-colors"
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="font-bold text-slate-300">Category</label>
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-500 text-white outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 text-white outline-none font-sans text-xs cursor-pointer transition-colors"
                   >
                     {CATEGORIES.filter((c) => c !== 'All').map((c) => (
-                      <option key={c} value={c}>
+                      <option key={c} value={c} className="bg-slate-900 text-white">
                         {c}
                       </option>
                     ))}
@@ -1291,42 +1490,51 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                 </div>
               </div>
 
-              {/* Sound Source Selector */}
+              {/* Sound Audio Source Selector */}
               <div className="space-y-2">
-                <label className="font-bold text-slate-300">Sound Audio Source</label>
-                <div className="flex border border-slate-800 rounded-xl p-1 bg-slate-950">
+                <label className="font-bold text-slate-300">Audio Source</label>
+                <div className="flex border border-slate-800/90 rounded-2xl p-1 bg-slate-950/80">
                   <button
                     type="button"
                     onClick={() => setActiveTabType('presets')}
-                    className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-colors ${
-                      activeTabType === 'presets' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                    className={`flex-1 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      activeTabType === 'presets'
+                        ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Preset SFX
+                    <Sparkles size={13} />
+                    <span>Preset SFX</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTabType('upload')}
-                    className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-colors ${
-                      activeTabType === 'upload' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                    className={`flex-1 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      activeTabType === 'upload'
+                        ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Upload MP3/WAV
+                    <FolderUp size={13} />
+                    <span>Upload Audio</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTabType('url')}
-                    className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-colors ${
-                      activeTabType === 'url' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                    className={`flex-1 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      activeTabType === 'url'
+                        ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Direct URL
+                    <ExternalLink size={13} />
+                    <span>Direct URL</span>
                   </button>
                 </div>
 
                 {/* Preset SFX Grid */}
                 {activeTabType === 'presets' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1 bg-slate-950 rounded-xl border border-slate-900">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1.5 bg-slate-950 rounded-2xl border border-slate-900 scrollbar-thin scrollbar-thumb-slate-800">
                     {PRESET_SYNTH_SOUNDS.map((ps) => {
                       const selected = formData.soundUrl === ps.id;
                       return (
@@ -1340,19 +1548,25 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                               title: prev.title || ps.name,
                               category: ps.category,
                               color: ps.color,
-                              iconName: ps.icon,
                               durationSeconds: ps.dur
                             }));
                             triggerSoundEffect('preview', ps.id, 0.8, 0.8);
                           }}
-                          className={`p-2 rounded-lg border text-left transition-all ${
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative overflow-hidden group ${
                             selected
-                              ? 'bg-cyan-500/20 border-cyan-400 text-white'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                              ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-sm ring-1 ring-cyan-400/40'
+                              : 'bg-slate-900/80 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-white hover:bg-slate-900'
                           }`}
                         >
-                          <div className="font-bold text-[11px] truncate">{ps.name}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">{ps.dur}s</div>
+                          <div className="font-extrabold text-[11px] truncate flex items-center justify-between">
+                            <span>{ps.name}</span>
+                            {selected && <Check size={12} className="text-cyan-400 flex-shrink-0" />}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-slate-500">
+                            <span>{ps.dur}s</span>
+                            <span>•</span>
+                            <span className="truncate">{ps.category}</span>
+                          </div>
                         </button>
                       );
                     })}
@@ -1361,7 +1575,7 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
 
                 {/* Upload File */}
                 {activeTabType === 'upload' && (
-                  <div className="p-4 rounded-xl border border-dashed border-slate-700 bg-slate-950/60 text-center space-y-2">
+                  <div className="p-5 rounded-2xl border-2 border-dashed border-slate-700 hover:border-cyan-500/50 bg-slate-950/60 text-center space-y-2.5 transition-colors">
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -1372,45 +1586,56 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                       }}
                       className="hidden"
                     />
-                    <FolderUp size={24} className="mx-auto text-slate-400" />
-                    <div className="text-xs font-bold text-white">
-                      {uploadingFile ? 'Uploading sound clip...' : 'Choose an MP3, WAV, or OGG file (max 15MB)'}
+                    <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mx-auto">
+                      <FolderUp size={20} />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-white">
+                        {uploadingFile ? 'Uploading sound clip...' : 'Choose an audio file from your computer'}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        Supports MP3, WAV, OGG, M4A up to 15MB
+                      </div>
                     </div>
                     {formData.soundUrl && !formData.soundUrl.startsWith('synth:') && (
-                      <div className="text-[11px] font-mono text-emerald-400 truncate">
+                      <div className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1.5 rounded-xl truncate inline-block max-w-full">
                         Selected: {formData.soundUrl}
                       </div>
                     )}
                     {uploadError && <div className="text-[11px] font-mono text-rose-400">{uploadError}</div>}
-                    <button
-                      type="button"
-                      disabled={uploadingFile}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs"
-                    >
-                      {uploadingFile ? 'Uploading...' : 'Browse Computer Files'}
-                    </button>
+                    <div>
+                      <button
+                        type="button"
+                        disabled={uploadingFile}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer shadow-sm active:scale-95 transition-all"
+                      >
+                        {uploadingFile ? 'Uploading...' : 'Browse Computer Files'}
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* URL Input */}
+                {/* Direct URL Input */}
                 {activeTabType === 'url' && (
-                  <input
-                    type="text"
-                    value={formData.soundUrl}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, soundUrl: e.target.value }))}
-                    placeholder="https://example.com/sound.mp3 or /uploads/..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-500 text-white outline-none font-mono text-xs"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.soundUrl}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, soundUrl: e.target.value }))}
+                      placeholder="https://example.com/sound.mp3 or /uploads/..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-cyan-500 text-white outline-none font-mono text-xs"
+                    />
+                  </div>
                 )}
               </div>
 
-              {/* Volume & Duration */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
+              {/* Volume & Duration Sliders */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                <div className="space-y-1.5 p-3 rounded-2xl bg-slate-950/60 border border-slate-850">
                   <div className="flex justify-between text-slate-300 font-bold">
                     <span>Pad Volume</span>
-                    <span className="font-mono text-cyan-400">{Math.round(formData.volume * 100)}%</span>
+                    <span className="font-mono text-cyan-400 font-bold">{Math.round(formData.volume * 100)}%</span>
                   </div>
                   <input
                     type="range"
@@ -1421,12 +1646,16 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                     onChange={(e) => setFormData((prev) => ({ ...prev, volume: parseFloat(e.target.value) }))}
                     className="w-full accent-cyan-400 cursor-pointer h-1.5 rounded bg-slate-800"
                   />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>10%</span>
+                    <span>100%</span>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1.5 p-3 rounded-2xl bg-slate-950/60 border border-slate-850">
                   <div className="flex justify-between text-slate-300 font-bold">
                     <span>Duration (seconds)</span>
-                    <span className="font-mono text-cyan-400">{formData.durationSeconds}s</span>
+                    <span className="font-mono text-cyan-400 font-bold">{formData.durationSeconds}s</span>
                   </div>
                   <input
                     type="number"
@@ -1435,39 +1664,56 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                     step="0.1"
                     value={formData.durationSeconds}
                     onChange={(e) => setFormData((prev) => ({ ...prev, durationSeconds: parseFloat(e.target.value) }))}
-                    className="w-full px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs outline-none"
+                    className="w-full px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-mono outline-none focus:border-cyan-500"
                   />
+                  <div className="text-[10px] text-slate-500 font-mono text-right">
+                    OBS alert display time
+                  </div>
                 </div>
               </div>
 
-              {/* Color Selector */}
-              <div className="space-y-1">
-                <label className="font-bold text-slate-300">Theme Color</label>
-                <div className="flex items-center gap-2">
-                  {COLOR_OPTIONS.map((col) => (
-                    <button
-                      key={col}
-                      type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, color: col }))}
-                      className="w-6 h-6 rounded-full transition-transform"
-                      style={{
-                        backgroundColor: col,
-                        transform: formData.color === col ? 'scale(1.25)' : 'scale(1)',
-                        boxShadow: formData.color === col ? `0 0 10px ${col}` : undefined
-                      }}
-                    />
-                  ))}
+              {/* Theme Color Selector */}
+              <div className="space-y-2 pt-1">
+                <label className="font-bold text-slate-300 flex items-center justify-between">
+                  <span>Theme Aura Color</span>
+                  <span className="text-[10px] font-mono text-slate-500">{formData.color}</span>
+                </label>
+                <div className="flex flex-wrap items-center gap-2.5 p-2.5 rounded-2xl bg-slate-950/60 border border-slate-850">
+                  {COLOR_OPTIONS.map((col) => {
+                    const isSelected = formData.color === col;
+                    return (
+                      <button
+                        key={col}
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, color: col }))}
+                        className={`w-7 h-7 rounded-full transition-all cursor-pointer relative ${
+                          isSelected ? 'scale-115 ring-2 ring-white shadow-lg' : 'hover:scale-105 opacity-80 hover:opacity-100'
+                        }`}
+                        style={{
+                          backgroundColor: col,
+                          boxShadow: isSelected ? `0 0 14px ${col}` : undefined
+                        }}
+                      >
+                        {isSelected && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-2 h-2 rounded-full bg-white shadow-sm" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
+            {/* Modal Action Footer */}
+            <div className="pt-3.5 border-t border-slate-800/80 flex items-center justify-between flex-shrink-0">
               <button
                 type="button"
                 onClick={() => triggerSoundEffect('test', formData.soundUrl, formData.volume, 0.8)}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-cyan-300 font-mono text-xs flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-700 hover:border-cyan-400 text-cyan-300 font-mono text-xs flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 transition-all"
               >
-                <Play size={13} />
+                <Play size={13} className="fill-cyan-400 text-cyan-400" />
                 <span>Test Sound</span>
               </button>
 
@@ -1475,14 +1721,19 @@ export const SoundboardManager: React.FC<SoundboardManagerProps> = ({ streamerTo
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors"
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveSound}
-                  className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition-colors shadow-lg shadow-cyan-500/20"
+                  className="px-5 py-2 rounded-xl font-bold text-xs transition-all shadow-lg cursor-pointer active:scale-95"
+                  style={{
+                    backgroundColor: formData.color || '#00F0FF',
+                    color: '#090D18',
+                    boxShadow: `0 0 20px ${formData.color || '#00F0FF'}50`
+                  }}
                 >
                   {editingItem ? 'Save Changes' : 'Create Sound Pad'}
                 </button>

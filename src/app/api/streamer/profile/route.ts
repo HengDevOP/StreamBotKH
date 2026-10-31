@@ -100,7 +100,8 @@ export async function GET(req: NextRequest) {
       plan: streamer.plan || 'free',
       overlayToken: streamer.overlayToken || streamer.overlay_token,
       telegramChatId: (streamer as any).telegramChatId || (streamer as any).telegram_chat_id,
-      telegramPairingCode: streamer.telegramPairingCode || (streamer as any).telegram_pairing_code
+      telegramPairingCode: streamer.telegramPairingCode || (streamer as any).telegram_pairing_code,
+      liveStreamUrl: streamer.liveStreamUrl || streamer.youtubeLiveUrl || ''
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -152,6 +153,8 @@ export async function PUT(req: NextRequest) {
     const newAvatarUrl = avatarUrl !== undefined ? String(avatarUrl).trim() : current.avatarUrl;
     const newPlan = plan !== undefined ? String(plan).toLowerCase() : (current.plan || 'free');
     const newThanks = customThanksMessage !== undefined ? String(customThanksMessage).trim() : (current.customThanksMessage || '');
+    const rawLiveUrl = body.liveStreamUrl !== undefined ? body.liveStreamUrl : body.youtubeLiveUrl;
+    const newLiveStreamUrl = rawLiveUrl !== undefined ? String(rawLiveUrl).trim() : (current.liveStreamUrl || '');
 
     // 3. Process social links with plan limits: Free (1 link), Pro (5 links)
     const isPro = newPlan === 'pro';
@@ -188,6 +191,7 @@ export async function PUT(req: NextRequest) {
           avatarUrl: newAvatarUrl,
           plan: newPlan,
           customThanksMessage: newThanks,
+          liveStreamUrl: newLiveStreamUrl,
           socialLinks: finalLinks,
           updatedAt: now
         }
@@ -244,7 +248,8 @@ export async function PUT(req: NextRequest) {
         plan: updated?.plan || 'free',
         overlayToken: updated?.overlayToken || updated?.overlay_token,
         telegramChatId: (updated as any)?.telegramChatId || (updated as any)?.telegram_chat_id,
-        telegramPairingCode: updated?.telegramPairingCode || (updated as any)?.telegram_pairing_code
+        telegramPairingCode: updated?.telegramPairingCode || (updated as any)?.telegram_pairing_code,
+        liveStreamUrl: updated?.liveStreamUrl || newLiveStreamUrl || ''
       }
     });
   } catch (err: any) {

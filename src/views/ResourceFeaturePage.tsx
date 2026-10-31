@@ -25,7 +25,12 @@ import {
   ShieldCheck,
   Crown,
   Sliders,
-  Monitor
+  Monitor,
+  Gamepad2,
+  Youtube,
+  Facebook,
+  Instagram,
+  Flame
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -360,6 +365,201 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
       'Set your Initial Duration (e.g. 04:00:00) and Seconds Added Per $1 Donated (e.g. 60 seconds).',
       'Copy the Timer Overlay URL (/overlay/timer/:token) into OBS Studio.',
       'Click Start Timer on your dashboard to begin the live countdown!'
+    ]
+  },
+  {
+    slug: '2d-pokemon',
+    title: '2D Pokémon Stream Avatars',
+    headline: 'Interactive 2D Pixel Pokémon Avatars & Real-Time Viewer Chat Bubbles',
+    badge: 'INTERACTIVE AVATARS',
+    planBadge: 'PRO PLAN',
+    shortSub: 'Pixel Pokémon avatars with live viewer speech bubbles',
+    description:
+      'Turn your livestream into an interactive Pokémon world! Every viewer in your chat spawns their own unique 2D pixel companion that roams, reacts, and displays their messages in retro comic speech bubbles directly on OBS.',
+    dashboardTab: 'pokemon',
+    color: '#10B981',
+    icon: Gamepad2,
+    obsDimensions: { width: '1920 px', height: '360 px', fps: '60 FPS' },
+    obsRouteExample: '/overlay/pokemon/:your_token',
+    highlights: [
+      {
+        title: 'Real-Time YouTube & Web Chat Sync',
+        desc: 'Connect your YouTube live stream link. Chat comments instantly spawn personal avatars on screen.'
+      },
+      {
+        title: '12 Iconic Kanto & Johto Pixel Avatars',
+        desc: 'Includes Pikachu, Bulbasaur, Charmander, Squirtle, Eevee, Gengar, Snorlax, Dragonite, Mew, and Lucario.'
+      },
+      {
+        title: 'Retro Timeloop Speech Bubbles',
+        desc: 'Clean pixel bubble pop animations with customized viewer username badges and multi-theme grass or neon platforms.'
+      },
+      {
+        title: 'Zero Latency OBS Browser Source',
+        desc: 'Super lightweight 60 FPS HTML5 canvas with zero client CPU lag during intense gaming streams.'
+      }
+    ],
+    steps: [
+      'Open Dashboard → 2D Pokémon in your Streamer Workstation.',
+      'Select your default starting Pokémon and choose which monsters are unlocked for viewers.',
+      'Adjust avatar walking speed, display duration, and choose between Transparent, Pixel Grass, or Cyber Neon.',
+      'Copy the 2D Pokémon OBS URL into your OBS Browser Source and enjoy interactive chat engagement!'
+    ]
+  },
+  {
+    slug: 'youtube-guide',
+    title: 'YouTube Live Guide',
+    headline: 'Step-by-Step Guide to Streaming on YouTube with StreamBotKH OBS Overlays',
+    badge: 'OFFICIAL PLATFORM GUIDE',
+    planBadge: 'ALL PLANS',
+    shortSub: 'Broadcast setup, stream keys & 0% fee tipping',
+    description:
+      'Learn how to connect StreamBotKH with YouTube Live. Broadcast in 1080p60 or 4K, sync live chat with 2D Pokémon, and receive instant zero-broker Bakong KHQR tips directly into your Cambodian bank account without losing 30% to Super Chat.',
+    dashboardTab: 'overview',
+    color: '#FF0000',
+    icon: Youtube,
+    obsDimensions: { width: '1920 px', height: '1080 px', fps: '60 FPS' },
+    obsRouteExample: '/overlay/alert/:your_token',
+    highlights: [
+      {
+        title: 'Bypass YouTube Super Chat 30% Cut',
+        desc: 'Receive 100% of your donations in KHR and USD straight to your ABA or ACLEDA bank account.'
+      },
+      {
+        title: 'Auto-Sync YouTube Live Comments',
+        desc: 'Feed your YouTube Live chat directly into your 2D Pokémon companion overlay for viewer interaction.'
+      },
+      {
+        title: 'High-Bitrate 1440p / 4K OBS Settings',
+        desc: 'Optimized RTMP streaming settings tailored for YouTube VP9 and AV1 transcode servers.'
+      },
+      {
+        title: 'Smart Media Share Video Alerts',
+        desc: 'Allow your YouTube viewers to request and share YouTube videos directly on your stream with paid tips.'
+      }
+    ],
+    steps: [
+      'Create a Live Stream on YouTube Studio (studio.youtube.com) and copy your RTMP Stream Key.',
+      'Paste your Stream Key into OBS Studio Settings → Stream → YouTube - RTMPS.',
+      'From your StreamBotKH Dashboard, copy your Alert Box and Tip QR overlay links into OBS as Browser Sources.',
+      'Share your personal tip link (@yourname) in your YouTube video description or pinned chat to start earning!'
+    ]
+  },
+  {
+    slug: 'facebook-guide',
+    title: 'Facebook Live Guide',
+    headline: 'Complete Guide to Facebook Gaming & Live Streaming in Cambodia',
+    badge: 'OFFICIAL PLATFORM GUIDE',
+    planBadge: 'ALL PLANS',
+    shortSub: 'Facebook Gaming & Cambodia live reach',
+    description:
+      'Facebook Live is Cambodia’s largest gaming broadcast platform. Set up OBS Studio with your Facebook Stream Key, add high-voltage Bakong KHQR tip alerts, and turn your Facebook followers into loyal paying supporters.',
+    dashboardTab: 'overview',
+    color: '#1877F2',
+    icon: Facebook,
+    obsDimensions: { width: '1920 px', height: '1080 px', fps: '60 FPS' },
+    obsRouteExample: '/overlay/alert/:your_token',
+    highlights: [
+      {
+        title: 'Maximized Cambodian Audience Reach',
+        desc: 'Tap into millions of Cambodian viewers on Facebook Mobile and Gaming with local KHQR support.'
+      },
+      {
+        title: 'Instant Khmer Riel (KHR) & USD Sound Alerts',
+        desc: 'Celebrate every Star or Bakong tip with custom Khmer audio announcements and high-energy sound clips.'
+      },
+      {
+        title: 'Permanent Stream Key Configuration',
+        desc: 'How to use a persistent Stream Key on your Facebook Gaming Creator page so you never have to re-enter it.'
+      },
+      {
+        title: 'Interactive Giveaway Spinning Wheel',
+        desc: 'Reward your Facebook viewers with live spinning wheel draws for skins, prizes, and game credits.'
+      }
+    ],
+    steps: [
+      'Go to Facebook Live Producer (facebook.com/live/producer) and select "Go live" from your Creator Page.',
+      'Select "Streaming software" and copy your Server URL and Stream Key into OBS Studio.',
+      'Add StreamBotKH Overlays (Donation Alerts, Leaderboard, and Subathon Timer) as OBS Browser Sources.',
+      'Pin your StreamBotKH Tip Page link in the comments of your Facebook stream!'
+    ]
+  },
+  {
+    slug: 'instagram-guide',
+    title: 'Instagram Live Guide',
+    headline: 'How to Broadcast Vertical 9:16 Streams to Instagram Live with OBS Studio',
+    badge: 'OFFICIAL PLATFORM GUIDE',
+    planBadge: 'ALL PLANS',
+    shortSub: 'Vertical OBS broadcasts & live engagement',
+    description:
+      'Broadcast crystal-clear 1080x1920 vertical streams to Instagram Live using OBS Studio. Display your custom Bakong QR tip code, floating chat goals, and top supporter badges perfectly fitted for mobile phone viewers.',
+    dashboardTab: 'overview',
+    color: '#E1306C',
+    icon: Instagram,
+    obsDimensions: { width: '1080 px', height: '1920 px', fps: '60 FPS' },
+    obsRouteExample: '/overlay/qr/:your_token',
+    highlights: [
+      {
+        title: 'Native 9:16 Vertical Video Canvas',
+        desc: 'OBS settings calibrated for 1080x1920 canvas resolution for flawless fullscreen phone streaming.'
+      },
+      {
+        title: 'On-Screen Tip QR Code Overlay',
+        desc: 'Display a clean, transparent scan-to-pay QR code so viewers can tip directly without clicking away.'
+      },
+      {
+        title: 'Instagram Live Producer Integration',
+        desc: 'Connect your Professional Instagram account via Live Producer RTMP directly to OBS Studio.'
+      },
+      {
+        title: 'High-Impact Mobile Creator Badges',
+        desc: 'Sleek, compact leaderboard and donation alert popups engineered specifically for vertical screens.'
+      }
+    ],
+    steps: [
+      'Open Instagram on desktop and navigate to Create → Live Video to generate your RTMP Stream URL & Key.',
+      'In OBS Studio, set Base Resolution to 1080x1920 (Vertical 9:16) and enter your Instagram RTMP details.',
+      'Add your StreamBotKH Tip QR Overlay (/overlay/qr/:token) in OBS and scale it to fit the bottom corner.',
+      'Hit "Start Streaming" in OBS and click "Go Live" in Instagram Live Producer!'
+    ]
+  },
+  {
+    slug: 'tiktok-trending',
+    title: 'TikTok Trending & Live',
+    headline: 'TikTok Live Studio, Viral Sound Effects & Audience Growth in Cambodia',
+    badge: 'CREATOR GROWTH GUIDE',
+    planBadge: 'ALL PLANS',
+    shortSub: 'Trending sounds, TikTok Studio & viral growth',
+    description:
+      'Unlock rapid viral growth on TikTok Live! Discover high-energy trending alert sounds, soundboard hotkey SFX, and how to embed custom Bakong KHQR tip alerts directly into TikTok Live Studio or OBS.',
+    dashboardTab: 'overview',
+    color: '#00F2FE',
+    icon: Flame,
+    obsDimensions: { width: '1080 px', height: '1920 px', fps: '60 FPS' },
+    obsRouteExample: '/overlay/soundboard/:your_token',
+    highlights: [
+      {
+        title: 'Trending 20+ Cambodian & Viral Alert Sounds',
+        desc: 'Access curated TikTok meme audio, Mario coins, nuke alarms, and money drops from our media library.'
+      },
+      {
+        title: 'TikTok Live Studio Custom Browser Sources',
+        desc: 'Step-by-step instructions to paste StreamBotKH overlays directly into TikTok Live Studio.'
+      },
+      {
+        title: 'Zero Platform Commission on Viewer Tips',
+        desc: 'Avoid TikTok coin deductions by accepting direct Bakong KHQR tips with 0% platform fee.'
+      },
+      {
+        title: 'Subathon Marathon Hype Machine',
+        desc: 'Run viral 24-hour subathons where viewer tips add extra time to the live clock.'
+      }
+    ],
+    steps: [
+      'Open TikTok Live Studio on your computer and add a "Browser Source" layer to your scene.',
+      'Copy your StreamBotKH Alert Box or Soundboard URL from your dashboard and paste it into TikTok Live Studio.',
+      'Use the Soundboard hotkeys on your PC to trigger instant viral sound effects during clutch gaming moments.',
+      'Put your StreamBotKH tip link in your TikTok bio and watch your supporter community grow!'
     ]
   }
 ];

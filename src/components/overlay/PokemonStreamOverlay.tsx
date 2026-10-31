@@ -387,7 +387,7 @@ export const PokemonStreamOverlay: React.FC<PokemonStreamOverlayProps> = ({
 
   return (
     <div
-      className={`relative w-full h-full overflow-hidden select-none font-sans ${
+      className={`relative w-full h-full overflow-hidden select-none font-sans isolate z-0 ${
         activeSettings.theme === 'pixel-grass'
           ? 'bg-gradient-to-b from-sky-400/20 via-transparent to-emerald-950/40'
           : activeSettings.theme === 'cyber-neon'
@@ -395,7 +395,9 @@ export const PokemonStreamOverlay: React.FC<PokemonStreamOverlayProps> = ({
           : 'bg-transparent'
       }`}
       style={{
-        minHeight: '260px'
+        minHeight: '260px',
+        contain: 'paint',
+        transform: 'translateZ(0)'
       }}
     >
       {/* Ground Walking Line / Platform */}
@@ -491,8 +493,8 @@ export const PokemonStreamOverlay: React.FC<PokemonStreamOverlayProps> = ({
             className="absolute bottom-5 pointer-events-none"
             style={{
               left: `${av.x}%`,
-              transform: 'translateX(-50%)',
-              zIndex: Math.floor(av.x) + (av.bubbleVisible ? 50 : 10)
+              transform: 'translateX(-50%) translateZ(0)',
+              zIndex: Math.floor(av.x % 20) + (av.bubbleVisible ? 15 : 2)
             }}
           >
             {/* ============================================================== */}
@@ -500,7 +502,7 @@ export const PokemonStreamOverlay: React.FC<PokemonStreamOverlayProps> = ({
             {/* ============================================================== */}
             {av.bubbleVisible && (
               <div
-                className={`absolute bottom-full mb-2 flex flex-col pointer-events-none z-50 ${bubbleAlignClass}`}
+                className={`absolute bottom-full mb-2 flex flex-col pointer-events-none z-20 ${bubbleAlignClass}`}
                 style={{
                   minWidth: '160px',
                   maxWidth: '320px'

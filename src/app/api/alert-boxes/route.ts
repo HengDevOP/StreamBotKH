@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAlertBoxesCollection, AlertBoxDoc } from '@/server/database/mongo';
+import { getAlertBoxesCollection, AlertBoxDoc, getUsersCollection, getAlertSettingsCollection } from '@/server/database/mongo';
 import { getAuthenticatedUser } from '@/server/auth';
-import { db } from '@/server/database/db';
 
 export const dynamic = 'force-dynamic';
 
 const DEMO_USER_ID = 'demo-streamer-id-1001';
 
-function resolveStreamerUserId(req: NextRequest, bodyToken?: string): string {
+async function resolveStreamerUserId(req: NextRequest, bodyToken?: string): Promise<string> {
   const user = getAuthenticatedUser(req);
   if (user?.id) {
     return user.id;
@@ -16,13 +15,21 @@ function resolveStreamerUserId(req: NextRequest, bodyToken?: string): string {
   const { searchParams } = new URL(req.url);
   const token = (searchParams.get('token') || bodyToken || searchParams.get('userId') || '').trim();
   if (token) {
-    const streamer = db.prepare(`
-      SELECT id FROM streamers
-      WHERE overlay_token = ? OR id = ? OR LOWER(username) = LOWER(?)
-    `).get(token, token, token) as any;
-    if (streamer?.id) {
-      return streamer.id;
-    }
+    try {
+      const usersCol = await getUsersCollection();
+      const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const streamer = await usersCol.findOne({
+        $or: [
+          { overlayToken: token },
+          { userId: token },
+          { id: token },
+          { username: { $regex: new RegExp(`^${escaped}$`, 'i') } }
+        ]
+      }) as any;
+      if (streamer?.userId || streamer?.id) {
+        return streamer.userId || streamer.id;
+      }
+    } catch (e) {}
   }
 
   return DEMO_USER_ID;
@@ -30,14 +37,15 @@ function resolveStreamerUserId(req: NextRequest, bodyToken?: string): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = resolveStreamerUserId(req);
+    const userId = await resolveStreamerUserId(req);
     const col = await getAlertBoxesCollection();
     const boxes = await col.find({ userId }).sort({ minAmountCondition: 1 }).toArray();
 
     let overlayToken = null;
     try {
-      const streamer = db.prepare('SELECT overlay_token FROM streamers WHERE id = ? OR username = ?').get(userId, userId) as any;
-      overlayToken = streamer?.overlay_token || null;
+      const usersCol = await getUsersCollection();
+      const streamer = await usersCol.findOne({ $or: [{ userId }, { id: userId }, { username: userId }] }) as any;
+      overlayToken = streamer?.overlayToken || streamer?.overlay_token || null;
     } catch (e) {}
 
     return NextResponse.json({ success: true, alertBoxes: boxes, overlayToken });
@@ -50,7 +58,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const userId = resolveStreamerUserId(req, body.token);
+    const userId = await resolveStreamerUserId(req, body.token);
     const {
       name,
       minAmountCondition = 1.0,
@@ -116,34 +124,27 @@ export async function POST(req: NextRequest) {
     const result = await col.insertOne(newDoc);
     const created = await col.findOne({ _id: result.insertedId });
 
-    // Synchronize to SQLite alert_settings for consistency
+    // Synchronize to MongoDB alert_settings
     try {
-      const streamer = db.prepare('SELECT id FROM streamers WHERE id = ? OR username = ? OR email = ?').get(userId, userId, userId) as any;
-      if (streamer?.id && created) {
-        db.prepare(`
-          INSERT INTO alert_settings (streamer_id, template_style, glow_color, sound_url, sound_volume, duration_seconds, custom_gif_url, text_template)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(streamer_id) DO UPDATE SET
-            template_style = excluded.template_style,
-            glow_color = excluded.glow_color,
-            sound_url = excluded.sound_url,
-            sound_volume = excluded.sound_volume,
-            duration_seconds = excluded.duration_seconds,
-            custom_gif_url = excluded.custom_gif_url,
-            text_template = excluded.text_template
-        `).run(
-          streamer.id,
-          created.templateStyle || 'neon-box',
-          created.glowColor || '#00F0FF',
-          created.soundUrl || '/sounds/cash-register-kaching.mp3',
-          Number(created.soundVolume) || 0.85,
-          Number(created.durationSeconds) || 8,
-          created.mediaUrl || '',
-          created.textTemplate || '{donator} donated {amount} through superchat!'
-        );
-      }
+      const alertSettingsCol = await getAlertSettingsCollection();
+      await alertSettingsCol.updateOne(
+        { streamerId: userId },
+        {
+          $set: {
+            templateStyle: created?.templateStyle || 'neon-box',
+            glowColor: created?.glowColor || '#00F0FF',
+            soundUrl: created?.soundUrl || '/sounds/cash-register-kaching.mp3',
+            soundVolume: Number(created?.soundVolume) || 0.85,
+            duration: Number(created?.durationSeconds) || 8,
+            customGifUrl: created?.mediaUrl || '',
+            textTemplate: created?.textTemplate || '{donator} donated {amount} through superchat!',
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
     } catch (e) {
-      console.warn('[AlertBox] Error syncing to sqlite alert_settings on create:', e);
+      console.warn('[AlertBox] Error syncing to alert_settings on create:', e);
     }
 
     return NextResponse.json({

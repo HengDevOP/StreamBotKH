@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/server/database/db';
+import { getPokemonSettingsCollection } from '@/server/database/mongo';
 import { youtubeChatService } from '@/server/services/youtubeChatService';
 import { POKEMON_ROSTER } from '@/utils/pokemonData';
 
@@ -10,57 +10,55 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token') || 'demo-token';
 
-    let settings = db.prepare('SELECT * FROM pokemon_widget_settings WHERE streamer_token = ?').get(token) as any;
+    const col = await getPokemonSettingsCollection();
+    let settings = await col.findOne({ streamerToken: token }) as any;
 
     if (!settings) {
-      db.prepare(`
-        INSERT INTO pokemon_widget_settings (
-          streamer_token, youtube_url, listener_active, default_pokemon,
-          allowed_pokemon, bubble_duration, max_on_screen, walk_speed,
-          scale, show_name, sound_enabled, theme, overlay_width, overlay_height
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        token,
-        '',
-        0,
-        1, // Bulbasaur default
-        '1,4,7,25,39,54,94,133,143,149,151,448',
-        8,
-        12,
-        'normal',
-        'medium',
-        1,
-        1,
-        'transparent',
-        1920,
-        360
-      );
-      settings = db.prepare('SELECT * FROM pokemon_widget_settings WHERE streamer_token = ?').get(token) as any;
+      settings = {
+        streamerToken: token,
+        youtubeUrl: '',
+        listenerActive: false,
+        defaultPokemon: 1,
+        allowedPokemon: '1,4,7,25,39,54,94,133,143,149,151,448',
+        bubbleDuration: 8,
+        maxOnScreen: 12,
+        walkSpeed: 'normal',
+        scale: 'medium',
+        showName: true,
+        soundEnabled: false,
+        theme: 'transparent',
+        overlayWidth: 1920,
+        overlayHeight: 360,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      await col.insertOne(settings);
     }
 
     const isListening = youtubeChatService.isListening(token);
     const activeVideoId = youtubeChatService.getActiveVideoId(token);
 
+    const allowedList = typeof settings.allowedPokemon === 'string'
+      ? settings.allowedPokemon.split(',').map((id: string) => parseInt(id.trim(), 10)).filter(Boolean)
+      : Array.isArray(settings.allowedPokemon) ? settings.allowedPokemon : [1, 4, 7, 25, 39, 54, 94, 133, 143, 149, 151, 448];
+
     return NextResponse.json({
       success: true,
       settings: {
-        streamerToken: settings.streamer_token,
-        youtubeUrl: settings.youtube_url || '',
-        listenerActive: isListening ? 1 : (settings.listener_active || 0),
-        defaultPokemon: settings.default_pokemon || 1,
-        allowedPokemon: (settings.allowed_pokemon || '1,4,7,25,39,54,94,133,143,149,151,448')
-          .split(',')
-          .map((id: string) => parseInt(id.trim(), 10))
-          .filter(Boolean),
-        bubbleDuration: settings.bubble_duration || 8,
-        maxOnScreen: settings.max_on_screen || 12,
-        walkSpeed: settings.walk_speed || 'normal',
+        streamerToken: settings.streamerToken || token,
+        youtubeUrl: settings.youtubeUrl || '',
+        listenerActive: isListening ? 1 : (settings.listenerActive ? 1 : 0),
+        defaultPokemon: settings.defaultPokemon || 1,
+        allowedPokemon: allowedList,
+        bubbleDuration: settings.bubbleDuration || 8,
+        maxOnScreen: settings.maxOnScreen || 12,
+        walkSpeed: settings.walkSpeed || 'normal',
         scale: settings.scale || 'medium',
-        showName: settings.show_name !== 0,
+        showName: settings.showName !== false,
         soundEnabled: false,
         theme: settings.theme || 'transparent',
-        overlayWidth: settings.overlay_width || 1920,
-        overlayHeight: settings.overlay_height || 360
+        overlayWidth: settings.overlayWidth || 1920,
+        overlayHeight: settings.overlayHeight || 360
       },
       isListening,
       activeVideoId,
@@ -77,6 +75,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const token = body.streamerToken || body.token || 'demo-token';
     const action = body.action;
+    const col = await getPokemonSettingsCollection();
 
     // Handle Manual / Test Comment
     if (action === 'test_comment') {
@@ -110,11 +109,17 @@ export async function POST(req: NextRequest) {
 
       youtubeChatService.startListener(token, youtubeUrl);
 
-      db.prepare(`
-        UPDATE pokemon_widget_settings
-        SET youtube_url = ?, listener_active = 1, updated_at = datetime('now')
-        WHERE streamer_token = ?
-      `).run(youtubeUrl, token);
+      await col.updateOne(
+        { streamerToken: token },
+        {
+          $set: {
+            youtubeUrl,
+            listenerActive: true,
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
 
       return NextResponse.json({
         success: true,
@@ -126,11 +131,16 @@ export async function POST(req: NextRequest) {
     if (action === 'stop_listener') {
       youtubeChatService.stopListener(token);
 
-      db.prepare(`
-        UPDATE pokemon_widget_settings
-        SET listener_active = 0, updated_at = datetime('now')
-        WHERE streamer_token = ?
-      `).run(token);
+      await col.updateOne(
+        { streamerToken: token },
+        {
+          $set: {
+            listenerActive: false,
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
 
       return NextResponse.json({
         success: true,
@@ -149,7 +159,6 @@ export async function POST(req: NextRequest) {
       walkSpeed,
       scale,
       showName,
-      soundEnabled,
       theme,
       overlayWidth,
       overlayHeight
@@ -157,40 +166,27 @@ export async function POST(req: NextRequest) {
 
     const allowedStr = Array.isArray(allowedPokemon) ? allowedPokemon.join(',') : '1,4,7,25,39,54,94,133,143,149,151,448';
 
-    db.prepare(`
-      INSERT INTO pokemon_widget_settings (
-        streamer_token, youtube_url, default_pokemon, allowed_pokemon,
-        bubble_duration, max_on_screen, walk_speed, scale,
-        show_name, sound_enabled, theme, overlay_width, overlay_height, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(streamer_token) DO UPDATE SET
-        youtube_url = excluded.youtube_url,
-        default_pokemon = excluded.default_pokemon,
-        allowed_pokemon = excluded.allowed_pokemon,
-        bubble_duration = excluded.bubble_duration,
-        max_on_screen = excluded.max_on_screen,
-        walk_speed = excluded.walk_speed,
-        scale = excluded.scale,
-        show_name = excluded.show_name,
-        sound_enabled = excluded.sound_enabled,
-        theme = excluded.theme,
-        overlay_width = excluded.overlay_width,
-        overlay_height = excluded.overlay_height,
-        updated_at = datetime('now')
-    `).run(
-      token,
-      youtubeUrl || '',
-      defaultPokemon || 1,
-      allowedStr,
-      bubbleDuration || 8,
-      maxOnScreen || 12,
-      walkSpeed || 'normal',
-      scale || 'medium',
-      showName ? 1 : 0,
-      0, // sound disabled
-      theme || 'transparent',
-      overlayWidth || 1920,
-      overlayHeight || 360
+    await col.updateOne(
+      { streamerToken: token },
+      {
+        $set: {
+          streamerToken: token,
+          youtubeUrl: youtubeUrl || '',
+          defaultPokemon: defaultPokemon || 1,
+          allowedPokemon: allowedStr,
+          bubbleDuration: bubbleDuration || 8,
+          maxOnScreen: maxOnScreen || 12,
+          walkSpeed: walkSpeed || 'normal',
+          scale: scale || 'medium',
+          showName: Boolean(showName),
+          soundEnabled: false,
+          theme: theme || 'transparent',
+          overlayWidth: overlayWidth || 1920,
+          overlayHeight: overlayHeight || 360,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
     );
 
     const updatedSettings = {

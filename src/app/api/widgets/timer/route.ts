@@ -1,21 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/server/database/db';
 import { getIO } from '@/server/services/socketService';
 import { v4 as uuidv4 } from 'uuid';
-import { getUsersCollection, getOverlayTokenHistoryCollection } from '@/server/database/mongo';
+import { getUsersCollection, getOverlayTokenHistoryCollection, getStreamTimersCollection } from '@/server/database/mongo';
 
 export const dynamic = 'force-dynamic';
-
-// Ensure table columns exist
-try {
-  db.exec("ALTER TABLE stream_timers ADD COLUMN show_title INTEGER DEFAULT 1");
-} catch (e) {}
-try {
-  db.exec("ALTER TABLE stream_timers ADD COLUMN show_description INTEGER DEFAULT 1");
-} catch (e) {}
-try {
-  db.exec("ALTER TABLE stream_timers ADD COLUMN description TEXT DEFAULT ''");
-} catch (e) {}
 
 const isBool = (val: any, defaultVal = true): boolean => {
   if (val === undefined || val === null) return defaultVal;
@@ -28,7 +16,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token') || 'demo-token';
 
-    let timer = db.prepare('SELECT * FROM stream_timers WHERE streamer_token = ?').get(token) as any;
+    const timersCol = await getStreamTimersCollection();
+    let timer = await timersCol.findOne({ streamerToken: token }) as any;
 
     if (!timer && token !== 'demo-token') {
       try {
@@ -56,17 +45,19 @@ export async function GET(req: NextRequest) {
             if (h.token) candidateTokens.add(h.token);
           }
           const tokenList = Array.from(candidateTokens);
-          const placeholders = tokenList.map(() => '?').join(',');
-          const existingTimer = db.prepare(`
-            SELECT * FROM stream_timers 
-            WHERE streamer_token IN (${placeholders})
-            ORDER BY last_updated_at DESC
-            LIMIT 1
-          `).get(...tokenList) as any;
+          const existingTimer = await timersCol.findOne({
+            $or: [
+              { streamerId: sId },
+              { streamerToken: { $in: tokenList } }
+            ]
+          }) as any;
 
           if (existingTimer) {
-            db.prepare('UPDATE stream_timers SET streamer_token = ? WHERE id = ?').run(token, existingTimer.id);
-            timer = db.prepare('SELECT * FROM stream_timers WHERE streamer_token = ?').get(token) as any;
+            await timersCol.updateOne(
+              { _id: existingTimer._id },
+              { $set: { streamerToken: token, streamerId: sId, lastUpdatedAt: new Date() } }
+            );
+            timer = await timersCol.findOne({ streamerToken: token }) as any;
           }
         }
       } catch (e) {}
@@ -74,71 +65,68 @@ export async function GET(req: NextRequest) {
 
     if (!timer) {
       const newId = uuidv4();
-      db.prepare(`
-        INSERT INTO stream_timers (
-          id, streamer_token, title, remaining_seconds, initial_seconds,
-          rate_minutes_per_usd, rate_minutes_per_khr, is_running, glow_color,
-          font_family, layout_mode, template_style, show_background, show_animation, sound_enabled, max_cap_seconds, last_updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(
-        newId,
-        token,
-        'SUBATHON COUNTDOWN 🔥',
-        7200, // 2 hours
-        7200,
-        10.0, // 1$ = 10mins (User requirement)
-        10.0,
-        1,
-        '#00F0FF',
-        'Chakra Petch',
-        'neon',
-        'cyber-neon',
-        1,
-        1,
-        1,
-        86400
-      );
-      timer = db.prepare('SELECT * FROM stream_timers WHERE id = ?').get(newId) as any;
-    } else if (timer.is_running === 1) {
-      // Calculate elapsed time since last_updated_at to provide accurate real-time countdown
-      const lastUpdated = new Date(timer.last_updated_at + 'Z').getTime();
+      const defaultDoc = {
+        id: newId,
+        streamerToken: token,
+        title: 'SUBATHON COUNTDOWN 🔥',
+        remainingSeconds: 7200,
+        initialSeconds: 7200,
+        rateMinutesPerUsd: 10.0,
+        rateMinutesPerKhr: 10.0,
+        isRunning: true,
+        glowColor: '#00F0FF',
+        fontFamily: 'Chakra Petch',
+        layoutMode: 'neon',
+        templateStyle: 'cyber-neon',
+        showBackground: true,
+        showAnimation: true,
+        showTitle: true,
+        showDescription: true,
+        description: '',
+        soundEnabled: true,
+        maxCapSeconds: 86400,
+        lastUpdatedAt: new Date()
+      };
+      await timersCol.insertOne(defaultDoc);
+      timer = defaultDoc;
+    } else if (timer.isRunning || timer.is_running === 1) {
+      const lastUpdated = new Date(timer.lastUpdatedAt || timer.last_updated_at || Date.now()).getTime();
       const now = Date.now();
       const elapsedSeconds = Math.max(0, Math.floor((now - lastUpdated) / 1000));
 
       if (elapsedSeconds > 0) {
-        const newRemaining = Math.max(0, timer.remaining_seconds - elapsedSeconds);
-        db.prepare(`
-          UPDATE stream_timers SET
-            remaining_seconds = ?,
-            last_updated_at = datetime('now')
-          WHERE id = ?
-        `).run(newRemaining, timer.id);
-        timer.remaining_seconds = newRemaining;
+        const curRemaining = timer.remainingSeconds ?? timer.remaining_seconds ?? 7200;
+        const newRemaining = Math.max(0, curRemaining - elapsedSeconds);
+        await timersCol.updateOne(
+          { _id: timer._id },
+          { $set: { remainingSeconds: newRemaining, lastUpdatedAt: new Date() } }
+        );
+        timer.remainingSeconds = newRemaining;
       }
     }
 
     return NextResponse.json({
       success: true,
       timer: {
-        id: timer.id,
-        token: timer.streamer_token,
+        id: timer.id || String(timer._id),
+        token: timer.streamerToken || timer.streamer_token,
         title: timer.title,
-        remainingSeconds: timer.remaining_seconds,
-        initialSeconds: timer.initial_seconds,
-        rateMinutesPerUsd: timer.rate_minutes_per_usd ?? 10.0,
-        rateMinutesPerKhr: timer.rate_minutes_per_khr ?? 10.0,
-        isRunning: timer.is_running === 1,
-        glowColor: timer.glow_color || '#00F0FF',
-        fontFamily: timer.font_family || 'Chakra Petch',
-        layoutMode: timer.layout_mode || 'neon',
-        templateStyle: timer.template_style || timer.layout_mode || 'cyber-neon',
-        showBackground: isBool(timer.show_background, true),
-        showAnimation: isBool(timer.show_animation, true),
-        showTitle: isBool(timer.show_title, true),
-        showDescription: isBool(timer.show_description, true),
+        remainingSeconds: timer.remainingSeconds ?? timer.remaining_seconds ?? 7200,
+        initialSeconds: timer.initialSeconds ?? timer.initial_seconds ?? 7200,
+        rateMinutesPerUsd: timer.rateMinutesPerUsd ?? timer.rate_minutes_per_usd ?? 10.0,
+        rateMinutesPerKhr: timer.rateMinutesPerKhr ?? timer.rate_minutes_per_khr ?? 10.0,
+        isRunning: Boolean(timer.isRunning ?? (timer.is_running === 1)),
+        glowColor: timer.glowColor || timer.glow_color || '#00F0FF',
+        fontFamily: timer.fontFamily || timer.font_family || 'Chakra Petch',
+        layoutMode: timer.layoutMode || timer.layout_mode || 'neon',
+        templateStyle: timer.templateStyle || timer.template_style || timer.layoutMode || 'cyber-neon',
+        showBackground: isBool(timer.showBackground ?? timer.show_background, true),
+        showAnimation: isBool(timer.showAnimation ?? timer.show_animation, true),
+        showTitle: isBool(timer.showTitle ?? timer.show_title, true),
+        showDescription: isBool(timer.showDescription ?? timer.show_description, true),
         description: timer.description || '',
-        soundEnabled: timer.sound_enabled === 1,
-        maxCapSeconds: timer.max_cap_seconds || 86400
+        soundEnabled: Boolean(timer.soundEnabled ?? (timer.sound_enabled === 1)),
+        maxCapSeconds: timer.maxCapSeconds || timer.max_cap_seconds || 86400
       }
     });
   } catch (err: any) {
@@ -152,101 +140,54 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const token = body.token || 'demo-token';
 
-    let timer = db.prepare('SELECT * FROM stream_timers WHERE streamer_token = ?').get(token) as any;
-    const now = new Date().toISOString();
+    const timersCol = await getStreamTimersCollection();
+    let timer = await timersCol.findOne({ streamerToken: token }) as any;
 
     const title = body.title !== undefined ? body.title : (timer?.title || 'SUBATHON COUNTDOWN 🔥');
-    const remainingSeconds = body.remainingSeconds !== undefined ? Number(body.remainingSeconds) : (timer?.remaining_seconds ?? 7200);
-    const initialSeconds = body.initialSeconds !== undefined ? Number(body.initialSeconds) : (timer?.initial_seconds ?? 7200);
-    const rateMinutesPerUsd = body.rateMinutesPerUsd !== undefined ? Number(body.rateMinutesPerUsd) : (timer?.rate_minutes_per_usd ?? 10.0);
-    const rateMinutesPerKhr = body.rateMinutesPerKhr !== undefined ? Number(body.rateMinutesPerKhr) : (timer?.rate_minutes_per_khr ?? 10.0);
-    const isRunning = body.isRunning !== undefined ? (body.isRunning ? 1 : 0) : (timer?.is_running ?? 1);
-    const glowColor = body.glowColor || timer?.glow_color || '#00F0FF';
-    const fontFamily = body.fontFamily || timer?.font_family || 'Chakra Petch';
-    const layoutMode = body.layoutMode || timer?.layout_mode || 'neon';
-    const templateStyle = body.templateStyle || body.layoutMode || timer?.template_style || timer?.layout_mode || 'cyber-neon';
-    const showBackground = isBool(body.showBackground, isBool(timer?.show_background, true)) ? 1 : 0;
-    const showAnimation = isBool(body.showAnimation, isBool(timer?.show_animation, true)) ? 1 : 0;
-    const showTitle = isBool(body.showTitle, isBool(timer?.show_title, true)) ? 1 : 0;
-    const showDescription = isBool(body.showDescription, isBool(timer?.show_description, true)) ? 1 : 0;
+    const remainingSeconds = body.remainingSeconds !== undefined ? Number(body.remainingSeconds) : (timer?.remainingSeconds ?? timer?.remaining_seconds ?? 7200);
+    const initialSeconds = body.initialSeconds !== undefined ? Number(body.initialSeconds) : (timer?.initialSeconds ?? timer?.initial_seconds ?? 7200);
+    const rateMinutesPerUsd = body.rateMinutesPerUsd !== undefined ? Number(body.rateMinutesPerUsd) : (timer?.rateMinutesPerUsd ?? timer?.rate_minutes_per_usd ?? 10.0);
+    const rateMinutesPerKhr = body.rateMinutesPerKhr !== undefined ? Number(body.rateMinutesPerKhr) : (timer?.rateMinutesPerKhr ?? timer?.rate_minutes_per_khr ?? 10.0);
+    const isRunning = body.isRunning !== undefined ? Boolean(body.isRunning) : Boolean(timer?.isRunning ?? (timer?.is_running === 1));
+    const glowColor = body.glowColor || timer?.glowColor || timer?.glow_color || '#00F0FF';
+    const fontFamily = body.fontFamily || timer?.fontFamily || timer?.font_family || 'Chakra Petch';
+    const layoutMode = body.layoutMode || timer?.layoutMode || timer?.layout_mode || 'neon';
+    const templateStyle = body.templateStyle || body.layoutMode || timer?.templateStyle || timer?.template_style || 'cyber-neon';
+    const showBackground = isBool(body.showBackground, isBool(timer?.showBackground ?? timer?.show_background, true));
+    const showAnimation = isBool(body.showAnimation, isBool(timer?.showAnimation ?? timer?.show_animation, true));
+    const showTitle = isBool(body.showTitle, isBool(timer?.showTitle ?? timer?.show_title, true));
+    const showDescription = isBool(body.showDescription, isBool(timer?.showDescription ?? timer?.show_description, true));
     const description = body.description !== undefined ? String(body.description) : (timer?.description || '');
-    const soundEnabled = body.soundEnabled !== undefined ? (body.soundEnabled ? 1 : 0) : (timer?.sound_enabled ?? 1);
-    const maxCapSeconds = body.maxCapSeconds !== undefined ? Number(body.maxCapSeconds) : (timer?.max_cap_seconds ?? 86400);
+    const soundEnabled = body.soundEnabled !== undefined ? Boolean(body.soundEnabled) : Boolean(timer?.soundEnabled ?? (timer?.sound_enabled === 1));
+    const maxCapSeconds = body.maxCapSeconds !== undefined ? Number(body.maxCapSeconds) : (timer?.maxCapSeconds ?? timer?.max_cap_seconds ?? 86400);
 
-    if (timer) {
-      db.prepare(`
-        UPDATE stream_timers SET
-          title = ?,
-          remaining_seconds = ?,
-          initial_seconds = ?,
-          rate_minutes_per_usd = ?,
-          rate_minutes_per_khr = ?,
-          is_running = ?,
-          glow_color = ?,
-          font_family = ?,
-          layout_mode = ?,
-          template_style = ?,
-          show_background = ?,
-          show_animation = ?,
-          show_title = ?,
-          show_description = ?,
-          description = ?,
-          sound_enabled = ?,
-          max_cap_seconds = ?,
-          last_updated_at = datetime('now')
-        WHERE streamer_token = ?
-      `).run(
-        title,
-        remainingSeconds,
-        initialSeconds,
-        rateMinutesPerUsd,
-        rateMinutesPerKhr,
-        isRunning,
-        glowColor,
-        fontFamily,
-        layoutMode,
-        templateStyle,
-        showBackground,
-        showAnimation,
-        showTitle,
-        showDescription,
-        description,
-        soundEnabled,
-        maxCapSeconds,
-        token
-      );
-    } else {
-      const newId = uuidv4();
-      db.prepare(`
-        INSERT INTO stream_timers (
-          id, streamer_token, title, remaining_seconds, initial_seconds,
-          rate_minutes_per_usd, rate_minutes_per_khr, is_running, glow_color,
-          font_family, layout_mode, template_style, show_background, show_animation,
-          show_title, show_description, description,
-          sound_enabled, max_cap_seconds, last_updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(
-        newId,
-        token,
-        title,
-        remainingSeconds,
-        initialSeconds,
-        rateMinutesPerUsd,
-        rateMinutesPerKhr,
-        isRunning,
-        glowColor,
-        fontFamily,
-        layoutMode,
-        templateStyle,
-        showBackground,
-        showAnimation,
-        showTitle,
-        showDescription,
-        description,
-        soundEnabled,
-        maxCapSeconds
-      );
-    }
+    const docUpdate = {
+      streamerToken: token,
+      title,
+      remainingSeconds,
+      initialSeconds,
+      rateMinutesPerUsd,
+      rateMinutesPerKhr,
+      isRunning,
+      glowColor,
+      fontFamily,
+      layoutMode,
+      templateStyle,
+      showBackground,
+      showAnimation,
+      showTitle,
+      showDescription,
+      description,
+      soundEnabled,
+      maxCapSeconds,
+      lastUpdatedAt: new Date()
+    };
+
+    await timersCol.updateOne(
+      { streamerToken: token },
+      { $set: docUpdate },
+      { upsert: true }
+    );
 
     const updated = {
       token,
@@ -255,24 +196,23 @@ export async function POST(req: NextRequest) {
       initialSeconds,
       rateMinutesPerUsd,
       rateMinutesPerKhr,
-      isRunning: isRunning === 1,
+      isRunning,
       glowColor,
       fontFamily,
       layoutMode,
       templateStyle,
-      showBackground: showBackground === 1,
-      showAnimation: showAnimation === 1,
-      showTitle: showTitle === 1,
-      showDescription: showDescription === 1,
+      showBackground,
+      showAnimation,
+      showTitle,
+      showDescription,
       description,
-      soundEnabled: soundEnabled === 1,
+      soundEnabled,
       maxCapSeconds,
       addedSeconds: body.addedSeconds || 0,
       donorName: body.donorName || null,
       tipAmount: body.tipAmount || null
     };
 
-    // Broadcast timer update to OBS Browser Source Overlay in real time
     const io = getIO();
     if (io) {
       io.to(`overlay:${token}`).emit('timer:update', updated);

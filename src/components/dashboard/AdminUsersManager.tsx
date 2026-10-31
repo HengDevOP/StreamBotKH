@@ -17,10 +17,13 @@ import {
   ChevronRight,
   Database,
   X,
-  CornerDownLeft
+  CornerDownLeft,
+  Eye,
+  Loader2
 } from 'lucide-react';
 import { request } from '../../services/api';
 import { useModal } from '../../context/ModalContext';
+import { useAuth } from '../../context/AuthContext';
 
 const USERS_PER_PAGE = 20;
 const CLIENT_CACHE_TTL_MS = 60 * 1000; // 60s client-side page cache to prevent server overload
@@ -71,6 +74,7 @@ interface AdminUsersManagerProps {
 
 export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentUserPlanUpdated }) => {
   const { showConfirm } = useModal();
+  const { user: currentUser, impersonateUser } = useAuth();
   const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [summary, setSummary] = useState({ totalUsers: 0, proUsers: 0, freeUsers: 0 });
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -91,6 +95,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
   const [loading, setLoading] = useState(true);
   const [servedFromCache, setServedFromCache] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -273,6 +278,28 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
           setErrorMsg(err.message || 'Failed to update user plan');
         } finally {
           setUpdatingId(null);
+        }
+      }
+    });
+  };
+
+  const handleInteractAsUser = (targetUser: AdminUserItem) => {
+    showConfirm({
+      title: `Interact as @${targetUser.username}?`,
+      message: `You are about to switch session and interact as @${targetUser.username} (${targetUser.displayName || targetUser.username}). You will access their live dashboard, overlays, soundboard, and settings as they see them. You can return to your admin account at any time using the banner at the top.`,
+      type: 'info',
+      confirmText: `Interact as @${targetUser.username}`,
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          setImpersonatingId(targetUser.id);
+          setErrorMsg(null);
+          await impersonateUser(targetUser.id);
+          // Redirect to the streamer dashboard
+          window.location.href = '/dashboard?tab=overview';
+        } catch (err: any) {
+          setErrorMsg(err.message || 'Failed to switch into user session');
+          setImpersonatingId(null);
         }
       }
     });
@@ -503,7 +530,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                 <th className="py-3.5 px-4">Verified Badge</th>
                 <th className="py-3.5 px-4">Current Plan</th>
                 <th className="py-3.5 px-4">Duration (31d Cycle)</th>
-                <th className="py-3.5 px-4 text-right">Manage Plan (31 Days)</th>
+                <th className="py-3.5 px-4 text-right">Actions &amp; Plan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70 text-xs">
@@ -640,6 +667,35 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="inline-flex items-center justify-end gap-2">
+                          {/* Interact As User Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleInteractAsUser(u)}
+                            disabled={isUpdating || impersonatingId === u.id || u.id === currentUser?.id}
+                            title={
+                              u.id === currentUser?.id
+                                ? 'This is your own admin account'
+                                : `Interact and test live dashboard as @${u.username}`
+                            }
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-[11px] font-mono transition-all cursor-pointer shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                              u.id === currentUser?.id
+                                ? 'bg-slate-900 text-slate-500 border border-slate-800'
+                                : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 hover:text-white border border-cyan-500/40 hover:border-cyan-400'
+                            }`}
+                          >
+                            {impersonatingId === u.id ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin text-cyan-300" />
+                                <span>Switching...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye size={12} className="text-cyan-400" />
+                                <span>Interact As</span>
+                              </>
+                            )}
+                          </button>
+
                           {!isPro ? (
                             <button
                               onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}

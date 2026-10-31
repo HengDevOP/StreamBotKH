@@ -289,12 +289,17 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
           </div>
 
           <div className="mt-8 pt-6 border-t border-purple-500/30 w-full">
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className="w-full py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-slate-950 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:opacity-95 transition-all shadow-lg shadow-purple-500/25 cursor-pointer"
+            <a
+              href="https://t.me/hchenheng"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.location.href = 'https://t.me/hchenheng';
+                }
+              }}
+              className="w-full block text-center py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-slate-950 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:opacity-95 transition-all shadow-lg shadow-purple-500/25 cursor-pointer"
             >
               Get Pro Plan
-            </button>
+            </a>
           </div>
         </div>
       </div>

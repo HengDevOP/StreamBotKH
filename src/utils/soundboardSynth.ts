@@ -20,13 +20,34 @@ export function getAudioContext(): AudioContext | null {
   return globalAudioCtx;
 }
 
-// Active sound tracker for panic stop
+// Active sound tracker for panic stop & single playback guard
 interface ActiveSoundHandle {
   id: string;
   stop: () => void;
 }
 
 const activeSounds: ActiveSoundHandle[] = [];
+
+// In-memory audio caches for zero-latency, instant playback
+const audioBufferCache = new Map<string, AudioBuffer>();
+const audioBufferInFlight = new Map<string, Promise<AudioBuffer | null>>();
+const preloadedAudioElements = new Map<string, HTMLAudioElement>();
+
+export function isSoundPlaying(soundId?: string): boolean {
+  if (!soundId) return activeSounds.length > 0;
+  return activeSounds.some((h) => h.id === soundId);
+}
+
+export function stopSound(soundId: string) {
+  for (let i = activeSounds.length - 1; i >= 0; i--) {
+    if (activeSounds[i].id === soundId) {
+      try {
+        activeSounds[i].stop();
+      } catch {}
+      activeSounds.splice(i, 1);
+    }
+  }
+}
 
 export function stopAllActiveSounds() {
   activeSounds.forEach((handle) => {
@@ -35,6 +56,68 @@ export function stopAllActiveSounds() {
     } catch {}
   });
   activeSounds.length = 0;
+}
+
+/**
+ * Preload and decode audio into in-memory Web Audio buffer for zero-latency instant play
+ */
+export async function preloadAudio(url: string): Promise<AudioBuffer | null> {
+  if (!url || typeof window === 'undefined' || url.startsWith('synth:')) return null;
+
+  // 1. Return from memory cache if already decoded
+  if (audioBufferCache.has(url)) {
+    return audioBufferCache.get(url)!;
+  }
+
+  // 2. Return in-flight fetch promise if already fetching
+  if (audioBufferInFlight.has(url)) {
+    return audioBufferInFlight.get(url)!;
+  }
+
+  const promise = (async () => {
+    try {
+      // Preload HTML5 Audio element in parallel as instant fallback
+      if (!preloadedAudioElements.has(url)) {
+        const fallbackAudio = new Audio();
+        fallbackAudio.preload = 'auto';
+        fallbackAudio.src = url;
+        preloadedAudioElements.set(url, fallbackAudio);
+      }
+
+      const res = await fetch(url, { cache: 'force-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const arrayBuffer = await res.arrayBuffer();
+
+      const ctx = getAudioContext();
+      if (!ctx) return null;
+
+      const decoded = await new Promise<AudioBuffer>((resolve, reject) => {
+        ctx.decodeAudioData(arrayBuffer.slice(0), resolve, reject);
+      });
+
+      audioBufferCache.set(url, decoded);
+      return decoded;
+    } catch (err) {
+      return null;
+    } finally {
+      audioBufferInFlight.delete(url);
+    }
+  })();
+
+  audioBufferInFlight.set(url, promise);
+  return promise;
+}
+
+/**
+ * Batch preload an array of audio URLs in background
+ */
+export function preloadAudioBatch(urls: string[]): void {
+  if (!Array.isArray(urls)) return;
+  urls.forEach((url) => {
+    if (url && !url.startsWith('synth:')) {
+      preloadAudio(url).catch(() => {});
+    }
+  });
 }
 
 /**
@@ -775,18 +858,25 @@ export function playSynthSheesh(ctx: AudioContext, volume: number = 0.8): { stop
 
 /**
  * Universal Soundboard Trigger
- * Dispatches to synth engine or HTML5 Audio
+ * Dispatches to Web Audio cache, synthesizer engine, or HTML5 Audio.
+ * Prevents multiple overlapping playback by stopping any active sounds.
  */
 export function triggerSoundEffect(
   soundId: string,
   soundUrl: string,
   volume: number = 0.8,
   masterVolume: number = 0.8,
-  onEnded?: () => void
+  onEnded?: () => void,
+  stopPrevious: boolean = true
 ): { stop: () => void; durationMs: number } {
+  // Prevent multiple overlapping plays: stop all active sounds first
+  if (stopPrevious) {
+    stopAllActiveSounds();
+  }
+
   const effectiveVolume = Math.max(0, Math.min(1, volume * masterVolume));
 
-  // Synthesizer dispatch
+  // 1. Synthesizer dispatch (instant Web Audio synthesis)
   if (soundUrl.startsWith('synth:')) {
     const synthType = soundUrl.replace('synth:', '').trim().toLowerCase();
     const ctx = getAudioContext();
@@ -865,14 +955,61 @@ export function triggerSoundEffect(
     return handle;
   }
 
-  // HTML5 Audio dispatch for uploaded / external sound files
+  // 2. Web Audio Cached AudioBuffer Dispatch (Zero-latency instant play!)
+  const ctx = getAudioContext();
+  if (ctx && audioBufferCache.has(soundUrl)) {
+    try {
+      const buffer = audioBufferCache.get(soundUrl)!;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+
+      const gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(effectiveVolume, ctx.currentTime);
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      source.start(0);
+
+      let isCleanedUp = false;
+      const stopFn = () => {
+        if (isCleanedUp) return;
+        isCleanedUp = true;
+        try {
+          source.stop();
+          gainNode.disconnect();
+        } catch {}
+      };
+
+      const tracker: ActiveSoundHandle = { id: soundId, stop: stopFn };
+      activeSounds.push(tracker);
+
+      source.onended = () => {
+        const idx = activeSounds.indexOf(tracker);
+        if (idx !== -1) activeSounds.splice(idx, 1);
+        if (onEnded) onEnded();
+      };
+
+      return {
+        stop: stopFn,
+        durationMs: Math.round(buffer.duration * 1000)
+      };
+    } catch (err) {
+      console.warn('[Soundboard] AudioBuffer play error, falling back:', err);
+    }
+  }
+
+  // Ensure audio is cached in background for future instant clicks
+  preloadAudio(soundUrl).catch(() => {});
+
+  // 3. Preloaded / HTML5 Audio Dispatch (Fallback)
   try {
-    const audio = new Audio(soundUrl);
+    const preloaded = preloadedAudioElements.get(soundUrl);
+    const audio = preloaded ? (preloaded.cloneNode(true) as HTMLAudioElement) : new Audio(soundUrl);
     audio.volume = effectiveVolume;
     audio.play().catch((err) => {
-      console.warn('[Soundboard] Play failed, falling back to airhorn:', err);
-      const ctx = getAudioContext();
-      if (ctx) playSynthAirhorn(ctx, effectiveVolume);
+      console.warn('[Soundboard] HTML5 Audio play failed, falling back to synth airhorn:', err);
+      const ctxFallback = getAudioContext();
+      if (ctxFallback) playSynthAirhorn(ctxFallback, effectiveVolume);
       if (onEnded) onEnded();
     });
 

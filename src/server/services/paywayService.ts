@@ -1,7 +1,13 @@
 import crypto from 'crypto';
 import axios from 'axios';
-import { db } from '../database/db';
-import { getAlertBoxesCollection } from '../database/mongo';
+import {
+  getDonationsCollection,
+  getUsersCollection,
+  getAlertSettingsCollection,
+  getVideoAlertSettingsCollection,
+  getAlertBoxesCollection,
+  getPaymentSettingsCollection
+} from '../database/mongo';
 import { broadcastAlertToOverlay, broadcastDonationToDashboard } from './socketService';
 import { sendTelegramDonationAlert } from './telegramService';
 
@@ -24,13 +30,17 @@ export interface ProcessPaymentSuccessParams {
 }
 
 /**
- * Marks donation as PAID, triggers OBS overlay alert, updates dashboard, and sends Telegram alert
+ * Marks donation as PAID in MongoDB Atlas, triggers OBS overlay alert, updates dashboard, and sends Telegram alert
  */
 export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParams) {
   const { donationId, paywayTranId, bakongHash } = params;
 
-  // 1. Retrieve donation
-  const donation = db.prepare('SELECT * FROM donations WHERE id = ?').get(donationId) as any;
+  // 1. Retrieve donation from MongoDB
+  const donationsCol = await getDonationsCollection();
+  const donation = await donationsCol.findOne({
+    $or: [{ id: donationId }, { _id: donationId as any }]
+  });
+
   if (!donation) {
     throw new Error(`Donation not found: ${donationId}`);
   }
@@ -40,34 +50,58 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
     return donation;
   }
 
-  // 2. Update donation status in DB
-  const updateDonation = db.prepare(`
-    UPDATE donations
-    SET status = 'PAID',
-        payway_tran_id = COALESCE(?, payway_tran_id),
-        bakong_hash = COALESCE(?, bakong_hash),
-        paid_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `);
-  updateDonation.run(paywayTranId || `ABA-${Date.now()}`, bakongHash || `BKG-${Date.now()}`, donationId);
+  const now = new Date();
+  const resolvedPaywayTranId = paywayTranId || `ABA-${Date.now()}`;
+  const resolvedBakongHash = bakongHash || `BKG-${Date.now()}`;
 
-  // 3. Fetch streamer & alert settings
-  const streamer = db.prepare('SELECT * FROM streamers WHERE id = ?').get(donation.streamer_id) as any;
-  const alertSettings = db.prepare('SELECT * FROM alert_settings WHERE streamer_id = ?').get(donation.streamer_id) as any;
-  const videoSettings = db.prepare('SELECT * FROM video_alert_settings WHERE streamer_id = ?').get(donation.streamer_id) as any;
+  // 2. Update donation status in MongoDB
+  await donationsCol.updateOne(
+    { _id: donation._id },
+    {
+      $set: {
+        status: 'PAID',
+        paywayTranId: resolvedPaywayTranId,
+        bakongHash: resolvedBakongHash,
+        paidAt: now,
+        isAlerted: true,
+        updatedAt: now
+      }
+    }
+  );
+
+  // 3. Fetch streamer & settings from MongoDB
+  const usersCol = await getUsersCollection();
+  const streamer = await usersCol.findOne({
+    $or: [
+      { userId: donation.streamerId },
+      { id: donation.streamerId as any },
+      ...(donation.streamerUsername ? [{ username: donation.streamerUsername }] : [])
+    ]
+  });
 
   if (streamer) {
+    const streamerKey = streamer.userId || (streamer as any).id || String(streamer._id);
+    const alertSettingsCol = await getAlertSettingsCollection();
+    const alertSettings = await alertSettingsCol.findOne({
+      $or: [{ streamerId: streamerKey }, ...(streamer.username ? [{ streamerId: streamer.username }] : [])]
+    });
+
+    const videoSettingsCol = await getVideoAlertSettingsCollection();
+    const videoSettings = await videoSettingsCol.findOne({
+      $or: [{ streamerId: streamerKey }, ...(streamer.username ? [{ streamerId: streamer.username }] : [])]
+    });
+
     let matchingBox: any = null;
     try {
       const alertBoxesCol = await getAlertBoxesCollection();
       const activeBoxes = await alertBoxesCol
         .find({
           $or: [
-            { userId: streamer.id },
-            { streamerId: streamer.id },
+            { userId: streamerKey },
+            { streamerId: streamerKey },
             ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
             ...(streamer.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
-            ...(streamer.overlay_token ? [{ overlayToken: streamer.overlay_token }, { token: streamer.overlay_token }] : [])
+            ...(streamer.overlayToken ? [{ overlayToken: streamer.overlayToken }, { token: streamer.overlayToken }] : [])
           ],
           isEnabled: true
         })
@@ -86,77 +120,79 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
     }
 
     // Only alert if amount is >= min_amount_alert
-    const minAlert = matchingBox ? (Number(matchingBox.minAmountCondition) || 0) : (alertSettings?.min_amount_alert || 0);
+    const minAlert = matchingBox ? (Number(matchingBox.minAmountCondition) || 0) : (alertSettings?.minAmountAlert || 0);
     const donationUsd = donation.currency === 'KHR' ? donation.amount / 4000 : donation.amount;
 
     if (donationUsd >= minAlert - 0.0001) {
       const alertPayload = {
         boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
         donationId: donation.id,
-        donorName: donation.donor_name,
-        donorMessage: donation.donor_message,
-        donor_message: donation.donor_message,
-        message: donation.donor_message,
+        donorName: donation.donorName,
+        donorMessage: donation.donorMessage,
+        donor_message: donation.donorMessage,
+        message: donation.donorMessage,
         amount: donation.amount,
         currency: donation.currency,
-        bankingName: donation.banking_name || 'Bakong KHQR',
-        videoUrl: donation.video_url || undefined,
-        videoTitle: donation.video_title || undefined,
-        videoStartTime: Number(donation.video_start_time) || 0,
-        videoEndTime: Number(donation.video_end_time) || 0,
-        videoAlertEnabled: videoSettings ? (videoSettings.is_enabled === 1) : true,
-        videoMinTipAmount: videoSettings ? Number(videoSettings.min_tip_amount) : 0.25,
-        videoMaxDurationSeconds: videoSettings ? Number(videoSettings.max_duration_seconds) : 300,
-        templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
-        textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
-        textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+        bankingName: donation.bankingName || 'Bakong KHQR',
+        videoUrl: donation.videoUrl || undefined,
+        videoTitle: donation.videoTitle || undefined,
+        videoStartTime: Number(donation.videoStartTime) || 0,
+        videoEndTime: Number(donation.videoEndTime) || 0,
+        videoAlertEnabled: Boolean(videoSettings?.isEnabled ?? true),
+        videoMinTipAmount: Number(videoSettings?.minTipAmount ?? 0.25),
+        videoMaxDurationSeconds: Number(videoSettings?.maxDurationSeconds ?? 300),
+        templateStyle: matchingBox?.templateStyle || alertSettings?.templateStyle || 'neon-box',
+        textTemplate: matchingBox?.textTemplate || alertSettings?.textTemplate || '{donator} donated {amount} through superchat!',
+        textColor: matchingBox?.textColor || alertSettings?.textColor || '#FFFFFF',
         donorColor: matchingBox?.donorColor || undefined,
         amountColor: matchingBox?.amountColor || undefined,
-        customGifUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-        mediaUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-        showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0),
-        fontFamily: matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
-        fontSize: matchingBox?.fontSize || alertSettings?.font_size || 28,
-        layoutMode: matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
-        animationStyle: matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
-        glowColor: matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF',
+        customGifUrl: matchingBox?.mediaUrl || alertSettings?.customGifUrl,
+        mediaUrl: matchingBox?.mediaUrl || alertSettings?.customGifUrl,
+        showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.showImage !== false),
+        fontFamily: matchingBox?.fontFamily || alertSettings?.fontFamily || 'Chakra Petch',
+        fontSize: matchingBox?.fontSize || alertSettings?.fontSize || 28,
+        layoutMode: matchingBox?.layoutMode || alertSettings?.layoutMode || 'top',
+        animationStyle: matchingBox?.animationStyle || alertSettings?.animationStyle || 'fade',
+        glowColor: matchingBox?.glowColor || alertSettings?.glowColor || '#00F0FF',
         soundUrl: (matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
           ? matchingBox.soundUrl
-          : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
-              ? alertSettings.sound_url
+          : (alertSettings?.soundUrl && !alertSettings.soundUrl.includes('neon-chime')
+              ? alertSettings.soundUrl
               : '/sounds/cash-register-kaching.mp3'),
-        soundVolume: matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85,
-        durationSeconds: matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8,
-        ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (alertSettings?.tts_enabled === 1 && donation.amount >= (alertSettings?.tts_min_amount || 0)),
-        ttsType: matchingBox?.ttsType || alertSettings?.tts_voice || 'google',
-        clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url
+        soundVolume: matchingBox?.soundVolume ?? alertSettings?.soundVolume ?? 0.85,
+        durationSeconds: matchingBox?.durationSeconds || alertSettings?.durationSeconds || 8,
+        ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (alertSettings?.ttsEnabled === true && donation.amount >= ((alertSettings as any)?.ttsMinAmount || alertSettings?.minAmountAlert || 0)),
+        ttsType: matchingBox?.ttsType || alertSettings?.ttsVoice || 'google',
+        clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.clonedVoiceSampleUrl
       };
 
       // Real-time broadcast to OBS overlay room
-      broadcastAlertToOverlay(streamer.overlay_token, alertPayload);
-
-      // Mark donation as alerted in DB
-      db.prepare('UPDATE donations SET is_alerted = 1 WHERE id = ?').run(donation.id);
+      const overlayToken = streamer.overlayToken || (streamer as any).overlay_token;
+      if (overlayToken) {
+        broadcastAlertToOverlay(overlayToken, alertPayload);
+      }
     }
 
     // Broadcast updated transaction to streamer dashboard
-    broadcastDonationToDashboard(streamer.id, {
+    broadcastDonationToDashboard(streamerKey, {
       ...donation,
       status: 'PAID',
-      paid_at: new Date().toISOString()
+      paidAt: now.toISOString(),
+      paid_at: now.toISOString()
     });
 
     // 4. Send Telegram Bot notification to streamer if linked
-    if (streamer.telegram_chat_id) {
+    const telegramChatId = (streamer as any).telegramChatId || (streamer as any).telegram_chat_id;
+    if (telegramChatId) {
       await sendTelegramDonationAlert({
-        chatId: streamer.telegram_chat_id,
-        streamerName: streamer.display_name,
-        donorName: donation.donor_name,
-        donorMessage: donation.donor_message,
+        chatId: telegramChatId,
+        streamerName: streamer.displayName || streamer.username,
+        donorName: donation.donorName,
+        donorMessage: donation.donorMessage,
         amount: donation.amount,
         currency: donation.currency,
-        bankingName: donation.banking_name,
-        tranId: paywayTranId || `ABA-${donation.id.slice(0, 8)}`
+        bankingName: donation.bankingName,
+        tranId: resolvedPaywayTranId
       });
     }
   }
@@ -165,14 +201,16 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
 }
 
 /**
- * Checks transaction status with ABA PayWay API.
- * Uses the Pro streamer's own merchant credentials stored in the DB.
- * Returns null if no credentials are configured.
+ * Checks transaction status with ABA PayWay API using Pro streamer credentials in MongoDB.
  */
 export async function checkPayWayTransaction(tranId: string, streamerId: string) {
-  const paymentSettings = db.prepare('SELECT * FROM payment_settings WHERE streamer_id = ?').get(streamerId) as any;
-  const merchantId = paymentSettings?.aba_merchant_id;
-  const apiKey = paymentSettings?.aba_api_key;
+  const paymentSettingsCol = await getPaymentSettingsCollection();
+  const paymentSettings = await paymentSettingsCol.findOne({
+    $or: [{ streamerId }, { _id: streamerId as any }]
+  });
+
+  const merchantId = (paymentSettings as any)?.abaMerchantId || (paymentSettings as any)?.aba_merchant_id;
+  const apiKey = (paymentSettings as any)?.abaApiKey || (paymentSettings as any)?.aba_api_key;
 
   if (!merchantId || !apiKey) {
     console.warn(`[PayWay] No merchant credentials configured for streamer ${streamerId}. Skipping check.`);
@@ -180,7 +218,6 @@ export async function checkPayWayTransaction(tranId: string, streamerId: string)
   }
 
   const reqTime = Math.floor(Date.now() / 1000).toString();
-  // Hash for check-transaction: req_time + merchant_id + tran_id
   const hashString = `${reqTime}${merchantId}${tranId}`;
   const hash = generatePayWayHash(hashString, apiKey);
 
