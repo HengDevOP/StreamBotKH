@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { getUsersCollection, getGatewayConfigCollection, getTemporaryDonationsCollection } from '@/server/database/mongo';
 import { sanitizeSocialLinks } from '@/utils/socialPlatforms';
+import { extractYoutubeId, getYoutubeLiveStats } from '@/utils/youtube';
+import { broadcastTvStreamerUpdated } from '@/server/services/socketService';
 
 const RESERVED_USERNAMES = new Set([
   'admin',
@@ -229,6 +231,30 @@ export async function PUT(req: NextRequest) {
         email: updated?.email || authUser.email
       });
     } catch (e) {}
+
+    const savedLiveUrl = updated?.liveStreamUrl || newLiveStreamUrl || '';
+    const savedYtId = extractYoutubeId(savedLiveUrl) || '';
+    const savedUsername = updated?.username || newUsername || '';
+    if (savedUsername) {
+      void (async () => {
+        try {
+          const stats = savedYtId
+            ? await getYoutubeLiveStats(savedYtId, { bypassCache: true })
+            : { isLive: false, viewers: 0 };
+          broadcastTvStreamerUpdated({
+            id: updated?.userId || authUser.id,
+            username: savedUsername,
+            displayName: updated?.displayName || savedUsername,
+            avatarUrl: updated?.avatarUrl || '',
+            bio: updated?.bio ?? '',
+            liveStreamUrl: savedLiveUrl,
+            youtubeId: savedYtId,
+            isLive: stats.isLive,
+            viewers: stats.isLive ? stats.viewers : 0
+          });
+        } catch (e) {}
+      })();
+    }
 
     return NextResponse.json({
       success: true,

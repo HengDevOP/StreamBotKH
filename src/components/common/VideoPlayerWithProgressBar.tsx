@@ -19,6 +19,7 @@ export interface VideoPlayerWithProgressBarProps {
   showControls?: boolean;
   isPreview?: boolean;
   onEnded?: () => void;
+  onPlayStateChange?: (isPlaying: boolean) => void;
   className?: string;
 }
 
@@ -60,62 +61,86 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   showControls = false,
   isPreview = false,
   onEnded,
+  onPlayStateChange,
   className = ''
 }) => {
   const safeStart = Math.max(0, startTime);
   const safeEnd = Math.max(safeStart + 1, endTime);
   const totalDuration = safeEnd - safeStart;
 
-  const [isPlaying, setIsPlaying] = useState<boolean>(autoplay && !isPaused);
+  const [isPlaying, setIsPlaying] = useState<boolean>((autoplay || isPreview) && !isPaused);
+  const [mountAutoplay, setMountAutoplay] = useState<boolean>((autoplay || isPreview) && !isPaused);
   const [renderKey, setRenderKey] = useState<number>(0);
 
   const barRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const onEndedRef = useRef(onEnded);
+  const onPlayStateChangeRef = useRef(onPlayStateChange);
+  const isPlayingRef = useRef<boolean>(isPlaying);
+  const isPausedRef = useRef<boolean>(isPaused);
   const animFrameRef = useRef<number | null>(null);
   const pausedProgressRef = useRef<number>(0);
   const startTimeRef = useRef<number | null>(null);
   const onEndedFiredRef = useRef<boolean>(false);
+  const isFirstClipEffectRef = useRef<boolean>(true);
+
+  isPlayingRef.current = isPlaying;
+  isPausedRef.current = isPaused;
 
   useEffect(() => {
     onEndedRef.current = onEnded;
   }, [onEnded]);
 
-  // Handle external pause command (e.g. viewer clicked Tips to show Bakong KHQR modal)
+  useEffect(() => {
+    onPlayStateChangeRef.current = onPlayStateChange;
+  }, [onPlayStateChange]);
+
+  const sendPlayerCommand = (func: string, args: unknown[] | string = '') => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    try {
+      win.postMessage(JSON.stringify({ event: 'listening' }), '*');
+      win.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+    } catch {}
+  };
+
+  // Handle external pause / autoplay state changes without reloading the iframe
   useEffect(() => {
     if (isPaused) {
       setIsPlaying(false);
-      try {
-        iframeRef.current?.contentWindow?.postMessage(
-          JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }),
-          '*'
-        );
-      } catch (e) {}
+      sendPlayerCommand('pauseVideo', '');
+    } else if (autoplay && !isPlayingRef.current && pausedProgressRef.current < 1) {
+      setIsPlaying(true);
+      sendPlayerCommand('playVideo', '');
     }
-  }, [isPaused]);
+  }, [isPaused, autoplay]);
 
   useEffect(() => {
-    if (!isPlaying) {
-      try {
-        iframeRef.current?.contentWindow?.postMessage(
-          JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }),
-          '*'
-        );
-      } catch (e) {}
+    if (isPlaying && !isPaused) {
+      sendPlayerCommand('playVideo', '');
+    } else {
+      sendPlayerCommand('pauseVideo', '');
     }
-  }, [isPlaying]);
+  }, [isPlaying, isPaused]);
 
-  // Reset timer when videoId, startTime, or endTime changes
+  // Reset timer & remount clip ONLY when videoId, startTime, or endTime changes
   useEffect(() => {
+    if (isFirstClipEffectRef.current) {
+      isFirstClipEffectRef.current = false;
+      return;
+    }
+
     pausedProgressRef.current = 0;
     startTimeRef.current = null;
     onEndedFiredRef.current = false;
     if (barRef.current) {
       barRef.current.style.width = '100%';
     }
-    setIsPlaying(autoplay && !isPaused);
+    const shouldPlay = (autoplay || isPreview) && !isPaused;
+    setIsPlaying(shouldPlay);
+    setMountAutoplay(shouldPlay);
     setRenderKey((k) => k + 1);
-  }, [videoId, safeStart, safeEnd, autoplay, isPaused]);
+  }, [videoId, safeStart, safeEnd]);
 
   // Real-time smooth 60fps countdown animation loop
   useEffect(() => {
@@ -155,6 +180,8 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
             }
             if (isPreview) {
               setIsPlaying(false);
+              sendPlayerCommand('pauseVideo', '');
+              onPlayStateChangeRef.current?.(false);
             }
             setTimeout(() => {
               onEndedRef.current?.();
@@ -191,15 +218,27 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
     if (barRef.current) {
       barRef.current.style.width = '100%';
     }
+    setMountAutoplay(true);
     setIsPlaying(true);
+    sendPlayerCommand('seekTo', [safeStart, true]);
+    sendPlayerCommand('playVideo', '');
     setRenderKey((k) => k + 1);
   };
 
-  const handleTogglePlay = () => {
+  const handleTogglePlay = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (pausedProgressRef.current >= 1) {
       handleRestart();
+      onPlayStateChangeRef.current?.(true);
+      return;
+    }
+    const next = !isPlaying;
+    setIsPlaying(next);
+    onPlayStateChangeRef.current?.(next);
+    if (next) {
+      sendPlayerCommand('playVideo', '');
     } else {
-      setIsPlaying((prev) => !prev);
+      sendPlayerCommand('pauseVideo', '');
     }
   };
 
@@ -249,10 +288,26 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
         <iframe
           ref={iframeRef}
           key={renderKey}
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=${isPlaying && !isPaused ? 1 : 0}&mute=${muted ? 1 : 0}&controls=${showControls ? 1 : 0}&start=${safeStart}&end=${safeEnd}&enablejsapi=1`}
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=${mountAutoplay ? 1 : 0}&mute=${muted ? 1 : 0}&controls=${showControls ? 1 : 0}&start=${safeStart}&end=${safeEnd}&playsinline=1&enablejsapi=1${
+            typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : ''
+          }`}
           title={videoTitle || 'YouTube Media Share'}
           className="w-full h-full pointer-events-none"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          onLoad={() => {
+            try {
+              iframeRef.current?.contentWindow?.postMessage(
+                JSON.stringify({ event: 'listening' }),
+                '*'
+              );
+            } catch {}
+            if (isPlayingRef.current && !isPausedRef.current) {
+              sendPlayerCommand('seekTo', [safeStart, true]);
+              sendPlayerCommand('playVideo', '');
+            } else {
+              sendPlayerCommand('pauseVideo', '');
+            }
+          }}
         />
 
         {/* Optional Preview Play/Pause button on preview screen only */}
@@ -260,7 +315,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
           <button
             type="button"
             onClick={handleTogglePlay}
-            className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 hover:bg-black/10 transition-colors pointer-events-auto"
+            className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 hover:bg-black/10 transition-colors pointer-events-auto cursor-pointer"
             title={isPlaying ? 'Pause preview' : 'Play preview'}
           >
             {!isPlaying && (

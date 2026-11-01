@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
 import { getUsersCollection, getOverlayTokenHistoryCollection, getMongoDb } from '../database/mongo';
+import { extractYoutubeId, getYoutubeLiveStats } from '../../utils/youtube';
 
 let io: SocketIOServer | null = null;
 
@@ -376,8 +377,45 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
+    // TV Live YouTube Concurrent Viewers ("watching now") WebSocket Subscription
+    socket.on('tv:watch_youtube', async (data: { videoIds?: string[] }) => {
+      socket.join('tv:live_viewers');
+      const rawIds = Array.isArray(data?.videoIds) ? data.videoIds : [];
+      const cleanSet = new Set<string>();
+      for (const raw of rawIds) {
+        const extracted = extractYoutubeId(raw);
+        if (extracted) cleanSet.add(extracted);
+      }
+
+      if (cleanSet.size > 0) {
+        socketWatchedVideoIds.set(socket.id, cleanSet);
+        ensureYoutubeStatsPoller();
+
+        try {
+          const entries = await Promise.all(
+            Array.from(cleanSet).map(async (vid) => [vid, await getYoutubeLiveStats(vid)] as const)
+          );
+          const stats: Record<string, { isLive: boolean; viewers: number }> = {};
+          for (const [vid, st] of entries) {
+            stats[vid] = st;
+          }
+          socket.emit('tv:youtube_stats', { stats, updatedAt: Date.now() });
+        } catch (e) {}
+      } else {
+        socketWatchedVideoIds.delete(socket.id);
+        stopYoutubeStatsPollerIfIdle();
+      }
+    });
+
+    socket.on('tv:leave', () => {
+      socket.leave('tv:live_viewers');
+      socketWatchedVideoIds.delete(socket.id);
+      stopYoutubeStatsPollerIfIdle();
+    });
+
     socket.on('disconnect', () => {
-      // Clean disconnect
+      socketWatchedVideoIds.delete(socket.id);
+      stopYoutubeStatsPollerIfIdle();
     });
   });
 
@@ -472,4 +510,75 @@ export function broadcastTicketStatusChanged(ticketId: string, statusData: any) 
   if (!activeIo) return;
   activeIo.to(`ticket:${ticketId}`).emit('ticket:status_changed', statusData);
   activeIo.emit('ticket:updated', { ticketId, ...statusData });
+}
+
+// ---------------------------------------------------------------------------
+// Live YouTube Concurrent Viewers ("watching now") WebSocket Streamer
+// ---------------------------------------------------------------------------
+const socketWatchedVideoIds = new Map<string, Set<string>>();
+let youtubeStatsInterval: NodeJS.Timeout | null = null;
+let youtubeStatsInFlight = false;
+
+function stopYoutubeStatsPollerIfIdle() {
+  if (socketWatchedVideoIds.size === 0 && youtubeStatsInterval) {
+    clearInterval(youtubeStatsInterval);
+    youtubeStatsInterval = null;
+  }
+}
+
+function ensureYoutubeStatsPoller() {
+  if (youtubeStatsInterval) return;
+  youtubeStatsInterval = setInterval(async () => {
+    if (youtubeStatsInFlight) return;
+    if (socketWatchedVideoIds.size === 0) {
+      stopYoutubeStatsPollerIfIdle();
+      return;
+    }
+
+    const activeIo = getIO();
+    if (!activeIo) return;
+
+    const allIds = new Set<string>();
+    for (const set of socketWatchedVideoIds.values()) {
+      for (const vid of set) {
+        allIds.add(vid);
+      }
+    }
+    if (allIds.size === 0) return;
+
+    youtubeStatsInFlight = true;
+    try {
+      const entries = await Promise.all(
+        Array.from(allIds).map(async (vid) => [vid, await getYoutubeLiveStats(vid, { bypassCache: true })] as const)
+      );
+      const stats: Record<string, { isLive: boolean; viewers: number }> = {};
+      for (const [vid, st] of entries) {
+        stats[vid] = st;
+      }
+      activeIo.to('tv:live_viewers').emit('tv:youtube_stats', {
+        stats,
+        updatedAt: Date.now()
+      });
+    } catch (e) {
+      // Ignore transient network errors
+    } finally {
+      youtubeStatsInFlight = false;
+    }
+  }, 8000);
+}
+
+export function broadcastTvStreamerUpdated(payload: {
+  id?: string;
+  username: string;
+  displayName?: string;
+  avatarUrl?: string;
+  bio?: string;
+  liveStreamUrl: string;
+  youtubeId: string;
+  isLive: boolean;
+  viewers: number;
+}) {
+  const activeIo = getIO();
+  if (!activeIo) return;
+  activeIo.to('tv:live_viewers').emit('tv:streamer_updated', payload);
 }

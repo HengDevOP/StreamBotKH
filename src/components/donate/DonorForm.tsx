@@ -46,7 +46,7 @@ interface DonorFormProps {
   isModalOpen?: boolean;
 }
 
-const DEMO_YOUTUBE_URL = 'https://www.youtube.com/watch?v=HSsGnEOFY6U&list=RDHSsGnEOFY6U&start_radio=1';
+const DEMO_YOUTUBE_URL = 'https://www.youtube.com/watch?v=HSsGnEOFY6U';
 
 export function extractYouTubeId(url: string): string | null {
   if (!url) return null;
@@ -180,6 +180,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
     }
 
     if (trimmed === lastFetchedUrl.current && videoTitle) {
+      setIsPlayingPreview(true);
       return;
     }
 
@@ -255,10 +256,16 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
   };
 
   const handleLoadDemoVideo = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    setVideoError(null);
     setVideoUrl(DEMO_YOUTUBE_URL);
     setVideoStartTime(0);
     setVideoEndTime(30);
-    fetchYoutubeDetails(DEMO_YOUTUBE_URL);
+    setIsPlayingPreview(true);
+    setPreviewKey((k) => k + 1);
+    void fetchYoutubeDetails(DEMO_YOUTUBE_URL);
   };
 
   const handleResetForm = () => {
@@ -483,16 +490,21 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
         {/* FIELD 4: Video URL (Media Share) - Only rendered if enabled by streamer */}
         {isVideoAlertsEnabled && (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex items-center gap-1.5">
-                <Youtube size={14} className="text-red-500" />
-                <span>Video URL (YouTube Media Share)</span>
+            <div className="flex items-start sm:items-center justify-between gap-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
+                <span className="inline-flex items-center gap-1.5 shrink-0">
+                  <Youtube size={14} className="text-red-500" />
+                  <span>Share Media</span>
+                </span>
+                <span className="text-red-500 font-mono font-bold text-[10px] sm:text-[11px] normal-case tracking-normal">
+                  [Required ${videoMinTip.toFixed(2)} To Show On Stream]
+                </span>
               </label>
               {meetsMinTip && (
                 <button
                   type="button"
                   onClick={handleLoadDemoVideo}
-                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline"
+                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline shrink-0 whitespace-nowrap"
                 >
                   Try Demo Video
                 </button>
@@ -569,17 +581,19 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
                   <div className="space-y-2.5 pt-1 animate-fadeIn">
                     {/* Live Preview Player with Custom Progress Duration Bar at Bottom */}
                     <VideoPlayerWithProgressBar
+                      key={previewKey}
                       videoId={activeVideoId}
                       startTime={videoStartTime}
                       endTime={videoEndTime}
                       autoplay={isPlayingPreview && !loading && !isModalOpen}
-                      isPaused={!isPlayingPreview || loading || Boolean(isModalOpen)}
+                      isPaused={Boolean(loading || isModalOpen)}
                       muted={false}
                       videoTitle={videoTitle}
                       donorName={donorName || 'Viewer'}
                       amount={amount}
                       currency={currency}
                       isPreview={true}
+                      onPlayStateChange={setIsPlayingPreview}
                     />
 
                     {/* Custom Clip Duration Line for easy drag & move segment up to 5 mins */}
@@ -591,6 +605,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
                       onChange={(newStart, newEnd) => {
                         setVideoStartTime(newStart);
                         setVideoEndTime(newEnd);
+                        setIsPlayingPreview(true);
+                        setPreviewKey((k) => k + 1);
                       }}
                     />
                   </div>

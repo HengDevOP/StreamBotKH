@@ -21,8 +21,13 @@ export interface PublicStreamerInfo {
   isVerified?: boolean;
   liveStreamUrl?: string;
   youtubeId?: string;
+  isLive?: boolean;
+  viewers?: number;
   hasMasterKhqr?: boolean;
   khqrImageUrl?: string;
+  isTelegramConnected?: boolean;
+  hasTelegramGroup?: boolean;
+  isTipConfigured?: boolean;
   socialLinks?: Array<{
     id: string;
     url: string;

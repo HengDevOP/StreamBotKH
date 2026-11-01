@@ -5,9 +5,11 @@ import {
   getPaymentSettingsCollection,
   getVideoAlertSettingsCollection,
   getGatewayConfigCollection,
+  getTelegramSessionsCollection,
+  getTelegramMonitoredGroupsCollection,
   restoreMasterKhqrImage
 } from '@/server/database/mongo';
-import { extractYoutubeId } from '@/utils/youtube';
+import { extractYoutubeId, getYoutubeLiveStats } from '@/utils/youtube';
 
 export async function GET(
   _req: NextRequest,
@@ -115,6 +117,48 @@ export async function GET(
       khqrImageUrl = paymentSettings.masterKhqrImage || paymentSettings.master_khqr_image;
     }
 
+    // 1. Check if streamer has an active GramJS / Telegram Session connected
+    let isTelegramConnected = false;
+    try {
+      const telegramCol = await getTelegramSessionsCollection();
+      const sessionDoc = await telegramCol.findOne({
+        $or: [
+          { streamerId, isConnected: true },
+          { streamerId: cleanUsername, isConnected: true }
+        ]
+      });
+      isTelegramConnected = Boolean(sessionDoc && sessionDoc.sessionString);
+    } catch (e) {}
+
+    // 2. Check if streamer has linked at least one monitored group
+    let hasTelegramGroup = false;
+    try {
+      const groupsCol = await getTelegramMonitoredGroupsCollection();
+      const groupCount = await groupsCol.countDocuments({
+        $or: [
+          { streamerId },
+          { streamerId: cleanUsername }
+        ]
+      });
+      hasTelegramGroup = groupCount > 0;
+    } catch (e) {}
+
+    // 3. Check if streamer has uploaded their Master KHQR image
+    const hasMasterKhqr = Boolean(khqrImageUrl);
+
+    // Tip is fully configured only if GramJS is connected, KHQR image is uploaded, and a monitored group is linked
+    const isTipConfigured = Boolean(isTelegramConnected && hasMasterKhqr && hasTelegramGroup);
+
+    const resolvedLiveUrl = mongoUser.liveStreamUrl || mongoUser.youtubeLiveUrl || '';
+    const resolvedYoutubeId = extractYoutubeId(resolvedLiveUrl) || undefined;
+    let isLive = false;
+    let viewers = 0;
+    if (resolvedYoutubeId) {
+      const liveStats = await getYoutubeLiveStats(resolvedYoutubeId);
+      isLive = liveStats.isLive;
+      viewers = liveStats.isLive ? liveStats.viewers : 0;
+    }
+
     return NextResponse.json({
       id: streamerId,
       username: mongoUser.username,
@@ -125,8 +169,10 @@ export async function GET(
       socialLinks: userSocialLinks,
       links: userSocialLinks,
       isVerified: Boolean(mongoUser.isVerified),
-      liveStreamUrl: mongoUser.liveStreamUrl || mongoUser.youtubeLiveUrl || '',
-      youtubeId: extractYoutubeId(mongoUser.liveStreamUrl || mongoUser.youtubeLiveUrl) || undefined,
+      liveStreamUrl: resolvedLiveUrl,
+      youtubeId: resolvedYoutubeId,
+      isLive,
+      viewers,
       plan: currentPlan,
       glowColor: alertSettings?.glowColor || alertSettings?.glow_color || '#00F0FF',
       minAmountAlert: Number(alertSettings?.minAmountAlert ?? alertSettings?.min_amount_alert ?? 1.0),
@@ -137,8 +183,11 @@ export async function GET(
       videoAlertEnabled: videoAlertEnabled,
       videoMinTipAmount: Number(videoSettings?.minTipAmount ?? videoSettings?.min_tip_amount ?? 2.0),
       videoMaxDurationSeconds: Number(videoSettings?.maxDurationSeconds ?? videoSettings?.max_duration_seconds ?? 30),
-      hasMasterKhqr: Boolean(khqrImageUrl),
-      khqrImageUrl: khqrImageUrl || undefined
+      hasMasterKhqr,
+      khqrImageUrl: khqrImageUrl || undefined,
+      isTelegramConnected,
+      hasTelegramGroup,
+      isTipConfigured
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -33,7 +33,6 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
   // Safe clamped values to prevent scale jump or out-of-range handles
   const safeEnd = Math.max(minClipDuration, Math.min(endTime, upperLimit));
   const safeStart = Math.max(0, Math.min(startTime, safeEnd - minClipDuration));
-  const currentDuration = Math.max(1, Math.round(safeEnd - safeStart));
 
   const trackRef = useRef<HTMLDivElement>(null);
   const [activeHandle, setActiveHandle] = useState<'start' | 'end' | 'middle' | null>(null);
@@ -42,6 +41,19 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
     startSec: 0,
     endSec: 0
   });
+
+  // Local drag state for silky smooth 60fps tracking without thrashing YouTube iframe
+  const [liveStart, setLiveStart] = useState<number>(safeStart);
+  const [liveEnd, setLiveEnd] = useState<number>(safeEnd);
+
+  useEffect(() => {
+    if (!activeHandle) {
+      setLiveStart(safeStart);
+      setLiveEnd(safeEnd);
+    }
+  }, [safeStart, safeEnd, activeHandle]);
+
+  const currentDuration = Math.max(1, Math.round(liveEnd - liveStart));
 
   // Allowed preset buttons (up to streamer's maximum allowed duration and within video length)
   const presets = [
@@ -61,14 +73,17 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
     setActiveHandle(handle);
     dragRef.current = {
       clientX: e.clientX,
-      startSec: safeStart,
-      endSec: safeEnd
+      startSec: liveStart,
+      endSec: liveEnd
     };
   };
 
   // Smooth 60fps window-level pointer drag tracking without dropping handles
   useEffect(() => {
     if (!activeHandle) return;
+
+    let finalStart = liveStart;
+    let finalEnd = liveEnd;
 
     const handlePointerMove = (e: PointerEvent) => {
       if (!trackRef.current) return;
@@ -80,30 +95,40 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
 
       if (activeHandle === 'start') {
         const targetStart = dragRef.current.startSec + deltaSec;
-        const clampedStart = Math.max(0, Math.min(targetStart, safeEnd - minClipDuration));
-        if (safeEnd - clampedStart > maxAllowedDuration) {
-          onChange(clampedStart, clampedStart + maxAllowedDuration);
-        } else {
-          onChange(clampedStart, safeEnd);
+        const clampedStart = Math.max(0, Math.min(targetStart, dragRef.current.endSec - minClipDuration));
+        let clampedEnd = dragRef.current.endSec;
+        if (clampedEnd - clampedStart > maxAllowedDuration) {
+          clampedEnd = clampedStart + maxAllowedDuration;
         }
+        finalStart = clampedStart;
+        finalEnd = clampedEnd;
+        setLiveStart(clampedStart);
+        setLiveEnd(clampedEnd);
       } else if (activeHandle === 'end') {
         const targetEnd = dragRef.current.endSec + deltaSec;
-        const clampedEnd = Math.max(safeStart + minClipDuration, Math.min(targetEnd, upperLimit));
-        if (clampedEnd - safeStart > maxAllowedDuration) {
-          onChange(clampedEnd - maxAllowedDuration, clampedEnd);
-        } else {
-          onChange(safeStart, clampedEnd);
+        const clampedEnd = Math.max(dragRef.current.startSec + minClipDuration, Math.min(targetEnd, upperLimit));
+        let clampedStart = dragRef.current.startSec;
+        if (clampedEnd - clampedStart > maxAllowedDuration) {
+          clampedStart = clampedEnd - maxAllowedDuration;
         }
+        finalStart = clampedStart;
+        finalEnd = clampedEnd;
+        setLiveStart(clampedStart);
+        setLiveEnd(clampedEnd);
       } else if (activeHandle === 'middle') {
         const dur = Math.max(minClipDuration, dragRef.current.endSec - dragRef.current.startSec);
         const targetStart = dragRef.current.startSec + deltaSec;
         const clampedStart = Math.max(0, Math.min(targetStart, upperLimit - dur));
-        onChange(clampedStart, clampedStart + dur);
+        finalStart = clampedStart;
+        finalEnd = clampedStart + dur;
+        setLiveStart(clampedStart);
+        setLiveEnd(clampedStart + dur);
       }
     };
 
     const handlePointerUp = () => {
       setActiveHandle(null);
+      onChange(finalStart, finalEnd);
     };
 
     window.addEventListener('pointermove', handlePointerMove);
@@ -115,7 +140,7 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, [activeHandle, maxScale, upperLimit, maxAllowedDuration, minClipDuration, safeStart, safeEnd, onChange]);
+  }, [activeHandle, maxScale, upperLimit, maxAllowedDuration, minClipDuration, onChange]);
 
   // Click on background track to shift clip
   const onTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -173,9 +198,9 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
     onChange(safeStart, newEnd);
   };
 
-  // Accurate percentage calculations
-  const startPct = Math.max(0, Math.min(100, (safeStart / maxScale) * 100));
-  const endPct = Math.max(0, Math.min(100, (safeEnd / maxScale) * 100));
+  // Accurate percentage calculations based on live positions
+  const startPct = Math.max(0, Math.min(100, (liveStart / maxScale) * 100));
+  const endPct = Math.max(0, Math.min(100, (liveEnd / maxScale) * 100));
   const clipWidthPct = Math.max(0, endPct - startPct);
 
   return (
@@ -193,9 +218,9 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
             </span>
           )}
           <span className="text-[10px] text-slate-300">
-            <span className="text-white font-bold">{formatTime(safeStart)}</span>
+            <span className="text-white font-bold">{formatTime(liveStart)}</span>
             <span className="mx-1 text-slate-500">➔</span>
-            <span className="text-white font-bold">{formatTime(safeEnd)}</span>
+            <span className="text-white font-bold">{formatTime(liveEnd)}</span>
           </span>
           <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400 font-extrabold text-[11px]">
             {currentDuration}s
