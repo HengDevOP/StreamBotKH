@@ -330,6 +330,32 @@ export interface OverlayDoc {
   updatedAt: Date;
 }
 
+export interface AlertConditionTierDoc {
+  id: string;
+  minAmountCondition: number;
+  isEnabled?: boolean;
+  templateStyle: string;
+  showImage: boolean;
+  mediaUrl?: string;
+  soundUrl: string;
+  soundVolume: number;
+  durationSeconds: number;
+  glowColor: string;
+  fontFamily: string;
+  fontSize?: number;
+  ttsEnabled: boolean;
+  ttsMinAmount: number;
+  ttsType: 'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned';
+  clonedVoiceName?: string;
+  clonedVoiceSampleUrl?: string;
+  textTemplate?: string;
+  textColor?: string;
+  donorColor?: string;
+  amountColor?: string;
+  layoutMode?: string;
+  animationStyle?: string;
+}
+
 export interface AlertBoxDoc {
   _id?: ObjectId;
   userId: string;
@@ -357,8 +383,39 @@ export interface AlertBoxDoc {
   messageTemplate?: string;
   layoutMode?: string;
   animationStyle?: string;
+  conditions?: AlertConditionTierDoc[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Given a list of active AlertBoxDoc items and a donation amount in USD,
+ * evaluates all condition tiers inside each box and returns the highest
+ * matching tier merged onto its parent box (preserving box._id).
+ */
+export function resolveMatchingAlertBox(activeBoxes: any[], effectiveAmountUsd: number): any | null {
+  if (!Array.isArray(activeBoxes) || activeBoxes.length === 0) return null;
+
+  const candidates: Array<{ merged: any; threshold: number }> = [];
+
+  for (const box of activeBoxes) {
+    if (!box || box.isEnabled === false) continue;
+    const rawTiers = Array.isArray(box.conditions) && box.conditions.length > 0 ? box.conditions : [box];
+    for (const tier of rawTiers) {
+      if (tier && tier.isEnabled === false) continue;
+      const threshold = Number(tier?.minAmountCondition ?? box.minAmountCondition) || 0;
+      candidates.push({
+        merged: tier === box ? box : { ...box, ...tier, _id: box._id, name: box.name, isEnabled: box.isEnabled },
+        threshold
+      });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => b.threshold - a.threshold);
+  const matched = candidates.find((c) => effectiveAmountUsd >= c.threshold - 0.0001);
+  return matched ? matched.merged : candidates[candidates.length - 1].merged;
 }
 
 export interface VoiceCloneDoc {

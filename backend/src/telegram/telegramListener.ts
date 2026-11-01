@@ -10,6 +10,7 @@ import {
   getVideoAlertSettingsCollection,
   getTemporaryDonationsCollection,
   getAlertBoxesCollection,
+  resolveMatchingAlertBox,
   cleanupExpiredPendingDonationsMongo
 } from '../../../src/server/database/mongo';
 
@@ -471,12 +472,7 @@ export class TelegramGroupListener {
           .toArray();
 
         const effectiveAmountUsd = effectiveCurrency === 'KHR' ? effectiveAmount / 4000 : effectiveAmount;
-        const matchingBoxes = activeBoxes.filter(
-          (b) => effectiveAmountUsd >= ((Number(b.minAmountCondition) || 0) - 0.0001)
-        );
-        matchingBox = matchingBoxes.length > 0
-          ? matchingBoxes[0]
-          : (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
+        matchingBox = resolveMatchingAlertBox(activeBoxes, effectiveAmountUsd);
       } catch (e) {
         console.warn('[TelegramListener] Could not fetch mongo alert boxes:', e);
       }

@@ -438,17 +438,43 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       const tipAmount = Number(payload.amount) || 0;
       const tipAmountInUsd = payload.currency === 'KHR' ? tipAmount / 4000 : tipAmount;
 
-      // Find highest active matching condition alert box (sorted descending by condition threshold)
+      // Find highest active matching condition tier across alert boxes (supports multi-condition tiers within a single box)
       const activeBoxes = alertBoxes.filter((b) => b.isEnabled);
-      const matchingBoxes = activeBoxes
-        .filter((b) => tipAmountInUsd >= ((Number(b.minAmountCondition) || 0) - 0.0001))
-        .sort((a, b) => (Number(b.minAmountCondition) || 0) - (Number(a.minAmountCondition) || 0));
 
-      // The highest box whose condition threshold is met (e.g. >= 0.10 picks 0.10, >= 0.01 picks 0.01)
+      const resolveTierForBox = (box: any) => {
+        if (!box) return null;
+        const rawTiers = Array.isArray(box.conditions) && box.conditions.length > 0 ? box.conditions : [box];
+        const enabledTiers = rawTiers.filter((t: any) => t && t.isEnabled !== false);
+        if (enabledTiers.length === 0) return box;
+        const sortedDesc = [...enabledTiers].sort(
+          (a: any, b: any) => (Number(b.minAmountCondition) || 0) - (Number(a.minAmountCondition) || 0)
+        );
+        const matched = sortedDesc.find(
+          (t: any) => tipAmountInUsd >= ((Number(t.minAmountCondition) || 0) - 0.0001)
+        );
+        const chosen = matched || sortedDesc[sortedDesc.length - 1];
+        return chosen === box ? box : { ...box, ...chosen, _id: box._id, name: box.name, isEnabled: box.isEnabled };
+      };
+
+      const allTierCandidates: Array<{ merged: any; threshold: number }> = [];
+      for (const b of activeBoxes) {
+        const rawTiers = Array.isArray(b.conditions) && b.conditions.length > 0 ? b.conditions : [b];
+        for (const t of rawTiers) {
+          if (t && t.isEnabled === false) continue;
+          const threshold = Number(t?.minAmountCondition ?? b.minAmountCondition) || 0;
+          allTierCandidates.push({
+            merged: t === b ? b : { ...b, ...t, _id: b._id, name: b.name, isEnabled: b.isEnabled },
+            threshold
+          });
+        }
+      }
+      allTierCandidates.sort((a, b) => b.threshold - a.threshold);
+
+      const matchedCandidate = allTierCandidates.find((c) => tipAmountInUsd >= c.threshold - 0.0001);
       const conditionMatchedBox =
-        (payload.boxId ? activeBoxes.find((b) => String(b._id) === String(payload.boxId)) : null) ||
-        matchingBoxes[0] ||
-        (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
+        (payload.boxId ? resolveTierForBox(activeBoxes.find((b) => String(b._id) === String(payload.boxId))) : null) ||
+        matchedCandidate?.merged ||
+        (allTierCandidates.length > 0 ? allTierCandidates[allTierCandidates.length - 1].merged : null);
 
       const resolvedBoxId = payload.boxId || (conditionMatchedBox?._id ? String(conditionMatchedBox._id) : null);
 
@@ -470,8 +496,10 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         }
       }
 
-      // If activeBoxId is specified on this overlay instance, prioritize its custom appearance & rules
-      const dedicatedBox = activeBoxId ? activeBoxes.find((b) => String(b._id) === String(activeBoxId)) : null;
+      // If activeBoxId is specified on this overlay instance, resolve the matching condition tier inside that dedicated box
+      const dedicatedBox = activeBoxId
+        ? resolveTierForBox(activeBoxes.find((b) => String(b._id) === String(activeBoxId)))
+        : null;
       const matchingBox = dedicatedBox || conditionMatchedBox || overlayConfig;
 
       const rawMsg = payload.donorMessage || payload.donor_message || payload.message || '';

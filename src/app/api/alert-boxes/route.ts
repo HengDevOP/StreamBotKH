@@ -61,19 +61,19 @@ export async function POST(req: NextRequest) {
     const userId = await resolveStreamerUserId(req, body.token);
     const {
       name,
-      minAmountCondition = 1.0,
+      minAmountCondition = 0.01,
       isEnabled = true,
       templateStyle = 'neon-box',
       showImage = true,
       mediaUrl = 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
-      soundUrl = '/sounds/neon-chime.mp3',
+      soundUrl = '/sounds/cash-register-kaching.mp3',
       soundVolume = 0.85,
       durationSeconds = 8,
       glowColor = '#00F0FF',
       fontFamily = 'Chakra Petch',
       fontSize = 24,
       ttsEnabled = true,
-      ttsMinAmount = 1.0,
+      ttsMinAmount = 0.01,
       ttsType = 'google',
       clonedVoiceName,
       clonedVoiceSampleUrl,
@@ -83,30 +83,90 @@ export async function POST(req: NextRequest) {
       amountColor,
       messageTemplate,
       layoutMode = 'top',
-      animationStyle = 'bounce'
+      animationStyle = 'fade',
+      conditions
     } = body;
 
-    if (!name || !name.trim()) {
+    if (!name || !String(name).trim()) {
       return NextResponse.json({ success: false, error: 'Donation box name is required' }, { status: 400 });
     }
+
+    const sanitizedName = String(name).trim().slice(0, 16);
+    const resolvedMinAmount = Math.max(0.001, Number(minAmountCondition) > 0 ? Number(minAmountCondition) : 0.01);
+
+    const sanitizedConditions = Array.isArray(conditions) && conditions.length > 0
+      ? conditions.map((c: any, idx: number) => ({
+          id: String(c?.id || `cond_${Date.now()}_${idx}`),
+          minAmountCondition: Math.max(0.001, Number(c?.minAmountCondition) > 0 ? Number(c.minAmountCondition) : 0.01),
+          isEnabled: c?.isEnabled !== false,
+          templateStyle: c?.templateStyle || templateStyle || 'neon-box',
+          showImage: c?.showImage !== false,
+          mediaUrl: c?.mediaUrl ?? mediaUrl ?? 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+          soundUrl: c?.soundUrl || soundUrl || '/sounds/cash-register-kaching.mp3',
+          soundVolume: Math.min(1, Math.max(0, Number(c?.soundVolume ?? soundVolume ?? 0.85))),
+          durationSeconds: Math.min(30, Math.max(3, Number(c?.durationSeconds || durationSeconds || 8))),
+          glowColor: c?.glowColor || glowColor || '#00F0FF',
+          fontFamily: c?.fontFamily || fontFamily || 'Chakra Petch',
+          fontSize: Number(c?.fontSize || fontSize || 24),
+          ttsEnabled: c?.ttsEnabled !== false,
+          ttsMinAmount: Number(c?.ttsMinAmount ?? ttsMinAmount ?? 0.01),
+          ttsType: c?.ttsType || ttsType || 'google',
+          clonedVoiceName: c?.clonedVoiceName ?? clonedVoiceName,
+          clonedVoiceSampleUrl: c?.clonedVoiceSampleUrl ?? clonedVoiceSampleUrl,
+          textTemplate: c?.textTemplate || textTemplate,
+          textColor: c?.textColor || textColor,
+          donorColor: c?.donorColor || donorColor || undefined,
+          amountColor: c?.amountColor || amountColor || undefined,
+          layoutMode: c?.layoutMode || layoutMode || 'top',
+          animationStyle: c?.animationStyle || animationStyle || 'fade'
+        }))
+      : [
+          {
+            id: `cond_${Date.now()}_0`,
+            minAmountCondition: resolvedMinAmount,
+            isEnabled: Boolean(isEnabled),
+            templateStyle: templateStyle || 'neon-box',
+            showImage: showImage !== false,
+            mediaUrl: mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+            soundUrl: soundUrl || '/sounds/cash-register-kaching.mp3',
+            soundVolume: Math.min(1, Math.max(0, Number(soundVolume) ?? 0.85)),
+            durationSeconds: Math.min(30, Math.max(3, Number(durationSeconds) || 8)),
+            glowColor: glowColor || '#00F0FF',
+            fontFamily: fontFamily || 'Chakra Petch',
+            fontSize: Number(fontSize) || 24,
+            ttsEnabled: Boolean(ttsEnabled),
+            ttsMinAmount: Number(ttsMinAmount) || 0.01,
+            ttsType: ttsType || 'google',
+            clonedVoiceName,
+            clonedVoiceSampleUrl,
+            textTemplate,
+            textColor,
+            donorColor: donorColor || undefined,
+            amountColor: amountColor || undefined,
+            layoutMode,
+            animationStyle
+          }
+        ];
+
+    const lowestThreshold = Math.min(...sanitizedConditions.map((c: any) => c.minAmountCondition));
 
     const col = await getAlertBoxesCollection();
     const newDoc: AlertBoxDoc = {
       userId,
-      name: name.trim(),
-      minAmountCondition: Math.max(0.001, Number(minAmountCondition) >= 0 ? Number(minAmountCondition) : 0.01),
+      name: sanitizedName,
+      minAmountCondition: lowestThreshold,
       isEnabled: Boolean(isEnabled),
       templateStyle: templateStyle || 'neon-box',
       showImage: showImage !== false,
       mediaUrl: mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
-      soundUrl: soundUrl || '/sounds/neon-chime.mp3',
+      soundUrl: soundUrl || '/sounds/cash-register-kaching.mp3',
       soundVolume: Math.min(1, Math.max(0, Number(soundVolume) ?? 0.85)),
       durationSeconds: Math.min(30, Math.max(3, Number(durationSeconds) || 8)),
       glowColor: glowColor || '#00F0FF',
       fontFamily: fontFamily || 'Chakra Petch',
       fontSize: Number(fontSize) || 24,
       ttsEnabled: Boolean(ttsEnabled),
-      ttsMinAmount: Number(ttsMinAmount) || 1.0,
+      ttsMinAmount: Number(ttsMinAmount) || 0.01,
       ttsType: ttsType || 'google',
       clonedVoiceName,
       clonedVoiceSampleUrl,
@@ -117,6 +177,7 @@ export async function POST(req: NextRequest) {
       messageTemplate,
       layoutMode,
       animationStyle,
+      conditions: sanitizedConditions,
       createdAt: new Date(),
       updatedAt: new Date()
     };

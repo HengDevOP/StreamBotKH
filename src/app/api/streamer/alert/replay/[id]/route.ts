@@ -5,7 +5,8 @@ import {
   getDonationsCollection,
   getAlertSettingsCollection,
   getVideoAlertSettingsCollection,
-  getAlertBoxesCollection
+  getAlertBoxesCollection,
+  resolveMatchingAlertBox
 } from '@/server/database/mongo';
 import { broadcastAlertToOverlay } from '@/server/services/socketService';
 
@@ -79,12 +80,7 @@ export async function POST(
         .toArray();
 
       const effectiveAmountUsd = donation.currency === 'KHR' ? donation.amount / 4000 : donation.amount;
-      const matchingBoxes = activeBoxes.filter(
-        (b) => effectiveAmountUsd >= ((Number(b.minAmountCondition) || 0) - 0.0001)
-      );
-      matchingBox = matchingBoxes.length > 0
-        ? matchingBoxes[0]
-        : (activeBoxes.length > 0 ? activeBoxes[activeBoxes.length - 1] : null);
+      matchingBox = resolveMatchingAlertBox(activeBoxes, effectiveAmountUsd);
     } catch (e) {
       console.warn('[Replay] Could not fetch mongo alert boxes:', e);
     }

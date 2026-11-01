@@ -13,6 +13,32 @@ export interface AlertSettings {
   text_template: string;
 }
 
+export interface AlertConditionTier {
+  id: string;
+  minAmountCondition: number;
+  isEnabled?: boolean;
+  templateStyle: 'neon-box' | 'glass-hologram' | 'cyber-glitch' | 'arcade' | 'minimal';
+  showImage: boolean;
+  mediaUrl?: string;
+  soundUrl: string;
+  soundVolume: number;
+  durationSeconds: number;
+  glowColor: string;
+  fontFamily: string;
+  fontSize?: number;
+  ttsEnabled: boolean;
+  ttsMinAmount: number;
+  ttsType: 'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned';
+  clonedVoiceName?: string;
+  clonedVoiceSampleUrl?: string;
+  textTemplate?: string;
+  textColor?: string;
+  donorColor?: string;
+  amountColor?: string;
+  layoutMode?: 'top' | 'left' | 'right' | 'banner';
+  animationStyle?: 'bounce' | 'fade' | 'pulse' | 'glitch' | 'slide' | 'zoom';
+}
+
 export interface AlertBox {
   _id: string;
   userId: string;
@@ -39,7 +65,8 @@ export interface AlertBox {
   amountColor?: string;
   messageTemplate?: string;
   layoutMode?: 'top' | 'left' | 'right' | 'banner';
-  animationStyle?: 'bounce' | 'pulse' | 'glitch' | 'slide' | 'zoom';
+  animationStyle?: 'bounce' | 'fade' | 'pulse' | 'glitch' | 'slide' | 'zoom';
+  conditions?: AlertConditionTier[];
   createdAt: string;
   updatedAt: string;
 }

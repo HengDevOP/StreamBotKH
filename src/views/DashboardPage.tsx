@@ -505,7 +505,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const currentObsConfig = useMemo(() => {
     const effectiveToken = user?.overlayToken || 'demo_token';
     const isAssetCategory = ([
-      'donation',
       'leaderboard',
       'goal',
       'timer',
@@ -539,18 +538,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           color: '#10B981', // Emerald
           bgGlow: 'hover:border-emerald-500/50',
           copyMessage: 'Copied Goals OBS URL!'
-        };
-      case 'donation':
-      case 'alerts':
-        return {
-          featureKey: 'donation',
-          label: 'Donation Alerts OBS',
-          shortLabel: 'Alerts',
-          url: `${origin}/overlay/alert/${effectiveToken}`,
-          icon: Bell,
-          color: '#00F0FF', // Cyan
-          bgGlow: 'hover:border-cyan-500/50',
-          copyMessage: 'Copied Donation Alerts OBS URL!'
         };
       case 'leaderboard':
         return {
@@ -1354,7 +1341,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // (The main sidebar is completely hidden and replaced by our new sidebar, with the top back button)
   if (selectedDonationId && (activeTab === 'donation' || activeTab === 'alerts' || activeTab === 'donations')) {
     return (
-      <div className="h-screen w-screen overflow-hidden bg-[#070A12] text-slate-100 flex flex-col antialiased">
+      <div className="flex-1 min-h-0 h-full w-full overflow-hidden overscroll-none bg-[#070A12] text-slate-100 flex flex-col antialiased">
         <DonationAlertsManager
           streamerToken={user?.overlayToken}
           initialSelectedBoxId={selectedDonationId}
@@ -1500,9 +1487,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       {/* ============================================================== */}
       {/* WORKBENCH & MAIN CONTENT AREA                                  */}
       {/* ============================================================== */}
-      <main className="flex-1 h-full overflow-y-auto min-w-0 flex flex-col bg-[#060911]">
+      <main className="flex-1 h-full min-h-0 overflow-hidden min-w-0 flex flex-col bg-[#060911]">
         {/* Top Desktop Application Header Bar (Executive Workbench Header) */}
-        <header className="sticky top-0 z-20 h-16 sm:h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0">
+        <header className="z-20 h-16 sm:h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0">
           <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-shrink-0">
             {/* Mobile Menu Hamburger */}
             <button
@@ -1605,7 +1592,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           </div>
         </header>
 
-        {/* Dynamic Workbench Views */}
+        {/* Dynamic Workbench Views (Internally Scrollable Container Only) */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         <div className="p-3 xs:p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6 sm:space-y-8 animate-fadeIn pb-16">
           {loading ? (
             <FeatureTabSkeleton tab={activeTab} />
@@ -2930,6 +2918,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           )}
             </>
           )}
+        </div>
         </div>
       </main>
 

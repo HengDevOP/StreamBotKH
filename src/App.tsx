@@ -240,7 +240,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isDashboard) {
     return (
-      <main className="w-full h-screen h-[100dvh] overflow-hidden bg-[#060911] text-slate-100 flex flex-col">
+      <main className="app-viewport-lock fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none bg-[#060911] text-slate-100 flex flex-col">
         <ImpersonationBanner />
         {children}
       </main>

@@ -64,13 +64,31 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       'amountColor',
       'messageTemplate',
       'layoutMode',
-      'animationStyle'
+      'animationStyle',
+      'conditions'
     ];
 
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        if (key === 'minAmountCondition') {
-          updateFields[key] = Math.max(0.001, Number(body[key]) >= 0 ? Number(body[key]) : 0.01);
+        if (key === 'name') {
+          const trimmed = String(body[key]).trim().slice(0, 16);
+          if (!trimmed) {
+            return NextResponse.json({ success: false, error: 'Donation box name is required' }, { status: 400 });
+          }
+          updateFields[key] = trimmed;
+        } else if (key === 'minAmountCondition') {
+          updateFields[key] = Math.max(0.001, Number(body[key]) > 0 ? Number(body[key]) : 0.01);
+        } else if (key === 'conditions' && Array.isArray(body.conditions)) {
+          const sanitized = body.conditions.map((c: any, idx: number) => ({
+            ...c,
+            id: String(c?.id || `cond_${Date.now()}_${idx}`),
+            minAmountCondition: Math.max(0.001, Number(c?.minAmountCondition) > 0 ? Number(c.minAmountCondition) : 0.01),
+            isEnabled: c?.isEnabled !== false
+          }));
+          updateFields.conditions = sanitized;
+          if (sanitized.length > 0) {
+            updateFields.minAmountCondition = Math.min(...sanitized.map((c: any) => c.minAmountCondition));
+          }
         } else {
           updateFields[key] = body[key];
         }

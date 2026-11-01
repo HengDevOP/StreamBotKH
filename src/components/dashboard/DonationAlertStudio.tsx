@@ -38,13 +38,17 @@ import {
   Pause,
   Loader2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Plus,
+  Menu,
+  X
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Switch } from '../common/Switch';
-import { AlertBox } from '../../types/alert';
+import { AlertBox, AlertConditionTier } from '../../types/alert';
 import { useAudio } from '../../hooks/useAudio';
 import { useSocket } from '../../context/SocketContext';
+import { useModal } from '../../context/ModalContext';
 import { VoiceClonerModal } from './VoiceClonerModal';
 import { MediaItem } from './MediaLibraryManager';
 import { mediaService } from '../../services/mediaService';
@@ -130,58 +134,128 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const isNew = !box || !box._id;
   const { playSound } = useAudio();
   const { socket } = useSocket();
+  const { showConfirm } = useModal();
 
   // Active Category Section (Accordion List Item Expanded: null = collapsed)
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'tts' | 'rules' | null>('text');
 
-  // Form State
-  const [name, setName] = useState(box?.name || 'New Donation Alert Box');
-  const [minAmountCondition, setMinAmountCondition] = useState<number>(box?.minAmountCondition ?? 1.0);
+  const initialConditions = useMemo<AlertConditionTier[]>(() => {
+    if (box?.conditions && Array.isArray(box.conditions) && box.conditions.length > 0) {
+      return box.conditions.map((c, idx) => ({
+        id: c.id || `cond_${idx}`,
+        minAmountCondition: Number(c.minAmountCondition) > 0 ? Number(c.minAmountCondition) : 0.01,
+        isEnabled: c.isEnabled !== false,
+        templateStyle: c.templateStyle || box.templateStyle || 'neon-box',
+        showImage: c.showImage !== false,
+        mediaUrl: c.mediaUrl ?? box.mediaUrl ?? 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+        layoutMode: c.layoutMode || box.layoutMode || 'top',
+        soundUrl:
+          c.soundUrl && !c.soundUrl.includes('neon-chime')
+            ? c.soundUrl
+            : box.soundUrl && !box.soundUrl.includes('neon-chime')
+            ? box.soundUrl
+            : '/sounds/cash-register-kaching.mp3',
+        soundVolume: c.soundVolume ?? box.soundVolume ?? 0.85,
+        durationSeconds: c.durationSeconds || box.durationSeconds || 8,
+        glowColor: c.glowColor || box.glowColor || '#00F0FF',
+        fontFamily: c.fontFamily || box.fontFamily || 'Kh Ang Bokor',
+        fontSize: c.fontSize || box.fontSize || 28,
+        textColor: c.textColor || box.textColor || '#FFFFFF',
+        donorColor: c.donorColor || box.donorColor || 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)',
+        amountColor: c.amountColor || box.amountColor || 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)',
+        textTemplate: c.textTemplate || box.textTemplate || '{donator} donated {amount} through superchat!',
+        animationStyle: (c.animationStyle === 'bounce' ? 'fade' : (c.animationStyle as any)) || 'fade',
+        ttsEnabled: c.ttsEnabled !== false,
+        ttsMinAmount: c.ttsMinAmount ?? box.ttsMinAmount ?? 0.01,
+        ttsType: c.ttsType || box.ttsType || 'google',
+        clonedVoiceName: c.clonedVoiceName ?? box.clonedVoiceName ?? '',
+        clonedVoiceSampleUrl: c.clonedVoiceSampleUrl ?? box.clonedVoiceSampleUrl ?? ''
+      }));
+    }
+    return [
+      {
+        id: 'cond_0',
+        minAmountCondition: box?.minAmountCondition ?? 0.01,
+        isEnabled: true,
+        templateStyle: box?.templateStyle || 'neon-box',
+        showImage: box?.showImage !== false,
+        mediaUrl: box?.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+        layoutMode: box?.layoutMode || 'top',
+        soundUrl:
+          box?.soundUrl && !box.soundUrl.includes('neon-chime')
+            ? box.soundUrl
+            : '/sounds/cash-register-kaching.mp3',
+        soundVolume: box?.soundVolume ?? 0.85,
+        durationSeconds: box?.durationSeconds || 8,
+        glowColor: box?.glowColor || '#00F0FF',
+        fontFamily: box?.fontFamily || 'Kh Ang Bokor',
+        fontSize: box?.fontSize || 28,
+        textColor: box?.textColor || '#FFFFFF',
+        donorColor: box?.donorColor || 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)',
+        amountColor: box?.amountColor || 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)',
+        textTemplate: box?.textTemplate || '{donator} donated {amount} through superchat!',
+        animationStyle: box?.animationStyle === 'bounce' ? 'fade' : (box?.animationStyle as any) || 'fade',
+        ttsEnabled: box?.ttsEnabled !== false,
+        ttsMinAmount: box?.ttsMinAmount ?? 0.01,
+        ttsType: box?.ttsType || 'google',
+        clonedVoiceName: box?.clonedVoiceName || '',
+        clonedVoiceSampleUrl: box?.clonedVoiceSampleUrl || ''
+      }
+    ];
+  }, [box?._id]);
+
+  const firstTier = initialConditions[0];
+  const [conditions, setConditions] = useState<AlertConditionTier[]>(initialConditions);
+  const [activeConditionId, setActiveConditionId] = useState<string>(firstTier.id);
+
+  // Form State (Box-level: name & isEnabled; Tier-level: active condition settings)
+  const [name, setName] = useState((box?.name || 'Standard Box').slice(0, 16));
+  const [minAmountCondition, setMinAmountCondition] = useState<number>(firstTier.minAmountCondition);
   const [isEnabled, setIsEnabled] = useState<boolean>(box?.isEnabled ?? true);
   const [templateStyle, setTemplateStyle] = useState<'neon-box' | 'glass-hologram' | 'cyber-glitch' | 'arcade' | 'minimal'>(
-    box?.templateStyle || 'neon-box'
+    firstTier.templateStyle || 'neon-box'
   );
-  const [showImage, setShowImage] = useState<boolean>(box?.showImage !== false);
+  const [showImage, setShowImage] = useState<boolean>(firstTier.showImage !== false);
   const [mediaUrl, setMediaUrl] = useState<string>(
-    box?.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif'
+    firstTier.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif'
   );
   const [layoutMode, setLayoutMode] = useState<'top' | 'left' | 'right' | 'banner'>(
-    box?.layoutMode || 'top'
+    firstTier.layoutMode || 'top'
   );
   const [soundUrl, setSoundUrl] = useState<string>(
-    box?.soundUrl && !box.soundUrl.includes('neon-chime')
-      ? box.soundUrl
+    firstTier.soundUrl && !firstTier.soundUrl.includes('neon-chime')
+      ? firstTier.soundUrl
       : '/sounds/cash-register-kaching.mp3'
   );
-  const [soundVolume, setSoundVolume] = useState<number>(box?.soundVolume ?? 0.85);
-  const [durationSeconds, setDurationSeconds] = useState<number>(box?.durationSeconds || 8);
-  const [glowColor, setGlowColor] = useState<string>(box?.glowColor || '#00F0FF');
-  const [fontFamily, setFontFamily] = useState<string>(box?.fontFamily || 'Kh Ang Bokor');
-  const [fontSize, setFontSize] = useState<number>(box?.fontSize || 28);
-  const [textColor, setTextColor] = useState<string>(box?.textColor || '#FFFFFF');
+  const [soundVolume, setSoundVolume] = useState<number>(firstTier.soundVolume ?? 0.85);
+  const [durationSeconds, setDurationSeconds] = useState<number>(firstTier.durationSeconds || 8);
+  const [glowColor, setGlowColor] = useState<string>(firstTier.glowColor || '#00F0FF');
+  const [fontFamily, setFontFamily] = useState<string>(firstTier.fontFamily || 'Kh Ang Bokor');
+  const [fontSize, setFontSize] = useState<number>(firstTier.fontSize || 28);
+  const [textColor, setTextColor] = useState<string>(firstTier.textColor || '#FFFFFF');
   const [donorColor, setDonorColor] = useState<string>(
-    box?.donorColor || 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)'
+    firstTier.donorColor || 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)'
   );
   const [amountColor, setAmountColor] = useState<string>(
-    box?.amountColor || 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)'
+    firstTier.amountColor || 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)'
   );
   const [fontSearch, setFontSearch] = useState<string>('');
   const [fontCategory, setFontCategory] = useState<string>('All');
   const [textTemplate, setTextTemplate] = useState<string>(
-    box?.textTemplate || '{donator} donated {amount} through superchat!'
+    firstTier.textTemplate || '{donator} donated {amount} through superchat!'
   );
   const [animationStyle, setAnimationStyle] = useState<'fade' | 'pulse' | 'glitch' | 'slide' | 'zoom'>(
-    box?.animationStyle === 'bounce' ? 'fade' : (box?.animationStyle as any) || 'fade'
+    firstTier.animationStyle === 'bounce' ? 'fade' : (firstTier.animationStyle as any) || 'fade'
   );
 
   // TTS State
-  const [ttsEnabled, setTtsEnabled] = useState<boolean>(box?.ttsEnabled !== false);
-  const [ttsMinAmount, setTtsMinAmount] = useState<number>(box?.ttsMinAmount ?? 1.0);
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(firstTier.ttsEnabled !== false);
+  const [ttsMinAmount, setTtsMinAmount] = useState<number>(firstTier.ttsMinAmount ?? 0.01);
   const [ttsType, setTtsType] = useState<'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned'>(
-    box?.ttsType || 'google'
+    firstTier.ttsType || 'google'
   );
-  const [clonedVoiceName, setClonedVoiceName] = useState<string>(box?.clonedVoiceName || '');
-  const [clonedVoiceSampleUrl, setClonedVoiceSampleUrl] = useState<string>(box?.clonedVoiceSampleUrl || '');
+  const [clonedVoiceName, setClonedVoiceName] = useState<string>(firstTier.clonedVoiceName || '');
+  const [clonedVoiceSampleUrl, setClonedVoiceSampleUrl] = useState<string>(firstTier.clonedVoiceSampleUrl || '');
 
   // UI / Action State
   const [saving, setSaving] = useState(false);
@@ -258,8 +332,280 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
 
   // Sample Simulation Data
   const [demoDonorName, setDemoDonorName] = useState('Supporter');
-  const [demoAmount, setDemoAmount] = useState(minAmountCondition >= 10 ? minAmountCondition : 1.0);
+  const [demoAmount, setDemoAmount] = useState(minAmountCondition >= 1 ? minAmountCondition : 1.0);
   const [demoMessage, setDemoMessage] = useState('Thank you for the stream!');
+
+  const formatConditionChip = (val: number): string => {
+    const num = Number(val) > 0 ? Number(val) : 0.01;
+    if (Math.round(num * 100) !== num * 100) {
+      return `${num.toFixed(3).replace(/0+$/, '')}$`;
+    }
+    return `${num.toFixed(2)}$`;
+  };
+
+  const snapshotCurrentTier = (targetId: string): AlertConditionTier => ({
+    id: targetId,
+    minAmountCondition: Number(minAmountCondition) > 0 ? Number(minAmountCondition) : 0.01,
+    isEnabled: true,
+    templateStyle,
+    showImage,
+    mediaUrl,
+    layoutMode,
+    soundUrl,
+    soundVolume: Number(soundVolume),
+    durationSeconds: Number(durationSeconds),
+    glowColor,
+    fontFamily,
+    fontSize: Number(fontSize),
+    textColor,
+    donorColor,
+    amountColor,
+    textTemplate,
+    animationStyle,
+    ttsEnabled,
+    ttsMinAmount: Number(ttsMinAmount) >= 0 ? Number(ttsMinAmount) : 0.01,
+    ttsType,
+    clonedVoiceName,
+    clonedVoiceSampleUrl
+  });
+
+  const applyTierToForm = (tier: AlertConditionTier) => {
+    const nextAmt = Number(tier.minAmountCondition) > 0 ? Number(tier.minAmountCondition) : 0.01;
+    setMinAmountCondition(nextAmt);
+    setTemplateStyle(tier.templateStyle || 'neon-box');
+    setShowImage(tier.showImage !== false);
+    setMediaUrl(tier.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif');
+    setLayoutMode(tier.layoutMode || 'top');
+    setSoundUrl(
+      tier.soundUrl && !tier.soundUrl.includes('neon-chime')
+        ? tier.soundUrl
+        : '/sounds/cash-register-kaching.mp3'
+    );
+    setSoundVolume(tier.soundVolume ?? 0.85);
+    setDurationSeconds(tier.durationSeconds || 8);
+    setGlowColor(tier.glowColor || '#00F0FF');
+    setFontFamily(tier.fontFamily || 'Kh Ang Bokor');
+    setFontSize(tier.fontSize || 28);
+    setTextColor(tier.textColor || '#FFFFFF');
+    setDonorColor(tier.donorColor || 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)');
+    setAmountColor(tier.amountColor || 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)');
+    setTextTemplate(tier.textTemplate || '{donator} donated {amount} through superchat!');
+    setAnimationStyle(tier.animationStyle === 'bounce' ? 'fade' : (tier.animationStyle as any) || 'fade');
+    setTtsEnabled(tier.ttsEnabled !== false);
+    setTtsMinAmount(tier.ttsMinAmount ?? 0.01);
+    setTtsType(tier.ttsType || 'google');
+    setClonedVoiceName(tier.clonedVoiceName || '');
+    setClonedVoiceSampleUrl(tier.clonedVoiceSampleUrl || '');
+    setDemoAmount(nextAmt >= 0.01 ? nextAmt : 1.0);
+  };
+
+  const handleSelectCondition = (targetId: string) => {
+    if (targetId === activeConditionId) return;
+    const synced = conditions.map((c) => (c.id === activeConditionId ? snapshotCurrentTier(activeConditionId) : c));
+    const targetTier = synced.find((c) => c.id === targetId);
+    if (!targetTier) return;
+    setConditions(synced);
+    setActiveConditionId(targetId);
+    applyTierToForm(targetTier);
+  };
+
+  const handleAddCondition = () => {
+    const synced = conditions.map((c) => (c.id === activeConditionId ? snapshotCurrentTier(activeConditionId) : c));
+    const maxExisting = synced.reduce((max, c) => Math.max(max, Number(c.minAmountCondition) || 0), 0);
+    let nextAmount = 1.0;
+    if (maxExisting < 0.01) {
+      nextAmount = 0.01;
+    } else if (maxExisting < 1) {
+      nextAmount = 1.0;
+    } else if (maxExisting < 5) {
+      nextAmount = 5.0;
+    } else if (maxExisting < 10) {
+      nextAmount = 10.0;
+    } else {
+      nextAmount = Number((maxExisting + 5).toFixed(2));
+    }
+
+    const baseTier = snapshotCurrentTier(activeConditionId);
+    const newId = `cond_${Date.now()}_${synced.length}`;
+    const newTier: AlertConditionTier = {
+      ...baseTier,
+      id: newId,
+      minAmountCondition: nextAmount,
+      ttsMinAmount: nextAmount
+    };
+
+    const nextConditions = [...synced, newTier];
+    setConditions(nextConditions);
+    setActiveConditionId(newId);
+    applyTierToForm(newTier);
+    setActiveTab('rules');
+  };
+
+  const handleDeleteActiveCondition = () => {
+    if (conditions.length <= 1) return;
+    const label = formatConditionChip(minAmountCondition);
+    showConfirm({
+      title: `Delete ${label} Condition?`,
+      message: `Are you sure you want to remove the ${label} condition tier from "${name}"?`,
+      type: 'danger',
+      confirmText: 'Delete Condition',
+      onConfirm: async () => {
+        const synced = conditions.map((c) => (c.id === activeConditionId ? snapshotCurrentTier(activeConditionId) : c));
+        const remaining = synced.filter((c) => c.id !== activeConditionId);
+        if (remaining.length === 0) return;
+
+        const nextActive = remaining[remaining.length - 1];
+        setConditions(remaining);
+        setActiveConditionId(nextActive.id);
+        applyTierToForm(nextActive);
+
+        if (!isNew && box?._id) {
+          try {
+            const primaryTier = remaining[0];
+            const lowestCondition = Math.min(...remaining.map((c) => Number(c.minAmountCondition) || 0.01));
+            const authToken = typeof window !== 'undefined'
+              ? (localStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_token'))
+              : null;
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (authToken) {
+              headers.Authorization = `Bearer ${authToken}`;
+            }
+            const res = await fetch(`/api/alert-boxes/${box._id}`, {
+              method: 'PATCH',
+              headers,
+              body: JSON.stringify({
+                minAmountCondition: lowestCondition > 0 ? lowestCondition : 0.01,
+                templateStyle: primaryTier.templateStyle,
+                showImage: primaryTier.showImage,
+                mediaUrl: primaryTier.mediaUrl,
+                layoutMode: primaryTier.layoutMode,
+                soundUrl: primaryTier.soundUrl,
+                soundVolume: Number(primaryTier.soundVolume),
+                durationSeconds: Number(primaryTier.durationSeconds),
+                glowColor: primaryTier.glowColor,
+                fontFamily: primaryTier.fontFamily,
+                fontSize: Number(primaryTier.fontSize),
+                textColor: primaryTier.textColor,
+                donorColor: primaryTier.donorColor,
+                amountColor: primaryTier.amountColor,
+                textTemplate: primaryTier.textTemplate,
+                animationStyle: primaryTier.animationStyle,
+                ttsEnabled: primaryTier.ttsEnabled,
+                ttsMinAmount: Number(primaryTier.ttsMinAmount),
+                ttsType: primaryTier.ttsType,
+                clonedVoiceName: primaryTier.clonedVoiceName,
+                clonedVoiceSampleUrl: primaryTier.clonedVoiceSampleUrl,
+                conditions: remaining,
+                token: effectiveToken
+              })
+            });
+            const data = await res.json();
+            if (res.ok && data.success && data.alertBox) {
+              setSavedBaseline((prev) => ({
+                ...prev,
+                conditions: remaining
+              }));
+              onSaveSuccess(data.alertBox);
+            }
+          } catch (err) {
+            console.error('Failed to persist condition deletion:', err);
+          }
+        }
+      }
+    });
+  };
+
+  // Baseline snapshot to detect unsaved edits and guard window reload / navigation
+  const [savedBaseline, setSavedBaseline] = useState<{
+    name: string;
+    isEnabled: boolean;
+    conditions: AlertConditionTier[];
+  }>(() => ({
+    name: (box?.name || 'Standard Box').slice(0, 16),
+    isEnabled: box?.isEnabled ?? true,
+    conditions: initialConditions
+  }));
+
+  const serializeBoxState = (boxName: string, enabled: boolean, tiers: AlertConditionTier[]) =>
+    JSON.stringify({
+      name: boxName.trim().slice(0, 16),
+      isEnabled: Boolean(enabled),
+      conditions: tiers.map((t) => ({
+        id: t.id,
+        minAmountCondition: Number(t.minAmountCondition) > 0 ? Number(t.minAmountCondition) : 0.01,
+        isEnabled: t.isEnabled !== false,
+        templateStyle: t.templateStyle || 'neon-box',
+        showImage: t.showImage !== false,
+        mediaUrl: t.mediaUrl || '',
+        layoutMode: t.layoutMode || 'top',
+        soundUrl: t.soundUrl || '/sounds/cash-register-kaching.mp3',
+        soundVolume: Number(t.soundVolume ?? 0.85),
+        durationSeconds: Number(t.durationSeconds || 8),
+        glowColor: (t.glowColor || '#00F0FF').toUpperCase(),
+        fontFamily: t.fontFamily || 'Kh Ang Bokor',
+        fontSize: Number(t.fontSize || 28),
+        textColor: (t.textColor || '#FFFFFF').toUpperCase(),
+        donorColor: t.donorColor || '',
+        amountColor: t.amountColor || '',
+        textTemplate: t.textTemplate || '',
+        animationStyle: t.animationStyle === 'bounce' ? 'fade' : t.animationStyle || 'fade',
+        ttsEnabled: t.ttsEnabled !== false,
+        ttsMinAmount: Number(t.ttsMinAmount ?? 0.01),
+        ttsType: t.ttsType || 'google',
+        clonedVoiceName: t.clonedVoiceName || '',
+        clonedVoiceSampleUrl: t.clonedVoiceSampleUrl || ''
+      }))
+    });
+
+  const liveConditionsSnapshot = conditions.map((c) =>
+    c.id === activeConditionId ? snapshotCurrentTier(activeConditionId) : c
+  );
+
+  const hasUnsavedChanges =
+    isNew ||
+    serializeBoxState(name, isEnabled, liveConditionsSnapshot) !==
+      serializeBoxState(savedBaseline.name, savedBaseline.isEnabled, savedBaseline.conditions);
+
+  // Prevent accidental browser reload / tab close when there are unsaved changes
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const handleResetChanges = () => {
+    setName(savedBaseline.name);
+    setIsEnabled(savedBaseline.isEnabled);
+    setConditions(savedBaseline.conditions);
+    const target =
+      savedBaseline.conditions.find((c) => c.id === activeConditionId) || savedBaseline.conditions[0];
+    if (target) {
+      setActiveConditionId(target.id);
+      applyTierToForm(target);
+    }
+  };
+
+  const handleSafeBack = () => {
+    if (!hasUnsavedChanges) {
+      onBack();
+      return;
+    }
+    showConfirm({
+      title: 'Unsaved Changes',
+      message: 'You have unsaved changes in this donation box. Discard changes and leave?',
+      type: 'warning',
+      confirmText: 'Discard & Leave',
+      cancelText: 'Stay',
+      onConfirm: () => {
+        onBack();
+      }
+    });
+  };
 
   // Listen to real socket donation alerts so they trigger in preview too
   useEffect(() => {
@@ -563,30 +909,39 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const handleSave = async () => {
     setSaving(true);
     try {
+      const finalConditions = conditions.map((c) =>
+        c.id === activeConditionId ? snapshotCurrentTier(activeConditionId) : c
+      );
+      setConditions(finalConditions);
+
+      const primaryTier = finalConditions[0] || snapshotCurrentTier(activeConditionId);
+      const lowestCondition = Math.min(...finalConditions.map((c) => Number(c.minAmountCondition) || 0.01));
+
       const payload = {
         name,
-        minAmountCondition: Number(minAmountCondition) >= 0 ? Number(minAmountCondition) : 0.01,
+        minAmountCondition: lowestCondition > 0 ? lowestCondition : 0.01,
         isEnabled,
-        templateStyle,
-        showImage,
-        mediaUrl,
-        layoutMode,
-        soundUrl,
-        soundVolume: Number(soundVolume),
-        durationSeconds: Number(durationSeconds),
-        glowColor,
-        fontFamily,
-        fontSize: Number(fontSize),
-        textColor,
-        donorColor,
-        amountColor,
-        textTemplate,
-        animationStyle,
-        ttsEnabled,
-        ttsMinAmount: Number(ttsMinAmount),
-        ttsType,
-        clonedVoiceName,
-        clonedVoiceSampleUrl
+        templateStyle: primaryTier.templateStyle,
+        showImage: primaryTier.showImage,
+        mediaUrl: primaryTier.mediaUrl,
+        layoutMode: primaryTier.layoutMode,
+        soundUrl: primaryTier.soundUrl,
+        soundVolume: Number(primaryTier.soundVolume),
+        durationSeconds: Number(primaryTier.durationSeconds),
+        glowColor: primaryTier.glowColor,
+        fontFamily: primaryTier.fontFamily,
+        fontSize: Number(primaryTier.fontSize),
+        textColor: primaryTier.textColor,
+        donorColor: primaryTier.donorColor,
+        amountColor: primaryTier.amountColor,
+        textTemplate: primaryTier.textTemplate,
+        animationStyle: primaryTier.animationStyle,
+        ttsEnabled: primaryTier.ttsEnabled,
+        ttsMinAmount: Number(primaryTier.ttsMinAmount),
+        ttsType: primaryTier.ttsType,
+        clonedVoiceName: primaryTier.clonedVoiceName,
+        clonedVoiceSampleUrl: primaryTier.clonedVoiceSampleUrl,
+        conditions: finalConditions
       };
 
       const authToken = typeof window !== 'undefined'
@@ -605,9 +960,12 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          setSavedBaseline({
+            name: name.trim().slice(0, 16),
+            isEnabled,
+            conditions: finalConditions
+          });
           onSaveSuccess(data.alertBox);
-          setSavedSuccess(true);
-          setTimeout(() => setSavedSuccess(false), 2500);
         } else {
           alert(data.error || 'Failed to update alert box');
         }
@@ -619,9 +977,12 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          setSavedBaseline({
+            name: name.trim().slice(0, 16),
+            isEnabled,
+            conditions: finalConditions
+          });
           onSaveSuccess(data.alertBox);
-          setSavedSuccess(true);
-          setTimeout(() => setSavedSuccess(false), 2500);
         } else {
           alert(data.error || 'Failed to create alert box');
         }
@@ -662,148 +1023,114 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       className={
         inlineMode
           ? 'flex flex-col w-full rounded-2xl overflow-hidden bg-[#070A12] border border-cyan-500/30 text-slate-100 shadow-2xl animate-fadeIn'
-          : 'flex flex-col h-screen w-screen overflow-hidden bg-[#070A12] text-slate-100'
+          : 'flex-1 min-h-0 h-full w-full flex flex-col overflow-hidden overscroll-none bg-[#070A12] text-slate-100'
       }
     >
       {/* ============================================================== */}
       {/* TOP HEADER NAVIGATION & ACTION BAR                             */}
       {/* ============================================================== */}
-      <header className="flex-shrink-0 min-h-16 border-b border-slate-800/80 bg-[#090D18]/95 px-3 sm:px-6 py-2 sm:py-0 flex items-center justify-between gap-2 sm:gap-4 z-20 backdrop-blur-md">
-        
+      <header className="flex-shrink-0 h-14 sm:h-16 border-b border-slate-800/80 bg-[#090D18]/95 px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4 z-40 backdrop-blur-md">
         {/* Left: Back/Collapse Button & Title */}
         <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
-          {mobileCategoriesOpen ? (
-            <button
-              type="button"
-              onClick={() => setMobileCategoriesOpen(false)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 text-cyan-300 hover:text-white text-xs font-mono font-bold transition-all shadow-md group flex-shrink-0"
-              title="Return to Live Canvas Preview"
-            >
-              <ArrowLeft size={15} className="text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
-              <span>Back to Preview</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onBack}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 text-slate-200 hover:text-white text-xs font-mono font-bold transition-all shadow-md group flex-shrink-0"
-            >
-              {inlineMode ? (
-                <>
-                  <ChevronUp size={15} className="text-cyan-400 group-hover:-translate-y-0.5 transition-transform" />
-                  <span className="hidden sm:inline">Collapse Box</span>
-                </>
-              ) : (
-                <>
-                  <ArrowLeft size={15} className="text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
-                  <span className="hidden sm:inline">Back to Dashboard</span>
-                </>
-              )}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleSafeBack}
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 text-slate-200 hover:text-white text-xs font-mono font-bold transition-all shadow-md group flex-shrink-0 cursor-pointer"
+          >
+            {inlineMode ? (
+              <>
+                <ChevronUp size={15} className="text-cyan-400 group-hover:-translate-y-0.5 transition-transform" />
+                <span className="hidden sm:inline">Collapse Box</span>
+              </>
+            ) : (
+              <>
+                <ArrowLeft size={15} className="text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
+                <span className="hidden sm:inline">Back to Dashboard</span>
+              </>
+            )}
+          </button>
 
           <div className="h-5 w-[1px] bg-slate-800 hidden sm:block" />
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2">
               <span className="text-xs font-mono text-slate-500 uppercase tracking-wider hidden md:inline">Donation Studio /</span>
-              <h2 className="text-xs sm:text-base font-bold text-white truncate font-['Chakra_Petch'] max-w-[110px] sm:max-w-xs md:max-w-md">
+              <h2 className="text-xs sm:text-base font-bold text-white truncate font-['Chakra_Petch'] max-w-[115px] xs:max-w-[150px] sm:max-w-xs md:max-w-md">
                 {name || 'Untitled Donation Alert'}
               </h2>
               <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex-shrink-0">
                 ≥ ${minAmountCondition.toFixed(2)}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 truncate hidden md:block">
-              Click any category on the left list to expand &amp; configure • Live Real-Time Preview
-            </p>
           </div>
         </div>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
-          {/* Mobile Categories Toggle Icon Button (only visible on device screen < lg when categories drawer is closed) */}
-          {!mobileCategoriesOpen && (
-            <button
-              type="button"
-              onClick={() => setMobileCategoriesOpen(true)}
-              className="lg:hidden flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 font-mono text-xs font-bold transition-all shadow-sm active:scale-95 flex-shrink-0"
-              title="Open customization categories"
-            >
-              <Sliders size={14} className="text-cyan-400" />
-              <span>Categories</span>
-            </button>
-          )}
-
-          {/* Dedicated OBS Studio Browser Source URL with Copy & Regenerate Icons (desktop only) */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono max-w-[360px]">
-            <Monitor size={14} className="text-cyan-400 flex-shrink-0" />
-            <span className="text-[11px] text-slate-400 truncate select-all flex-1" title={dedicatedBoxUrl}>
-              {dedicatedBoxUrl}
-            </span>
+        {/* Right: Overlay Quick Action Icons (No Raw URL Displayed) + Mobile Sidebar Toggle */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800/90">
             <button
               type="button"
               onClick={copyObsUrl}
-              title={copiedUrl ? 'Copied OBS URL!' : 'Copy Dedicated OBS Browser Source URL'}
-              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-colors flex-shrink-0"
+              title={copiedUrl ? 'Copied OBS Overlay URL!' : 'Copy OBS Overlay URL'}
+              aria-label="Copy OBS Overlay URL"
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                copiedUrl
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-900'
+              }`}
             >
-              {copiedUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+              {copiedUrl ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
             </button>
+            <a
+              href={dedicatedBoxUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open Target Overlay"
+              aria-label="Open Target Overlay"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-900 transition-colors flex items-center justify-center"
+            >
+              <ExternalLink size={15} />
+            </a>
             {onRegenerateToken && (
               <button
                 type="button"
                 onClick={onRegenerateToken}
                 title="Regenerate Overlay Security Token"
-                className="p-1 rounded-lg hover:bg-red-950/40 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
+                aria-label="Regenerate Overlay Security Token"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-950/40 transition-colors cursor-pointer"
               >
-                <RefreshCw size={14} className="hover:rotate-180 transition-transform duration-500" />
+                <RefreshCw size={15} className="hover:rotate-180 transition-transform duration-500" />
               </button>
             )}
           </div>
 
-          {/* Test Alert Button */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleSimulateAlert}
-            disabled={isSimulating}
-            className="border-cyan-500/40 bg-cyan-950/30 text-cyan-300 hover:bg-cyan-900/50 font-mono text-xs font-bold shadow-[0_0_12px_rgba(0,240,255,0.15)] flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3"
-          >
-            <Play size={13} className={isSimulating ? 'text-cyan-400 animate-spin fill-cyan-400' : 'text-cyan-400 fill-cyan-400'} />
-            <span className="hidden sm:inline">{isSimulating ? 'Playing Alert...' : 'Test Alert'}</span>
-          </Button>
-
-          {/* Save Button */}
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={handleSave}
-            loading={saving}
-            className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold font-mono text-xs px-2.5 sm:px-4 shadow-[0_0_15px_rgba(0,240,255,0.3)] flex-shrink-0"
-          >
-            {savedSuccess ? (
-              <>
-                <Check size={14} className="text-slate-950" />
-                <span className="hidden sm:inline">Saved!</span>
-              </>
-            ) : (
-              <>
-                <Save size={14} className="text-slate-950" />
-                <span>Save</span>
-              </>
-            )}
-          </Button>
-
-          {!isNew && (
+          {/* Device Screen Rightbar Menu Toggle Icon */}
+          {!inlineMode && (
             <button
               type="button"
-              onClick={handleDelete}
-              title="Delete this donation box"
-              className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-red-950/40 border border-slate-800 hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
+              onClick={() => setMobileCategoriesOpen((prev) => !prev)}
+              aria-label={mobileCategoriesOpen ? 'Close donation box sidebar' : 'Open donation box sidebar'}
+              title={mobileCategoriesOpen ? 'Close Sidebar' : 'Open Sidebar'}
+              className={`lg:hidden p-2 rounded-xl border transition-all duration-200 flex items-center justify-center flex-shrink-0 cursor-pointer active:scale-95 ${
+                mobileCategoriesOpen
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(0,240,255,0.25)]'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+              }`}
             >
-              <Trash2 size={14} />
+              <div className="relative w-[18px] h-[18px] flex items-center justify-center">
+                <Menu
+                  size={18}
+                  className={`absolute transition-all duration-200 ${
+                    mobileCategoriesOpen ? 'opacity-0 rotate-90 scale-75' : 'opacity-100 rotate-0 scale-100'
+                  }`}
+                />
+                <X
+                  size={18}
+                  className={`absolute transition-all duration-200 ${
+                    mobileCategoriesOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-75'
+                  }`}
+                />
+              </div>
             </button>
           )}
         </div>
@@ -812,26 +1139,66 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       {/* ============================================================== */}
       {/* 2-COLUMN STUDIO WORKBENCH: EXPANDABLE CATEGORY LIST + PREVIEW  */}
       {/* ============================================================== */}
-      <div className={inlineMode ? 'flex flex-col lg:flex-row' : 'flex-1 flex flex-col lg:flex-row overflow-hidden'}>
-        
+      <div className={inlineMode ? 'flex flex-col lg:flex-row relative' : 'flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative'}>
+        {/* Device Screen Animated Backdrop for Rightbar Drawer */}
+        {!inlineMode && (
+          <div
+            onClick={() => setMobileCategoriesOpen(false)}
+            className={`absolute inset-0 z-30 bg-black/65 backdrop-blur-xs transition-opacity duration-300 lg:hidden ${
+              mobileCategoriesOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
+          />
+        )}
+
         {/* ============================================================ */}
-        {/* LEFT PANE: EXPANDABLE CATEGORY ACCORDION LIST                */}
+        {/* DONATION BOX SIDEBAR (DESKTOP LEFT / DEVICE ANIMATED RIGHTBAR) */}
         {/* ============================================================ */}
         <aside
-          className={`w-full lg:w-[440px] flex-shrink-0 flex-col border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#090D18] z-10 ${
-            inlineMode ? '' : 'overflow-hidden'
-          } ${mobileCategoriesOpen ? 'flex flex-1' : 'hidden lg:flex'}`}
+          className={
+            inlineMode
+              ? 'w-full lg:w-[440px] flex-shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#090D18] z-10'
+              : `absolute inset-y-0 right-0 z-40 w-[88vw] max-w-[400px] min-h-0 flex flex-col border-l border-slate-800/90 bg-[#090D18] overflow-hidden transition-transform duration-300 ease-out lg:static lg:inset-auto lg:z-10 lg:w-[440px] lg:max-w-none lg:flex-shrink-0 lg:border-l-0 lg:border-r lg:border-slate-800/80 lg:translate-x-0 lg:pointer-events-auto lg:shadow-none ${
+                  mobileCategoriesOpen
+                    ? 'translate-x-0 pointer-events-auto shadow-[-16px_0_40px_rgba(0,0,0,0.8)]'
+                    : 'translate-x-full pointer-events-none'
+                }`
+          }
         >
-          <div className="px-4 py-3 bg-[#060912] border-b border-slate-800/80 flex items-center justify-between">
-            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
-              <Layers size={13} />
-              <span>Donation Alert Categories</span>
-            </span>
-            <span className="text-[10px] font-mono text-slate-500">Click category to expand</span>
+          {/* Condition Tier Selector Bar (within the same Donation Box) */}
+          <div className="px-3 py-2.5 bg-[#060912] border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto flex-shrink-0">
+            {conditions.map((cond) => {
+              const isSelected = cond.id === activeConditionId;
+              const displayAmount = isSelected ? minAmountCondition : cond.minAmountCondition;
+              return (
+                <button
+                  key={cond.id}
+                  type="button"
+                  onClick={() => handleSelectCondition(cond.id)}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                  title={`Condition ≥ $${(Number(displayAmount) > 0 ? Number(displayAmount) : 0.01).toFixed(2)}`}
+                >
+                  <span>{formatConditionChip(displayAmount)}</span>
+                </button>
+              );
+            })}
+
+            {/* Add New Condition Tier Button (+ icon) inside the same Donation Box */}
+            <button
+              type="button"
+              onClick={handleAddCondition}
+              title="Add new condition in this donation box"
+              className="w-8 h-8 rounded-xl bg-slate-900/90 hover:bg-cyan-500/20 border border-slate-800 hover:border-cyan-400/60 text-cyan-400 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer active:scale-95"
+            >
+              <Plus size={14} />
+            </button>
           </div>
 
           {/* Vertical Accordion List of Categories */}
-          <div className={`${inlineMode ? 'max-h-[680px]' : 'flex-1'} overflow-y-auto p-3 space-y-2.5 text-xs`}>
+          <div className={`${inlineMode ? 'max-h-[680px]' : 'flex-1 min-h-0'} overflow-y-auto overscroll-contain p-3 space-y-2.5 text-xs`}>
             
             {/* -------------------------------------------------------- */}
             {/* CATEGORY 1: TEXT & STYLING                               */}
@@ -861,9 +1228,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
                       <span>1. Text &amp; Styling</span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 truncate font-mono">
-                      {fontFamily} ({fontSize}px) • {animationStyle.toUpperCase()}
                     </div>
                   </div>
                 </div>
@@ -1302,9 +1666,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                     <div className="text-xs font-bold text-white font-['Chakra_Petch']">
                       2. Image &amp; Sound
                     </div>
-                    <div className="text-[11px] text-slate-400 truncate font-mono">
-                      {showImage ? 'Image Active' : 'Image Hidden'} • {soundUrl.split('/').pop()} ({Math.round(soundVolume * 100)}%)
-                    </div>
                   </div>
                 </div>
                 <ChevronDown
@@ -1604,9 +1965,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                     <div className="text-xs font-bold text-white font-['Chakra_Petch']">
                       3. Text-to-Speech &amp; AI Voice Clone
                     </div>
-                    <div className="text-[11px] text-slate-400 truncate font-mono">
-                      {ttsEnabled ? `Active (${ttsType}) • Min $${ttsMinAmount.toFixed(2)}` : 'TTS Disabled'}
-                    </div>
                   </div>
                 </div>
                 <ChevronDown
@@ -1827,9 +2185,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                     <div className="text-xs font-bold text-white font-['Chakra_Petch']">
                       4. Condition Threshold &amp; Rules
                     </div>
-                    <div className="text-[11px] text-slate-400 truncate font-mono">
-                      Trigger ≥ ${minAmountCondition.toFixed(2)} USD • {isEnabled ? 'Active' : 'Muted'}
-                    </div>
                   </div>
                 </div>
                 <ChevronDown
@@ -1844,14 +2199,18 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 <div className="px-4 pb-4 pt-2 border-t border-slate-800/80 space-y-4 animate-fadeIn">
                   {/* Box Name */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-mono font-bold text-slate-300 block">
-                      Donation Box Name
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-slate-300 block">
+                        Donation Box Name
+                      </label>
+                      <span className="text-[10px] font-mono text-slate-500">{name.length}/16</span>
+                    </div>
                     <input
                       type="text"
+                      maxLength={16}
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Standard Tip Alert"
+                      onChange={(e) => setName(e.target.value.slice(0, 16))}
+                      placeholder="Standard Box"
                       className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
                     />
                   </div>
@@ -1882,32 +2241,35 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                     </p>
                   </div>
 
-                  {/* Dedicated OBS Browser Source URL Box */}
+                  {/* Dedicated OBS Browser Source Action Icons (No Raw URL Displayed) */}
                   <div className="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-cyan-300">
                         <Monitor size={14} className="text-cyan-400" />
-                        Dedicated OBS Source URL
+                        Dedicated OBS Overlay
                       </div>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                        ≥ ${minAmountCondition.toFixed(2)} Only
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-slate-950 p-2 rounded-xl border border-slate-800">
-                      <span className="text-[11px] font-mono text-slate-300 truncate select-all flex-1" title={dedicatedBoxUrl}>
-                        {dedicatedBoxUrl}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={copyObsUrl}
-                        className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-mono font-bold flex items-center gap-1 transition-colors"
-                      >
-                        {copiedUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                        <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={copyObsUrl}
+                          title={copiedUrl ? 'Copied OBS Overlay URL!' : 'Copy OBS Overlay URL'}
+                          className="p-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 transition-colors cursor-pointer"
+                        >
+                          {copiedUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                        </button>
+                        <a
+                          href={dedicatedBoxUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open Target Overlay"
+                          className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 border border-slate-800 transition-colors"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
                     </div>
                     <p className="text-[10px] text-slate-400 font-mono leading-relaxed">
-                      Add this dedicated URL as a Browser Source in OBS Studio (1920x1080) to exclusively capture alerts matching this threshold tier.
+                      Copy or open this box&apos;s dedicated Browser Source overlay for OBS Studio (1920x1080).
                     </p>
                   </div>
 
@@ -1922,114 +2284,43 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Sidebar Footer: Save Box Shortcut */}
-          <div className="p-3 bg-[#060912] border-t border-slate-800/80 flex items-center justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={mobileCategoriesOpen ? () => setMobileCategoriesOpen(false) : onBack}
-              className="text-xs font-mono"
-            >
-              {mobileCategoriesOpen ? 'Done & Preview' : inlineMode ? 'Collapse' : 'Cancel'}
-            </Button>
-
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={handleSave}
-              loading={saving}
-              className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold font-mono text-xs px-5 shadow-[0_0_12px_rgba(0,240,255,0.25)]"
-            >
-              {savedSuccess ? 'Saved!' : 'Save Box'}
-            </Button>
+            {/* -------------------------------------------------------- */}
+            {/* DELETE CONDITION SECTION (BOTTOM OF SIDEBAR)             */}
+            {/* -------------------------------------------------------- */}
+            <div className={`pt-2 ${hasUnsavedChanges ? 'pb-20' : 'pb-2'}`}>
+              <div className="p-3.5 rounded-2xl bg-red-950/15 border border-red-500/25 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-red-300 font-['Chakra_Petch']">
+                    Delete Condition ({formatConditionChip(minAmountCondition)})
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={conditions.length <= 1}
+                  onClick={handleDeleteActiveCondition}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center gap-1.5 flex-shrink-0 transition-all ${
+                    conditions.length > 1
+                      ? 'bg-red-500/15 hover:bg-red-500/25 border-red-500/40 text-red-300 hover:text-red-200 cursor-pointer active:scale-95'
+                      : 'bg-slate-900/60 border-slate-800 text-slate-600 cursor-not-allowed'
+                  }`}
+                >
+                  <Trash2 size={13} />
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>
           </div>
         </aside>
 
         {/* ============================================================ */}
         {/* CENTER MAIN WORKBENCH: LIVE PREVIEW OF ALERTS DONATIONS      */}
         {/* ============================================================ */}
-        <main
-          className={`flex-1 flex-col overflow-y-auto bg-[#070A12] p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 ${
-            mobileCategoriesOpen ? 'hidden lg:flex' : 'flex'
-          }`}
-        >
-          {/* Mobile Categories Floating Banner on device screens */}
-          <div className="lg:hidden flex items-center justify-between p-3 rounded-2xl bg-[#090D18] border border-cyan-500/30 shadow-lg">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
-                <Sliders size={15} />
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-white block truncate font-['Chakra_Petch']">
-                  Alert Configuration
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  Text, Audio, GIF, Font &amp; TTS
-                </span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMobileCategoriesOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs font-mono transition-all flex items-center gap-1 shadow-sm shadow-cyan-400/20 flex-shrink-0 cursor-pointer"
-            >
-              <span>Edit Settings</span>
-            </button>
-          </div>
-          
-          {/* Top Preview Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-200 font-bold flex items-center gap-1.5">
-                <Monitor size={15} className="text-cyan-400" />
-                Live Alert Canvas Preview
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">
-                1920 × 1080 FHD
-              </span>
-              <span className="text-slate-500 text-[11px]">Real-time Reactive</span>
-            </div>
-
-            {/* Transparent Canvas Indicator & Scale Controls */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-400 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                <span>100% Transparent Canvas</span>
-              </div>
-
-              {/* Zoom Scale Buttons */}
-              <div className="hidden sm:flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setZoomScale((z) => Math.max(0.6, z - 0.1))}
-                  className="p-1 rounded text-slate-400 hover:text-white"
-                  title="Zoom Out"
-                >
-                  <ZoomOut size={13} />
-                </button>
-                <span className="text-[10px] text-slate-300 px-1 font-bold">{Math.round(zoomScale * 100)}%</span>
-                <button
-                  type="button"
-                  onClick={() => setZoomScale((z) => Math.min(1.2, z + 0.1))}
-                  className="p-1 rounded text-slate-400 hover:text-white"
-                  title="Zoom In"
-                >
-                  <ZoomIn size={13} />
-                </button>
-              </div>
-            </div>
-          </div>
-
+        <main className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[#070A12] p-2.5 sm:p-4 lg:p-5 gap-2.5 sm:gap-3.5">
           {/* ========================================================== */}
           {/* THE INTERACTIVE OBS STREAM CANVAS SIMULATOR (TRANSPARENT)  */}
           {/* ========================================================== */}
-          <div
-            className="w-full rounded-3xl border-2 border-slate-800 relative overflow-hidden transition-all flex items-center justify-center p-6 sm:p-12 min-h-[440px] shadow-2xl bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] bg-slate-950/70"
-          >
+          <div className="flex-1 min-h-0 w-full rounded-2xl sm:rounded-3xl border-2 border-slate-800 relative overflow-hidden transition-all flex items-center justify-center p-3 sm:p-6 lg:p-8 shadow-2xl bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] bg-slate-950/70">
             {/* Corner OBS Crosshairs */}
             <div className="absolute top-3 left-4 text-[10px] font-mono text-slate-600 flex items-center gap-1.5 select-none">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -2041,7 +2332,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
             {/* ======================================================== */}
             {isSimulating ? (
               <div
-                className="w-full flex items-center justify-center animate-fadeIn"
+                className="w-full max-h-full flex items-center justify-center animate-fadeIn"
                 style={{
                   transform: `scale(${zoomScale})`
                 }}
@@ -2077,8 +2368,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 />
               </div>
             ) : (
-              /* Idle Stream Overlay View: Waiting for alert trigger (No test button here; Test button is only on the top bar) */
-              <div className="flex flex-col items-center justify-center p-8 text-center space-y-2 select-none animate-fadeIn opacity-40 hover:opacity-75 transition-opacity">
+              <div className="flex flex-col items-center justify-center p-4 sm:p-8 text-center space-y-2 select-none animate-fadeIn opacity-40 hover:opacity-75 transition-opacity">
                 <div className="w-10 h-10 rounded-2xl bg-slate-900/40 border border-slate-800/60 flex items-center justify-center text-slate-600">
                   <Monitor size={18} className="text-slate-600" />
                 </div>
@@ -2090,6 +2380,73 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ========================================================== */}
+          {/* BOTTOM PREVIEW TEST ALERT SIMULATION DOCK                  */}
+          {/* ========================================================== */}
+          <div className="flex-shrink-0 rounded-2xl bg-[#090D18]/95 border border-slate-800/90 p-2.5 sm:p-3.5 shadow-xl flex flex-col xl:flex-row items-stretch xl:items-center gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 flex-1">
+              {/* Simulated Donor Name */}
+              <div className="col-span-1 sm:col-span-3 relative">
+                <span className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-[10px] font-mono uppercase text-slate-500 select-none">
+                  From
+                </span>
+                <input
+                  type="text"
+                  value={demoDonorName}
+                  onChange={(e) => setDemoDonorName(e.target.value)}
+                  placeholder="Supporter"
+                  className="w-full pl-11 sm:pl-12 pr-2.5 py-1.5 sm:py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500/60 text-xs font-mono text-white focus:outline-none transition-colors"
+                />
+              </div>
+
+              {/* Simulated Tip Amount */}
+              <div className="col-span-1 sm:col-span-3 relative">
+                <span className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-cyan-400 select-none">
+                  $
+                </span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={demoAmount}
+                  onChange={(e) => setDemoAmount(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
+                  className="w-full pl-6 sm:pl-7 pr-9 sm:pr-10 py-1.5 sm:py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500/60 text-xs font-mono font-bold text-white focus:outline-none transition-colors"
+                />
+                <span className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-500 select-none">
+                  USD
+                </span>
+              </div>
+
+              {/* Simulated Message */}
+              <div className="col-span-2 sm:col-span-6 relative">
+                <input
+                  type="text"
+                  value={demoMessage}
+                  onChange={(e) => setDemoMessage(e.target.value)}
+                  placeholder="Enter test cheer message..."
+                  className="w-full px-3 py-1.5 sm:py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-500/60 text-xs font-mono text-slate-200 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSimulateAlert}
+              disabled={isSimulating}
+              className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-['Chakra_Petch'] font-bold text-xs tracking-wide flex items-center justify-center gap-2 transition-all flex-shrink-0 cursor-pointer active:scale-95 ${
+                isSimulating
+                  ? 'bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 shadow-[0_0_20px_rgba(0,240,255,0.25)]'
+                  : 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_18px_rgba(0,240,255,0.35)]'
+              }`}
+            >
+              <Play
+                size={14}
+                className={isSimulating ? 'text-cyan-300 animate-spin fill-cyan-300' : 'text-slate-950 fill-slate-950'}
+              />
+              <span>{isSimulating ? 'Playing Alert...' : 'Test Alert'}</span>
+            </button>
           </div>
         </main>
       </div>
@@ -2407,6 +2764,50 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
           setIsVoiceClonerOpen(false);
         }}
       />
+
+      {/* ============================================================== */}
+      {/* BOTTOM FLOATING UNSAVED CHANGES TOAST BAR                      */}
+      {/* ============================================================== */}
+      <div
+        className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1.5rem)] max-w-xl transition-all duration-300 ease-in-out ${
+          hasUnsavedChanges
+            ? 'translate-y-0 opacity-100 pointer-events-auto'
+            : 'translate-y-24 opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="rounded-2xl px-4 py-3 bg-[#0B101E]/95 backdrop-blur-xl border border-cyan-500/40 shadow-[0_14px_45px_rgba(0,0,0,0.85),0_0_25px_rgba(0,240,255,0.18)] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse flex-shrink-0 shadow-[0_0_8px_rgba(0,240,255,0.8)]" />
+            <span className="text-xs font-mono font-bold text-slate-100 truncate">
+              Careful — you have unsaved changes!
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {!isNew && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleResetChanges}
+                className="px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={handleSave}
+              loading={saving}
+              className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold font-mono text-xs px-4 shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+            >
+              <Save size={13} className="text-slate-950" />
+              <span>Save Changes</span>
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

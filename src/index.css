@@ -35,6 +35,16 @@ body:has(.obs-overlay) {
   background-image: none !important;
 }
 
+/* Lock document viewport on full-screen responsive app views to prevent page scrolling */
+html:has(.app-viewport-lock),
+body:has(.app-viewport-lock),
+#root:has(.app-viewport-lock) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
 /* Subtle Dark Grid */
 .cyber-grid {
   background-size: 40px 40px;
