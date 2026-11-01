@@ -215,6 +215,53 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
 
+    // Non-destructive live test simulation for preview & OBS overlay
+    if (body.simulateTest) {
+      const testAmount = Math.max(1, parseFloat(body.testAmount) || 10);
+      const baseCurrent = Number(existing.currentAmount ?? existing.current_amount ?? 0);
+      const goalIdStr = existing.id || String(existing._id);
+      const io = getIO();
+      if (io) {
+        const testPayload = {
+          id: goalIdStr,
+          token,
+          title: existing.title,
+          targetAmount: Number(existing.targetAmount ?? 100),
+          currentAmount: baseCurrent + testAmount,
+          accentColor: existing.accentColor || '#10B981',
+          templateStyle: existing.templateStyle || 'cyber-neon',
+          showBalance: existing.showBalance !== false,
+          showBackground: existing.showBackground !== false,
+          showAnimation: existing.showAnimation !== false,
+          endDate: existing.endDate || null,
+          isActive: Boolean(existing.isActive),
+          donorName: 'Test Supporter',
+          addedAmount: testAmount,
+          isTest: true
+        };
+        io.to(`overlay:${token}`).emit('goal:update', testPayload);
+        if (token !== 'demo-token') {
+          io.to('overlay:demo-token').emit('goal:update', testPayload);
+        }
+
+        setTimeout(() => {
+          const revertPayload = {
+            ...testPayload,
+            currentAmount: baseCurrent,
+            donorName: null,
+            addedAmount: null,
+            isTest: true
+          };
+          io.to(`overlay:${token}`).emit('goal:update', revertPayload);
+          if (token !== 'demo-token') {
+            io.to('overlay:demo-token').emit('goal:update', revertPayload);
+          }
+        }, 3500);
+      }
+
+      return NextResponse.json({ success: true, simulated: true });
+    }
+
     const willBeActive = body.isActive !== undefined ? Boolean(body.isActive) : Boolean(existing.isActive);
     if (willBeActive) {
       await goalsCol.updateMany({ streamerToken: token }, { $set: { isActive: false } });

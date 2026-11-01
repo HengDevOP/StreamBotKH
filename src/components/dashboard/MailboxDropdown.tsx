@@ -116,7 +116,7 @@ export const MailboxDropdown: React.FC<MailboxDropdownProps> = ({
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-full mt-2.5 w-80 sm:w-96 rounded-2xl bg-[#090D18]/95 backdrop-blur-2xl border border-slate-700/80 shadow-[0_16px_40px_rgba(0,0,0,0.85)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 font-sans"
+      className="absolute right-0 top-full mt-2.5 w-80 sm:w-96 rounded-2xl bg-[#090D18]/95 backdrop-blur-2xl border border-slate-700/80 shadow-[0_16px_40px_rgba(0,0,0,0.85)] z-[60] overflow-hidden animate-in fade-in zoom-in-95 duration-150 font-sans"
     >
       {/* Top Header */}
       <div className="p-3.5 px-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">

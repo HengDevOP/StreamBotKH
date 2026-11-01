@@ -132,8 +132,26 @@ export interface PendingAuth {
   createdAt: number;
 }
 
+export interface PendingQrAuth {
+  client: TelegramClient;
+  apiId: number;
+  apiHash: string;
+  qrUrl: string;
+  expiresAt: number;
+  status: 'waiting' | 'finalizing' | 'need_password' | 'authenticated' | 'error';
+  user?: {
+    phone?: string;
+    username?: string;
+    firstName?: string;
+    displayName?: string;
+  };
+  errorMessage?: string;
+  createdAt: number;
+}
+
 interface TelegramGlobalState {
   pendingAuth: Map<string, PendingAuth>;
+  pendingQrAuth: Map<string, PendingQrAuth>;
   activeClients: Map<string, TelegramClient>;
   monitoredChats: Map<string, string[]>;
   connectingPromises: Map<string, Promise<TelegramClient | null>>;
@@ -153,6 +171,7 @@ const g = globalThis as unknown as {
 if (!g.__telegramGlobalState) {
   g.__telegramGlobalState = {
     pendingAuth: new Map(),
+    pendingQrAuth: new Map(),
     activeClients: new Map(),
     monitoredChats: new Map(),
     connectingPromises: new Map(),
@@ -163,6 +182,7 @@ if (!g.__telegramGlobalState) {
     recentSessionMatchedAmounts: new Map()
   };
 } else {
+  if (!g.__telegramGlobalState.pendingQrAuth) g.__telegramGlobalState.pendingQrAuth = new Map();
   if (!g.__telegramGlobalState.processedMessageKeys) g.__telegramGlobalState.processedMessageKeys = new Set();
   if (!g.__telegramGlobalState.processedTxRefs) g.__telegramGlobalState.processedTxRefs = new Set();
   if (!g.__telegramGlobalState.processedTransactionRefs) g.__telegramGlobalState.processedTransactionRefs = new Map();
@@ -173,6 +193,10 @@ if (!g.__telegramGlobalState) {
 class TelegramUserClientManager {
   private get pendingAuth(): Map<string, PendingAuth> {
     return g.__telegramGlobalState!.pendingAuth;
+  }
+
+  private get pendingQrAuth(): Map<string, PendingQrAuth> {
+    return g.__telegramGlobalState!.pendingQrAuth;
   }
 
   private get activeClients(): Map<string, TelegramClient> {
@@ -203,10 +227,10 @@ class TelegramUserClientManager {
     });
 
     try {
-      client.setLogLevel('warn');
+      (client as any).setLogLevel('warn');
     } catch (_) {}
 
-    client.onError = (err: any) => {
+    (client as any).onError = async (err: any) => {
       if (err?.message === 'TIMEOUT' || err?.message?.includes('TIMEOUT')) {
         return;
       }
@@ -621,6 +645,477 @@ class TelegramUserClientManager {
       console.error('❌ [TelegramJS] verifyCode error:', err);
       throw new Error(err.message || 'Invalid verification code. Please check the code and try again.');
     }
+  }
+
+  /**
+   * Persist an authenticated GramJS QR client session into MongoDB & attach listeners
+   */
+  private async completeQrSignIn(
+    streamerId: string,
+    client: TelegramClient,
+    user: any,
+    apiId: number,
+    apiHash: string
+  ) {
+    const rawPhone = user?.phone ? String(user.phone).trim() : '';
+    const phoneNumber = rawPhone
+      ? rawPhone.startsWith('+')
+        ? rawPhone
+        : `+${rawPhone}`
+      : '';
+    const displayName = user?.firstName
+      ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
+      : user?.username
+      ? `@${user.username}`
+      : phoneNumber || 'Connected Streamer';
+
+    const sessionString = client.session.save() as unknown as string;
+
+    try {
+      const sessionsCol = await getTelegramSessionsCollection();
+      await sessionsCol.updateOne(
+        { streamerId },
+        {
+          $set: {
+            streamerId,
+            phoneNumber,
+            userName: displayName,
+            sessionString,
+            apiId,
+            apiHash,
+            isSimulation: false,
+            isConnected: true,
+            updatedAt: new Date()
+          },
+          $unset: {
+            pendingPhone: '',
+            pendingHash: ''
+          },
+          $setOnInsert: { createdAt: new Date() }
+        },
+        { upsert: true }
+      );
+      console.log(`⚡ [MongoDB] GramJS QR session stored for streamer [${streamerId}] (${displayName})!`);
+    } catch (mongoErr) {
+      console.error('[MongoDB] Failed saving QR authenticated session:', mongoErr);
+    }
+
+    try {
+      const usersCol = await getUsersCollection();
+      await usersCol.updateOne(
+        { $or: [{ userId: streamerId }, { username: streamerId }] },
+        {
+          $set: {
+            ...(phoneNumber ? { telegramPhone: phoneNumber } : {}),
+            telegramUserName: displayName,
+            telegramSession: sessionString,
+            telegramApiId: apiId,
+            telegramApiHash: apiHash,
+            updatedAt: new Date()
+          },
+          $unset: {
+            telegramPendingPhone: '',
+            telegramPendingHash: '',
+            telegramPendingSession: ''
+          }
+        }
+      );
+    } catch (_) {}
+
+    // Disconnect any previous active client if different instance
+    const prevActive = this.activeClients.get(streamerId);
+    if (prevActive && prevActive !== client) {
+      try {
+        await prevActive.disconnect();
+      } catch (_) {}
+    }
+
+    this.attachMessageListener(streamerId, client);
+    this.activeClients.set(streamerId, client);
+    this.pendingAuth.delete(streamerId);
+
+    const userSummary = {
+      phone: phoneNumber,
+      username: user?.username,
+      firstName: user?.firstName || displayName,
+      displayName
+    };
+
+    const qrRecord = this.pendingQrAuth.get(streamerId);
+    if (qrRecord) {
+      qrRecord.status = 'authenticated';
+      qrRecord.user = userSummary;
+    }
+
+    await this.refreshMonitoredChats(streamerId);
+    console.log(`✅ [TelegramJS QR] Connected successfully via QR as ${displayName}!`);
+    return userSummary;
+  }
+
+  /**
+   * Internal helper to check/finalize or refresh ExportLoginToken on a pending QR session
+   */
+  private async refreshOrFinalizeQrToken(streamerId: string): Promise<void> {
+    const qrState = this.pendingQrAuth.get(streamerId);
+    if (!qrState || qrState.status === 'authenticated' || qrState.status === 'need_password' || qrState.status === 'finalizing') {
+      return;
+    }
+
+    qrState.status = 'finalizing';
+    const { client, apiId, apiHash } = qrState;
+
+    try {
+      if (!client.connected) {
+        await client.connect();
+      }
+
+      const result = await client.invoke(
+        new Api.auth.ExportLoginToken({
+          apiId: Number(apiId),
+          apiHash,
+          exceptIds: []
+        })
+      );
+
+      if (
+        result instanceof Api.auth.LoginTokenSuccess &&
+        result.authorization instanceof Api.auth.Authorization
+      ) {
+        await this.completeQrSignIn(streamerId, client, result.authorization.user, apiId, apiHash);
+        return;
+      }
+
+      if (result instanceof Api.auth.LoginTokenMigrateTo) {
+        console.log(`⚡ [TelegramJS QR] Migrating QR login to DC ${result.dcId}...`);
+        await (client as any)._switchDC(result.dcId);
+        const migrated = await client.invoke(
+          new Api.auth.ImportLoginToken({
+            token: result.token
+          })
+        );
+        if (
+          migrated instanceof Api.auth.LoginTokenSuccess &&
+          migrated.authorization instanceof Api.auth.Authorization
+        ) {
+          await this.completeQrSignIn(streamerId, client, migrated.authorization.user, apiId, apiHash);
+          return;
+        }
+      }
+
+      if (result instanceof Api.auth.LoginToken) {
+        const tokenB64Url = Buffer.from(result.token).toString('base64url');
+        qrState.qrUrl = `tg://login?token=${tokenB64Url}`;
+        qrState.expiresAt = result.expires * 1000;
+        qrState.status = 'waiting';
+        return;
+      }
+
+      qrState.status = 'waiting';
+    } catch (err: any) {
+      if (err?.errorMessage === 'SESSION_PASSWORD_NEEDED') {
+        console.log(`🔐 [TelegramJS QR] 2FA password required for streamer [${streamerId}].`);
+        qrState.status = 'need_password';
+        qrState.errorMessage = undefined;
+        return;
+      }
+      console.error('❌ [TelegramJS QR] refreshOrFinalizeQrToken error:', err?.message || err);
+      qrState.status = 'error';
+      qrState.errorMessage = err?.message || 'QR login failed. Please generate a new QR code.';
+    }
+  }
+
+  /**
+   * Generate a GramJS Telegram QR Code login session (tg://login?token=...)
+   */
+  public async startQrLogin(params: {
+    streamerId: string;
+    apiId?: number;
+    apiHash?: string;
+    forceRefresh?: boolean;
+  }): Promise<{
+    success: boolean;
+    status: string;
+    qrUrl?: string;
+    expiresAt?: number;
+    user?: any;
+    message?: string;
+  }> {
+    const { streamerId, forceRefresh } = params;
+    const apiId =
+      params.apiId ||
+      (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
+    const apiHash =
+      params.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
+
+    const existingQr = this.pendingQrAuth.get(streamerId);
+    if (existingQr && !forceRefresh) {
+      if (existingQr.status === 'authenticated') {
+        return {
+          success: true,
+          status: 'authenticated',
+          user: existingQr.user,
+          message: `Connected as ${existingQr.user?.displayName || 'Streamer'}!`
+        };
+      }
+      if (existingQr.status === 'need_password') {
+        return {
+          success: true,
+          status: 'need_password',
+          message: 'Two-Step Verification (2FA) password required.'
+        };
+      }
+      if (existingQr.status === 'waiting' && Date.now() < existingQr.expiresAt - 2000) {
+        return {
+          success: true,
+          status: 'waiting',
+          qrUrl: existingQr.qrUrl,
+          expiresAt: existingQr.expiresAt
+        };
+      }
+    }
+
+    // Clean up any stale pending QR client before creating a fresh one
+    if (existingQr && existingQr.status !== 'authenticated') {
+      try {
+        await existingQr.client.disconnect();
+      } catch (_) {}
+      this.pendingQrAuth.delete(streamerId);
+    }
+
+    const client = this.createClient('', apiId, apiHash);
+    await client.connect();
+
+    const result = await client.invoke(
+      new Api.auth.ExportLoginToken({
+        apiId: Number(apiId),
+        apiHash,
+        exceptIds: []
+      })
+    );
+
+    if (
+      result instanceof Api.auth.LoginTokenSuccess &&
+      result.authorization instanceof Api.auth.Authorization
+    ) {
+      const userSummary = await this.completeQrSignIn(
+        streamerId,
+        client,
+        result.authorization.user,
+        apiId,
+        apiHash
+      );
+      return {
+        success: true,
+        status: 'authenticated',
+        user: userSummary
+      };
+    }
+
+    if (!(result instanceof Api.auth.LoginToken)) {
+      try {
+        await client.disconnect();
+      } catch (_) {}
+      throw new Error('Unexpected response from Telegram while generating login QR code.');
+    }
+
+    const tokenB64Url = Buffer.from(result.token).toString('base64url');
+    const qrUrl = `tg://login?token=${tokenB64Url}`;
+    const expiresAt = result.expires * 1000;
+
+    const qrRecord: PendingQrAuth = {
+      client,
+      apiId,
+      apiHash,
+      qrUrl,
+      expiresAt,
+      status: 'waiting',
+      createdAt: Date.now()
+    };
+
+    this.pendingQrAuth.set(streamerId, qrRecord);
+
+    // Listen for instant UpdateLoginToken push when scanned on phone
+    client.addEventHandler((update: any) => {
+      if (update instanceof Api.UpdateLoginToken) {
+        this.refreshOrFinalizeQrToken(streamerId).catch((e) =>
+          console.error('[TelegramJS QR] UpdateLoginToken handler error:', e)
+        );
+      }
+    });
+
+    console.log(`📱 [TelegramJS QR] Generated login QR token for streamer [${streamerId}] (DC ${client.session.dcId})`);
+
+    return {
+      success: true,
+      status: 'waiting',
+      qrUrl,
+      expiresAt
+    };
+  }
+
+  /**
+   * Poll current QR login state & seamlessly rotate expired 30s QR tokens
+   */
+  public async pollQrLogin(streamerId: string): Promise<{
+    success: boolean;
+    status: string;
+    isConnected?: boolean;
+    qrUrl?: string;
+    expiresAt?: number;
+    user?: any;
+    message?: string;
+  }> {
+    const qrState = this.pendingQrAuth.get(streamerId);
+    if (!qrState) {
+      const status = await this.getStatus(streamerId);
+      if (status.isConnected) {
+        return {
+          success: true,
+          status: 'authenticated',
+          isConnected: true,
+          user: {
+            phone: status.phoneNumber,
+            displayName: status.userName
+          }
+        };
+      }
+      return { success: true, status: 'idle' };
+    }
+
+    if (qrState.status === 'authenticated') {
+      const user = qrState.user;
+      this.pendingQrAuth.delete(streamerId);
+      return {
+        success: true,
+        status: 'authenticated',
+        isConnected: true,
+        user,
+        message: `Connected successfully as ${user?.displayName || 'Streamer'}!`
+      };
+    }
+
+    if (qrState.status === 'need_password') {
+      return {
+        success: true,
+        status: 'need_password',
+        message: 'Two-Step Verification (2FA) password required.'
+      };
+    }
+
+    if (qrState.status === 'error') {
+      return {
+        success: false,
+        status: 'error',
+        message: qrState.errorMessage || 'QR code expired or failed.'
+      };
+    }
+
+    // Rotate or finalize when within 2 seconds of token expiry
+    if (qrState.status === 'waiting' && Date.now() >= qrState.expiresAt - 2000) {
+      await this.refreshOrFinalizeQrToken(streamerId);
+      const updated = this.pendingQrAuth.get(streamerId);
+      if (updated?.status === 'authenticated') {
+        const user = updated.user;
+        this.pendingQrAuth.delete(streamerId);
+        return {
+          success: true,
+          status: 'authenticated',
+          isConnected: true,
+          user,
+          message: `Connected successfully as ${user?.displayName || 'Streamer'}!`
+        };
+      }
+      if (updated?.status === 'need_password') {
+        return {
+          success: true,
+          status: 'need_password',
+          message: 'Two-Step Verification (2FA) password required.'
+        };
+      }
+    }
+
+    return {
+      success: true,
+      status: 'waiting',
+      qrUrl: qrState.qrUrl,
+      expiresAt: qrState.expiresAt
+    };
+  }
+
+  /**
+   * Complete QR login when Telegram account has 2-Step Verification (2FA) Password enabled
+   */
+  public async submitQrPassword(params: {
+    streamerId: string;
+    password: string;
+  }): Promise<{
+    success: boolean;
+    status: string;
+    isConnected?: boolean;
+    user?: any;
+    message: string;
+  }> {
+    const { streamerId, password } = params;
+    const qrState = this.pendingQrAuth.get(streamerId);
+    if (!qrState || !qrState.client) {
+      throw new Error('No pending QR session found. Please scan a new QR code.');
+    }
+
+    if (!qrState.client.connected) {
+      await qrState.client.connect();
+    }
+
+    try {
+      const user = await qrState.client.signInWithPassword(
+        { apiId: qrState.apiId, apiHash: qrState.apiHash },
+        {
+          password: async () => password,
+          onError: (err: Error) => {
+            throw err;
+          }
+        }
+      );
+
+      const userSummary = await this.completeQrSignIn(
+        streamerId,
+        qrState.client,
+        user,
+        qrState.apiId,
+        qrState.apiHash
+      );
+      this.pendingQrAuth.delete(streamerId);
+
+      return {
+        success: true,
+        status: 'authenticated',
+        isConnected: true,
+        user: userSummary,
+        message: `Connected successfully as ${userSummary.displayName}!`
+      };
+    } catch (err: any) {
+      console.error('❌ [TelegramJS QR] 2FA password error:', err?.message || err);
+      throw new Error(
+        err?.errorMessage === 'PASSWORD_HASH_INVALID'
+          ? 'Incorrect 2FA password. Please try again.'
+          : err?.message || 'Failed to verify 2FA password.'
+      );
+    }
+  }
+
+  /**
+   * Cancel an uncompleted pending QR login session
+   */
+  public async cancelQrLogin(streamerId: string): Promise<{ success: boolean }> {
+    const qrState = this.pendingQrAuth.get(streamerId);
+    if (qrState) {
+      if (qrState.status !== 'authenticated' && this.activeClients.get(streamerId) !== qrState.client) {
+        try {
+          await qrState.client.disconnect();
+        } catch (_) {}
+      }
+      this.pendingQrAuth.delete(streamerId);
+    }
+    return { success: true };
   }
 
   /**
@@ -1470,6 +1965,13 @@ class TelegramUserClientManager {
       this.activeClients.delete(streamerId);
     }
 
+    const pendingQr = this.pendingQrAuth.get(streamerId);
+    if (pendingQr && pendingQr.client !== client) {
+      try {
+        await pendingQr.client.disconnect();
+      } catch (e) {}
+    }
+    this.pendingQrAuth.delete(streamerId);
     this.pendingAuth.delete(streamerId);
     this.monitoredChats.delete(streamerId);
 

@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
+import { QRCodeSVG } from 'qrcode.react';
 import { useModal } from '../../context/ModalContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -234,12 +235,22 @@ export const PaymentGatewayAdmin: React.FC = () => {
   };
 
   // ================================================================
-  // STEP 1 STATE: GramJS MTProto User Client Connection
+  // STEP 1 STATE: GramJS MTProto User Client Connection (Phone & QR)
   // ================================================================
+  const [loginMethod, setLoginMethod] = useState<'qr' | 'phone'>('qr');
   const [userPhone, setUserPhone] = useState('+855');
   const [userApiId, setUserApiId] = useState('');
   const [userApiHash, setUserApiHash] = useState('');
   const [showHowItWorks, setShowHowItWorks] = useState(false);
+
+  // GramJS QR Code Login State
+  const [qrUrl, setQrUrl] = useState<string>('');
+  const [qrExpiresAt, setQrExpiresAt] = useState<number>(0);
+  const [qrCountdown, setQrCountdown] = useState<number>(0);
+  const [qrLoading, setQrLoading] = useState<boolean>(false);
+  const [qrNeedPassword, setQrNeedPassword] = useState<boolean>(false);
+  const [qrTwoFaPassword, setQrTwoFaPassword] = useState<string>('');
+  const [qrSubmittingPassword, setQrSubmittingPassword] = useState<boolean>(false);
 
   const [codeRequested, setCodeRequested] = useState(false);
   const [phoneCodeHash, setPhoneCodeHash] = useState('');
@@ -290,8 +301,10 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const [connectingGroupId, setConnectingGroupId] = useState<string | null>(null);
   const [step3Msg, setStep3Msg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Group directory search state
-  const [groupSearch, setGroupSearch] = useState('');
+  // Group directory search state & 5-item progressive scroll pagination
+  const [groupSearchInput, setGroupSearchInput] = useState('');
+  const [activeGroupSearch, setActiveGroupSearch] = useState('');
+  const [visibleGroupCount, setVisibleGroupCount] = useState(5);
 
   // ----------------------------------------------------------------
   // Authenticated Fetch Helper (Per Client Account Session)
@@ -669,6 +682,165 @@ export const PaymentGatewayAdmin: React.FC = () => {
       setVerifyingCode(false);
     }
   };
+
+  // ----------------------------------------------------------------
+  // STEP 1 QR HANDLERS: GramJS QR Code Generation & Scan Polling
+  // ----------------------------------------------------------------
+  const startQrCodeSession = async (forceRefresh = false) => {
+    setStep1Msg(null);
+    setQrLoading(true);
+    try {
+      const res = await authFetch('/api/telegram/user/qr-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiId: userApiId.trim() || undefined,
+          apiHash: userApiHash.trim() || undefined,
+          forceRefresh
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setStep1Msg({ type: 'error', text: data.error || 'Failed to generate Telegram QR code.' });
+        return;
+      }
+
+      if (data.status === 'authenticated') {
+        setQrUrl('');
+        setQrNeedPassword(false);
+        setQrTwoFaPassword('');
+        setStep1Msg({ type: 'success', text: data.message || 'Connected via Telegram QR!' });
+        goToStep(2);
+        await fetchUserClientStatus();
+        await fetchTargetGroups();
+        return;
+      }
+
+      if (data.status === 'need_password') {
+        setQrNeedPassword(true);
+        return;
+      }
+
+      if (data.qrUrl) {
+        setQrUrl(data.qrUrl);
+        setQrExpiresAt(data.expiresAt || Date.now() + 30000);
+        setQrNeedPassword(false);
+      }
+    } catch (err: any) {
+      setStep1Msg({ type: 'error', text: err.message || 'Network error generating QR code.' });
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleSwitchLoginMethod = (method: 'phone' | 'qr') => {
+    if (method === loginMethod) return;
+    setStep1Msg(null);
+    setLoginMethod(method);
+    if (method === 'phone') {
+      setQrUrl('');
+      setQrNeedPassword(false);
+      setQrTwoFaPassword('');
+      authFetch('/api/telegram/user/qr-login', { method: 'DELETE' }).catch(() => {});
+    }
+  };
+
+  const handleSubmitQrPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qrTwoFaPassword.trim()) {
+      setStep1Msg({ type: 'error', text: 'Please enter your Telegram 2FA password.' });
+      return;
+    }
+    setStep1Msg(null);
+    setQrSubmittingPassword(true);
+    try {
+      const res = await authFetch('/api/telegram/user/qr-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'password',
+          password: qrTwoFaPassword.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.status === 'authenticated') {
+        setQrUrl('');
+        setQrNeedPassword(false);
+        setQrTwoFaPassword('');
+        setStep1Msg({ type: 'success', text: data.message || 'Connected via Telegram QR!' });
+        goToStep(2);
+        await fetchUserClientStatus();
+        await fetchTargetGroups();
+      } else {
+        setStep1Msg({ type: 'error', text: data.error || 'Failed to verify 2FA password.' });
+      }
+    } catch (err: any) {
+      setStep1Msg({ type: 'error', text: err.message || 'Error verifying 2FA password.' });
+    } finally {
+      setQrSubmittingPassword(false);
+    }
+  };
+
+  // Auto-generate QR code & poll scan status while QR tab is active on Step 1
+  useEffect(() => {
+    if (activeStep !== 1 || loginMethod !== 'qr' || userClientStatus.isConnected) {
+      return;
+    }
+
+    let cancelled = false;
+    if (!qrUrl && !qrNeedPassword) {
+      startQrCodeSession(false);
+    }
+
+    const pollInterval = setInterval(async () => {
+      if (cancelled || qrNeedPassword || qrSubmittingPassword) return;
+      try {
+        const res = await authFetch('/api/telegram/user/qr-login');
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+
+        if (data.status === 'authenticated' || data.isConnected) {
+          if (cancelled) return;
+          setQrUrl('');
+          setQrNeedPassword(false);
+          setQrTwoFaPassword('');
+          setStep1Msg({ type: 'success', text: data.message || 'Connected via Telegram QR!' });
+          goToStep(2);
+          await fetchUserClientStatus();
+          await fetchTargetGroups();
+        } else if (data.status === 'need_password') {
+          if (!cancelled) setQrNeedPassword(true);
+        } else if (data.status === 'waiting' && data.qrUrl) {
+          if (!cancelled) {
+            setQrUrl(data.qrUrl);
+            if (data.expiresAt) setQrExpiresAt(data.expiresAt);
+          }
+        } else if (data.status === 'idle' && !qrLoading) {
+          if (!cancelled) startQrCodeSession(false);
+        }
+      } catch (_) {}
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(pollInterval);
+    };
+  }, [activeStep, loginMethod, userClientStatus.isConnected, qrNeedPassword, qrSubmittingPassword]);
+
+  // Live 1-second QR token expiry countdown
+  useEffect(() => {
+    if (!qrExpiresAt || loginMethod !== 'qr' || userClientStatus.isConnected) {
+      setQrCountdown(0);
+      return;
+    }
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((qrExpiresAt - Date.now()) / 1000));
+      setQrCountdown(remaining);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [qrExpiresAt, loginMethod, userClientStatus.isConnected]);
 
   const handleDisconnectUserClient = () => {
     showConfirm({
@@ -1132,9 +1304,180 @@ export const PaymentGatewayAdmin: React.FC = () => {
               </div>
             </div>
           ) : (
-            /* Login Form */
-            <div className="space-y-5">
-              {!codeRequested ? (
+            /* Login Form: Phone Number (OTP) OR GramJS QR Code */
+            <div className="space-y-4">
+              {/* Connection Method Segmented Switcher */}
+              <div className="grid grid-cols-2 gap-1.5 p-1.5 rounded-2xl bg-[#070A13] border border-slate-800/90">
+                <button
+                  type="button"
+                  onClick={() => handleSwitchLoginMethod('qr')}
+                  className={`py-2.5 px-3 rounded-xl font-['Chakra_Petch'] font-bold text-xs tracking-wide flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    loginMethod === 'qr'
+                      ? 'bg-cyan-400 text-slate-950 shadow-[0_0_16px_rgba(0,240,255,0.3)]'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900/70'
+                  }`}
+                >
+                  <QrCode size={14} />
+                  <span>QR</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchLoginMethod('phone')}
+                  className={`py-2.5 px-3 rounded-xl font-['Chakra_Petch'] font-bold text-xs tracking-wide flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    loginMethod === 'phone'
+                      ? 'bg-cyan-400 text-slate-950 shadow-[0_0_16px_rgba(0,240,255,0.3)]'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900/70'
+                  }`}
+                >
+                  <Phone size={14} />
+                  <span>Phone</span>
+                </button>
+              </div>
+
+              {loginMethod === 'qr' ? (
+                /* GramJS Live QR Code Login Card */
+                qrNeedPassword ? (
+                  <form
+                    onSubmit={handleSubmitQrPassword}
+                    className="p-6 rounded-2xl bg-[#090D18] border border-amber-500/40 space-y-5 animate-fadeIn shadow-2xl"
+                  >
+                    <div className="space-y-1.5 text-center flex flex-col items-center">
+                      <label className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center justify-center gap-2">
+                        <KeyRound size={14} />
+                        <span>Two-Step Verification (2FA)</span>
+                      </label>
+                      <p className="text-[11px] text-slate-400 font-mono text-center max-w-sm">
+                        QR scan succeeded! Your Telegram account has a Cloud Password enabled — enter it below to finish connecting.
+                      </p>
+                    </div>
+
+                    <input
+                      type="password"
+                      required
+                      autoFocus
+                      value={qrTwoFaPassword}
+                      onChange={(e) => setQrTwoFaPassword(e.target.value)}
+                      placeholder="Enter your Telegram 2FA password"
+                      className="w-full py-3 px-4 rounded-xl bg-slate-950 border border-amber-500/40 text-sm font-mono text-white focus:outline-none focus:border-amber-400"
+                    />
+
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQrNeedPassword(false);
+                          setQrTwoFaPassword('');
+                          startQrCodeSession(true);
+                        }}
+                        className="text-xs font-mono text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer"
+                      >
+                        &larr; Back to QR Code
+                      </button>
+
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        size="md"
+                        loading={qrSubmittingPassword}
+                        className="font-bold px-6 shadow-lg shadow-cyan-400/20"
+                      >
+                        Verify &amp; Connect
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-5 animate-fadeIn">
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-6 sm:gap-8">
+                      {/* QR Code Frame */}
+                      <div className="flex flex-col items-center gap-2.5 flex-shrink-0">
+                        <div className="relative w-52 h-52 rounded-2xl bg-white p-3.5 border-2 border-cyan-400/50 shadow-[0_0_30px_rgba(0,240,255,0.2)] flex items-center justify-center">
+                          {qrLoading && !qrUrl ? (
+                            <div className="flex flex-col items-center justify-center gap-2 text-slate-700">
+                              <RefreshCw size={26} className="animate-spin text-cyan-600" />
+                              <span className="text-[11px] font-mono font-bold text-slate-600">
+                                Generating QR...
+                              </span>
+                            </div>
+                          ) : qrUrl ? (
+                            <>
+                              <QRCodeSVG
+                                value={qrUrl}
+                                size={180}
+                                level="M"
+                                includeMargin={false}
+                              />
+                              {/* Centered Telegram Logo Badge */}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="w-10 h-10 rounded-full bg-white p-1 shadow-md flex items-center justify-center">
+                                  <TelegramIcon className="w-8 h-8 text-[#0088cc]" />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startQrCodeSession(true)}
+                              className="flex flex-col items-center gap-2 text-slate-700 hover:text-cyan-600 transition-colors cursor-pointer"
+                            >
+                              <RefreshCw size={24} />
+                              <span className="text-xs font-mono font-bold">Generate QR</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Live Expiry & Manual Refresh Row */}
+                        <div className="flex items-center gap-2.5 text-[11px] font-mono text-slate-400">
+                          {qrUrl && (
+                            <span>
+                              Auto-refreshes in{' '}
+                              <span className="text-cyan-400 font-bold">{qrCountdown}s</span>
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            disabled={qrLoading}
+                            onClick={() => startQrCodeSession(true)}
+                            className="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-bold disabled:opacity-50 cursor-pointer"
+                          >
+                            <RefreshCw size={11} className={qrLoading ? 'animate-spin' : ''} />
+                            <span>Refresh</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Simple Scan Steps 1, 2, 3 */}
+                      <div className="flex flex-col gap-2 max-w-sm w-full">
+                        <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono">
+                          <span className="w-5 h-5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold flex items-center justify-center flex-shrink-0 text-[11px]">
+                            1
+                          </span>
+                          <span className="text-slate-300">
+                            Open <strong className="text-white">Telegram</strong> on your phone
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono">
+                          <span className="w-5 h-5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold flex items-center justify-center flex-shrink-0 text-[11px]">
+                            2
+                          </span>
+                          <span className="text-slate-300">
+                            Go to <strong className="text-white">Settings</strong> &gt; <strong className="text-white">Devices</strong> &gt; <strong className="text-cyan-400">Link Desktop Device</strong>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono">
+                          <span className="w-5 h-5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold flex items-center justify-center flex-shrink-0 text-[11px]">
+                            3
+                          </span>
+                          <span className="text-slate-300">
+                            Scan this QR code to connect
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              ) : !codeRequested ? (
                 <form onSubmit={handleSendCode} className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4">
                   <div className="space-y-2">
                     <label className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
@@ -1196,7 +1539,9 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     {codeDigits.map((digit, idx) => (
                       <input
                         key={idx}
-                        ref={(el) => (digitInputRefs.current[idx] = el)}
+                        ref={(el) => {
+                          digitInputRefs.current[idx] = el;
+                        }}
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
@@ -1520,7 +1865,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
         {/* STEP 3 CONTENT: "Connect to Group via Link Telegram"           */}
         {/* ============================================================== */}
         {activeStep === 3 && (
-          <Card glow="cyan" className="space-y-6">
+          <div className="rounded-2xl bg-[#090D18] border border-cyan-500/30 p-5 sm:p-7 space-y-4 shadow-lg shadow-cyan-500/5">
             {step3Msg && (
               <div
                 className={`p-3.5 rounded-xl border text-xs flex items-center justify-between animate-fadeIn ${
@@ -1544,7 +1889,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             )}
 
             {!userClientStatus.isConnected ? (
-              <div className="py-12 px-6 text-center space-y-5 rounded-2xl bg-[#090D18] border border-amber-500/30">
+              <div className="py-12 px-6 text-center space-y-5 rounded-2xl bg-[#070A14] border border-amber-500/30">
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
                   <AlertCircle size={32} />
                 </div>
@@ -1569,24 +1914,42 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-5 sm:p-7 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-4 shadow-lg shadow-cyan-500/5">
-                {/* Top Row: Prominent Search Bar & Top-Right Refresh Icon Button */}
-                <div className="flex items-center gap-2.5">
+              <div className="space-y-4">
+                {/* Search Bar (Search strictly by Group Name upon pressing Enter) & Refresh Button */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setActiveGroupSearch(groupSearchInput.trim());
+                    setVisibleGroupCount(5);
+                  }}
+                  className="flex items-center gap-2.5"
+                >
                   <div className="relative flex-1 group">
                     <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 pointer-events-none transition-colors">
                       <Search size={16} />
                     </div>
                     <input
                       type="text"
-                      value={groupSearch}
-                      onChange={(e) => setGroupSearch(e.target.value)}
-                      placeholder="Search groups by name or chat ID (e.g. ABA, Bakong, Hayday, Transaction)..."
+                      value={groupSearchInput}
+                      onChange={(e) => setGroupSearchInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          setActiveGroupSearch(groupSearchInput.trim());
+                          setVisibleGroupCount(5);
+                        }
+                      }}
+                      placeholder="Type group name and press Enter to search..."
                       className="w-full pl-10 pr-9 py-2.5 sm:py-3 rounded-xl bg-slate-950/90 hover:bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono"
                     />
-                    {groupSearch && (
+                    {groupSearchInput && (
                       <button
                         type="button"
-                        onClick={() => setGroupSearch('')}
+                        onClick={() => {
+                          setGroupSearchInput('');
+                          setActiveGroupSearch('');
+                          setVisibleGroupCount(5);
+                        }}
                         className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-white cursor-pointer"
                       >
                         ✕
@@ -1594,38 +1957,58 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     )}
                   </div>
 
+                  <button
+                    type="submit"
+                    title="Search"
+                    className="px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono text-xs font-bold transition-all cursor-pointer flex-shrink-0"
+                  >
+                    Search
+                  </button>
+
                   {/* Refresh Button with Icon Only at Top Right */}
                   <button
                     type="button"
-                    onClick={fetchTargetGroups}
+                    onClick={() => {
+                      setVisibleGroupCount(5);
+                      fetchTargetGroups();
+                    }}
                     disabled={loadingGroups}
                     title="Refresh Groups"
                     className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/40 text-slate-400 hover:text-cyan-400 transition-colors flex items-center justify-center cursor-pointer flex-shrink-0 shadow-sm"
                   >
                     <RefreshCw size={15} className={loadingGroups ? 'animate-spin text-cyan-400' : ''} />
                   </button>
-                </div>
+                </form>
 
-                {/* 1 GRID ONLY: CLEAN LIST OF TELEGRAM GROUPS */}
+                {/* 1 GRID ONLY: CLEAN LIST OF TELEGRAM GROUPS WITH 5 PER SCROLL CACHE */}
                 {(() => {
                   if (loadingGroups && availableDialogs.length === 0) {
                     return (
-                      <div className="py-12 px-6 rounded-2xl bg-slate-950/60 border border-slate-800 text-center space-y-3 font-mono">
-                        <RefreshCw size={24} className="animate-spin text-cyan-400 mx-auto" />
-                        <div className="text-white text-xs font-bold">Scanning Telegram account groups & channels...</div>
-                        <p className="text-[11px] text-slate-500">Fetching dialogs from your connected GramJS session</p>
+                      <div className="space-y-2.5 animate-fadeIn">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <div
+                            key={i}
+                            className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-800/80 bg-slate-950/60 flex items-center justify-between gap-3 animate-pulse"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800/80 flex-shrink-0" />
+                              <div className="space-y-1.5 flex-1 min-w-0">
+                                <div className="w-48 sm:w-64 h-4 rounded bg-slate-800/80" />
+                                <div className="w-24 h-2.5 rounded bg-slate-800/50" />
+                              </div>
+                            </div>
+                            <div className="w-24 sm:w-28 h-8 rounded-xl bg-slate-800/70 flex-shrink-0" />
+                          </div>
+                        ))}
                       </div>
                     );
                   }
 
+                  // Search strictly by group title/name
                   const filtered = availableDialogs.filter((d) => {
-                    if (!groupSearch.trim()) return true;
-                    const q = groupSearch.toLowerCase().trim();
-                    return (
-                      d.title.toLowerCase().includes(q) ||
-                      d.id.includes(q) ||
-                      (d.username && d.username.toLowerCase().includes(q))
-                    );
+                    if (!activeGroupSearch) return true;
+                    const q = activeGroupSearch.toLowerCase();
+                    return d.title.toLowerCase().includes(q);
                   });
 
                   // Sort active connected groups strictly to the top
@@ -1640,123 +2023,151 @@ export const PaymentGatewayAdmin: React.FC = () => {
                   if (sorted.length === 0) {
                     return (
                       <div className="p-8 rounded-2xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400 space-y-1 font-mono">
-                        <p className="text-white font-bold">No groups match your search.</p>
-                        <p className="text-slate-500">Try typing a different name or clearing the search input.</p>
+                        <p className="text-white font-bold">No groups match &quot;{activeGroupSearch}&quot;.</p>
+                        <p className="text-slate-500">Check the spelling or clear the search input and press Enter.</p>
                       </div>
                     );
                   }
 
+                  const displayedGroups = sorted.slice(0, visibleGroupCount);
+                  const hasMoreGroups = sorted.length > visibleGroupCount;
+
                   return (
-                    <div className="grid grid-cols-1 gap-2.5">
-                      {sorted.map((dialog) => {
-                        const isMonitored = isGroupConnected(dialog, targetGroups);
-                        const isConnecting = connectingGroupId === dialog.id;
+                    <div className="space-y-3">
+                      <div
+                        onScroll={(e) => {
+                          const target = e.currentTarget;
+                          const atBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 60;
+                          if (atBottom && hasMoreGroups) {
+                            setVisibleGroupCount((prev) => Math.min(prev + 5, sorted.length));
+                          }
+                        }}
+                        className="max-h-[520px] overflow-y-auto overscroll-contain pr-1 space-y-2.5 custom-scrollbar"
+                      >
+                        {displayedGroups.map((dialog) => {
+                          const isMonitored = isGroupConnected(dialog, targetGroups);
+                          const isConnecting = connectingGroupId === dialog.id;
 
-                        const titleLower = dialog.title.toLowerCase();
-                        const isBankRelated =
-                          titleLower.includes('aba') ||
-                          titleLower.includes('bank') ||
-                          titleLower.includes('transaction') ||
-                          titleLower.includes('cam-tool') ||
-                          titleLower.includes('khmc') ||
-                          titleLower.includes('acleda') ||
-                          titleLower.includes('wing') ||
-                          titleLower.includes('canadia') ||
-                          titleLower.includes('bakong') ||
-                          titleLower.includes('alert') ||
-                          titleLower.includes('pay');
+                          const titleLower = dialog.title.toLowerCase();
+                          const isBankRelated =
+                            titleLower.includes('aba') ||
+                            titleLower.includes('bank') ||
+                            titleLower.includes('transaction') ||
+                            titleLower.includes('cam-tool') ||
+                            titleLower.includes('khmc') ||
+                            titleLower.includes('acleda') ||
+                            titleLower.includes('wing') ||
+                            titleLower.includes('canadia') ||
+                            titleLower.includes('bakong') ||
+                            titleLower.includes('alert') ||
+                            titleLower.includes('pay');
 
-                        return (
-                          <div
-                            key={dialog.id}
-                            onClick={() =>
-                              isMonitored
-                                ? handlePromptDisconnectGroup(dialog)
-                                : handlePromptConnectGroup(dialog)
-                            }
-                            className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3 sm:gap-4 relative group cursor-pointer ${
-                              isMonitored
-                                ? 'bg-[#0B1524] border-emerald-500/40 shadow-sm shadow-emerald-500/5 hover:border-emerald-500/60'
-                                : 'bg-slate-950/60 border-slate-800/90 hover:border-cyan-500/40 hover:bg-[#0c1220]'
-                            }`}
-                          >
-                            {/* Left Accent indicator for active monitored group */}
-                            {isMonitored && (
-                              <div className="absolute left-0 top-3 bottom-3 w-1 bg-gradient-to-b from-emerald-400 to-teal-400 rounded-r" />
-                            )}
+                          return (
+                            <div
+                              key={dialog.id}
+                              onClick={() =>
+                                isMonitored
+                                  ? handlePromptDisconnectGroup(dialog)
+                                  : handlePromptConnectGroup(dialog)
+                              }
+                              className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3 sm:gap-4 relative group cursor-pointer ${
+                                isMonitored
+                                  ? 'bg-[#0B1524] border-emerald-500/40 shadow-sm shadow-emerald-500/5 hover:border-emerald-500/60'
+                                  : 'bg-slate-950/60 border-slate-800/90 hover:border-cyan-500/40 hover:bg-[#0c1220]'
+                              }`}
+                            >
+                              {/* Left Accent indicator for active monitored group */}
+                              {isMonitored && (
+                                <div className="absolute left-0 top-3 bottom-3 w-1 bg-gradient-to-b from-emerald-400 to-teal-400 rounded-r" />
+                              )}
 
-                            {/* Left Side: Telegram Logo Avatar & Group Title */}
-                            <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
-                              {/* Telegram Logo Icon as Avatar */}
-                              <div
-                                className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm ${
-                                  isMonitored
-                                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
-                                    : 'bg-[#0088cc]/10 border border-[#0088cc]/30 text-[#0088cc]'
-                                }`}
-                              >
-                                <TelegramIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                                {isMonitored && (
-                                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#090D18] flex items-center justify-center">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Title & Bank Badge only (Cleaned of description & chat ID) */}
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h5
-                                    className="text-xs sm:text-sm font-bold text-white truncate max-w-[280px] sm:max-w-md md:max-w-xl font-sans tracking-tight"
-                                    title={dialog.title}
-                                  >
-                                    {dialog.title}
-                                  </h5>
-                                  {isBankRelated && (
-                                    <span className="px-1.5 py-0.5 text-[9px] rounded bg-cyan-950 text-cyan-400 font-bold border border-cyan-800/40 uppercase tracking-wider font-mono">
-                                      BANK
+                              {/* Left Side: Telegram Logo Avatar & Group Title */}
+                              <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                                <div
+                                  className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm ${
+                                    isMonitored
+                                      ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+                                      : 'bg-[#0088cc]/10 border border-[#0088cc]/30 text-[#0088cc]'
+                                  }`}
+                                >
+                                  <TelegramIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                  {isMonitored && (
+                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#090D18] flex items-center justify-center">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
                                     </span>
                                   )}
                                 </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h5
+                                      className="text-xs sm:text-sm font-bold text-white truncate max-w-[280px] sm:max-w-md md:max-w-xl font-sans tracking-tight"
+                                      title={dialog.title}
+                                    >
+                                      {dialog.title}
+                                    </h5>
+                                    {isBankRelated && (
+                                      <span className="px-1.5 py-0.5 text-[9px] rounded bg-cyan-950 text-cyan-400 font-bold border border-cyan-800/40 uppercase tracking-wider font-mono">
+                                        BANK
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right Side: Action Button */}
+                              <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                {isMonitored ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePromptDisconnectGroup(dialog)}
+                                    className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold font-mono text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                                    title="Connected to listener (Click to disconnect)"
+                                  >
+                                    <Check size={14} className="stroke-[3]" />
+                                    <span>Connected</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={isConnecting}
+                                    onClick={() => handlePromptConnectGroup(dialog)}
+                                    className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm hover:shadow-cyan-500/10 cursor-pointer disabled:opacity-50"
+                                  >
+                                    {isConnecting ? (
+                                      <>
+                                        <RefreshCw size={12} className="animate-spin text-cyan-400" />
+                                        <span>Connecting...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus size={13} />
+                                        <span>Connect Listener</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
                               </div>
                             </div>
+                          );
+                        })}
+                      </div>
 
-                            {/* Right Side: Action Button */}
-                            <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                              {isMonitored ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handlePromptDisconnectGroup(dialog)}
-                                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold font-mono text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
-                                  title="Connected to listener (Click to disconnect)"
-                                >
-                                  <Check size={14} className="stroke-[3]" />
-                                  <span>Connected</span>
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  disabled={isConnecting}
-                                  onClick={() => handlePromptConnectGroup(dialog)}
-                                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm hover:shadow-cyan-500/10 cursor-pointer disabled:opacity-50"
-                                >
-                                  {isConnecting ? (
-                                    <>
-                                      <RefreshCw size={12} className="animate-spin text-cyan-400" />
-                                      <span>Connecting...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Plus size={13} />
-                                      <span>Connect Listener</span>
-                                    </>
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {/* Cache pagination footer: loads 5 per scroll/click */}
+                      {hasMoreGroups && (
+                        <div className="pt-1 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                          <span>
+                            Showing {displayedGroups.length} of {sorted.length} groups
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setVisibleGroupCount((prev) => Math.min(prev + 5, sorted.length))}
+                            className="text-cyan-400 hover:text-cyan-300 font-bold cursor-pointer"
+                          >
+                            + Load 5 more groups
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -1776,7 +2187,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                 <span>Back to Step 2</span>
               </Button>
             </div>
-          </Card>
+          </div>
         )}
       </div>
 

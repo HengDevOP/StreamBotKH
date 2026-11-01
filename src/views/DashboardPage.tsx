@@ -1489,7 +1489,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       {/* ============================================================== */}
       <main className="flex-1 h-full min-h-0 overflow-hidden min-w-0 flex flex-col bg-[#060911]">
         {/* Top Desktop Application Header Bar (Executive Workbench Header) */}
-        <header className="z-20 h-16 sm:h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0">
+        <header className="z-40 h-16 sm:h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0">
           <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-shrink-0">
             {/* Mobile Menu Hamburger */}
             <button

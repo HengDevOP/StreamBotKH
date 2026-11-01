@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      await lbCol.insertOne(defaultDoc);
+      await lbCol.insertOne(defaultDoc as any);
       row = defaultDoc;
     }
 
@@ -198,8 +198,34 @@ export async function POST(req: NextRequest) {
       showBackground = true,
       showAnimation = true,
       showRankBadges = true,
-      fontFamily = 'Chakra Petch'
+      fontFamily = 'Chakra Petch',
+      testTip = false
     } = body;
+
+    // Simulation test for leaderboard tip
+    if (testTip) {
+      const io = getIO();
+      if (io) {
+        const testDonation = {
+          donor_name: body.testName || 'Top Supporter Sokha',
+          amount: parseFloat(body.testAmount) || 25.0,
+          currency: 'USD',
+          banking_name: 'ABA Bank',
+          message: 'Keep rocking the livestream! Top Supporter tip!'
+        };
+        io.to(`overlay:${token}`).emit('donation:paid', testDonation);
+        io.to(`overlay:${token}`).emit('donation:alert', testDonation);
+        io.to(`overlay:${token}`).emit('leaderboard:tip', testDonation);
+        io.to(`overlay:${token}`).emit('leaderboard:update', { refresh: true });
+        if (token !== 'demo-token') {
+          io.to('overlay:demo-token').emit('donation:paid', testDonation);
+          io.to('overlay:demo-token').emit('donation:alert', testDonation);
+          io.to('overlay:demo-token').emit('leaderboard:tip', testDonation);
+          io.to('overlay:demo-token').emit('leaderboard:update', { refresh: true });
+        }
+      }
+      return NextResponse.json({ success: true, message: 'Test tip broadcasted to OBS overlay' });
+    }
 
     const cleanMaxRows = Math.min(10, Math.max(1, parseInt(String(maxRows), 10) || 3));
 

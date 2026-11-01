@@ -26,6 +26,11 @@ import {
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
+import {
+  DateTimeCalendarPicker,
+  toLocalDateTimeValue,
+  formatGoalEndDate
+} from '../common/DateTimeCalendarPicker';
 import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
 import { GOAL_TEMPLATES, GoalTemplateRenderer, GoalTemplateMeta } from '../overlay/goalTemplates';
@@ -92,9 +97,10 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   const parsedFormTarget = Math.max(1, parseFloat(formTargetInput) || 1);
   const parsedFormCurrent = Math.max(0, parseFloat(formCurrentInput) || 0);
 
-  // Copy status
+  // Copy & Test status
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedGoalId, setCopiedGoalId] = useState<string | null>(null);
+  const [isTestingGoal, setIsTestingGoal] = useState(false);
 
   const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/goal/${streamerToken || 'streamer-token'}`;
 
@@ -124,7 +130,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     if (!socket) return;
 
     const handleGoalUpdate = (payload: any) => {
-      if (!payload || !payload.id) return;
+      if (!payload || !payload.id || payload.isTest) return;
       setGoals((prev) => {
         const exists = prev.some((g) => g.id === payload.id);
         if (!exists) {
@@ -193,8 +199,9 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     setFormShowBalance(true);
     setFormShowBackground(true);
     setFormShowAnimation(true);
-    const defaultDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    setFormEndDate(defaultDate);
+    const defaultEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    defaultEnd.setHours(23, 59, 0, 0);
+    setFormEndDate(toLocalDateTimeValue(defaultEnd));
     setFormIsActive(true);
     setIsModalOpen(true);
   };
@@ -490,29 +497,27 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     });
   };
 
-  // Simulate Tip Addition into Active Goal
-  const handleSimulateTip = async (amount: number) => {
-    if (!activeGoal) return;
+  // Trigger Live Test Preview & OBS Overlay Simulation
+  const handleTestGoal = async () => {
+    if (!activeGoal || isTestingGoal) return;
+    setIsTestingGoal(true);
     try {
-      const res = await fetch('/api/widgets/goals', {
+      await fetch('/api/widgets/goals', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: activeGoal.id,
           token: streamerToken || 'demo-token',
-          addAmount: amount
+          simulateTest: true,
+          testAmount: 10
         })
       });
-      const data = await res.json();
-      if (data.success && data.goal) {
-        setGoals((prev) =>
-          prev.map((g) => (g.id === activeGoal.id ? { ...g, currentAmount: data.goal.currentAmount } : g))
-        );
-        setActiveGoal((prev) => (prev ? { ...prev, currentAmount: data.goal.currentAmount } : null));
-      }
     } catch (err) {
-      console.error('[GoalWidgetManager] Error simulating tip:', err);
+      console.error('[GoalWidgetManager] Error testing goal:', err);
     }
+    setTimeout(() => {
+      setIsTestingGoal(false);
+    }, 3500);
   };
 
   // Reset Active Goal to 0
@@ -571,102 +576,8 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
       {/* ============================================================== */}
       {activeGoal && (
         <Card className="p-5 sm:p-6 bg-[#090D18] border border-slate-800 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <Monitor size={16} className="text-emerald-400" />
-              <h4 className="text-sm font-bold text-white font-['Chakra_Petch']">
-                Active Goal Live Preview (OBS Widget)
-              </h4>
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 font-bold">
-                Style: {currentTemplate.name}
-              </span>
-            </div>
-            {/* Quick Test Simulator & Balance Toggle Controls */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                type="button"
-                onClick={handleToggleShowBalance}
-                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-colors flex items-center gap-1 ${
-                  activeGoal.showBalance !== false
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
-                }`}
-                title="Toggle balance display on stream"
-              >
-                <span>Balance:</span>
-                <span className={activeGoal.showBalance !== false ? 'text-emerald-400' : 'text-slate-500'}>
-                  {activeGoal.showBalance !== false ? 'ON' : 'OFF'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleToggleShowBackground}
-                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-colors flex items-center gap-1 ${
-                  activeGoal.showBackground !== false
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
-                }`}
-                title="Toggle container background (transparent floating overlay)"
-              >
-                <span>Background:</span>
-                <span className={activeGoal.showBackground !== false ? 'text-emerald-400' : 'text-slate-500'}>
-                  {activeGoal.showBackground !== false ? 'ON' : 'OFF'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleToggleShowAnimation}
-                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-colors flex items-center gap-1 ${
-                  activeGoal.showAnimation !== false
-                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
-                }`}
-                title="Toggle animated progress bar"
-              >
-                <Sparkles size={11} className={activeGoal.showAnimation !== false ? 'text-amber-400 animate-pulse' : 'text-slate-500'} />
-                <span>Animation:</span>
-                <span className={activeGoal.showAnimation !== false ? 'text-amber-400' : 'text-slate-500'}>
-                  {activeGoal.showAnimation !== false ? 'ON' : 'OFF'}
-                </span>
-              </button>
-
-              <span className="text-[10px] font-mono text-slate-500 uppercase ml-1 mr-0.5">Test:</span>
-              <button
-                type="button"
-                onClick={() => handleSimulateTip(5)}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold transition-colors"
-              >
-                +$5
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSimulateTip(10)}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold transition-colors"
-              >
-                +$10
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSimulateTip(25)}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold transition-colors"
-              >
-                +$25
-              </button>
-              <button
-                type="button"
-                onClick={handleResetGoal}
-                title="Reset progress to 0"
-                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors ml-0.5"
-              >
-                <RotateCcw size={12} />
-              </button>
-            </div>
-          </div>
-
           {/* Checkerboard Preview Area */}
-          <div className="w-full rounded-2xl bg-[#040711] border border-slate-800/80 p-6 sm:p-8 flex items-center justify-center relative overflow-hidden min-h-[190px]">
+          <div className="w-full rounded-2xl bg-[#040711] border border-slate-800/80 px-5 sm:px-8 pt-14 pb-7 sm:py-10 flex items-center justify-center relative overflow-hidden min-h-[210px]">
             <div
               className="absolute inset-0 opacity-15 pointer-events-none"
               style={{
@@ -677,18 +588,42 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
               }}
             />
 
+            {/* Top-Right Simple Test Button */}
+            <button
+              type="button"
+              onClick={handleTestGoal}
+              disabled={isTestingGoal}
+              className={`absolute top-3 right-3 z-20 px-3.5 py-1.5 rounded-xl font-['Chakra_Petch'] font-bold text-xs tracking-wide flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                isTestingGoal
+                  ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.2)]'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-[0_0_14px_rgba(16,185,129,0.3)]'
+              }`}
+            >
+              <Play
+                size={12}
+                className={
+                  isTestingGoal
+                    ? 'text-emerald-300 fill-emerald-300 animate-pulse'
+                    : 'text-slate-950 fill-slate-950'
+                }
+              />
+              <span>{isTestingGoal ? 'Testing...' : 'Test'}</span>
+            </button>
+
             {/* Rendered Template */}
             <div className="relative z-10 w-full flex justify-center">
               <GoalTemplateRenderer
                 title={activeGoal.title}
                 targetAmount={activeGoal.targetAmount}
-                currentAmount={activeGoal.currentAmount}
+                currentAmount={isTestingGoal ? activeGoal.currentAmount + 10 : activeGoal.currentAmount}
                 accentColor={activeGoal.accentColor || '#10B981'}
                 templateStyle={activeGoal.templateStyle || 'cyber-neon'}
                 showBalance={activeGoal.showBalance !== false}
                 showBackground={activeGoal.showBackground !== false}
                 showAnimation={activeGoal.showAnimation !== false}
                 endDate={activeGoal.endDate}
+                recentDonor={isTestingGoal ? 'Test Supporter' : null}
+                addedAmount={isTestingGoal ? 10 : null}
               />
             </div>
           </div>
@@ -881,9 +816,11 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
 
                   {/* Metadata and Action Buttons */}
                   <div className="flex items-center justify-between text-xs font-mono pt-1">
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                      <Calendar size={12} className="text-slate-500" />
-                      <span>{goal.endDate ? `Ends: ${goal.endDate}` : 'No deadline'}</span>
+                    <div className="text-[11px] text-slate-400 flex items-center gap-1.5 min-w-0">
+                      <Calendar size={12} className="text-slate-500 flex-shrink-0" />
+                      <span className="truncate">
+                        {goal.endDate ? `Ends: ${formatGoalEndDate(goal.endDate)}` : 'No end date'}
+                      </span>
                     </div>
 
                     {/* Action buttons */}
@@ -1010,9 +947,9 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                     </div>
                   </div>
 
-                  {/* Row 1: Goal Title & Target Deadline Date */}
+                  {/* Row 1: Goal Title & End Date */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                    <div className="sm:col-span-7 space-y-1.5">
+                    <div className="sm:col-span-6 space-y-1.5">
                       <label className="text-xs font-mono font-bold text-slate-300 block">
                         Goal Title / Milestone *
                       </label>
@@ -1030,15 +967,14 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                       />
                     </div>
 
-                    <div className="sm:col-span-5 space-y-1.5">
+                    <div className="sm:col-span-6 space-y-1.5">
                       <label className="text-xs font-mono font-bold text-slate-300 block">
-                        Target Deadline Date
+                        End Date
                       </label>
-                      <input
-                        type="date"
+                      <DateTimeCalendarPicker
                         value={formEndDate}
-                        onChange={(e) => setFormEndDate(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400 transition-colors"
+                        onChange={setFormEndDate}
+                        placeholder="Select end date & time"
                       />
                     </div>
                   </div>
