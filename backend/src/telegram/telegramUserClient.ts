@@ -1116,8 +1116,7 @@ class TelegramUserClientManager {
                   ...(targetStreamer.username ? [{ userId: targetStreamer.username }, { streamerId: targetStreamer.username }] : []),
                   ...(targetStreamer.email ? [{ userId: targetStreamer.email }, { userEmail: targetStreamer.email }] : []),
                   ...(targetOverlayToken ? [{ overlayToken: targetOverlayToken }, { token: targetOverlayToken }] : [])
-                ],
-                isEnabled: true
+                ]
               })
               .sort({ minAmountCondition: -1 })
               .toArray();

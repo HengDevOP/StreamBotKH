@@ -284,25 +284,6 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     });
   };
 
-  // Quick toggle on/off directly from card list
-  const handleToggleBoxStatus = async (box: AlertBox, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updatedStatus = !box.isEnabled;
-    setAlertBoxes((prev) =>
-      prev.map((b) => (b._id === box._id ? { ...b, isEnabled: updatedStatus } : b))
-    );
-
-    try {
-      await fetch(`/api/alert-boxes/${box._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isEnabled: updatedStatus })
-      });
-    } catch (e) {
-      console.error('Failed to update toggle:', e);
-    }
-  };
-
   // Quick test sound & OBS overlay trigger from card list
   const handleTestAlertBox = (box: AlertBox, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -441,13 +422,11 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
               <div
                 key={box._id}
                 onClick={() => handleOpenStudio(box)}
-                className={`group p-5 rounded-2xl bg-[#090D18] border transition-all duration-300 hover:border-cyan-500/50 hover:shadow-[0_0_25px_rgba(0,240,255,0.15)] cursor-pointer flex flex-col justify-between space-y-4 relative overflow-hidden ${
-                  box.isEnabled ? 'border-slate-800' : 'border-slate-800/40 opacity-60'
-                }`}
+                className="group p-5 rounded-2xl bg-[#090D18] border border-slate-800 transition-all duration-300 hover:border-cyan-500/50 hover:shadow-[0_0_25px_rgba(0,240,255,0.15)] cursor-pointer flex flex-col justify-between space-y-4 relative overflow-hidden"
               >
-                {/* Card Top: Name & Condition Badge */}
+                {/* Card Top: Condition Badges, Top-Right Delete Button & Name */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-1 min-w-0">
                       {(Array.isArray(box.conditions) && box.conditions.length > 0
                         ? box.conditions
@@ -477,27 +456,14 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
                       )}
                     </div>
 
-                    {/* Toggle ON/OFF Switch */}
                     <button
                       type="button"
-                      onClick={(e) => handleToggleBoxStatus(box, e)}
-                      className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-slate-800 transition-colors"
-                      title={box.isEnabled ? 'Click to deactivate' : 'Click to activate'}
+                      onClick={(e) => handleDeleteBoxCard(box, e)}
+                      title={`Delete ${box.name}`}
+                      aria-label={`Delete ${box.name}`}
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/50 border border-slate-800 hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0 cursor-pointer"
                     >
-                      <span className={`text-[10px] font-mono font-bold ${box.isEnabled ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {box.isEnabled ? 'ACTIVE' : 'MUTED'}
-                      </span>
-                      <div
-                        className={`w-8 h-4 rounded-full transition-colors relative p-0.5 ${
-                          box.isEnabled ? 'bg-cyan-400' : 'bg-slate-700'
-                        }`}
-                      >
-                        <div
-                          className={`w-3 h-3 rounded-full bg-slate-950 transition-transform ${
-                            box.isEnabled ? 'translate-x-4' : 'translate-x-0'
-                          }`}
-                        />
-                      </div>
+                      <Trash2 size={13} />
                     </button>
                   </div>
 
@@ -607,14 +573,6 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
                     >
                       <Edit2 size={12} />
                       <span className="hidden xs:inline">Manage</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeleteBoxCard(box, e)}
-                      title={`Delete ${box.name}`}
-                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/50 border border-slate-800 hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
-                    >
-                      <Trash2 size={13} />
                     </button>
                   </div>
                 </div>

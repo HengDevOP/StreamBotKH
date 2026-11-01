@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Target,
   Copy,
@@ -26,6 +27,7 @@ import {
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useSocket } from '../../context/SocketContext';
+import { useModal } from '../../context/ModalContext';
 import { GOAL_TEMPLATES, GoalTemplateRenderer, GoalTemplateMeta } from '../overlay/goalTemplates';
 
 export interface StreamGoal {
@@ -56,6 +58,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   totalRaised = 0
 }) => {
   const { socket } = useSocket();
+  const { showConfirm } = useModal();
 
   const [goals, setGoals] = useState<StreamGoal[]>([]);
   const [activeGoal, setActiveGoal] = useState<StreamGoal | null>(null);
@@ -74,8 +77,8 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
 
   // Form State
   const [formTitle, setFormTitle] = useState('');
-  const [formTarget, setFormTarget] = useState<number>(200);
-  const [formCurrent, setFormCurrent] = useState<number>(0);
+  const [formTargetInput, setFormTargetInput] = useState<string>('150');
+  const [formCurrentInput, setFormCurrentInput] = useState<string>('0');
   const [formColor, setFormColor] = useState<string>('#10B981');
   const [formTemplateStyle, setFormTemplateStyle] = useState<string>('cyber-neon');
   const [formShowBalance, setFormShowBalance] = useState<boolean>(true);
@@ -83,7 +86,11 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   const [formShowAnimation, setFormShowAnimation] = useState<boolean>(true);
   const [formEndDate, setFormEndDate] = useState<string>('');
   const [formIsActive, setFormIsActive] = useState<boolean>(true);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const parsedFormTarget = Math.max(1, parseFloat(formTargetInput) || 1);
+  const parsedFormCurrent = Math.max(0, parseFloat(formCurrentInput) || 0);
 
   // Copy status
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -118,8 +125,13 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
 
     const handleGoalUpdate = (payload: any) => {
       if (!payload || !payload.id) return;
-      setGoals((prev) =>
-        prev.map((g) => {
+      setGoals((prev) => {
+        const exists = prev.some((g) => g.id === payload.id);
+        if (!exists) {
+          const base = payload.isActive ? prev.map((g) => ({ ...g, isActive: false })) : prev;
+          return [payload as StreamGoal, ...base];
+        }
+        return prev.map((g) => {
           if (g.id === payload.id) {
             return {
               ...g,
@@ -139,10 +151,12 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
             return { ...g, isActive: false };
           }
           return g;
-        })
-      );
+        });
+      });
 
-      if (payload.isActive || (activeGoal && activeGoal.id === payload.id)) {
+      if (payload.isActive) {
+        setActiveGoal(payload as StreamGoal);
+      } else if (activeGoal && activeGoal.id === payload.id) {
         setActiveGoal((prev) => (prev ? { ...prev, ...payload } : payload));
       }
     };
@@ -170,9 +184,10 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   const openCreateModal = () => {
     setModalMode('create');
     setEditingId(null);
+    setFormError(null);
     setFormTitle('');
-    setFormTarget(150);
-    setFormCurrent(0);
+    setFormTargetInput('150');
+    setFormCurrentInput('0');
     setFormColor('#10B981');
     setFormTemplateStyle('cyber-neon');
     setFormShowBalance(true);
@@ -180,7 +195,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     setFormShowAnimation(true);
     const defaultDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     setFormEndDate(defaultDate);
-    setFormIsActive(goals.length === 0);
+    setFormIsActive(true);
     setIsModalOpen(true);
   };
 
@@ -188,9 +203,10 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   const openEditModal = (goal: StreamGoal) => {
     setModalMode('edit');
     setEditingId(goal.id);
+    setFormError(null);
     setFormTitle(goal.title);
-    setFormTarget(goal.targetAmount);
-    setFormCurrent(goal.currentAmount);
+    setFormTargetInput(String(goal.targetAmount ?? 150));
+    setFormCurrentInput(String(goal.currentAmount ?? 0));
     setFormColor(goal.accentColor || '#10B981');
     setFormTemplateStyle(goal.templateStyle || 'cyber-neon');
     setFormShowBalance(goal.showBalance !== false);
@@ -204,19 +220,27 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   // Save Goal (Create or Edit)
   const handleSaveGoal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle.trim()) return;
+    const cleanTitle = formTitle.trim();
+    if (!cleanTitle) {
+      setFormError('Please enter a goal title.');
+      return;
+    }
+
+    const targetNum = Math.max(1, parseFloat(formTargetInput) || 1);
+    const currentNum = Math.max(0, parseFloat(formCurrentInput) || 0);
 
     try {
       setIsSubmitting(true);
+      setFormError(null);
       if (modalMode === 'create') {
         const res = await fetch('/api/widgets/goals', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             token: streamerToken || 'demo-token',
-            title: formTitle.trim(),
-            targetAmount: formTarget,
-            currentAmount: formCurrent,
+            title: cleanTitle,
+            targetAmount: targetNum,
+            currentAmount: currentNum,
             accentColor: formColor,
             templateStyle: formTemplateStyle,
             showBalance: formShowBalance,
@@ -227,13 +251,21 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
           })
         });
         const data = await res.json();
-        if (data.success && data.goal) {
-          if (formIsActive) {
-            setGoals((prev) => [data.goal, ...prev.map((g) => ({ ...g, isActive: false }))]);
-            setActiveGoal(data.goal);
-          } else {
-            setGoals((prev) => [data.goal, ...prev]);
-          }
+        if (!res.ok || !data.success || !data.goal) {
+          setFormError(data?.error || 'Failed to create goal. Please try again.');
+          return;
+        }
+        setGoals((prev) => {
+          const filtered = prev.filter((g) => g.id !== data.goal.id);
+          return formIsActive
+            ? [data.goal, ...filtered.map((g) => ({ ...g, isActive: false }))]
+            : [data.goal, ...filtered];
+        });
+        if (formIsActive || !activeGoal) {
+          setActiveGoal(data.goal);
+        }
+        if (!formIsActive && filterStatus === 'active') {
+          setFilterStatus('all');
         }
       } else if (modalMode === 'edit' && editingId) {
         const res = await fetch('/api/widgets/goals', {
@@ -242,9 +274,9 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
           body: JSON.stringify({
             id: editingId,
             token: streamerToken || 'demo-token',
-            title: formTitle.trim(),
-            targetAmount: formTarget,
-            currentAmount: formCurrent,
+            title: cleanTitle,
+            targetAmount: targetNum,
+            currentAmount: currentNum,
             accentColor: formColor,
             templateStyle: formTemplateStyle,
             showBalance: formShowBalance,
@@ -255,22 +287,25 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
           })
         });
         const data = await res.json();
-        if (data.success && data.goal) {
-          setGoals((prev) =>
-            prev.map((g) => {
-              if (g.id === editingId) return data.goal;
-              if (formIsActive) return { ...g, isActive: false };
-              return g;
-            })
-          );
-          if (formIsActive || (activeGoal && activeGoal.id === editingId)) {
-            setActiveGoal(data.goal);
-          }
+        if (!res.ok || !data.success || !data.goal) {
+          setFormError(data?.error || 'Failed to update goal. Please try again.');
+          return;
+        }
+        setGoals((prev) =>
+          prev.map((g) => {
+            if (g.id === editingId) return data.goal;
+            if (formIsActive) return { ...g, isActive: false };
+            return g;
+          })
+        );
+        if (formIsActive || (activeGoal && activeGoal.id === editingId)) {
+          setActiveGoal(data.goal);
         }
       }
       setIsModalOpen(false);
     } catch (err) {
       console.error('[GoalWidgetManager] Error saving goal:', err);
+      setFormError('Network error while saving goal. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -422,24 +457,37 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     }
   };
 
-  // Delete Goal
-  const handleDeleteGoal = async (goalId: string) => {
-    if (!window.confirm('Are you sure you want to delete this goal?')) return;
-    try {
-      const res = await fetch(`/api/widgets/goals?id=${goalId}&token=${streamerToken || 'demo-token'}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (data.success) {
-        setGoals((prev) => prev.filter((g) => g.id !== goalId));
-        if (activeGoal && activeGoal.id === goalId) {
-          const remaining = goals.filter((g) => g.id !== goalId);
-          setActiveGoal(remaining[0] || null);
+  // Delete Goal with Confirmation Modal
+  const handleDeleteGoal = (goal: StreamGoal) => {
+    showConfirm({
+      title: 'Delete Goal?',
+      message: `Are you sure you want to delete "${goal.title}"? This action cannot be undone.`,
+      type: 'danger',
+      confirmText: 'Delete Goal',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/widgets/goals?id=${goal.id}&token=${streamerToken || 'demo-token'}`, {
+            method: 'DELETE'
+          });
+          const data = await res.json();
+          if (data.success) {
+            setGoals((prev) => {
+              const remaining = prev.filter((g) => g.id !== goal.id);
+              if (goal.isActive && remaining.length > 0) {
+                return remaining.map((g, idx) => (idx === 0 ? { ...g, isActive: true } : g));
+              }
+              return remaining;
+            });
+            if (activeGoal && activeGoal.id === goal.id) {
+              const remaining = goals.filter((g) => g.id !== goal.id);
+              setActiveGoal(remaining[0] ? { ...remaining[0], isActive: true } : null);
+            }
+          }
+        } catch (err) {
+          console.error('[GoalWidgetManager] Error deleting goal:', err);
         }
       }
-    } catch (err) {
-      console.error('[GoalWidgetManager] Error deleting goal:', err);
-    }
+    });
   };
 
   // Simulate Tip Addition into Active Goal
@@ -468,29 +516,37 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   };
 
   // Reset Active Goal to 0
-  const handleResetGoal = async () => {
+  const handleResetGoal = () => {
     if (!activeGoal) return;
-    if (!window.confirm('Reset current progress of this active goal to $0.00?')) return;
-    try {
-      const res = await fetch('/api/widgets/goals', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: activeGoal.id,
-          token: streamerToken || 'demo-token',
-          currentAmount: 0
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.goal) {
-        setGoals((prev) =>
-          prev.map((g) => (g.id === activeGoal.id ? { ...g, currentAmount: 0 } : g))
-        );
-        setActiveGoal((prev) => (prev ? { ...prev, currentAmount: 0 } : null));
+    const targetGoal = activeGoal;
+    showConfirm({
+      title: 'Reset Goal Progress?',
+      message: `Reset current progress of "${targetGoal.title}" back to $0.00?`,
+      type: 'warning',
+      confirmText: 'Reset Progress',
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/widgets/goals', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: targetGoal.id,
+              token: streamerToken || 'demo-token',
+              currentAmount: 0
+            })
+          });
+          const data = await res.json();
+          if (data.success && data.goal) {
+            setGoals((prev) =>
+              prev.map((g) => (g.id === targetGoal.id ? { ...g, currentAmount: 0 } : g))
+            );
+            setActiveGoal((prev) => (prev && prev.id === targetGoal.id ? { ...prev, currentAmount: 0 } : prev));
+          }
+        } catch (err) {
+          console.error('[GoalWidgetManager] Error resetting goal:', err);
+        }
       }
-    } catch (err) {
-      console.error('[GoalWidgetManager] Error resetting goal:', err);
-    }
+    });
   };
 
   // Filtered list
@@ -860,9 +916,9 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteGoal(goal.id)}
+                        onClick={() => handleDeleteGoal(goal)}
                         title="Delete goal"
-                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-red-400 transition-colors"
+                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -876,433 +932,544 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
       </div>
 
       {/* ============================================================== */}
-      {/* 4. CREATE / EDIT GOAL MODAL WITH 20-TEMPLATE SELECTOR          */}
+      {/* 4. CREATE / EDIT GOAL MODAL (PORTALED WEB APPLICATION MODAL)   */}
       {/* ============================================================== */}
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
-          onClick={() => setIsModalOpen(false)}
-        >
+      {isModalOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
           <div
-            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#090D18] border border-emerald-500/40 p-6 shadow-2xl relative space-y-4"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[9990] flex items-stretch md:items-center justify-center p-0 md:p-4 bg-[#090D18] md:bg-black/80 md:backdrop-blur-md overscroll-none animate-fade-in"
           >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                  <Target size={18} />
-                </div>
-                <h3 className="text-lg font-bold text-white font-['Chakra_Petch']">
-                  {modalMode === 'create' ? 'Create New Goal' : 'Edit Goal & Template'}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSaveGoal} className="space-y-4">
-              {/* Goal Title */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-slate-300 block">
-                  Goal Title / Milestone *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. New Streaming Setup"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
-                />
-              </div>
-
-              {/* Target & Current Amount */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono font-bold text-slate-300 block">
-                    Target Goal ($) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    step={1}
-                    value={formTarget}
-                    onChange={(e) => setFormTarget(Math.max(1, parseFloat(e.target.value) || 1))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-mono font-bold text-slate-300 block">
-                    Starting Amount ($)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={formCurrent}
-                    onChange={(e) => setFormCurrent(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-              </div>
-
-              {/* Styling Template Selector with Modal Browser */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
-                    <Palette size={13} className="text-emerald-400" />
-                    <span>Styling Template (20 Designs) *</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTemplateModalTarget('form');
-                      setIsTemplateModalOpen(true);
-                    }}
-                    className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 font-bold underline flex items-center gap-1"
-                  >
-                    <span>Browse All Previews</span>
-                    <ExternalLink size={11} />
-                  </button>
-                </div>
-
-                {/* Selected Template Card Banner */}
-                {(() => {
-                  const sel = GOAL_TEMPLATES.find((t) => t.id === formTemplateStyle) || GOAL_TEMPLATES[0];
-                  return (
-                    <div
-                      onClick={() => {
-                        setTemplateModalTarget('form');
-                        setIsTemplateModalOpen(true);
-                      }}
-                      className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyan-500/50 cursor-pointer flex items-center justify-between gap-3 transition-colors group"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-3.5 h-3.5 rounded-full flex-shrink-0" style={{ backgroundColor: sel.previewColor }} />
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-white font-['Chakra_Petch'] truncate">
-                            {sel.name}
-                          </div>
-                          <div className="text-[10px] text-slate-400 truncate">{sel.description}</div>
-                        </div>
-                      </div>
-                      <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-mono font-bold group-hover:bg-cyan-500/20 transition-colors flex-shrink-0">
-                        Change
-                      </span>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* End Date */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-slate-300 block">
-                  Target Deadline Date
-                </label>
-                <input
-                  type="date"
-                  value={formEndDate}
-                  onChange={(e) => setFormEndDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
-                />
-              </div>
-
-              {/* Accent Glow Color */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-bold text-slate-300 block">
-                  Custom Accent / Glow Color
-                </label>
-                <div className="flex items-center gap-2">
-                  {['#10B981', '#00F0FF', '#A855F7', '#F59E0B', '#EF4444', '#EC4899', '#3B82F6', '#FBBF24'].map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setFormColor(c)}
-                      className={`w-7 h-7 rounded-lg border-2 transition-transform ${
-                        formColor === c ? 'scale-110 border-white' : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                  <input
-                    type="text"
-                    value={formColor}
-                    onChange={(e) => setFormColor(e.target.value)}
-                    className="w-24 px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-white text-xs font-mono text-center ml-auto"
-                  />
-                </div>
-              </div>
-
-              {/* Show Balance Toggle Setting */}
-              <div className="pt-1">
-                <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer select-none">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-mono text-slate-200 font-bold block">
-                      Show Balance ($ current / $ target)
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">
-                      Display dollar amounts on the right side next to the goal title
-                    </span>
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="w-full h-full max-h-full md:h-auto md:max-h-[90dvh] md:max-w-2xl rounded-none md:rounded-3xl bg-[#090D18] border-0 md:border border-emerald-500/40 shadow-none md:shadow-[0_24px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden relative text-slate-100 antialiased"
+            >
+              {/* 1. Pinned Modal Header */}
+              <div className="px-4 md:px-6 pt-[max(0.875rem,env(safe-area-inset-top))] pb-3.5 md:py-4 border-b border-slate-800/90 bg-[#0B101E] flex items-center justify-between gap-3 flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                    <Target size={18} />
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={formShowBalance}
-                    onChange={(e) => setFormShowBalance(e.target.checked)}
-                    className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0 focus:ring-offset-0"
-                  />
-                </label>
-              </div>
-
-              {/* Show Background Toggle Setting */}
-              <div className="pt-1">
-                <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer select-none">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-mono text-slate-200 font-bold block">
-                      Show Container Background
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">
-                      Turn off for a clean 100% transparent floating bar overlay directly over stream gameplay
-                    </span>
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] truncate leading-tight">
+                      {modalMode === 'create' ? 'Create New Goal' : 'Edit Goal & Template'}
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] font-mono text-slate-400 truncate">
+                      Real-time OBS milestone bar with custom styling & animation
+                    </p>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={formShowBackground}
-                    onChange={(e) => setFormShowBackground(e.target.checked)}
-                    className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0 focus:ring-offset-0"
-                  />
-                </label>
-              </div>
-
-              {/* Show Animation Toggle Setting */}
-              <div className="pt-1">
-                <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer select-none">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-mono text-slate-200 font-bold block flex items-center gap-1.5">
-                      <Sparkles size={13} className="text-amber-400" />
-                      <span>Enable Progress Bar Animation</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">
-                      Each template features its own unique dynamic animation (hazard stripes, golden light sweep, arcade strobe, radar beam, etc.)
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={formShowAnimation}
-                    onChange={(e) => setFormShowAnimation(e.target.checked)}
-                    className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0 focus:ring-offset-0"
-                  />
-                </label>
-              </div>
-
-              {/* Set as Active Checkbox */}
-              <div className="pt-1">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={formIsActive}
-                    onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-emerald-500 focus:ring-0 focus:ring-offset-0"
-                  />
-                  <span className="text-xs font-mono text-slate-300 font-bold">
-                    Set as Active Goal for OBS Studio
-                  </span>
-                </label>
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex items-center gap-3 pt-3 border-t border-slate-800">
+                </div>
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-semibold text-xs transition-colors"
+                  aria-label="Close modal"
+                  className="p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors flex-shrink-0 cursor-pointer"
                 >
-                  Cancel
+                  <X size={18} />
                 </button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="md"
-                  disabled={isSubmitting || !formTitle.trim()}
-                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
-                >
-                  {isSubmitting ? 'Saving...' : modalMode === 'create' ? 'Create Goal' : 'Save Changes'}
-                </Button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* ============================================================== */}
-      {/* 5. TEMPLATE PREVIEWS MODAL (ALL 20 UNIQUE DESIGNS)             */}
-      {/* ============================================================== */}
-      {isTemplateModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn"
-          onClick={() => setIsTemplateModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-5xl max-h-[92vh] bg-[#080C16] border border-cyan-500/30 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="p-5 sm:p-6 border-b border-slate-800 flex items-start justify-between gap-4 bg-slate-950/70 flex-shrink-0">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                    <Palette size={18} />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-white font-['Chakra_Petch']">
-                    Goal Styling Templates (20 Unique Designs)
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-400">
-                  Click any template to select it. Each template features custom typography, frames, glowing accents, and themed progress bar animations.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsTemplateModalOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
-              >
-                <X size={20} />
-              </button>
-            </div>
+              {/* 2. Form Wrapper (Scrollable Body + Pinned Footer) */}
+              <form onSubmit={handleSaveGoal} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4">
+                  {/* Inline Error Feedback */}
+                  {formError && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs font-mono text-red-300">
+                      {formError}
+                    </div>
+                  )}
 
-            {/* Category Filter Pills */}
-            <div className="px-5 sm:px-6 py-3 border-b border-slate-800/80 bg-slate-950/40 flex items-center gap-1.5 overflow-x-auto flex-shrink-0">
-              {(['All', 'Cyber', 'Gaming', 'Aesthetic', 'Retro', 'Minimal', 'Special'] as const).map((cat) => {
-                const count = cat === 'All' ? GOAL_TEMPLATES.length : GOAL_TEMPLATES.filter((t) => t.category === cat).length;
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setTemplateFilter(cat)}
-                    className={`px-3 py-1 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap ${
-                      templateFilter === cat
-                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                        : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'
-                    }`}
-                  >
-                    {cat} ({count})
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Template Preview Cards Grid */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {filteredTemplates.map((tpl) => {
-                  const isCurrentSelected =
-                    templateModalTarget === 'form'
-                      ? formTemplateStyle === tpl.id
-                      : (activeGoal?.templateStyle || 'cyber-neon') === tpl.id;
-
-                  return (
+                  {/* Live Real-Time OBS Goal Preview Strip */}
+                  <div className="rounded-2xl bg-[#040711] border border-slate-800/90 p-3.5 sm:p-5 flex items-center justify-center relative overflow-hidden min-h-[104px] sm:min-h-[120px]">
                     <div
-                      key={tpl.id}
-                      onClick={() => handleSelectTemplateFromModal(tpl.id, tpl.previewColor)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-3 relative group ${
-                        isCurrentSelected
-                          ? 'bg-cyan-950/30 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.25)] ring-1 ring-cyan-400/50'
-                          : 'bg-[#090D18] border-slate-800/90 hover:border-slate-700 hover:bg-[#0C1222]'
-                      }`}
-                    >
-                      {/* Top Header Row */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm"
-                            style={{ backgroundColor: tpl.previewColor }}
-                          />
-                          <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] truncate">
-                            {tpl.name}
-                          </h4>
-                          <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-                            {tpl.category}
-                          </span>
-                        </div>
+                      className="absolute inset-0 opacity-15 pointer-events-none"
+                      style={{
+                        backgroundImage:
+                          'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
+                        backgroundSize: '18px 18px',
+                        backgroundPosition: '0 0, 0 9px, 9px -9px, -9px 0px'
+                      }}
+                    />
+                    <span className="absolute top-2 left-3 text-[9px] font-mono uppercase tracking-wider text-slate-500 select-none">
+                      Live Preview
+                    </span>
+                    <div className="relative z-10 w-full flex justify-center pt-2 sm:pt-0 transform scale-[0.92] sm:scale-100 origin-center">
+                      <GoalTemplateRenderer
+                        title={formTitle.trim() || 'New Streaming Setup'}
+                        targetAmount={parsedFormTarget}
+                        currentAmount={parsedFormCurrent}
+                        accentColor={formColor || '#10B981'}
+                        templateStyle={formTemplateStyle || 'cyber-neon'}
+                        showBalance={formShowBalance}
+                        showBackground={formShowBackground}
+                        showAnimation={formShowAnimation}
+                        endDate={formEndDate || null}
+                      />
+                    </div>
+                  </div>
 
-                        {isCurrentSelected ? (
-                          <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold flex-shrink-0">
-                            <Check size={11} />
-                            Selected
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-mono text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                            Click to apply
-                          </span>
-                        )}
-                      </div>
+                  {/* Row 1: Goal Title & Target Deadline Date */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-7 space-y-1.5">
+                      <label className="text-xs font-mono font-bold text-slate-300 block">
+                        Goal Title / Milestone *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        autoFocus={modalMode === 'create'}
+                        placeholder="e.g. New Streaming Setup"
+                        value={formTitle}
+                        onChange={(e) => {
+                          setFormTitle(e.target.value);
+                          if (formError) setFormError(null);
+                        }}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400 transition-colors"
+                      />
+                    </div>
 
-                      {/* Live Rendered Template Preview */}
-                      <div className="w-full rounded-xl bg-[#040711] border border-slate-800/70 p-3 sm:p-4 flex items-center justify-center relative overflow-hidden pointer-events-none">
-                        <div
-                          className="absolute inset-0 opacity-10 pointer-events-none"
-                          style={{
-                            backgroundImage:
-                              'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
-                            backgroundSize: '16px 16px',
-                            backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px'
+                    <div className="sm:col-span-5 space-y-1.5">
+                      <label className="text-xs font-mono font-bold text-slate-300 block">
+                        Target Deadline Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formEndDate}
+                        onChange={(e) => setFormEndDate(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Target Goal ($) & Starting Amount ($) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-mono font-bold text-slate-300 block">
+                        Target Goal ($) *
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-emerald-400 select-none">
+                          $
+                        </span>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          step="any"
+                          inputMode="decimal"
+                          value={formTargetInput}
+                          onChange={(e) => setFormTargetInput(e.target.value)}
+                          onBlur={() => {
+                            const clamped = Math.max(1, parseFloat(formTargetInput) || 1);
+                            setFormTargetInput(String(clamped));
                           }}
+                          className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400 transition-colors"
                         />
-                        <div className="w-full max-w-sm relative z-10 transform scale-95 sm:scale-100 origin-center">
-                          <GoalTemplateRenderer
-                            title={activeGoal ? activeGoal.title : tpl.name}
-                            targetAmount={100}
-                            currentAmount={68}
-                            accentColor={tpl.previewColor}
-                            templateStyle={tpl.id}
-                            showBalance={true}
-                            showBackground={true}
-                            showAnimation={true}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Description & Action Button */}
-                      <div className="flex items-center justify-between gap-3 pt-1">
-                        <p className="text-[11px] text-slate-400 line-clamp-1">{tpl.description}</p>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectTemplateFromModal(tpl.id, tpl.previewColor);
-                          }}
-                          className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 ${
-                            isCurrentSelected
-                              ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
-                              : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800'
-                          }`}
-                        >
-                          {isCurrentSelected ? (
-                            <>
-                              <Check size={13} />
-                              <span>Active</span>
-                            </>
-                          ) : (
-                            <span>Use Template</span>
-                          )}
-                        </button>
                       </div>
                     </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-mono font-bold text-slate-300 block">
+                        Starting Amount ($)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-400 select-none">
+                          $
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          inputMode="decimal"
+                          value={formCurrentInput}
+                          onChange={(e) => setFormCurrentInput(e.target.value)}
+                          onBlur={() => {
+                            const clamped = Math.max(0, parseFloat(formCurrentInput) || 0);
+                            setFormCurrentInput(String(clamped));
+                          }}
+                          className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-emerald-400 transition-colors"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Styling Template Selector (20 Designs) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
+                        <Palette size={13} className="text-emerald-400" />
+                        <span>Styling Template (20 Designs)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTemplateModalTarget('form');
+                          setIsTemplateModalOpen(true);
+                        }}
+                        className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 font-bold underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Browse All Previews</span>
+                        <ExternalLink size={11} />
+                      </button>
+                    </div>
+
+                    {(() => {
+                      const sel = GOAL_TEMPLATES.find((t) => t.id === formTemplateStyle) || GOAL_TEMPLATES[0];
+                      return (
+                        <div
+                          onClick={() => {
+                            setTemplateModalTarget('form');
+                            setIsTemplateModalOpen(true);
+                          }}
+                          className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyan-500/50 cursor-pointer flex items-center justify-between gap-3 transition-colors group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full flex-shrink-0 shadow-sm"
+                              style={{ backgroundColor: sel.previewColor }}
+                            />
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-white font-['Chakra_Petch'] truncate">
+                                {sel.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate">{sel.description}</div>
+                            </div>
+                          </div>
+                          <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-mono font-bold group-hover:bg-cyan-500/20 transition-colors flex-shrink-0">
+                            Change
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Row 4: Responsive Accent / Glow Color Picker */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-mono font-bold text-slate-300 block">
+                      Custom Accent / Glow Color
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {['#10B981', '#00F0FF', '#A855F7', '#F59E0B', '#EF4444', '#EC4899', '#3B82F6', '#FBBF24'].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setFormColor(c)}
+                          aria-label={`Select color ${c}`}
+                          className={`w-7 h-7 rounded-lg border-2 transition-transform cursor-pointer ${
+                            formColor.toUpperCase() === c ? 'scale-110 border-white shadow-md' : 'border-transparent hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        <input
+                          type="color"
+                          value={/^#[0-9A-Fa-f]{6}$/.test(formColor) ? formColor : '#10B981'}
+                          onChange={(e) => setFormColor(e.target.value.toUpperCase())}
+                          className="w-7 h-7 rounded-lg bg-transparent border border-slate-700 cursor-pointer p-0 overflow-hidden"
+                          title="Pick custom color"
+                        />
+                        <input
+                          type="text"
+                          value={formColor}
+                          onChange={(e) => setFormColor(e.target.value)}
+                          maxLength={9}
+                          className="w-24 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white text-xs font-mono text-center focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 5: Responsive 2x2 Display & OBS Settings Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setFormShowBalance((v) => !v)}
+                      className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-xs font-mono text-slate-200 font-bold block truncate">
+                          Show Balance ($ / $)
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Display dollar progress next to title
+                        </span>
+                      </div>
+                      <span
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors flex items-center flex-shrink-0 ${
+                          formShowBalance ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'
+                        }`}
+                      >
+                        <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormShowBackground((v) => !v)}
+                      className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-xs font-mono text-slate-200 font-bold block truncate">
+                          Container Background
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Off = 100% transparent floating bar
+                        </span>
+                      </div>
+                      <span
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors flex items-center flex-shrink-0 ${
+                          formShowBackground ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'
+                        }`}
+                      >
+                        <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormShowAnimation((v) => !v)}
+                      className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-xs font-mono text-slate-200 font-bold flex items-center gap-1.5 truncate">
+                          <Sparkles size={12} className="text-amber-400 flex-shrink-0" />
+                          <span className="truncate">Bar Animation</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Dynamic shimmer, scanline & glow
+                        </span>
+                      </div>
+                      <span
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors flex items-center flex-shrink-0 ${
+                          formShowAnimation ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'
+                        }`}
+                      >
+                        <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormIsActive((v) => !v)}
+                      className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-left transition-colors cursor-pointer ${
+                        formIsActive
+                          ? 'bg-emerald-950/25 border-emerald-500/40'
+                          : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <span className="text-xs font-mono text-slate-200 font-bold block truncate">
+                          Active on OBS Studio
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Display immediately on live overlay
+                        </span>
+                      </div>
+                      <span
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors flex items-center flex-shrink-0 ${
+                          formIsActive ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'
+                        }`}
+                      >
+                        <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Pinned Modal Action Footer */}
+                <div className="px-4 md:px-6 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] md:py-3.5 border-t border-slate-800/90 bg-[#0B101E] flex items-center flex-shrink-0">
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    loading={isSubmitting}
+                    disabled={isSubmitting || !formTitle.trim()}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+                  >
+                    {isSubmitting ? 'Saving...' : modalMode === 'create' ? 'Create Goal' : 'Save Changes'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ============================================================== */}
+      {/* 5. TEMPLATE PREVIEWS MODAL (PORTALED ABOVE CREATE GOAL MODAL)  */}
+      {/* ============================================================== */}
+      {isTemplateModalOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9995] flex items-stretch md:items-center justify-center p-0 md:p-6 bg-[#080C16] md:bg-black/85 md:backdrop-blur-md overscroll-none animate-fade-in"
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="w-full h-full max-h-full md:h-auto md:max-h-[92dvh] md:max-w-5xl rounded-none md:rounded-3xl bg-[#080C16] border-0 md:border border-cyan-500/30 shadow-none md:shadow-2xl flex flex-col overflow-hidden text-slate-100 antialiased"
+            >
+              {/* Modal Header */}
+              <div className="px-4 md:px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-3.5 md:py-5 border-b border-slate-800 flex items-start justify-between gap-4 bg-slate-950/70 flex-shrink-0">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
+                      <Palette size={18} />
+                    </div>
+                    <h3 className="text-base sm:text-xl font-bold text-white font-['Chakra_Petch'] truncate">
+                      Goal Styling Templates (20 Designs)
+                    </h3>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-slate-400 line-clamp-2">
+                    Click any template to apply it. Each template includes custom typography, frames, glowing accents, and progress bar animations.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsTemplateModalOpen(false)}
+                  aria-label="Close templates modal"
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0 cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-b border-slate-800/80 bg-slate-950/40 flex items-center gap-1.5 overflow-x-auto flex-shrink-0">
+                {(['All', 'Cyber', 'Gaming', 'Aesthetic', 'Retro', 'Minimal', 'Special'] as const).map((cat) => {
+                  const count = cat === 'All' ? GOAL_TEMPLATES.length : GOAL_TEMPLATES.filter((t) => t.category === cat).length;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setTemplateFilter(cat)}
+                      className={`px-3 py-1 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer ${
+                        templateFilter === cat
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                          : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'
+                      }`}
+                    >
+                      {cat} ({count})
+                    </button>
                   );
                 })}
               </div>
+
+              {/* Template Preview Cards Grid */}
+              <div className="p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto overscroll-contain space-y-4 flex-1 min-h-0">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
+                  {filteredTemplates.map((tpl) => {
+                    const isCurrentSelected =
+                      templateModalTarget === 'form'
+                        ? formTemplateStyle === tpl.id
+                        : (activeGoal?.templateStyle || 'cyber-neon') === tpl.id;
+
+                    return (
+                      <div
+                        key={tpl.id}
+                        onClick={() => handleSelectTemplateFromModal(tpl.id, tpl.previewColor)}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-3 relative group ${
+                          isCurrentSelected
+                            ? 'bg-cyan-950/30 border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.25)] ring-1 ring-cyan-400/50'
+                            : 'bg-[#090D18] border-slate-800/90 hover:border-slate-700 hover:bg-[#0C1222]'
+                        }`}
+                      >
+                        {/* Top Header Row */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm"
+                              style={{ backgroundColor: tpl.previewColor }}
+                            />
+                            <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] truncate">
+                              {tpl.name}
+                            </h4>
+                            <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 flex-shrink-0">
+                              {tpl.category}
+                            </span>
+                          </div>
+
+                          {isCurrentSelected ? (
+                            <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold flex-shrink-0">
+                              <Check size={11} />
+                              Selected
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                              Click to apply
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Live Rendered Template Preview */}
+                        <div className="w-full rounded-xl bg-[#040711] border border-slate-800/70 p-3 sm:p-4 flex items-center justify-center relative overflow-hidden pointer-events-none">
+                          <div
+                            className="absolute inset-0 opacity-10 pointer-events-none"
+                            style={{
+                              backgroundImage:
+                                'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
+                              backgroundSize: '16px 16px',
+                              backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px'
+                            }}
+                          />
+                          <div className="w-full max-w-sm relative z-10 transform scale-95 sm:scale-100 origin-center">
+                            <GoalTemplateRenderer
+                              title={
+                                templateModalTarget === 'form' && formTitle.trim()
+                                  ? formTitle.trim()
+                                  : activeGoal
+                                  ? activeGoal.title
+                                  : tpl.name
+                              }
+                              targetAmount={100}
+                              currentAmount={68}
+                              accentColor={tpl.previewColor}
+                              templateStyle={tpl.id}
+                              showBalance={true}
+                              showBackground={true}
+                              showAnimation={true}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Description & Action Button */}
+                        <div className="flex items-center justify-between gap-3 pt-1">
+                          <p className="text-[11px] text-slate-400 line-clamp-1">{tpl.description}</p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectTemplateFromModal(tpl.id, tpl.previewColor);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+                              isCurrentSelected
+                                ? 'bg-cyan-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+                                : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800'
+                            }`}
+                          >
+                            {isCurrentSelected ? (
+                              <>
+                                <Check size={13} />
+                                <span>Active</span>
+                              </>
+                            ) : (
+                              <span>Use Template</span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

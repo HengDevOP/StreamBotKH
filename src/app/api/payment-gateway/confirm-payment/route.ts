@@ -242,8 +242,7 @@ export async function POST(req: NextRequest) {
             ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
             ...(streamer.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
             ...(resolvedOverlayToken ? [{ overlayToken: resolvedOverlayToken }, { token: resolvedOverlayToken }] : [])
-          ],
-          isEnabled: true
+          ]
         })
         .sort({ minAmountCondition: -1 })
         .toArray();

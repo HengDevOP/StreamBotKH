@@ -144,7 +144,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       return box.conditions.map((c, idx) => ({
         id: c.id || `cond_${idx}`,
         minAmountCondition: Number(c.minAmountCondition) > 0 ? Number(c.minAmountCondition) : 0.01,
-        isEnabled: c.isEnabled !== false,
+        isEnabled: true,
         templateStyle: c.templateStyle || box.templateStyle || 'neon-box',
         showImage: c.showImage !== false,
         mediaUrl: c.mediaUrl ?? box.mediaUrl ?? 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
@@ -208,10 +208,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [conditions, setConditions] = useState<AlertConditionTier[]>(initialConditions);
   const [activeConditionId, setActiveConditionId] = useState<string>(firstTier.id);
 
-  // Form State (Box-level: name & isEnabled; Tier-level: active condition settings)
+  // Form State (Box-level: name; Tier-level: active condition settings)
   const [name, setName] = useState((box?.name || 'Standard Box').slice(0, 16));
   const [minAmountCondition, setMinAmountCondition] = useState<number>(firstTier.minAmountCondition);
-  const [isEnabled, setIsEnabled] = useState<boolean>(box?.isEnabled ?? true);
   const [templateStyle, setTemplateStyle] = useState<'neon-box' | 'glass-hologram' | 'cyber-glitch' | 'arcade' | 'minimal'>(
     firstTier.templateStyle || 'neon-box'
   );
@@ -518,22 +517,18 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   // Baseline snapshot to detect unsaved edits and guard window reload / navigation
   const [savedBaseline, setSavedBaseline] = useState<{
     name: string;
-    isEnabled: boolean;
     conditions: AlertConditionTier[];
   }>(() => ({
     name: (box?.name || 'Standard Box').slice(0, 16),
-    isEnabled: box?.isEnabled ?? true,
     conditions: initialConditions
   }));
 
-  const serializeBoxState = (boxName: string, enabled: boolean, tiers: AlertConditionTier[]) =>
+  const serializeBoxState = (boxName: string, tiers: AlertConditionTier[]) =>
     JSON.stringify({
       name: boxName.trim().slice(0, 16),
-      isEnabled: Boolean(enabled),
       conditions: tiers.map((t) => ({
         id: t.id,
         minAmountCondition: Number(t.minAmountCondition) > 0 ? Number(t.minAmountCondition) : 0.01,
-        isEnabled: t.isEnabled !== false,
         templateStyle: t.templateStyle || 'neon-box',
         showImage: t.showImage !== false,
         mediaUrl: t.mediaUrl || '',
@@ -563,8 +558,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
 
   const hasUnsavedChanges =
     isNew ||
-    serializeBoxState(name, isEnabled, liveConditionsSnapshot) !==
-      serializeBoxState(savedBaseline.name, savedBaseline.isEnabled, savedBaseline.conditions);
+    serializeBoxState(name, liveConditionsSnapshot) !==
+      serializeBoxState(savedBaseline.name, savedBaseline.conditions);
 
   // Prevent accidental browser reload / tab close when there are unsaved changes
   useEffect(() => {
@@ -580,7 +575,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
 
   const handleResetChanges = () => {
     setName(savedBaseline.name);
-    setIsEnabled(savedBaseline.isEnabled);
     setConditions(savedBaseline.conditions);
     const target =
       savedBaseline.conditions.find((c) => c.id === activeConditionId) || savedBaseline.conditions[0];
@@ -920,7 +914,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       const payload = {
         name,
         minAmountCondition: lowestCondition > 0 ? lowestCondition : 0.01,
-        isEnabled,
+        isEnabled: true,
         templateStyle: primaryTier.templateStyle,
         showImage: primaryTier.showImage,
         mediaUrl: primaryTier.mediaUrl,
@@ -962,7 +956,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         if (res.ok && data.success) {
           setSavedBaseline({
             name: name.trim().slice(0, 16),
-            isEnabled,
             conditions: finalConditions
           });
           onSaveSuccess(data.alertBox);
@@ -979,7 +972,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         if (res.ok && data.success) {
           setSavedBaseline({
             name: name.trim().slice(0, 16),
-            isEnabled,
             conditions: finalConditions
           });
           onSaveSuccess(data.alertBox);
@@ -2271,15 +2263,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                     <p className="text-[10px] text-slate-400 font-mono leading-relaxed">
                       Copy or open this box&apos;s dedicated Browser Source overlay for OBS Studio (1920x1080).
                     </p>
-                  </div>
-
-                  {/* Active Box Toggle */}
-                  <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-mono font-bold text-slate-200">Box Active Status</div>
-                      <div className="text-[11px] text-slate-400">Enable or disable this alert box</div>
-                    </div>
-                    <Switch checked={isEnabled} onChange={setIsEnabled} />
                   </div>
                 </div>
               )}

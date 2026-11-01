@@ -675,7 +675,7 @@ export const MultiStreamPage: React.FC = () => {
     }
   }, [videoDuration]);
 
-  // Handle escape key and body scroll lock for unconfigured tip popup modal
+  // Handle escape key for unconfigured tip popup modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -683,11 +683,9 @@ export const MultiStreamPage: React.FC = () => {
       }
     };
     if (isUnconfiguredTipModalOpen) {
-      document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
     }
     return () => {
-      document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isUnconfiguredTipModalOpen]);
@@ -858,7 +856,7 @@ export const MultiStreamPage: React.FC = () => {
       if (exists) return prev;
       const ytId = extractYoutubeId(user.liveStreamUrl) || '';
       const userChannel: StreamerClient = {
-        id: user.userId || user.username,
+        id: (user as any).userId || user.id || user.username,
         name: user.displayName || user.username,
         username: user.username,
         avatar: user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`,
@@ -1415,7 +1413,7 @@ export const MultiStreamPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full h-screen h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#060911] text-slate-100 flex flex-col font-sans cursor-default select-text antialiased selection:bg-cyan-500/30 selection:text-white">
+    <div className="app-viewport-lock fixed inset-0 w-full h-[100dvh] max-h-[100dvh] overflow-hidden overscroll-none bg-[#060911] text-slate-100 flex flex-col font-sans cursor-default select-text antialiased selection:bg-cyan-500/30 selection:text-white">
       {/* ============================================================== */}
       {/* 1. TOP APPLICATION NAVIGATION BAR                              */}
       {/* ============================================================== */}
@@ -1511,7 +1509,7 @@ export const MultiStreamPage: React.FC = () => {
             </div>
 
             {/* Navmenu Streamers List (Live sorted to top) */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-2">
               <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-bold mb-1">
                 Select Stream to Watch ({filteredStreamers.length})
               </div>
@@ -1534,13 +1532,13 @@ export const MultiStreamPage: React.FC = () => {
         {/* ============================================================ */}
         <main
           ref={mainStageScrollRef}
-          className={`w-full lg:w-[clamp(30rem,calc(((100dvh-21.25rem)*16/9)+1.5rem),calc(100%-20rem))] flex flex-col min-w-0 bg-[#060911] ${
-            isFullscreen ? 'overflow-visible' : 'overflow-hidden lg:overflow-y-auto'
-          } p-1.5 sm:p-3 gap-1.5 sm:gap-2 shrink-0 lg:flex-none lg:h-full scroll-smooth`}
+          className={`w-full lg:w-[clamp(26rem,calc(((100dvh-21rem)*16/9)+1.5rem),calc(100%-21rem))] flex flex-col min-w-0 min-h-0 bg-[#060911] ${
+            isFullscreen ? 'overflow-visible' : 'overflow-hidden'
+          } p-1.5 sm:p-2.5 lg:p-3 gap-1.5 sm:gap-2 shrink-0 lg:flex-none lg:h-full`}
         >
-          {/* Top-Left Responsive 16:9 Video Wrapper */}
-          <div className="w-full max-w-[calc((100dvh-18rem)*16/9)] lg:max-w-none mx-auto lg:mx-0 flex flex-col gap-1.5 sm:gap-2 shrink-0">
-            {/* 1. Video Player Canvas (True 16:9 aspect-video — Expands & Rotates Horizontally in Fullscreen) */}
+          {/* Top-Left Responsive 16:9 Video Wrapper (Non-Scrolling Fit to Screen) */}
+          <div className="w-full lg:flex-1 lg:min-h-0 mx-auto lg:mx-0 flex flex-col gap-1.5 sm:gap-2 shrink-0 lg:shrink">
+            {/* 1. Video Player Canvas (True 16:9 on mobile/desktop — Never Overflows Viewport) */}
             <div
               ref={videoStageRef}
               onMouseMove={() => {
@@ -1552,7 +1550,7 @@ export const MultiStreamPage: React.FC = () => {
               className={
                 isFullscreen
                   ? 'fixed inset-0 z-[100] w-full h-full bg-black overflow-hidden flex items-center justify-center'
-                  : 'relative w-full aspect-video rounded-xl sm:rounded-2xl bg-[#04060A] border border-slate-800/80 overflow-hidden shadow-2xl flex items-center justify-center shrink-0'
+                  : 'relative w-full max-h-[36dvh] sm:max-h-[42dvh] lg:max-h-[calc((100vw-22.5rem)*9/16)] aspect-video lg:aspect-auto lg:flex-1 lg:min-h-0 mx-auto rounded-xl sm:rounded-2xl bg-[#04060A] border border-slate-800/80 overflow-hidden shadow-2xl flex items-center justify-center shrink-0 lg:shrink'
               }
             >
             <div
@@ -1938,7 +1936,7 @@ export const MultiStreamPage: React.FC = () => {
           </div>
 
           {/* 3. Desktop Recommended Streamers Section (1-Row Left/Right Scrollable Carousel) */}
-          <section className="hidden lg:flex lg:flex-col gap-2 pt-0.5 pb-1 shrink-0 w-full">
+          <section className="hidden lg:flex lg:flex-col gap-1.5 pt-0.5 shrink-0 w-full">
             <div className="flex items-center justify-between px-0.5">
               <div className="flex items-center gap-2">
                 <Sparkles size={15} className="text-emerald-400" />
@@ -2034,7 +2032,7 @@ export const MultiStreamPage: React.FC = () => {
                           handleSelectRecommendedStreamer(s);
                         }
                       }}
-                      className={`group relative w-[195px] xl:w-[210px] shrink-0 snap-start rounded-xl bg-[#090D18] border transition-all duration-200 overflow-hidden cursor-pointer flex flex-col shadow-lg ${
+                      className={`group relative w-[180px] xl:w-[198px] shrink-0 snap-start rounded-xl bg-[#090D18] border transition-all duration-200 overflow-hidden cursor-pointer flex flex-col shadow-lg ${
                         isCurrent
                           ? 'border-emerald-500/70 ring-1 ring-emerald-500/30'
                           : 'border-slate-800/80 hover:border-emerald-500/50 hover:bg-[#0C1222] hover:shadow-emerald-950/30'
@@ -2333,7 +2331,7 @@ export const MultiStreamPage: React.FC = () => {
                 <>
                   <div
                     ref={chatScrollRef}
-                    className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-3 space-y-1.5 sm:space-y-2.5 text-xs font-mono scroll-smooth"
+                    className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3 space-y-1.5 sm:space-y-2.5 text-xs font-mono scroll-smooth"
                   >
                     <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/60 text-[10px] text-slate-400 text-center">
                       Welcome to @{selectedStreamer.name}&apos;s live stream room! Be respectful to everyone.
@@ -2433,7 +2431,7 @@ export const MultiStreamPage: React.FC = () => {
                   />
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-2">
                 {filteredStreamers.map((s) => renderStreamerItem(s, true))}
               </div>
             </div>
@@ -2443,7 +2441,7 @@ export const MultiStreamPage: React.FC = () => {
           {sideTab === 'tip' && (
             <div className="h-full flex flex-col min-h-0 bg-[#090D18]">
               {/* 1. Scrollable Form Body */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-3.5 space-y-2.5 sm:space-y-3">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3.5 space-y-2.5 sm:space-y-3">
                 {/* Streamer Profile Header */}
                 <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 flex items-center justify-between gap-2.5 shadow-md select-text cursor-default">
                   <div className="flex items-center gap-2.5 min-w-0 select-text">

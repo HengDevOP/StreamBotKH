@@ -438,32 +438,31 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       const tipAmount = Number(payload.amount) || 0;
       const tipAmountInUsd = payload.currency === 'KHR' ? tipAmount / 4000 : tipAmount;
 
-      // Find highest active matching condition tier across alert boxes (supports multi-condition tiers within a single box)
-      const activeBoxes = alertBoxes.filter((b) => b.isEnabled);
+      // Find highest matching condition tier across all created alert boxes (all boxes active by default)
+      const activeBoxes = alertBoxes;
 
       const resolveTierForBox = (box: any) => {
         if (!box) return null;
-        const rawTiers = Array.isArray(box.conditions) && box.conditions.length > 0 ? box.conditions : [box];
-        const enabledTiers = rawTiers.filter((t: any) => t && t.isEnabled !== false);
-        if (enabledTiers.length === 0) return box;
-        const sortedDesc = [...enabledTiers].sort(
+        const rawTiers = (Array.isArray(box.conditions) && box.conditions.length > 0 ? box.conditions : [box]).filter(Boolean);
+        if (rawTiers.length === 0) return box;
+        const sortedDesc = [...rawTiers].sort(
           (a: any, b: any) => (Number(b.minAmountCondition) || 0) - (Number(a.minAmountCondition) || 0)
         );
         const matched = sortedDesc.find(
           (t: any) => tipAmountInUsd >= ((Number(t.minAmountCondition) || 0) - 0.0001)
         );
         const chosen = matched || sortedDesc[sortedDesc.length - 1];
-        return chosen === box ? box : { ...box, ...chosen, _id: box._id, name: box.name, isEnabled: box.isEnabled };
+        return chosen === box ? box : { ...box, ...chosen, _id: box._id, name: box.name, isEnabled: true };
       };
 
       const allTierCandidates: Array<{ merged: any; threshold: number }> = [];
       for (const b of activeBoxes) {
         const rawTiers = Array.isArray(b.conditions) && b.conditions.length > 0 ? b.conditions : [b];
         for (const t of rawTiers) {
-          if (t && t.isEnabled === false) continue;
+          if (!t) continue;
           const threshold = Number(t?.minAmountCondition ?? b.minAmountCondition) || 0;
           allTierCandidates.push({
-            merged: t === b ? b : { ...b, ...t, _id: b._id, name: b.name, isEnabled: b.isEnabled },
+            merged: t === b ? b : { ...b, ...t, _id: b._id, name: b.name, isEnabled: true },
             threshold
           });
         }

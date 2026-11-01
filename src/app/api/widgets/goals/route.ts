@@ -115,17 +115,33 @@ export async function POST(req: NextRequest) {
 
     const goalsCol = await getStreamGoalsCollection();
 
+    // Resolve streamerId when possible so token regeneration preserves newly created goals
+    let streamerId: string | undefined;
+    if (token && token !== 'demo-token') {
+      try {
+        const usersCol = await getUsersCollection();
+        const streamer: any = await usersCol.findOne({
+          $or: [{ overlayToken: token }, { overlay_token: token } as any]
+        });
+        streamerId = streamer?.userId || streamer?.id || (streamer?._id ? String(streamer._id) : undefined);
+      } catch {}
+    }
+
     // If marked active, deactivate other goals for this streamer
     if (isActive) {
-      await goalsCol.updateMany({ streamerToken: token }, { $set: { isActive: false } });
+      await goalsCol.updateMany(
+        streamerId ? { $or: [{ streamerToken: token }, { streamerId }] } : { streamerToken: token },
+        { $set: { isActive: false } }
+      );
     }
 
     const newId = uuidv4();
     const now = new Date();
 
-    const newDoc = {
+    const newDoc: any = {
       id: newId,
       streamerToken: token,
+      ...(streamerId ? { streamerId } : {}),
       title,
       targetAmount,
       currentAmount,
@@ -304,14 +320,20 @@ export async function DELETE(req: NextRequest) {
         await goalsCol.updateOne({ _id: nextActive[0]._id }, { $set: { isActive: true } });
         const io = getIO();
         if (io) {
+          const promoted: any = nextActive[0];
           io.to(`overlay:${token}`).emit('goal:update', {
-            id: nextActive[0].id || String(nextActive[0]._id),
+            id: promoted.id || String(promoted._id),
             token,
-            title: nextActive[0].title,
-            targetAmount: Number(nextActive[0].targetAmount),
-            currentAmount: Number(nextActive[0].currentAmount),
-            accentColor: nextActive[0].accentColor,
-            endDate: nextActive[0].endDate,
+            title: promoted.title,
+            targetAmount: Number(promoted.targetAmount ?? 100),
+            currentAmount: Number(promoted.currentAmount ?? 0),
+            initialAmount: Number(promoted.initialAmount ?? promoted.currentAmount ?? 0),
+            accentColor: promoted.accentColor || '#10B981',
+            templateStyle: promoted.templateStyle || 'cyber-neon',
+            showBalance: promoted.showBalance !== false,
+            showBackground: promoted.showBackground !== false,
+            showAnimation: promoted.showAnimation !== false,
+            endDate: promoted.endDate || null,
             isActive: true
           });
         }

@@ -38,12 +38,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     const body = await req.json();
-    const updateFields: any = { updatedAt: new Date() };
+    const updateFields: any = { updatedAt: new Date(), isEnabled: true };
 
     const allowed = [
       'name',
       'minAmountCondition',
-      'isEnabled',
       'templateStyle',
       'showImage',
       'mediaUrl',
@@ -83,7 +82,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             ...c,
             id: String(c?.id || `cond_${Date.now()}_${idx}`),
             minAmountCondition: Math.max(0.001, Number(c?.minAmountCondition) > 0 ? Number(c.minAmountCondition) : 0.01),
-            isEnabled: c?.isEnabled !== false
+            isEnabled: true
           }));
           updateFields.conditions = sanitized;
           if (sanitized.length > 0) {

@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       ? conditions.map((c: any, idx: number) => ({
           id: String(c?.id || `cond_${Date.now()}_${idx}`),
           minAmountCondition: Math.max(0.001, Number(c?.minAmountCondition) > 0 ? Number(c.minAmountCondition) : 0.01),
-          isEnabled: c?.isEnabled !== false,
+          isEnabled: true,
           templateStyle: c?.templateStyle || templateStyle || 'neon-box',
           showImage: c?.showImage !== false,
           mediaUrl: c?.mediaUrl ?? mediaUrl ?? 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
           {
             id: `cond_${Date.now()}_0`,
             minAmountCondition: resolvedMinAmount,
-            isEnabled: Boolean(isEnabled),
+            isEnabled: true,
             templateStyle: templateStyle || 'neon-box',
             showImage: showImage !== false,
             mediaUrl: mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
       userId,
       name: sanitizedName,
       minAmountCondition: lowestThreshold,
-      isEnabled: Boolean(isEnabled),
+      isEnabled: true,
       templateStyle: templateStyle || 'neon-box',
       showImage: showImage !== false,
       mediaUrl: mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',

@@ -99,7 +99,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 xs:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 xs:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
       {/* Backdrop */}
       <div
         className="fixed inset-0"

@@ -10,6 +10,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const pathname = location.pathname;
   const isOverlay = pathname?.startsWith('/overlay');
   const isDashboard = pathname?.startsWith('/dashboard');
+  const isMultiStream =
+    pathname === '/tv' ||
+    pathname?.startsWith('/tv/') ||
+    pathname === '/muti-stream' ||
+    pathname === '/multi-stream';
 
   if (isOverlay) {
     return (
@@ -21,6 +26,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             background-image: none !important;
           }
         `}} />
+        {children}
+      </main>
+    );
+  }
+
+  if (isMultiStream) {
+    return (
+      <main className="app-viewport-lock fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none bg-[#060911] text-slate-100 flex flex-col">
         {children}
       </main>
     );

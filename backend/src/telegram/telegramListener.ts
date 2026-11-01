@@ -465,8 +465,7 @@ export class TelegramGroupListener {
               ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
               ...(streamer.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
               ...(streamerOverlayToken ? [{ overlayToken: streamerOverlayToken }, { token: streamerOverlayToken }] : [])
-            ],
-            isEnabled: true
+            ]
           })
           .sort({ minAmountCondition: -1 })
           .toArray();

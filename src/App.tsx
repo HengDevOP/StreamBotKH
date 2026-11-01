@@ -234,8 +234,16 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const isDonate = pathname.startsWith('/@') || pathname.startsWith('/donate');
   const isMultiStream = pathname === '/tv' || pathname.startsWith('/tv/') || pathname.startsWith('/tv?') || pathname === '/muti-stream' || pathname === '/multi-stream';
 
-  if (isOverlay || isMultiStream) {
+  if (isOverlay) {
     return <main className="w-screen h-screen overflow-hidden bg-transparent m-0 p-0">{children}</main>;
+  }
+
+  if (isMultiStream) {
+    return (
+      <main className="app-viewport-lock fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none bg-[#060911] text-slate-100 m-0 p-0">
+        {children}
+      </main>
+    );
   }
 
   if (isDashboard) {

@@ -143,13 +143,22 @@ export interface StreamTimerDoc {
 
 export interface StreamGoalDoc {
   _id?: ObjectId;
-  streamerId: string;
+  id?: string;
+  streamerId?: string;
+  streamerToken?: string;
   title: string;
   targetAmount: number;
   currentAmount: number;
-  currency: string;
-  theme: string;
-  fontFamily: string;
+  initialAmount?: number;
+  accentColor?: string;
+  templateStyle?: string;
+  showBalance?: boolean;
+  showBackground?: boolean;
+  showAnimation?: boolean;
+  endDate?: string | null;
+  currency?: string;
+  theme?: string;
+  fontFamily?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -399,13 +408,13 @@ export function resolveMatchingAlertBox(activeBoxes: any[], effectiveAmountUsd: 
   const candidates: Array<{ merged: any; threshold: number }> = [];
 
   for (const box of activeBoxes) {
-    if (!box || box.isEnabled === false) continue;
+    if (!box) continue;
     const rawTiers = Array.isArray(box.conditions) && box.conditions.length > 0 ? box.conditions : [box];
     for (const tier of rawTiers) {
-      if (tier && tier.isEnabled === false) continue;
+      if (!tier) continue;
       const threshold = Number(tier?.minAmountCondition ?? box.minAmountCondition) || 0;
       candidates.push({
-        merged: tier === box ? box : { ...box, ...tier, _id: box._id, name: box.name, isEnabled: box.isEnabled },
+        merged: tier === box ? box : { ...box, ...tier, _id: box._id, name: box.name, isEnabled: true },
         threshold
       });
     }

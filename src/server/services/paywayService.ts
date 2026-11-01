@@ -103,8 +103,7 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
             ...(streamer.username ? [{ userId: streamer.username }, { streamerId: streamer.username }] : []),
             ...(streamer.email ? [{ userId: streamer.email }, { userEmail: streamer.email }] : []),
             ...(streamer.overlayToken ? [{ overlayToken: streamer.overlayToken }, { token: streamer.overlayToken }] : [])
-          ],
-          isEnabled: true
+          ]
         })
         .sort({ minAmountCondition: -1 })
         .toArray();
