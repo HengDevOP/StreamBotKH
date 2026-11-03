@@ -29,9 +29,49 @@ export async function GET(req: NextRequest) {
   let planExpiresAt = streamer.planExpiresAt || null;
   let planDurationDays = Number(streamer.planDurationDays || 0);
 
-  if (currentPlan === 'pro' && planExpiresAt) {
+  // Check 7-Day Free Trial status
+  let trialActive = Boolean(streamer.trialActive);
+  let trialStartDate = streamer.trialStartDate || null;
+  let trialEndDate = streamer.trialEndDate || null;
+  let hasUsedTrial = Boolean(streamer.hasUsedTrial);
+
+  const nowMs = Date.now();
+  if (trialActive && trialEndDate) {
+    const trialEndMs = new Date(trialEndDate).getTime();
+    if (!isNaN(trialEndMs) && trialEndMs <= nowMs) {
+      // Trial expired: mark user hasUsedTrial = true and revert plan to free
+      await usersCol.updateOne(
+        { _id: streamer._id },
+        {
+          $set: {
+            trialActive: false,
+            hasUsedTrial: true,
+            trialEnded: true,
+            plan: (streamer.plan === 'trial' || streamer.plan === 'pro') ? 'free' : (streamer.plan || 'free'),
+            updatedAt: new Date()
+          }
+        }
+      );
+      trialActive = false;
+      hasUsedTrial = true;
+      if (currentPlan === 'trial' || currentPlan === 'pro') {
+        currentPlan = 'free';
+        planStartedAt = null;
+        planExpiresAt = null;
+        planDurationDays = 0;
+      }
+    }
+  }
+
+  let trialRemainingDays = 0;
+  if (trialActive && trialEndDate) {
+    const diff = new Date(trialEndDate).getTime() - nowMs;
+    trialRemainingDays = Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  if (currentPlan === 'pro' && planExpiresAt && !trialActive) {
     const expiresTime = new Date(planExpiresAt).getTime();
-    if (!isNaN(expiresTime) && expiresTime < Date.now()) {
+    if (!isNaN(expiresTime) && expiresTime < nowMs) {
       await usersCol.updateOne(
         { _id: streamer._id },
         {
@@ -64,6 +104,11 @@ export async function GET(req: NextRequest) {
     planStartedAt,
     planExpiresAt,
     planDurationDays,
+    trialActive,
+    trialStartDate,
+    trialEndDate,
+    hasUsedTrial,
+    trialRemainingDays,
     overlayToken: streamer.overlayToken || (streamer as any).overlay_token,
     telegramChatId: (streamer as any).telegramChatId || (streamer as any).telegram_chat_id,
     telegramPairingCode: (streamer as any).telegramPairingCode || (streamer as any).telegram_pairing_code,

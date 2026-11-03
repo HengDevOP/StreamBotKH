@@ -86,6 +86,16 @@ export async function GET(req: NextRequest) {
         remainingDays = 31;
       }
 
+      const trialActive = Boolean(
+        r.trialActive &&
+        r.trialEndDate &&
+        new Date(r.trialEndDate).getTime() > Date.now()
+      );
+      const hasUsedTrial = Boolean(r.hasUsedTrial);
+      const trialRemainingDays = (trialActive && r.trialEndDate)
+        ? Math.max(1, Math.ceil((new Date(r.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        : 0;
+
       return {
         id: r.userId || r.id,
         email: r.email,
@@ -93,11 +103,14 @@ export async function GET(req: NextRequest) {
         displayName: r.displayName || r.display_name || r.username,
         avatarUrl: r.avatarUrl || r.avatar_url,
         bio: r.bio,
-        plan: currentPlan,
+        plan: trialActive ? 'trial' : currentPlan,
         planStartedAt,
         planExpiresAt,
         planDurationDays,
         remainingDays,
+        trialActive,
+        hasUsedTrial,
+        trialRemainingDays,
         isVerified: Boolean(r.isVerified || r.is_verified),
         isAdmin: isAdminEmail(r.email),
         createdAt: r.createdAt || r.created_at

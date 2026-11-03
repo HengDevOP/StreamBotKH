@@ -39,6 +39,9 @@ export interface AdminUserItem {
   planExpiresAt?: string | null;
   planDurationDays?: number;
   remainingDays: number;
+  trialActive?: boolean;
+  hasUsedTrial?: boolean;
+  trialRemainingDays?: number;
   isVerified: boolean;
   isAdmin: boolean;
   createdAt?: string;
@@ -632,7 +635,12 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
 
                       {/* Plan Badge */}
                       <td className="py-3.5 px-4">
-                        {isPro ? (
+                        {u.trialActive ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[11px] font-bold uppercase">
+                            <Sparkles size={12} className="text-amber-400" />
+                            <span>TRIAL ({u.trialRemainingDays || 7}d left)</span>
+                          </span>
+                        ) : isPro ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono text-[11px] font-bold uppercase">
                             <Crown size={12} className="text-purple-400" />
                             <span>PRO PLAN (0% Fee)</span>
@@ -640,6 +648,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[11px] font-semibold uppercase">
                             <span>FREE (10% Fee)</span>
+                            {u.hasUsedTrial && <span className="text-[9px] text-amber-500 font-normal ml-1">• Trial Used</span>}
                           </span>
                         )}
                       </td>

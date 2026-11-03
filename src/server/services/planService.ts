@@ -74,12 +74,39 @@ export async function verifyProStreamerByToken(token: string): Promise<ProVerifi
     const streamerId = streamer.userId || streamer.id || String(streamer._id);
     const plan = String(streamer.plan || 'free').toLowerCase();
     const isAdmin = Boolean(streamer.isAdmin);
-    const isPro = isAdmin || (plan !== 'free');
+
+    // Check active 7-Day Free Trial
+    let isTrialActive = false;
+    const now = Date.now();
+    if (streamer.trialActive && streamer.trialEndDate) {
+      const trialEndMs = new Date(streamer.trialEndDate).getTime();
+      if (!isNaN(trialEndMs)) {
+        if (now < trialEndMs) {
+          isTrialActive = true;
+        } else {
+          // Trial has ended: update DB to mark trial completed & revert plan to free
+          usersCol.updateOne(
+            { _id: streamer._id },
+            {
+              $set: {
+                trialActive: false,
+                hasUsedTrial: true,
+                trialEnded: true,
+                plan: (streamer.plan === 'trial' || streamer.plan === 'pro') ? 'free' : (streamer.plan || 'free'),
+                updatedAt: new Date()
+              }
+            }
+          ).catch((e) => console.warn('[planService] Failed to mark trial expired:', e));
+        }
+      }
+    }
+
+    const isPro = isAdmin || (plan !== 'free') || isTrialActive;
 
     return {
       isPro,
       streamerId,
-      plan,
+      plan: isTrialActive ? 'trial' : plan,
       isAdmin,
       reason: isPro ? undefined : 'Streamer is on Free plan. Pro plan upgrade required.'
     };

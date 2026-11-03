@@ -19,6 +19,11 @@ export interface Streamer {
   planStartedAt?: string | null;
   planExpiresAt?: string | null;
   planDurationDays?: number;
+  trialActive?: boolean;
+  trialStartDate?: string | null;
+  trialEndDate?: string | null;
+  hasUsedTrial?: boolean;
+  trialRemainingDays?: number;
   isAdmin?: boolean;
   overlayToken: string;
   telegramChatId?: string;

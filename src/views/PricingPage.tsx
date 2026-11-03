@@ -19,27 +19,103 @@ import {
   Trophy,
   Target,
   Timer,
-  Bot
+  Bot,
+  Gift
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { Button } from '../components/common/Button';
 import { request } from '../services/api';
 import { PromotionConfig } from '../components/dashboard/AdminPromotionManager';
+import { useAuth } from '../context/AuthContext';
 
 interface PricingPageProps {
   onNavigate: (page: string) => void;
 }
 
+interface TrialSettings {
+  isEnabled: boolean;
+  durationDays: number;
+  userEligible?: boolean;
+  hasUsedTrial?: boolean;
+  trialActive?: boolean;
+  trialEndDate?: string | null;
+  remainingDays?: number;
+}
+
 export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
+  const { user, refreshUser, loginWithGoogleRedirect } = useAuth();
   const [currency, setCurrency] = useState<'USD' | 'KHR'>('USD');
   const [annualBilling, setAnnualBilling] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [promo, setPromo] = useState<PromotionConfig | null>(null);
+  const [trialSettings, setTrialSettings] = useState<TrialSettings | null>(null);
+  const [claimingTrial, setClaimingTrial] = useState(false);
+  const [trialSuccessMsg, setTrialSuccessMsg] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
 
   useEffect(() => {
     request<PromotionConfig>('/promotions')
       .then((data) => setPromo(data))
       .catch(() => {});
-  }, []);
+
+    request<TrialSettings>('/trial/settings')
+      .then((data) => setTrialSettings(data))
+      .catch(() => {});
+  }, [user]);
+
+  // If user clicked trial while unauthenticated and just completed login, auto-claim
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      const pendingClaim = sessionStorage.getItem('auto_claim_trial');
+      if (pendingClaim === 'true') {
+        sessionStorage.removeItem('auto_claim_trial');
+        handleClaimTrial();
+      }
+    }
+  }, [user]);
+
+  const handleClaimTrial = async () => {
+    if (!user) {
+      // Must be a signed-in user: save intent and redirect to Google Sign-In
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('auto_claim_trial', 'true');
+      }
+      loginWithGoogleRedirect();
+      return;
+    }
+
+    setClaimingTrial(true);
+    setClaimError(null);
+    try {
+      const res = await request<{ success: boolean; message: string; trialRemainingDays?: number }>('/trial/claim', {
+        method: 'POST'
+      });
+      if (res?.success) {
+        if (typeof window !== 'undefined') {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }
+        await refreshUser();
+        setTrialSuccessMsg(`🎉 Success! Free Pro Trial is now active. Unlocking all Pro overlays!`);
+        setTimeout(() => {
+          onNavigate('dashboard');
+        }, 1200);
+      }
+    } catch (err: any) {
+      console.error('Failed to claim trial:', err);
+      setClaimError(err?.message || 'Failed to claim trial. Please try again.');
+    } finally {
+      setClaimingTrial(false);
+    }
+  };
+
+  const isProUser = Boolean(user && user.plan === 'pro');
+  const hasUsedTrialAlready = Boolean(user && user.hasUsedTrial && !user.isAdmin);
+  const isTrialEnabled = Boolean(trialSettings?.isEnabled);
+  const showFreeTrial = isTrialEnabled && !isProUser && !hasUsedTrialAlready;
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -232,17 +308,31 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold">PRO PLAN</span>
+                {showFreeTrial && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 animate-pulse">
+                    <Sparkles size={11} />
+                    {trialSettings?.durationDays || 7}-Day Free Trial
+                  </span>
+                )}
               </div>
               <div className="flex items-baseline gap-2.5">
                 <span className="text-3xl font-extrabold text-white">
-                  {getProPrice()}
+                  {showFreeTrial ? '$0' : getProPrice()}
                 </span>
-                {promo?.isActive && (
-                  <span className="text-sm font-mono text-slate-500 line-through">
-                    {getOriginalProPrice()}
+                {showFreeTrial ? (
+                  <span className="text-xs font-mono text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                    for first {trialSettings?.durationDays || 7} days
                   </span>
+                ) : (
+                  <>
+                    {promo?.isActive && (
+                      <span className="text-sm font-mono text-slate-500 line-through">
+                        {getOriginalProPrice()}
+                      </span>
+                    )}
+                    <span className="text-sm font-normal text-slate-400">/ month</span>
+                  </>
                 )}
-                <span className="text-sm font-normal text-slate-400">/ month</span>
               </div>
             </div>
 
@@ -288,18 +378,46 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
             </ul>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-purple-500/30 w-full">
-            <a
-              href="https://t.me/hchenheng"
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  window.location.href = 'https://t.me/hchenheng';
-                }
-              }}
-              className="w-full block text-center py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-slate-950 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:opacity-95 transition-all shadow-lg shadow-purple-500/25 cursor-pointer"
-            >
-              Get Pro Plan
-            </a>
+          <div className="mt-8 pt-6 border-t border-purple-500/30 w-full space-y-2.5">
+            {showFreeTrial ? (
+              <button
+                type="button"
+                onClick={handleClaimTrial}
+                disabled={claimingTrial}
+                className="w-full py-3.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-slate-950 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300 hover:from-amber-300 hover:to-orange-300 transition-all shadow-lg shadow-amber-500/25 cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+              >
+                <Gift size={16} className="text-slate-950 animate-bounce" />
+                <span>{claimingTrial ? 'Activating Free Trial...' : `Free Trial ${trialSettings?.durationDays || 7} Days`}</span>
+              </button>
+            ) : (
+              <a
+                href="https://t.me/hchenheng"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.href = 'https://t.me/hchenheng';
+                  }
+                }}
+                className="w-full block text-center py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-slate-950 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:opacity-95 transition-all shadow-lg shadow-purple-500/25 cursor-pointer"
+              >
+                Get Pro Plan
+              </a>
+            )}
+
+            {trialSuccessMsg && (
+              <p className="text-center text-xs text-emerald-400 font-semibold animate-pulse">
+                {trialSuccessMsg}
+              </p>
+            )}
+            {claimError && (
+              <p className="text-center text-xs text-rose-400 font-medium">
+                {claimError}
+              </p>
+            )}
+            {hasUsedTrialAlready && (
+              <p className="text-[10px] text-slate-400 text-center font-mono">
+                • 7-day free trial completed. Upgrade to Pro to unlock all stream assets.
+              </p>
+            )}
           </div>
         </div>
       </div>

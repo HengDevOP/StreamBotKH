@@ -62,7 +62,8 @@ import {
   Headphones,
   Youtube,
   Radio,
-  Crown
+  Crown,
+  Gift
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -103,6 +104,7 @@ import { AdminUsersManager } from '../components/dashboard/AdminUsersManager';
 import { AdminPullRequestsManager } from '../components/dashboard/AdminPullRequestsManager';
 import { TicketSupportManager } from '../components/dashboard/TicketSupportManager';
 import { AdminPromotionManager, PromotionConfig } from '../components/dashboard/AdminPromotionManager';
+import { AdminTrialManager } from '../components/dashboard/AdminTrialManager';
 import { MediaPickerModal } from '../components/dashboard/MediaPickerModal';
 import { MailboxDrawer } from '../components/dashboard/MailboxDrawer';
 import { MailboxManager } from '../components/dashboard/MailboxManager';
@@ -142,6 +144,7 @@ export type DashboardTab =
   | 'support'
   | 'report-issue'
   | 'admin-users'
+  | 'admin-trial'
   | 'admin-requests'
   | 'admin-promotion';
 
@@ -155,6 +158,66 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab || 'overview');
   const [selectedDonationId, setSelectedDonationId] = useState<string | null>(initialSelectedId || null);
   const [activePromo, setActivePromo] = useState<PromotionConfig | null>(null);
+
+  // 7-Day Free Pro Trial state
+  const [trialSettings, setTrialSettings] = useState<{
+    isEnabled: boolean;
+    durationDays: number;
+    userEligible: boolean;
+    hasUsedTrial: boolean;
+    trialActive: boolean;
+    trialEndDate: string | null;
+    remainingDays: number;
+  } | null>(null);
+  const [claimingTrial, setClaimingTrial] = useState(false);
+
+  const loadTrialSettings = React.useCallback(async () => {
+    try {
+      const data = await request<any>('/trial/settings');
+      if (data && (data.success || data.isEnabled !== undefined)) {
+        setTrialSettings(data);
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    loadTrialSettings();
+  }, [loadTrialSettings, activeTab]);
+
+  const handleClaimTrial = async () => {
+    setClaimingTrial(true);
+    try {
+      const data = await request<any>('/trial/claim', {
+        method: 'POST'
+      });
+
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+
+      setCurrentPlan('pro');
+      await refreshUser();
+      await loadTrialSettings();
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to activate free trial');
+    } finally {
+      setClaimingTrial(false);
+    }
+  };
+
+  // Auto-claim trial if triggered by public pricing page or query
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      const autoClaim = sessionStorage.getItem('auto_claim_trial');
+      if (autoClaim === 'true') {
+        sessionStorage.removeItem('auto_claim_trial');
+        handleClaimTrial();
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     request<PromotionConfig>('/promotions')
@@ -325,13 +388,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setProfileLiveStreamUrl(user.liveStreamUrl || '');
       const incomingLinks = (user as any).socialLinks || (user as any).links || [];
       setProfileLinks(Array.isArray(incomingLinks) ? incomingLinks : []);
-      if (user.plan) {
-        const p = user.plan.toLowerCase();
-        const resolved = (p === 'pro' || p === 'studio' || p === 'starter') ? 'pro' : 'free';
+      const trialOn = Boolean(
+        (user.trialActive && user.trialEndDate && new Date(user.trialEndDate).getTime() > Date.now()) ||
+        (trialSettings?.trialActive && (trialSettings?.remainingDays || 0) > 0)
+      );
+      if (user.plan || trialOn) {
+        const p = (user.plan || '').toLowerCase();
+        const resolved = (p === 'pro' || p === 'studio' || p === 'starter' || trialOn) ? 'pro' : 'free';
         setCurrentPlan(resolved);
       }
     }
-  }, [user]);
+  }, [user, trialSettings]);
+
+  const isTrialActive = Boolean(
+    (user?.trialActive && user?.trialEndDate && new Date(user.trialEndDate).getTime() > Date.now()) ||
+    (trialSettings?.trialActive && (trialSettings?.remainingDays || 0) > 0)
+  );
+  const hasUsedTrial = Boolean(user?.hasUsedTrial || trialSettings?.hasUsedTrial);
+  const trialRemainingDays = trialSettings?.remainingDays || user?.trialRemainingDays || 7;
 
   const setPlan = async (plan: 'free' | 'pro') => {
     setCurrentPlan(plan);
@@ -1066,6 +1140,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 badge: null
               },
               {
+                id: 'admin-trial' as DashboardTab,
+                label: 'Free 7-Day Trial',
+                icon: Gift,
+                badge: trialSettings?.isEnabled ? 'ON' : null
+              },
+              {
                 id: 'admin-requests' as DashboardTab,
                 label: 'Support Tickets',
                 icon: Headphones,
@@ -1118,14 +1198,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           label: 'Live Chat',
           icon: MessageSquare,
           badge: 'NEW',
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'subscribers' as DashboardTab,
           label: 'Subscribers',
           icon: Crown,
           badge: 'NEW',
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'donation' as DashboardTab,
@@ -1138,49 +1218,49 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           label: 'Leaderboard',
           icon: Trophy,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'goal' as DashboardTab,
           label: 'Goals',
           icon: Target,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'timer' as DashboardTab,
           label: 'Timer',
           icon: Timer,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'soundboard' as DashboardTab,
           label: 'Soundboard',
           icon: Volume2,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'video-alerts' as DashboardTab,
           label: 'Video Alerts',
           icon: Video,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'wheel' as DashboardTab,
           label: 'Wheels',
           icon: Disc,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'pokemon' as DashboardTab,
           label: '2D Pokémon',
           icon: Gamepad2,
           badge: 'NEW',
-          isLocked: currentPlan === 'free' && !isAdmin
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         }
       ]
     },
@@ -1687,6 +1767,62 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           ) : (
             <>
           {/* ============================================================== */}
+          {/* 7-DAY FREE TRIAL BANNERS                                       */}
+          {/* ============================================================== */}
+          {trialSettings?.isEnabled && ((!hasUsedTrial && currentPlan === 'free') || isAdmin) && !isTrialActive && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-cyan-500/10 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/5">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shrink-0 shadow-lg shadow-amber-500/10">
+                  <Gift size={22} className="animate-bounce" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                      {trialSettings.durationDays || 7}-Day Free Pro Trial Available!
+                    </h3>
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      SPECIAL OFFER
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Admin has unlocked a free {trialSettings.durationDays || 7}-day Pro trial! Experience all Pro widgets, overlays, alert boxes, and 100MB storage at $0.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={claimingTrial}
+                onClick={handleClaimTrial}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-lg shadow-amber-500/20"
+              >
+                <Sparkles size={14} />
+                <span>{claimingTrial ? 'Activating...' : `Start Free ${trialSettings.durationDays || 7}-Day Trial`}</span>
+              </button>
+            </div>
+          )}
+
+          {isTrialActive && (
+            <div className="px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-cyan-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                <span className="text-amber-300 font-bold uppercase tracking-wide">
+                  7-Day Free Pro Trial Active
+                </span>
+                <span className="text-slate-300">
+                  • Full Pro plan features unlocked ({trialRemainingDays} days left)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('billing')}
+                className="text-xs text-cyan-300 hover:text-cyan-200 underline font-semibold cursor-pointer shrink-0"
+              >
+                View Plans &amp; Billing &rarr;
+              </button>
+            </div>
+          )}
+
+          {/* ============================================================== */}
           {/* TAB 1: OVERVIEW & HUD                                          */}
           {/* ============================================================== */}
           {activeTab === 'overview' && (
@@ -1840,9 +1976,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* ============================================================== */}
           {/* PRO PLAN STREAM ASSETS (LEADERBOARD, GOALS, TIMER, SOUNDBOARD, VIDEO ALERTS, WHEELS, LIVE CHAT, SUBSCRIBERS) */}
           {/* ============================================================== */}
-          {(['leaderboard', 'goal', 'timer', 'soundboard', 'video-alerts', 'wheel', 'chat', 'subscribers'] as DashboardTab[]).includes(activeTab) &&
+          {(['leaderboard', 'goal', 'timer', 'soundboard', 'video-alerts', 'wheel', 'chat', 'subscribers', 'pokemon'] as DashboardTab[]).includes(activeTab) &&
             currentPlan === 'free' &&
-            !isAdmin && (
+            !isAdmin &&
+            !isTrialActive && (
               <div className="p-8 sm:p-12 rounded-2xl bg-gradient-to-b from-[#0e1424] to-[#090D18] border border-amber-500/30 text-center max-w-2xl mx-auto space-y-6 my-8 shadow-2xl">
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/20 mx-auto">
                   <Lock size={32} />
@@ -1860,18 +1997,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   </p>
                 </div>
 
-                <div className="flex items-center justify-center gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                  {trialSettings?.isEnabled && !hasUsedTrial && (
+                    <button
+                      type="button"
+                      onClick={handleClaimTrial}
+                      disabled={claimingTrial}
+                      className="py-3 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                    >
+                      <Gift size={15} />
+                      <span>{claimingTrial ? 'Activating...' : `Start Free ${trialSettings.durationDays || 7}-Day Trial`}</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setUpgradeFeatureName(currentTabTitle);
                       setIsVideoUpgradeModalOpen(true);
                     }}
-                    className="py-3 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                    className="py-3 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-purple-500/20 transition-all cursor-pointer"
                   >
                     <Sparkles size={14} />
                     <span>Upgrade to Pro Plan</span>
                   </button>
                 </div>
+
+                {hasUsedTrial && (
+                  <p className="text-[11px] text-amber-400/80 font-mono pt-1">
+                    • Your 7-day free trial has expired. Upgrade to Pro to continue using {currentTabTitle}.
+                  </p>
+                )}
               </div>
             )}
 
@@ -2640,7 +2794,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   <div className="flex-1 flex flex-col space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-mono font-bold uppercase text-purple-400">PRO PLAN (31 DAYS)</span>
-                      {currentPlan === 'pro' && (
+                      {trialSettings?.isEnabled && ((!hasUsedTrial && currentPlan === 'free') || isAdmin) && !isTrialActive ? (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 flex items-center gap-1 animate-pulse">
+                          <Sparkles size={11} />
+                          {trialSettings.durationDays || 7} DAYS FREE
+                        </span>
+                      ) : isTrialActive ? (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">
+                          TRIAL ACTIVE • {trialRemainingDays}D LEFT
+                        </span>
+                      ) : currentPlan === 'pro' && (
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold border border-purple-500/40">
                           ACTIVE • 31D CYCLE
                         </span>
@@ -2662,11 +2825,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           $4.99 <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days (1 month)</span>
                         </div>
                       )}
-                      {currentPlan === 'pro' && user.planExpiresAt && (
+                      {isTrialActive ? (
+                        <div className="text-[11px] text-amber-300 font-mono mt-1 flex items-center gap-1.5">
+                          <Sparkles size={12} className="text-amber-400" />
+                          <span>Free Pro Trial Active: {trialRemainingDays} days remaining</span>
+                        </div>
+                      ) : currentPlan === 'pro' && user.planExpiresAt ? (
                         <div className="text-[11px] text-purple-300 font-mono mt-1">
                           Expires: {new Date(user.planExpiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                     <p className="text-xs text-slate-400">
                       Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Alerts, Wheels), and removed watermark.
@@ -2703,26 +2871,44 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </ul>
                   </div>
 
-                  <div className="mt-6 pt-5 border-t border-purple-500/30 w-full">
-                    <button
-                      onClick={() => {
-                        if (isAdmin) {
-                          setPlan('pro');
-                        } else {
-                          setIsVideoUpgradeModalOpen(true);
-                        }
-                      }}
-                      disabled={currentPlan === 'pro'}
-                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${
-                        currentPlan === 'pro'
-                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 cursor-default'
-                          : 'bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-slate-950 shadow-lg shadow-purple-500/20 font-extrabold cursor-pointer'
-                      }`}
-                    >
-                      {currentPlan === 'pro'
-                        ? 'Active Plan (31d • 0% Fee)'
-                        : `Upgrade to Pro ($${activePromo?.isActive ? activePromo.promoPriceUsd.toFixed(2) : '4.99'} / 31d)`}
-                    </button>
+                  <div className="mt-6 pt-5 border-t border-purple-500/30 w-full space-y-2.5">
+                    {trialSettings?.isEnabled && ((!hasUsedTrial && currentPlan === 'free') || isAdmin) && !isTrialActive ? (
+                      <button
+                        type="button"
+                        onClick={handleClaimTrial}
+                        disabled={claimingTrial}
+                        className="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300 hover:from-amber-300 hover:to-orange-300 text-slate-950 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/25 transition-all active:scale-95"
+                      >
+                        <Gift size={15} className="text-slate-950 animate-bounce" />
+                        <span>{claimingTrial ? 'Activating Free Trial...' : `Free Trial ${trialSettings.durationDays || 7} Days`}</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (isAdmin) {
+                            setPlan('pro');
+                          } else {
+                            setIsVideoUpgradeModalOpen(true);
+                          }
+                        }}
+                        disabled={currentPlan === 'pro'}
+                        className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${
+                          currentPlan === 'pro'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 cursor-default'
+                            : 'bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-slate-950 shadow-lg shadow-purple-500/20 font-extrabold cursor-pointer'
+                        }`}
+                      >
+                        {currentPlan === 'pro'
+                          ? (isTrialActive ? `Trial Active (${trialRemainingDays}d remaining)` : 'Active Plan (31d • 0% Fee)')
+                          : `Upgrade to Pro ($${activePromo?.isActive ? activePromo.promoPriceUsd.toFixed(2) : '4.99'} / 31d)`}
+                      </button>
+                    )}
+
+                    {hasUsedTrial && currentPlan === 'free' && !isTrialActive && (
+                      <p className="text-[10px] text-slate-400 text-center font-mono">
+                        • 7-day free trial completed. Upgrade to Pro to unlock all stream assets.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2734,6 +2920,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* ============================================================== */}
           {activeTab === 'admin-promotion' && isAdmin && (
             <AdminPromotionManager />
+          )}
+
+          {/* ============================================================== */}
+          {/* ADMIN PANEL: 7-DAY FREE TRIAL CONFIGURATION                    */}
+          {/* ============================================================== */}
+          {activeTab === 'admin-trial' && isAdmin && (
+            <AdminTrialManager />
           )}
 
           {/* ============================================================== */}

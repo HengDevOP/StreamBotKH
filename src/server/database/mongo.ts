@@ -27,6 +27,11 @@ export interface UserDoc {
   planStartedAt?: string | null;
   planExpiresAt?: string | null;
   planDurationDays?: number;
+  trialActive?: boolean;
+  trialStartDate?: string | null;
+  trialEndDate?: string | null;
+  hasUsedTrial?: boolean;
+  trialEnded?: boolean;
   overlayToken?: string;
   overlay_token?: string;
   telegramPhone?: string;
@@ -840,6 +845,21 @@ export async function getPokemonSettingsCollection(): Promise<Collection<Pokemon
 export async function getStreamChatSettingsCollection(): Promise<Collection<StreamChatSettingsDoc>> {
   const db = await getMongoDb();
   return db.collection<StreamChatSettingsDoc>('stream_chat_settings');
+}
+
+export interface PlatformTrialConfigDoc {
+  _id?: ObjectId;
+  id: string; // 'pro_plan_trial'
+  isEnabled: boolean;
+  durationDays: number;
+  trialName: string;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
+}
+
+export async function getTrialConfigCollection(): Promise<Collection<PlatformTrialConfigDoc>> {
+  const db = await getMongoDb();
+  return db.collection<PlatformTrialConfigDoc>('platform_trial_configs');
 }
 
 export async function getPromotionsCollection(): Promise<Collection<PlatformPromotionDoc>> {
