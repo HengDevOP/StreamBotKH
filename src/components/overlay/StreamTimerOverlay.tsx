@@ -31,6 +31,7 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
   const [showDescription, setShowDescription] = useState(true);
   const [description, setDescription] = useState('');
   const [maxCapSeconds, setMaxCapSeconds] = useState(86400);
+  const [isLocked, setIsLocked] = useState(false);
 
   const processedAlertIdsRef = useRef<Set<string>>(new Set());
 
@@ -39,6 +40,11 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
     fetch(`/api/widgets/timer?token=${effectiveToken}`)
       .then((res) => res.json())
       .then((data) => {
+        if (data.isLocked || !data.success) {
+          setIsLocked(true);
+          return;
+        }
+        setIsLocked(false);
         if (data.success && data.timer) {
           const t = data.timer;
           if (t.title !== undefined) setTitle(t.title || 'SUBATHON COUNTDOWN 🔥');
@@ -151,6 +157,10 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
       socket.off('timer:update', handleTimerUpdate);
     };
   }, [socket, rateMinutesPerUsd, maxCapSeconds]);
+
+  if (isLocked) {
+    return <div className="w-full h-full bg-transparent" />;
+  }
 
   return (
     <div className="w-full h-full min-h-screen bg-transparent flex flex-col items-center justify-center p-4 relative select-none">

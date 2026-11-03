@@ -1,4 +1,5 @@
-import { getIO } from './socketService';
+import { getIO, broadcastToAllStreamerRooms } from './socketService';
+import { getSubscribersCollection, buildSubscriberUsernameQuery } from '../database/mongo';
 import axios from 'axios';
 
 export interface PokemonCommentEvent {
@@ -61,6 +62,51 @@ class YouTubeChatService {
       }
     } catch (err: any) {
       console.warn('⚠️ [YouTubeChatService] Socket settings emit error:', err.message);
+    }
+  }
+
+  /**
+   * Broadcast a chat message to Live Chat stream overlay with subscriber badge if matched
+   */
+  public async emitLiveChatMessage(token: string, comment: { id: string; author: string; avatar?: string; message: string; timestamp: number }) {
+    try {
+      let activeSub: any = null;
+      try {
+        const subCol = await getSubscribersCollection();
+        activeSub = await subCol.findOne({
+          streamerToken: token,
+          status: 'active',
+          expiresAt: { $gt: new Date() },
+          ...buildSubscriberUsernameQuery(comment.author)
+        });
+      } catch (dbErr: any) {
+        console.warn('⚠️ [YouTubeChatService] Subscriber lookup error:', dbErr.message);
+      }
+
+      const chatMsg = {
+        id: comment.id,
+        author: comment.author,
+        avatar: comment.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(comment.author)}`,
+        message: comment.message,
+        badge: activeSub ? activeSub.badgeText : undefined,
+        badgeColor: activeSub?.badgeColor,
+        badgeBg: activeSub?.badgeBg,
+        badgeBorder: activeSub?.badgeBorder,
+        badgeIcon: activeSub?.badgeIcon,
+        badgeGifUrl: activeSub ? (activeSub.badgeGifUrl || activeSub.badgeImage) : undefined,
+        badgeImage: activeSub ? (activeSub.badgeImage || activeSub.badgeGifUrl) : undefined,
+        platform: 'youtube',
+        isTest: false,
+        timestamp: comment.timestamp || Date.now()
+      };
+
+      broadcastToAllStreamerRooms(token, 'chat:message', chatMsg);
+      if (token === 'demo-token') {
+        const io = getIO();
+        io?.to('overlay:demo-token').emit('chat:message', chatMsg);
+      }
+    } catch (err: any) {
+      console.warn('⚠️ [YouTubeChatService] emitLiveChatMessage error:', err.message);
     }
   }
 
@@ -176,13 +222,19 @@ class YouTubeChatService {
           const message = messageParts.map((r: any) => r.text || '').join('');
 
           if (message) {
-            this.emitPokemonComment(token, {
+            const commentPayload = {
               id: id || `yt_${Date.now()}_${Math.random()}`,
               author,
               avatar,
               message,
               timestamp: Date.now()
-            });
+            };
+
+            // 1. Send to Pokémon stream overlay
+            this.emitPokemonComment(token, commentPayload);
+
+            // 2. Send to Live Chat overlay with subscriber badge if matched
+            this.emitLiveChatMessage(token, commentPayload);
           }
         }
       }

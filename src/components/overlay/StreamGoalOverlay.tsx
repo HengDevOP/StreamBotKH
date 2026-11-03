@@ -23,6 +23,7 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
   const [endDate, setEndDate] = useState<string | null>(null);
   const [recentDonor, setRecentDonor] = useState<string | null>(null);
   const [addedAmount, setAddedAmount] = useState<number | null>(null);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
 
   // 1. Fetch initial goal data from API
   useEffect(() => {
@@ -30,6 +31,11 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
+        if (data.isLocked || !data.success) {
+          setIsLocked(true);
+          return;
+        }
+        setIsLocked(false);
         if (data.success) {
           const g = data.goal || data.activeGoal;
           if (g) {
@@ -89,6 +95,10 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
       socket.off('goal:update', handleGoalUpdate);
     };
   }, [socket, goalId]);
+
+  if (isLocked) {
+    return <div className="w-full h-full bg-transparent" />;
+  }
 
   return (
     <div className="w-full min-h-screen bg-transparent flex items-center justify-center p-6 select-none overflow-hidden">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPokemonSettingsCollection } from '@/server/database/mongo';
 import { youtubeChatService } from '@/server/services/youtubeChatService';
 import { POKEMON_ROSTER } from '@/utils/pokemonData';
+import { verifyProStreamerByToken } from '@/server/services/planService';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,20 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token') || 'demo-token';
+
+    // Verify streamer has Pro plan active
+    const { isPro } = await verifyProStreamerByToken(token);
+    if (!isPro) {
+      return NextResponse.json(
+        {
+          success: false,
+          isLocked: true,
+          error: 'Pro plan required for Pokémon stream overlay.',
+          settings: null
+        },
+        { status: 403 }
+      );
+    }
 
     const col = await getPokemonSettingsCollection();
     let settings = await col.findOne({ streamerToken: token }) as any;
@@ -74,6 +89,20 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const token = body.streamerToken || body.token || 'demo-token';
+
+    // Verify streamer has Pro plan active before configuring or broadcasting
+    const { isPro } = await verifyProStreamerByToken(token);
+    if (!isPro) {
+      return NextResponse.json(
+        {
+          success: false,
+          isLocked: true,
+          error: 'Pro plan required to configure or broadcast Pokémon overlay.'
+        },
+        { status: 403 }
+      );
+    }
+
     const action = body.action;
     const col = await getPokemonSettingsCollection();
 

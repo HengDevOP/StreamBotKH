@@ -41,6 +41,7 @@ import {
   Menu,
   Youtube,
   Play,
+  Pause,
   AlertCircle,
   AlertTriangle,
   Loader2
@@ -72,8 +73,11 @@ export interface StreamerClient {
   hasTelegramGroup?: boolean;
   hasMasterKhqr?: boolean;
   isTipConfigured?: boolean;
+  videoAlertEnabled?: boolean;
+  hasVideoOverlay?: boolean;
   videoMinTipAmount?: number;
   videoMaxDurationSeconds?: number;
+  plan?: string;
 }
 
 // Default initial database streamer
@@ -86,7 +90,11 @@ const DEFAULT_STREAMER: StreamerClient = {
   viewers: 0,
   isLive: false,
   youtubeId: '',
-  tipUsername: 'selenuxml'
+  tipUsername: 'selenuxml',
+  isTipConfigured: true,
+  videoAlertEnabled: false,
+  hasVideoOverlay: false,
+  plan: 'free'
 };
 
 const INITIAL_STREAMERS: StreamerClient[] = [DEFAULT_STREAMER];
@@ -246,6 +254,7 @@ export const MultiStreamPage: React.FC = () => {
   const [fitScreenMode, setFitScreenMode] = useState<'fit' | 'grid'>('fit');
   const [volume, setVolume] = useState<number>(50);
   const [isMuted, setIsMuted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -267,7 +276,6 @@ export const MultiStreamPage: React.FC = () => {
   ];
   const [selectedQuality, setSelectedQuality] = useState<string>('auto');
   const [isQualityMenuOpen, setIsQualityMenuOpen] = useState<boolean>(false);
-  const [showNativeControls, setShowNativeControls] = useState<boolean>(false);
   const mainStageScrollRef = useRef<HTMLElement | null>(null);
   const recommendedRowRef = useRef<HTMLDivElement | null>(null);
   const [canScrollRecLeft, setCanScrollRecLeft] = useState<boolean>(false);
@@ -506,6 +514,86 @@ export const MultiStreamPage: React.FC = () => {
       }
     }
   };
+
+  // Player controls: Pause / Resume
+  const handleTogglePlayPause = () => {
+    if (!videoIframeRef.current?.contentWindow) return;
+    try {
+      const next = !isPlaying;
+      setIsPlaying(next);
+      videoIframeRef.current.contentWindow.postMessage(
+        JSON.stringify({
+          event: 'command',
+          func: next ? 'playVideo' : 'pauseVideo',
+          args: []
+        }),
+        '*'
+      );
+    } catch (err) {}
+  };
+
+  // Player controls: Mute / Unmute
+  const handleToggleMute = () => {
+    if (!videoIframeRef.current?.contentWindow) return;
+    try {
+      const nextMuted = !isMuted;
+      setIsMuted(nextMuted);
+      videoIframeRef.current.contentWindow.postMessage(
+        JSON.stringify({
+          event: 'command',
+          func: nextMuted ? 'mute' : 'unMute',
+          args: []
+        }),
+        '*'
+      );
+    } catch (err) {}
+  };
+
+  // Player controls: Return / Snap directly to current live duration
+  const handleSeekToLive = () => {
+    if (!videoIframeRef.current?.contentWindow) return;
+    try {
+      videoIframeRef.current.contentWindow.postMessage(
+        JSON.stringify({
+          event: 'command',
+          func: 'seekTo',
+          args: [9999999, true]
+        }),
+        '*'
+      );
+      videoIframeRef.current.contentWindow.postMessage(
+        JSON.stringify({
+          event: 'command',
+          func: 'playVideo',
+          args: []
+        }),
+        '*'
+      );
+      setIsPlaying(true);
+    } catch (err) {}
+  };
+
+  // Sync player playing/paused/muted state from YouTube iframe events
+  useEffect(() => {
+    const handleYtMessage = (event: MessageEvent) => {
+      try {
+        if (typeof event.data !== 'string') return;
+        const data = JSON.parse(event.data);
+        if (data.event === 'infoDelivery' && data.info) {
+          if (data.info.playerState === 1) {
+            setIsPlaying(true);
+          } else if (data.info.playerState === 2) {
+            setIsPlaying(false);
+          }
+          if (typeof data.info.muted === 'boolean') {
+            setIsMuted(data.info.muted);
+          }
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('message', handleYtMessage);
+    return () => window.removeEventListener('message', handleYtMessage);
+  }, []);
 
   // Chat State
   const [chatMode, setChatMode] = useState<'youtube' | 'room'>('youtube');
@@ -815,6 +903,9 @@ export const MultiStreamPage: React.FC = () => {
             hasTelegramGroup: s.hasTelegramGroup,
             hasMasterKhqr: s.hasMasterKhqr,
             isTipConfigured: s.isTipConfigured,
+            videoAlertEnabled: Boolean(s.videoAlertEnabled),
+            hasVideoOverlay: Boolean(s.hasVideoOverlay),
+            plan: s.plan || 'free',
             videoMinTipAmount: Number(s.videoMinTipAmount ?? 2.0),
             videoMaxDurationSeconds: Number(s.videoMaxDurationSeconds ?? 300)
           }));
@@ -907,6 +998,9 @@ export const MultiStreamPage: React.FC = () => {
               hasTelegramGroup: pub.hasTelegramGroup,
               hasMasterKhqr: pub.hasMasterKhqr,
               isTipConfigured: pub.isTipConfigured,
+              videoAlertEnabled: Boolean(pub.videoAlertEnabled),
+              hasVideoOverlay: Boolean(pub.hasVideoOverlay),
+              plan: pub.plan || 'free',
               videoMinTipAmount: Number(pub.videoMinTipAmount ?? 2.0),
               videoMaxDurationSeconds: Number(pub.videoMaxDurationSeconds ?? 300)
             };
@@ -942,6 +1036,9 @@ export const MultiStreamPage: React.FC = () => {
             hasTelegramGroup: pub.hasTelegramGroup ?? prev.hasTelegramGroup,
             hasMasterKhqr: pub.hasMasterKhqr ?? prev.hasMasterKhqr,
             isTipConfigured: pub.isTipConfigured ?? prev.isTipConfigured,
+            videoAlertEnabled: Boolean(pub.videoAlertEnabled),
+            hasVideoOverlay: Boolean(pub.hasVideoOverlay),
+            plan: pub.plan || prev.plan || 'free',
             videoMinTipAmount: nextMinTip,
             videoMaxDurationSeconds: nextMaxDur
           };
@@ -957,6 +1054,9 @@ export const MultiStreamPage: React.FC = () => {
                   hasTelegramGroup: pub.hasTelegramGroup ?? s.hasTelegramGroup,
                   hasMasterKhqr: pub.hasMasterKhqr ?? s.hasMasterKhqr,
                   isTipConfigured: pub.isTipConfigured ?? s.isTipConfigured,
+                  videoAlertEnabled: Boolean(pub.videoAlertEnabled),
+                  hasVideoOverlay: Boolean(pub.hasVideoOverlay),
+                  plan: pub.plan || s.plan || 'free',
                   videoMinTipAmount: nextMinTip,
                   videoMaxDurationSeconds: nextMaxDur
                 }
@@ -1244,7 +1344,8 @@ export const MultiStreamPage: React.FC = () => {
     const donor = tipDonorName.trim() || user?.displayName || user?.username || 'Anonymous Supporter';
     const bank = bankingName.trim() || donor || 'Bakong KHQR';
     const msg = tipDonorMessage.trim() || `Cheering for ${target.name}! 🔥`;
-    const cleanShareUrl = activeShareVideoId && videoUrl.trim() ? videoUrl.trim() : '';
+    const isShareVideoAllowed = Boolean(target.videoAlertEnabled && target.hasVideoOverlay !== false);
+    const cleanShareUrl = isShareVideoAllowed && activeShareVideoId && videoUrl.trim() ? videoUrl.trim() : '';
 
     try {
       const res = await donationService.createDonation({
@@ -1622,13 +1723,12 @@ export const MultiStreamPage: React.FC = () => {
                 })}
               </div>
             ) : selectedStreamer.isLive && selectedStreamer.youtubeId ? (
-              /* Single Focus View (Continuous Live Stream on Current View without Pause or YouTube Labels) */
+              /* Single Focus View (Interactive Live Stream with Pause, Resume, Volume, and Live Duration) */
               <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden select-none">
-                {/* 1. Cropped & Scaled Video Player (Hides YouTube top title header and bottom-right logo outside overflow) */}
                 <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
                   <iframe
                     ref={videoIframeRef}
-                    key={`${selectedStreamer.youtubeId}_${selectedQuality}_${showNativeControls ? 'ctrl' : 'noctrl'}`}
+                    key={`${selectedStreamer.youtubeId}_${selectedQuality}`}
                     onLoad={() => {
                       if (videoIframeRef.current && videoIframeRef.current.contentWindow) {
                         try {
@@ -1657,44 +1757,15 @@ export const MultiStreamPage: React.FC = () => {
                         } catch (e) {}
                       }
                     }}
-                    src={`https://www.youtube.com/embed/${selectedStreamer.youtubeId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=${showNativeControls ? 1 : 0}&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1&enablejsapi=1${
+                    src={`https://www.youtube.com/embed/${selectedStreamer.youtubeId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1&modestbranding=0&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1${
                       typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : ''
                     }${selectedQuality !== 'auto' ? `&vq=${selectedQuality}` : ''}`}
                     title={selectedStreamer.name}
-                    className={`border-0 select-none shrink-0 ${
-                      showNativeControls
-                        ? 'w-full h-full pointer-events-auto'
-                        : 'w-[104%] h-[114%] -mt-[2%] -mb-[4%] pointer-events-none'
-                    }`}
+                    className="w-full h-full border-0 select-auto shrink-0 pointer-events-auto"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
                 </div>
-
-                {/* 2. Interactive Shield: Disables clicking video to pause it, keeping live on current view */}
-                {!showNativeControls && (
-                  <div
-                    onClick={() => {
-                      if (isFullscreen) {
-                        if (showFullscreenHud) {
-                          setShowFullscreenHud(false);
-                        } else {
-                          revealFullscreenHud();
-                        }
-                      }
-                    }}
-                    onDoubleClick={handleToggleFullscreen}
-                    className="absolute inset-0 z-10 bg-transparent select-none cursor-default"
-                  />
-                )}
-
-                {/* 3. Subtle Corner Gradients: Guarantees YouTube labels and logo are completely hidden (active when native controls off) */}
-                {!showNativeControls && (
-                  <>
-                    <div className="absolute top-0 left-0 right-0 h-10 z-20 pointer-events-none bg-gradient-to-b from-black/85 to-transparent" />
-                    <div className="absolute bottom-0 right-0 w-32 h-14 z-20 pointer-events-none bg-gradient-to-t from-black/90 to-transparent" />
-                  </>
-                )}
               </div>
             ) : (
               /* Streamer Offline Screen */
@@ -1770,9 +1841,7 @@ export const MultiStreamPage: React.FC = () => {
                     e.stopPropagation();
                     void exitFullscreenMode();
                   }}
-                  className={`absolute ${
-                    showNativeControls ? 'top-3 right-3 sm:top-5 sm:right-5' : 'bottom-3 right-3 sm:bottom-5 sm:right-5'
-                  } z-40 p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-emerald-400/60 text-white shadow-2xl transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                  className={`absolute top-3 right-3 sm:top-5 sm:right-5 z-40 p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-emerald-400/60 text-white shadow-2xl transition-all duration-300 cursor-pointer flex items-center justify-center ${
                     showFullscreenHud ? 'opacity-100' : 'opacity-50 hover:opacity-100'
                   }`}
                   title="Minimize Video"
@@ -1828,8 +1897,61 @@ export const MultiStreamPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Quick Action Icons (Quality, Share & Fullscreen) */}
+            {/* Right: Quick Action Controls (Play/Pause, Mute/Volume, Live Jump, Open YouTube, Quality, Share & Fullscreen) */}
             <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+              {/* Play / Pause Toggle Button */}
+              {selectedStreamer.isLive && selectedStreamer.youtubeId && (
+                <button
+                  type="button"
+                  onClick={handleTogglePlayPause}
+                  className="p-1 sm:p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
+                  title={isPlaying ? 'Pause stream' : 'Resume stream'}
+                  aria-label={isPlaying ? 'Pause' : 'Resume'}
+                >
+                  {isPlaying ? <Pause size={13} className="text-cyan-400" /> : <Play size={13} className="text-cyan-400" />}
+                </button>
+              )}
+
+              {/* Volume / Mute Toggle Button */}
+              {selectedStreamer.isLive && selectedStreamer.youtubeId && (
+                <button
+                  type="button"
+                  onClick={handleToggleMute}
+                  className="p-1 sm:p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
+                  title={isMuted ? 'Unmute audio' : 'Mute audio'}
+                  aria-label={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <VolumeX size={13} className="text-red-400" /> : <Volume2 size={13} className="text-slate-300" />}
+                </button>
+              )}
+
+              {/* Jump to Current Live Duration Button */}
+              {selectedStreamer.isLive && selectedStreamer.youtubeId && (
+                <button
+                  type="button"
+                  onClick={handleSeekToLive}
+                  className="flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg bg-red-600/15 border border-red-500/40 text-red-400 hover:bg-red-600 hover:text-white transition-all cursor-pointer font-mono text-[10px] sm:text-[11px] font-bold"
+                  title="Click to jump to current live duration"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <span>LIVE</span>
+                </button>
+              )}
+
+              {/* Open Current Live on Original YouTube Provider Button */}
+              {selectedStreamer.youtubeId && (
+                <a
+                  href={`https://www.youtube.com/watch?v=${selectedStreamer.youtubeId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 p-1 sm:p-1.5 rounded-lg bg-red-600/15 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
+                  title="Watch current live duration on original YouTube provider"
+                >
+                  <Youtube size={13} />
+                  <span className="hidden md:inline text-[10px] font-mono font-semibold">YouTube</span>
+                </a>
+              )}
+
               {/* Stream Quality Selector Dropdown */}
               <div className="relative" ref={qualityMenuRef}>
                 <button
@@ -1878,31 +2000,6 @@ export const MultiStreamPage: React.FC = () => {
                           </button>
                         );
                       })}
-                    </div>
-
-                    {/* Optional Native Player Controls Toggle */}
-                    <div className="pt-1.5 mt-1 border-t border-slate-800/80">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowNativeControls(!showNativeControls);
-                          setIsQualityMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all cursor-pointer ${
-                          showNativeControls
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold'
-                            : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'
-                        }`}
-                        title="Toggle YouTube Player Gear & Resolution Menu"
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-mono font-medium">Native Gear Controls</span>
-                          <span className="text-[9px] text-slate-500 font-mono leading-none">
-                            {showNativeControls ? 'Controls Enabled' : 'Unlock YouTube player bar'}
-                          </span>
-                        </div>
-                        {showNativeControls && <Check size={13} className="text-amber-400 shrink-0 ml-2" />}
-                      </button>
                     </div>
                   </div>
                 )}
@@ -2554,7 +2651,8 @@ export const MultiStreamPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Share Media (YouTube Video & Clip Duration — Exact Donation Page Experience) */}
+                {/* Share Media (YouTube Video & Clip Duration — Exact Donation Page Experience) - ONLY if streamer has unlocked Video Alerts */}
+                {Boolean(selectedStreamer.videoAlertEnabled && selectedStreamer.hasVideoOverlay !== false && (selectedStreamer.plan ? selectedStreamer.plan.toLowerCase() !== 'free' : true)) && (
                 <div className="space-y-2 pt-0.5">
                   <div className="flex items-start sm:items-center justify-between gap-2">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
@@ -2643,6 +2741,7 @@ export const MultiStreamPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
               {/* 2. Pinned Action Footer: Fits on application screen, always visible without getting cut off */}

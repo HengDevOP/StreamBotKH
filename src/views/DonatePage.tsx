@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   donationService,
@@ -42,9 +42,14 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
   const [activeDonation, setActiveDonation] = useState<CreateDonationResponse | null>(null);
   const [currentDonorName, setCurrentDonorName] = useState<string>('');
   const [currentBankingName, setCurrentBankingName] = useState<string>('Bakong KHQR');
+  const [subscriptionMeta, setSubscriptionMeta] = useState<{ isSubscription: boolean; tierId?: string; tierName?: string } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [cancelMessage, setCancelMessage] = useState<string | null>(null);
+  const [setupToastVisible, setSetupToastVisible] = useState<boolean>(false);
+  const [setupToastActive, setSetupToastActive] = useState<boolean>(false);
+  const setupToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const setupToastExitTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-dismiss cancel toast after 6 seconds
   useEffect(() => {
@@ -54,6 +59,41 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
     }, 6000);
     return () => clearTimeout(timer);
   }, [cancelMessage]);
+
+  const dismissSetupToast = () => {
+    if (setupToastTimerRef.current) clearTimeout(setupToastTimerRef.current);
+    if (setupToastExitTimerRef.current) clearTimeout(setupToastExitTimerRef.current);
+    setSetupToastActive(false);
+    setupToastExitTimerRef.current = setTimeout(() => {
+      setSetupToastVisible(false);
+    }, 450);
+  };
+
+  const handleSetupRequired = () => {
+    setCancelMessage(null);
+    if (setupToastTimerRef.current) clearTimeout(setupToastTimerRef.current);
+    if (setupToastExitTimerRef.current) clearTimeout(setupToastExitTimerRef.current);
+
+    setSetupToastVisible(true);
+    // Double requestAnimationFrame ensures initial translate-x-[125%] is rendered before animating to translate-x-0
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setSetupToastActive(true);
+      });
+    });
+
+    // Auto-dismiss after 4.5 seconds (toast slides back out to the right)
+    setupToastTimerRef.current = setTimeout(() => {
+      dismissSetupToast();
+    }, 4500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (setupToastTimerRef.current) clearTimeout(setupToastTimerRef.current);
+      if (setupToastExitTimerRef.current) clearTimeout(setupToastExitTimerRef.current);
+    };
+  }, []);
 
   // Selected supporter video for instant playback preview modal
   const [previewingVideoUrl, setPreviewingVideoUrl] = useState<string | null>(null);
@@ -82,9 +122,25 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
   const handleFormSubmit = async (formData: DonorFormData) => {
     if (!streamer) return;
 
+    if (streamer.isTipConfigured === false) {
+      handleSetupRequired();
+      return;
+    }
+
     setCancelMessage(null);
+    dismissSetupToast();
     setSubmitting(true);
     try {
+      if (formData.isSubscription) {
+        setSubscriptionMeta({
+          isSubscription: true,
+          tierId: formData.tierId,
+          tierName: formData.tierName
+        });
+      } else {
+        setSubscriptionMeta(null);
+      }
+
       const res = await donationService.createDonation({
         streamerId: streamer.id,
         donorName: formData.donorName,
@@ -125,13 +181,38 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             : prev
         );
       }
-      if (paidDetails.donor_name) {
+      if (paidDetails.donor_name && !currentDonorName) {
         setCurrentDonorName(paidDetails.donor_name);
       }
       if (paidDetails.banking_name) {
         setCurrentBankingName(paidDetails.banking_name);
       }
     }
+
+    // If viewer subscribed, register membership in database & emit real-time event
+    if (subscriptionMeta?.isSubscription && streamer) {
+      const finalSubscriberName = (currentDonorName || paidDetails?.donor_name || 'Supporter').trim();
+      const finalBankingName = (paidDetails?.banking_name || currentBankingName || finalSubscriberName).trim();
+
+      fetch('/api/widgets/subscribers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_subscription',
+          streamerUsername: streamer.username,
+          streamerToken: (streamer as any).overlayToken || streamer.id,
+          subscriberName: finalSubscriberName,
+          bankingName: finalBankingName,
+          tierId: subscriptionMeta.tierId,
+          donorMessage: (activeDonation as any)?.donor_message || '',
+          paymentMethod: 'Bakong KHQR',
+          transactionId: paidDetails?.hash || paidDetails?.md5 || (activeDonation as any)?.md5 || ('khqr_' + Date.now())
+        })
+      }).catch((err) => {
+        console.error('Failed to create subscription record:', err);
+      });
+    }
+
     // Refresh supporters feed
     donationService.getStreamerRecentDonations(cleanUsername).then(setRecentSupporters).catch(() => {});
   };
@@ -139,6 +220,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
   const handleReset = () => {
     setIsSuccess(false);
     setActiveDonation(null);
+    setSubscriptionMeta(null);
   };
 
   if (loading) {
@@ -216,6 +298,26 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         </div>
       )}
 
+      {/* Payment Setup Required Toast (Slides in from right to left, slides back to right on dismiss) */}
+      {setupToastVisible && !isSuccess && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className={`fixed z-50 top-4 right-4 sm:top-6 sm:right-6 max-w-[calc(100vw-2rem)] sm:max-w-md transition-all duration-400 ease-out transform pointer-events-auto ${
+            setupToastActive
+              ? 'translate-x-0 opacity-100 shadow-2xl shadow-red-950/70'
+              : 'translate-x-[125%] opacity-0 pointer-events-none'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 sm:gap-3 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl bg-red-600 text-white shadow-xl border border-red-500/80">
+            <XCircle size={18} className="shrink-0 text-white" />
+            <span className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] tracking-wide select-none">
+              Payment setup required!
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Success Screen after Payment */}
       {isSuccess && activeDonation ? (
         <div className="w-full max-w-md mx-auto py-2 sm:py-4 animate-fadeIn">
@@ -227,6 +329,8 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             streamerName={streamer.displayName}
             customThanksMessage={streamer.customThanksMessage}
             isVerified={streamer.isVerified}
+            isSubscription={Boolean(subscriptionMeta?.isSubscription)}
+            tierName={subscriptionMeta?.tierName}
             onReset={handleReset}
           />
         </div>
@@ -239,6 +343,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             <DonorForm
               streamer={streamer}
               onSubmit={handleFormSubmit}
+              onSetupRequired={handleSetupRequired}
               loading={submitting}
               isModalOpen={isModalOpen}
             />

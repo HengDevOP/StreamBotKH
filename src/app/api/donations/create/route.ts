@@ -39,10 +39,10 @@ export async function POST(req: NextRequest) {
       ? bankingName.slice(0, 60).trim()
       : 'Bakong KHQR';
 
-    const cleanVideoUrl = videoUrl && typeof videoUrl === 'string' ? videoUrl.trim() : null;
-    const cleanVideoTitle = videoTitle && typeof videoTitle === 'string' ? videoTitle.trim() : null;
-    const cleanVideoStartTime = Number(videoStartTime) || 0;
-    const cleanVideoEndTime = Number(videoEndTime) || 0;
+    let cleanVideoUrl = videoUrl && typeof videoUrl === 'string' ? videoUrl.trim() : null;
+    let cleanVideoTitle = videoTitle && typeof videoTitle === 'string' ? videoTitle.trim() : null;
+    let cleanVideoStartTime = Number(videoStartTime) || 0;
+    let cleanVideoEndTime = Number(videoEndTime) || 0;
 
     // Resolve target streamer ID and username from MongoDB
     let resolvedStreamerId = streamerId;
@@ -61,6 +61,20 @@ export async function POST(req: NextRequest) {
       if (mUser) {
         resolvedStreamerId = mUser.userId || (mUser as any).id || String(mUser._id);
         resolvedUsername = mUser.username || '';
+
+        // If streamer has not unlocked Video Alerts (not Pro plan and not Admin), strip video attachment
+        const streamerPlan = String(mUser.plan || 'free').toLowerCase();
+        const isStreamerAdmin = Boolean(
+          (mUser as any).isAdmin ||
+          (mUser.email && mUser.email.trim().toLowerCase() === 'hchenheng@gmail.com')
+        );
+        const isVideoAlertsUnlocked = streamerPlan !== 'free' || isStreamerAdmin;
+        if (!isVideoAlertsUnlocked) {
+          cleanVideoUrl = null;
+          cleanVideoTitle = null;
+          cleanVideoStartTime = 0;
+          cleanVideoEndTime = 0;
+        }
       }
     } catch (e) {}
 

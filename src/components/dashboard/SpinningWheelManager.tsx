@@ -100,6 +100,20 @@ export const SpinningWheelManager: React.FC<SpinningWheelManagerProps> = ({
       const sliceIndex = Math.floor(normalizedAngle / degreesPerSlice);
       const winner = slices[sliceIndex % slices.length]?.label || slices[0].label;
       setWinningSlice(winner);
+
+      // Broadcast wheel spin to OBS overlay via API (Gated by Pro plan)
+      if (streamerToken && !isLocked) {
+        fetch('/api/widgets/wheel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: streamerToken,
+            totalRotation,
+            slices,
+            winner
+          })
+        }).catch(() => {});
+      }
     }, 4000);
   };
 

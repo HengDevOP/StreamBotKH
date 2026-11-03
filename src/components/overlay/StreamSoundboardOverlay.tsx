@@ -40,6 +40,7 @@ interface ActiveSoundAlert {
 export const StreamSoundboardOverlay: React.FC<StreamSoundboardOverlayProps> = ({ token }) => {
   const [activeAlert, setActiveAlert] = useState<ActiveSoundAlert | null>(null);
   const [outputMode, setOutputMode] = useState<string>('both'); // 'local', 'overlay', 'both'
+  const [isLocked, setIsLocked] = useState<boolean>(false);
   const activeAlertTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper to render matching icon - Volume icon used for all soundboards
@@ -54,6 +55,11 @@ export const StreamSoundboardOverlay: React.FC<StreamSoundboardOverlayProps> = (
     fetch(`/api/soundboard?token=${effectiveToken}`)
       .then((res) => res.json())
       .then((data) => {
+        if (data.isLocked || !data.success) {
+          setIsLocked(true);
+          return;
+        }
+        setIsLocked(false);
         if (data.success && data.settings) {
           setOutputMode(data.settings.outputMode || 'both');
         }
@@ -141,7 +147,7 @@ export const StreamSoundboardOverlay: React.FC<StreamSoundboardOverlayProps> = (
     };
   }, [token, outputMode]);
 
-  if (!activeAlert) {
+  if (!activeAlert || isLocked) {
     return <div className="w-full h-full bg-transparent" />;
   }
 

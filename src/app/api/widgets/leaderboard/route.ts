@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getIO } from '@/server/services/socketService';
 import { v4 as uuidv4 } from 'uuid';
 import { getUsersCollection, getDonationsCollection, getStreamLeaderboardsCollection } from '@/server/database/mongo';
+import { verifyProStreamerByToken } from '@/server/services/planService';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,21 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token') || 'demo-token';
+
+    // Verify streamer has Pro plan active
+    const { isPro } = await verifyProStreamerByToken(token);
+    if (!isPro) {
+      return NextResponse.json(
+        {
+          success: false,
+          isLocked: true,
+          error: 'Pro plan required for Leaderboard stream widget.',
+          leaderboard: null,
+          topDonors: []
+        },
+        { status: 403 }
+      );
+    }
 
     const lbCol = await getStreamLeaderboardsCollection();
     let row = await lbCol.findOne({ streamerToken: token }) as any;
@@ -201,6 +217,19 @@ export async function POST(req: NextRequest) {
       fontFamily = 'Chakra Petch',
       testTip = false
     } = body;
+
+    // Verify streamer has Pro plan active before saving or broadcasting to overlay
+    const { isPro } = await verifyProStreamerByToken(token);
+    if (!isPro) {
+      return NextResponse.json(
+        {
+          success: false,
+          isLocked: true,
+          error: 'Pro plan required to configure or broadcast to Leaderboard overlay.'
+        },
+        { status: 403 }
+      );
+    }
 
     // Simulation test for leaderboard tip
     if (testTip) {

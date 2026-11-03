@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { mediaService } from '../services/mediaService';
 
@@ -18,12 +18,14 @@ const SocketContext = createContext<SocketContextType | undefined>(undefined);
 let globalSocket: Socket | null = null;
 let lastJoinedOverlayToken: string | null = null;
 let lastJoinedStreamerId: string | null = null;
+const joinedOverlayTokens = new Set<string>();
+const joinedDashboardIds = new Set<string>();
 
 function getGlobalSocket(): Socket {
   if (!globalSocket && typeof window !== 'undefined') {
     globalSocket = io(window.location.origin, {
       path: '/socket.io',
-      transports: ['polling', 'websocket'], // Start with HTTP polling handshake -> smooth WebSocket upgrade (prevents connection abortion during React StrictMode)
+      transports: ['polling', 'websocket'], // Start with HTTP polling handshake -> smooth WebSocket upgrade
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -47,34 +49,38 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     mediaService.attachSocket(s);
 
     const onConnect = () => {
-      console.log('⚡ [Socket] Connected to streambotkh gateway:', s.id);
       setConnected(true);
+      joinedOverlayTokens.clear();
+      joinedDashboardIds.clear();
 
       // Auto-rejoin rooms on reconnect or server restart so overlay never goes silent
       if (lastJoinedOverlayToken) {
-        console.log('🔄 [Socket] Auto-rejoining overlay room on connect:', lastJoinedOverlayToken);
+        joinedOverlayTokens.add(lastJoinedOverlayToken);
         s.emit('join:overlay', { overlayToken: lastJoinedOverlayToken });
       }
       if (lastJoinedStreamerId) {
-        console.log('🔄 [Socket] Auto-rejoining dashboard room on connect:', lastJoinedStreamerId);
+        joinedDashboardIds.add(lastJoinedStreamerId);
         s.emit('join:dashboard', { streamerId: lastJoinedStreamerId });
       }
     };
 
     const onDisconnect = () => {
-      console.log('⚡ [Socket] Disconnected from gateway');
       setConnected(false);
+      joinedOverlayTokens.clear();
+      joinedDashboardIds.clear();
     };
 
     s.on('connect', onConnect);
     s.on('disconnect', onDisconnect);
 
-    // If socket is already connected when this component mounts, ensure rooms are joined!
+    // If socket is already connected when this component mounts, ensure rooms are joined once!
     if (s.connected) {
-      if (lastJoinedOverlayToken) {
+      if (lastJoinedOverlayToken && !joinedOverlayTokens.has(lastJoinedOverlayToken)) {
+        joinedOverlayTokens.add(lastJoinedOverlayToken);
         s.emit('join:overlay', { overlayToken: lastJoinedOverlayToken });
       }
-      if (lastJoinedStreamerId) {
+      if (lastJoinedStreamerId && !joinedDashboardIds.has(lastJoinedStreamerId)) {
+        joinedDashboardIds.add(lastJoinedStreamerId);
         s.emit('join:dashboard', { streamerId: lastJoinedStreamerId });
       }
     }
@@ -86,30 +92,42 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  const joinOverlayRoom = (overlayToken: string) => {
+  const joinOverlayRoom = useCallback((overlayToken: string) => {
     if (!overlayToken) return;
     lastJoinedOverlayToken = overlayToken;
-    const s = socket || getGlobalSocket();
-    if (s) {
-      console.log('⚡ [SocketContext] joinOverlayRoom called for:', overlayToken);
+    const s = getGlobalSocket();
+
+    // Deduplicate: If socket is connected and already joined this token, do not emit again
+    if (s && s.connected) {
+      if (joinedOverlayTokens.has(overlayToken)) {
+        return;
+      }
+      joinedOverlayTokens.add(overlayToken);
       s.emit('join:overlay', { overlayToken });
     }
-  };
+  }, []);
 
-  const joinDashboardRoom = (streamerId: string) => {
+  const joinDashboardRoom = useCallback((streamerId: string) => {
     if (!streamerId) return;
     lastJoinedStreamerId = streamerId;
-    const s = socket || getGlobalSocket();
-    if (s) {
+    const s = getGlobalSocket();
+
+    // Deduplicate: If socket is connected and already joined this streamerId, do not emit again
+    if (s && s.connected) {
+      if (joinedDashboardIds.has(streamerId)) {
+        return;
+      }
+      joinedDashboardIds.add(streamerId);
       s.emit('join:dashboard', { streamerId });
     }
-  };
+  }, []);
 
-  const triggerTestAlert = (overlayToken: string, payload: any) => {
-    if (socket) {
-      socket.emit('trigger:test_alert', { overlayToken, ...payload });
+  const triggerTestAlert = useCallback((overlayToken: string, payload: any) => {
+    const s = getGlobalSocket();
+    if (s && s.connected) {
+      s.emit('trigger:test_alert', { overlayToken, ...payload });
     }
-  };
+  }, []);
 
   return (
     <SocketContext.Provider value={{ socket, connected, joinOverlayRoom, joinDashboardRoom, triggerTestAlert }}>

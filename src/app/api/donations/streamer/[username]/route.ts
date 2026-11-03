@@ -89,7 +89,14 @@ export async function GET(
     }
 
     const userSocialLinks: any[] = Array.isArray(mongoUser.socialLinks) ? mongoUser.socialLinks : [];
-    const videoAlertEnabled = Boolean(videoSettings?.isEnabled ?? videoSettings?.is_enabled ?? true);
+
+    // Streamer must have unlocked Video Alerts (Pro plan or Admin) and enabled the feature
+    const isStreamerAdmin = Boolean(
+      (mongoUser as any).isAdmin ||
+      (mongoUser.email && mongoUser.email.trim().toLowerCase() === 'hchenheng@gmail.com')
+    );
+    const isVideoAlertsUnlocked = currentPlan !== 'free' || isStreamerAdmin;
+    const videoAlertEnabled = isVideoAlertsUnlocked && Boolean(videoSettings?.isEnabled ?? videoSettings?.is_enabled ?? true);
 
     // Check if streamer has an active uploaded Master KHQR code (verified & restored)
     let khqrImageUrl = '';
@@ -149,7 +156,7 @@ export async function GET(
     // Tip is fully configured only if GramJS is connected, KHQR image is uploaded, and a monitored group is linked
     const isTipConfigured = Boolean(isTelegramConnected && hasMasterKhqr && hasTelegramGroup);
 
-    const resolvedLiveUrl = mongoUser.liveStreamUrl || mongoUser.youtubeLiveUrl || '';
+    const resolvedLiveUrl = (mongoUser as any).liveStreamUrl || (mongoUser as any).youtubeLiveUrl || '';
     const resolvedYoutubeId = extractYoutubeId(resolvedLiveUrl) || undefined;
     let isLive = false;
     let viewers = 0;

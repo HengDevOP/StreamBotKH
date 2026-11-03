@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getIO } from '@/server/services/socketService';
 import { v4 as uuidv4 } from 'uuid';
 import { getUsersCollection, getOverlayTokenHistoryCollection, getStreamTimersCollection } from '@/server/database/mongo';
+import { verifyProStreamerByToken } from '@/server/services/planService';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,20 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token') || 'demo-token';
+
+    // Verify streamer has Pro plan active
+    const { isPro } = await verifyProStreamerByToken(token);
+    if (!isPro) {
+      return NextResponse.json(
+        {
+          success: false,
+          isLocked: true,
+          error: 'Pro plan required for Subathon Timer widget.',
+          timer: null
+        },
+        { status: 403 }
+      );
+    }
 
     const timersCol = await getStreamTimersCollection();
     let timer = await timersCol.findOne({ streamerToken: token }) as any;
@@ -87,7 +102,7 @@ export async function GET(req: NextRequest) {
         maxCapSeconds: 86400,
         lastUpdatedAt: new Date()
       };
-      await timersCol.insertOne(defaultDoc);
+      await timersCol.insertOne(defaultDoc as any);
       timer = defaultDoc;
     } else if (timer.isRunning || timer.is_running === 1) {
       const lastUpdated = new Date(timer.lastUpdatedAt || timer.last_updated_at || Date.now()).getTime();
@@ -139,6 +154,19 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const token = body.token || 'demo-token';
+
+    // Verify streamer has Pro plan active before updating or broadcasting to overlay
+    const { isPro } = await verifyProStreamerByToken(token);
+    if (!isPro) {
+      return NextResponse.json(
+        {
+          success: false,
+          isLocked: true,
+          error: 'Pro plan required to configure or broadcast to Subathon Timer.'
+        },
+        { status: 403 }
+      );
+    }
 
     const timersCol = await getStreamTimersCollection();
     let timer = await timersCol.findOne({ streamerToken: token }) as any;

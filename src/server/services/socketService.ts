@@ -1,8 +1,9 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
-import { getUsersCollection, getOverlayTokenHistoryCollection, getMongoDb } from '../database/mongo';
+import { getUsersCollection, getOverlayTokenHistoryCollection, getMongoDb, getSubscribersCollection, buildSubscriberUsernameQuery } from '../database/mongo';
 import { extractYoutubeId, getYoutubeLiveStats } from '../../utils/youtube';
+import { verifyProStreamerByToken } from './planService';
 
 let io: SocketIOServer | null = null;
 
@@ -138,7 +139,7 @@ async function joinStreamerRooms(socket: Socket, token: string) {
   } catch (e) {}
 }
 
-async function broadcastToAllStreamerRooms(token: string, event: string, payload: any) {
+export async function broadcastToAllStreamerRooms(token: string, event: string, payload: any) {
   const io = getIO();
   if (!io) return;
   try {
@@ -269,33 +270,53 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
   io.on('connection', (socket: Socket) => {
     // OBS overlay joins room using overlay_token
     socket.on('join:overlay', (data: { overlayToken: string }) => {
-      if (data?.overlayToken) {
-        socket.join(`overlay:${data.overlayToken}`);
-        console.log(`[Socket] Overlay connected for token: ${data.overlayToken.slice(0, 10)}... (Socket ID: ${socket.id})`);
+      if (!data?.overlayToken) return;
+      const roomName = `overlay:${data.overlayToken}`;
+      const isAlreadyInRoom = socket.rooms.has(roomName);
 
+      socket.join(roomName);
+
+      if (!isAlreadyInRoom) {
+        console.log(`[Socket] Overlay connected for token: ${data.overlayToken.slice(0, 10)}... (Socket ID: ${socket.id})`);
         // Automatically map legacy or regenerated tokens to the streamer's room so OBS never breaks!
         joinStreamerRooms(socket, data.overlayToken);
-
-        socket.emit('overlay:connected', { status: 'ready', message: 'StreamNeon overlay connected successfully' });
       }
+
+      socket.emit('overlay:connected', { status: 'ready', message: 'StreamNeon overlay connected successfully' });
     });
 
     // Streamer dashboard joins room using streamerId
     socket.on('join:dashboard', (data: { streamerId: string }) => {
-      if (data?.streamerId) {
-        socket.join(`dashboard:${data.streamerId}`);
+      if (!data?.streamerId) return;
+      const roomName = `dashboard:${data.streamerId}`;
+      const isAlreadyInRoom = socket.rooms.has(roomName);
+
+      socket.join(roomName);
+
+      if (!isAlreadyInRoom) {
         console.log(`[Socket] Dashboard connected for streamerId: ${data.streamerId}`);
       }
     });
 
     // Test alert trigger from dashboard
-    socket.on('trigger:test_alert', (payload: AlertPayload & { overlayToken: string }) => {
+    socket.on('trigger:test_alert', async (payload: AlertPayload & { overlayToken: string }) => {
       const token = payload?.overlayToken || 'demo-token';
       console.log(`[Socket] Triggering test alert for overlay token: ${token}`);
-      const testPayload = {
+      const testPayload: any = {
         ...payload,
         isTest: true
       };
+
+      // Strip videoUrl if streamer is on Free plan (Video Alerts is Pro feature)
+      if (testPayload.videoUrl) {
+        const { isPro } = await verifyProStreamerByToken(token);
+        if (!isPro) {
+          delete testPayload.videoUrl;
+          delete testPayload.videoTitle;
+          delete testPayload.videoStartTime;
+          delete testPayload.videoEndTime;
+        }
+      }
 
       // Broadcast single alert event to target overlay room
       io?.to(`overlay:${token}`).emit('donation:alert', testPayload);
@@ -335,9 +356,76 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
-    // Soundboard event triggers for OBS overlay & stream sync
-    socket.on('soundboard:play', (payload: any) => {
+    // Live Chat overlay test message trigger
+    socket.on('chat:test_message', async (data: any) => {
+      const token = data?.token || data?.streamerToken || 'demo-token';
+      console.log(`[Socket] Broadcasting chat:test_message for token: ${token}`);
+      const authorName = (data?.author || 'SubscriberFan').trim();
+      let assignedBadge = data?.badge;
+      let badgeColor = data?.badgeColor;
+      let badgeBg = data?.badgeBg;
+      let badgeBorder = data?.badgeBorder;
+      let badgeIcon = data?.badgeIcon;
+      let badgeGifUrl = data?.badgeGifUrl || data?.badgeImage;
+      let badgeImage = data?.badgeImage || data?.badgeGifUrl;
+
+      try {
+        const subCol = await getSubscribersCollection();
+        const activeSub = await subCol.findOne({
+          streamerToken: token,
+          status: 'active',
+          expiresAt: { $gt: new Date() },
+          ...buildSubscriberUsernameQuery(authorName)
+        });
+
+        if (activeSub) {
+          assignedBadge = activeSub.badgeText;
+          badgeColor = activeSub.badgeColor;
+          badgeBg = activeSub.badgeBg;
+          badgeBorder = activeSub.badgeBorder;
+          badgeIcon = activeSub.badgeIcon;
+          badgeGifUrl = activeSub.badgeGifUrl || activeSub.badgeImage;
+          badgeImage = activeSub.badgeImage || activeSub.badgeGifUrl;
+        }
+      } catch (err: any) {
+        // Fallback
+      }
+
+      if (assignedBadge === undefined) {
+        assignedBadge = 'VIP';
+      }
+
+      const testMsg = {
+        id: 'test_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        author: authorName,
+        message: data?.message || 'Hyped subscriber in the chat! Let’s go! 🔥✨',
+        avatar: data?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(authorName)}`,
+        badge: assignedBadge,
+        badgeColor: badgeColor || '#00F0FF',
+        badgeBg,
+        badgeBorder,
+        badgeIcon: badgeIcon || 'Crown',
+        badgeGifUrl,
+        badgeImage,
+        platform: data?.platform || 'youtube',
+        isTest: true,
+        timestamp: Date.now()
+      };
+
+      broadcastToAllStreamerRooms(token, 'chat:message', testMsg);
+      if (token === 'demo-token') {
+        io?.to('overlay:demo-token').emit('chat:message', testMsg);
+      }
+    });
+
+    // Soundboard event triggers for OBS overlay & stream sync (PRO Plan Feature Only)
+    socket.on('soundboard:play', async (payload: any) => {
       const token = payload?.overlayToken || payload?.token || 'demo-token';
+      const { isPro } = await verifyProStreamerByToken(token);
+      if (!isPro) {
+        console.warn(`[Socket] Blocked soundboard:play - Free streamer token: ${token}`);
+        return;
+      }
       console.log(`[Socket] Soundboard play event: "${payload?.title || payload?.soundId}" (Token: ${token})`);
       io?.to(`overlay:${token}`).emit('soundboard:play', payload);
       if (token !== 'demo-token') {
@@ -345,8 +433,13 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
-    socket.on('soundboard:stop', (payload: any) => {
+    socket.on('soundboard:stop', async (payload: any) => {
       const token = payload?.overlayToken || payload?.token || 'demo-token';
+      const { isPro } = await verifyProStreamerByToken(token);
+      if (!isPro) {
+        console.warn(`[Socket] Blocked soundboard:stop - Free streamer token: ${token}`);
+        return;
+      }
       console.log(`[Socket] Soundboard panic stop event (Token: ${token})`);
       io?.to(`overlay:${token}`).emit('soundboard:stop', payload);
       if (token !== 'demo-token') {
@@ -354,11 +447,31 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
-    socket.on('soundboard:update', (payload: any) => {
+    socket.on('soundboard:update', async (payload: any) => {
       const token = payload?.overlayToken || payload?.token || 'demo-token';
+      const { isPro } = await verifyProStreamerByToken(token);
+      if (!isPro) {
+        console.warn(`[Socket] Blocked soundboard:update - Free streamer token: ${token}`);
+        return;
+      }
       io?.to(`overlay:${token}`).emit('soundboard:update', payload);
       if (token !== 'demo-token') {
         io?.to('overlay:demo-token').emit('soundboard:update', payload);
+      }
+    });
+
+    // Spinning Wheel event triggers for OBS overlay & stream sync (PRO Plan Feature Only)
+    socket.on('wheel:spin', async (payload: any) => {
+      const token = payload?.overlayToken || payload?.token || 'demo-token';
+      const { isPro } = await verifyProStreamerByToken(token);
+      if (!isPro) {
+        console.warn(`[Socket] Blocked wheel:spin - Free streamer token: ${token}`);
+        return;
+      }
+      console.log(`[Socket] Wheel spin event for token: ${token}`);
+      io?.to(`overlay:${token}`).emit('wheel:spin', payload);
+      if (token !== 'demo-token') {
+        io?.to('overlay:demo-token').emit('wheel:spin', payload);
       }
     });
 

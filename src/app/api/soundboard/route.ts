@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSoundboardsCollection, getSoundboardItemsCollection } from '@/server/database/mongo';
 import { getIO } from '@/server/services/socketService';
+import { verifyProStreamerByToken } from '@/server/services/planService';
 import { v4 as uuidv4 } from 'uuid';
 
 export const dynamic = 'force-dynamic';
@@ -537,6 +538,21 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token') || 'demo-token';
 
+    // Verify streamer has Pro plan active
+    const { isPro } = await verifyProStreamerByToken(token);
+    if (!isPro) {
+      return NextResponse.json(
+        {
+          success: false,
+          isLocked: true,
+          error: 'Pro plan required for Soundboard stream widget.',
+          items: [],
+          settings: null
+        },
+        { status: 403 }
+      );
+    }
+
     const sbCol = await getSoundboardsCollection();
     const sbiCol = await getSoundboardItemsCollection();
 
@@ -633,6 +649,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const token = body.token || 'demo-token';
     const action = body.action || 'update_settings';
+
+    // Verify streamer has Pro plan active before updating or broadcasting
+    const { isPro } = await verifyProStreamerByToken(token);
+    if (!isPro) {
+      return NextResponse.json(
+        {
+          success: false,
+          isLocked: true,
+          error: 'Pro plan required to configure or broadcast to Soundboard overlay.'
+        },
+        { status: 403 }
+      );
+    }
 
     const sbCol = await getSoundboardsCollection();
     const sbiCol = await getSoundboardItemsCollection();

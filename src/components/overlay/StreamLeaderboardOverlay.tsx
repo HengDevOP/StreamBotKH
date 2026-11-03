@@ -21,6 +21,7 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
   const [showRankBadges, setShowRankBadges] = useState(true);
   const [fontFamily, setFontFamily] = useState('Chakra Petch');
   const [topDonors, setTopDonors] = useState<LeaderboardDonor[]>([]);
+  const [isLocked, setIsLocked] = useState(false);
 
   // 1. Fetch initial leaderboard settings & top donors
   const fetchLeaderboardData = () => {
@@ -28,6 +29,12 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
+        if (data.isLocked || !data.success) {
+          setIsLocked(true);
+          setTopDonors([]);
+          return;
+        }
+        setIsLocked(false);
         if (data.success && data.leaderboard) {
           const lb = data.leaderboard;
           setTitle(lb.title || 'TOP SUPPORTERS');
@@ -95,6 +102,10 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
       socket.off('donation:alert', handleNewDonation);
     };
   }, [socket, token]);
+
+  if (isLocked) {
+    return <div className="w-full h-full bg-transparent" />;
+  }
 
   return (
     <div className="w-full h-full min-h-screen bg-transparent flex flex-col items-center justify-center p-4 select-none">

@@ -28,6 +28,8 @@ import { StreamLeaderboardOverlay } from './components/overlay/StreamLeaderboard
 import { StreamTimerOverlay } from './components/overlay/StreamTimerOverlay';
 import { PokemonStreamOverlay } from './components/overlay/PokemonStreamOverlay';
 import { StreamTipQrOverlay } from './components/overlay/StreamTipQrOverlay';
+import { StreamWheelOverlay } from './components/overlay/StreamWheelOverlay';
+import { StreamChatOverlay } from './components/overlay/StreamChatOverlay';
 
 // Wrapper for Dashboard Page reading query parameters (?tab=...&id=...)
 function DashboardRouteWrapper() {
@@ -223,6 +225,40 @@ function TipQrOverlayRouteWrapper() {
   );
 }
 
+// Wrapper for Spinning Wheel Widget Overlay
+function WheelOverlayRouteWrapper() {
+  const { token } = useParams<{ token?: string }>();
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0 flex items-center justify-center">
+      <style>{`
+        html, body, #root, main {
+          background: transparent !important;
+          background-color: transparent !important;
+          background-image: none !important;
+        }
+      `}</style>
+      <StreamWheelOverlay token={token || 'demo-token'} />
+    </div>
+  );
+}
+
+// Wrapper for Live Chat OBS Browser Source Overlay
+function ChatOverlayRouteWrapper() {
+  const { token } = useParams<{ token?: string }>();
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0 flex flex-col justify-end">
+      <style>{`
+        html, body, #root, main {
+          background: transparent !important;
+          background-color: transparent !important;
+          background-image: none !important;
+        }
+      `}</style>
+      <StreamChatOverlay token={token || 'demo-token'} />
+    </div>
+  );
+}
+
 // Layout wrapper determining whether to display Navbar and Footer
 function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -335,6 +371,10 @@ function AppRoutes() {
         <Route path="/overlay/timer" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/timer/:token" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
+        <Route path="/overlay/wheel" element={<WheelOverlayRouteWrapper />} />
+        <Route path="/overlay/wheel/:token" element={<WheelOverlayRouteWrapper />} />
+        <Route path="/overlay/chat" element={<ChatOverlayRouteWrapper />} />
+        <Route path="/overlay/chat/:token" element={<ChatOverlayRouteWrapper />} />
         <Route path="/overlay/qr" element={<TipQrOverlayRouteWrapper />} />
         <Route path="/overlay/qr/:token" element={<TipQrOverlayRouteWrapper />} />
         <Route path="/overlay/tip-qr/:token" element={<TipQrOverlayRouteWrapper />} />
@@ -350,6 +390,10 @@ function AppRoutes() {
         <Route path="/widget/timer" element={<TimerOverlayRouteWrapper />} />
         <Route path="/widget/timer/:token" element={<TimerOverlayRouteWrapper />} />
         <Route path="/widget/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
+        <Route path="/widget/wheel" element={<WheelOverlayRouteWrapper />} />
+        <Route path="/widget/wheel/:token" element={<WheelOverlayRouteWrapper />} />
+        <Route path="/widget/chat" element={<ChatOverlayRouteWrapper />} />
+        <Route path="/widget/chat/:token" element={<ChatOverlayRouteWrapper />} />
         <Route path="/widget/qr" element={<TipQrOverlayRouteWrapper />} />
         <Route path="/widget/qr/:token" element={<TipQrOverlayRouteWrapper />} />
         <Route path="/widget/tip-qr/:token" element={<TipQrOverlayRouteWrapper />} />

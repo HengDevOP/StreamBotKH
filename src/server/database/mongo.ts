@@ -178,6 +178,91 @@ export interface StreamLeaderboardDoc {
   updatedAt: Date;
 }
 
+export interface StreamChatSettingsDoc {
+  _id?: ObjectId;
+  id?: string;
+  streamerToken: string;
+  theme?: string;
+  fontFamily?: string;
+  authorFontFamily?: string;
+  messageFontFamily?: string;
+  fontSize?: string;
+  lineStyle?: 'inline' | 'indented' | 'stacked';
+  authorColor?: string;
+  messageColor?: string;
+  animationStyle?: string;
+  overlayWidth?: number;
+  overlayHeight?: number;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
+  showBadges?: boolean;
+  showAvatars?: boolean;
+  showTimestamp?: boolean;
+  fadeDuration?: number;
+  messageDelay?: number;
+  maxMessages?: number;
+  textBorderWidth?: number;
+  textBorderColor?: string;
+  textShadowStyle?: 'none' | 'soft' | 'strong' | 'glow' | 'custom';
+  textShadowColor?: string;
+  textShadowBlur?: number;
+  youtubeUrl?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface SubscriberTierDoc {
+  id: string;
+  name: string;
+  price: number;
+  currency: 'USD' | 'KHR';
+  badgeText: string;
+  badgeColor: string;
+  badgeBg?: string;
+  badgeBorder?: string;
+  badgeIcon: string;
+  badgeGifUrl?: string;
+  badgeImage?: string;
+  perks: string[];
+  description?: string;
+}
+
+export interface SubscriberSettingsDoc {
+  _id?: ObjectId;
+  streamerToken: string;
+  streamerUsername?: string;
+  enabled: boolean;
+  tiers: SubscriberTierDoc[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface SubscriberDoc {
+  _id?: ObjectId;
+  id: string;
+  streamerToken: string;
+  streamerUsername: string;
+  subscriberName: string;
+  youtubeHandle?: string;
+  tierId: string;
+  tierName: string;
+  price: number;
+  currency: 'USD' | 'KHR';
+  badgeText: string;
+  badgeColor: string;
+  badgeBg?: string;
+  badgeBorder?: string;
+  badgeIcon: string;
+  badgeGifUrl?: string;
+  badgeImage?: string;
+  paymentMethod: string;
+  status: 'active' | 'cancelled' | 'expired';
+  subscribedAt: Date;
+  expiresAt: Date;
+  donorMessage?: string;
+  transactionId?: string;
+}
+
 export interface StreamSoundboardDoc {
   _id?: ObjectId;
   id: string;
@@ -752,9 +837,56 @@ export async function getPokemonSettingsCollection(): Promise<Collection<Pokemon
   return db.collection<PokemonWidgetSettingsDoc>('pokemon_widget_settings');
 }
 
+export async function getStreamChatSettingsCollection(): Promise<Collection<StreamChatSettingsDoc>> {
+  const db = await getMongoDb();
+  return db.collection<StreamChatSettingsDoc>('stream_chat_settings');
+}
+
 export async function getPromotionsCollection(): Promise<Collection<PlatformPromotionDoc>> {
   const db = await getMongoDb();
   return db.collection<PlatformPromotionDoc>('platform_promotions');
+}
+
+export async function getSubscriberSettingsCollection(): Promise<Collection<SubscriberSettingsDoc>> {
+  const db = await getMongoDb();
+  return db.collection<SubscriberSettingsDoc>('subscriber_settings');
+}
+
+export async function getSubscribersCollection(): Promise<Collection<SubscriberDoc>> {
+  const db = await getMongoDb();
+  return db.collection<SubscriberDoc>('subscribers');
+}
+
+/**
+ * Helper to build a flexible MongoDB query matching YouTube usernames / handles
+ * Handles:
+ * - With or without leading '@' (e.g. '@SokhaGamer' <=> 'SokhaGamer')
+ * - Display names with spaces matching handle without spaces (e.g. 'Sokha Gamer' <=> 'SokhaGamer')
+ * - Case-insensitive regex
+ */
+export function buildSubscriberUsernameQuery(authorName: string) {
+  const clean = String(authorName || '').trim();
+  const noAt = clean.replace(/^@+/, '').trim();
+  const noSpaces = noAt.replace(/\s+/g, '');
+  const escapedClean = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedNoAt = noAt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedNoSpaces = noSpaces.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const conditions: any[] = [
+    { subscriberName: { $regex: new RegExp(`^@?${escapedNoAt}$`, 'i') } },
+    { subscriberName: { $regex: new RegExp(`^@?${escapedClean}$`, 'i') } }
+  ];
+
+  if (noSpaces && noSpaces !== noAt) {
+    conditions.push({ subscriberName: { $regex: new RegExp(`^@?${escapedNoSpaces}$`, 'i') } });
+  }
+
+  conditions.push(
+    { youtubeHandle: { $regex: new RegExp(`^@?${escapedNoAt}$`, 'i') } },
+    { youtubeHandle: { $regex: new RegExp(`^@?${escapedClean}$`, 'i') } }
+  );
+
+  return { $or: conditions };
 }
 
 /**

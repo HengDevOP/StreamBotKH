@@ -14,6 +14,8 @@ interface DonationSuccessProps {
   streamerName: string;
   customThanksMessage?: string;
   isVerified?: boolean;
+  isSubscription?: boolean;
+  tierName?: string;
   onReset: () => void;
 }
 
@@ -25,6 +27,8 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
   streamerName,
   customThanksMessage,
   isVerified,
+  isSubscription,
+  tierName,
   onReset
 }) => {
   useEffect(() => {
@@ -112,19 +116,25 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
 
       {/* Creator Custom Thank You Section */}
       <div className="space-y-3 relative z-10">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold tracking-wide">
-          <ShieldCheck size={14} className="text-emerald-400" />
-          <span>PAYMENT VERIFIED &amp; ALERT BROADCAST</span>
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wide border ${
+          isSubscription
+            ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+            : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+        }`}>
+          <ShieldCheck size={14} className={isSubscription ? 'text-amber-400' : 'text-emerald-400'} />
+          <span>{isSubscription ? `👑 SUBSCRIBED: ${tierName?.toUpperCase() || 'VIP'} ACTIVE` : 'PAYMENT VERIFIED & ALERT BROADCAST'}</span>
         </div>
 
         <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-['Chakra_Petch'] tracking-wide">
-          THANK YOU FOR YOUR SUPPORT!
+          {isSubscription ? 'WELCOME TO THE CLUB!' : 'THANK YOU FOR YOUR SUPPORT!'}
         </h2>
 
         {/* Custom Thanks Message from Streamer Account Settings */}
         <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-slate-200 text-sm leading-relaxed font-sans shadow-inner">
           <p className="whitespace-pre-line font-medium text-slate-100">
-            "{displayMessage}"
+            {isSubscription
+              ? `Congratulations, ${donorName || 'Supporter'}! You are now subscribed as ${tierName || 'VIP'}. Your custom subscriber badge is now live in stream chat!`
+              : `"${displayMessage}"`}
           </p>
           <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-center gap-2 text-xs font-mono text-cyan-400">
             <Heart size={13} className="text-pink-500 fill-pink-500" />
@@ -138,11 +148,11 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
         </div>
       </div>
 
-      {/* Clean Verified Tip Summary */}
+      {/* Clean Verified Tip / Subscription Summary */}
       <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs font-mono flex items-center justify-between px-5 text-slate-400 relative z-10">
-        <span>Total Tip Amount</span>
+        <span>{isSubscription ? 'Membership Dues' : 'Total Tip Amount'}</span>
         <span className="text-sm font-extrabold text-emerald-400 font-mono tracking-tight">
-          {formattedAmount}
+          {formattedAmount} {isSubscription ? '/ month' : ''}
         </span>
       </div>
 
@@ -153,7 +163,7 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
         icon={<ArrowLeft size={16} />}
         className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-500/20 cursor-pointer"
       >
-        Send Another Tip
+        {isSubscription ? 'Return to Stream' : 'Send Another Tip'}
       </Button>
     </Card>
   );

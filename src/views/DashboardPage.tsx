@@ -61,7 +61,8 @@ import {
   Mail,
   Headphones,
   Youtube,
-  Radio
+  Radio,
+  Crown
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -92,6 +93,9 @@ import { GoalWidgetManager } from '../components/dashboard/GoalWidgetManager';
 import { SpinningWheelManager } from '../components/dashboard/SpinningWheelManager';
 import { VideoAlertsManager } from '../components/dashboard/VideoAlertsManager';
 import { PokemonWidgetManager } from '../components/dashboard/PokemonWidgetManager';
+import { LiveChatWidgetManager } from '../components/dashboard/LiveChatWidgetManager';
+import { BroadcastStreamManager } from '../components/dashboard/BroadcastStreamManager';
+import { SubscribersManager } from '../components/dashboard/SubscribersManager';
 import { ProUpgradeModal } from '../components/dashboard/ProUpgradeModal';
 import { TimerWidgetManager } from '../components/dashboard/TimerWidgetManager';
 import { SoundboardManager } from '../components/dashboard/SoundboardManager';
@@ -115,6 +119,7 @@ interface DashboardPageProps {
 
 export type DashboardTab =
   | 'overview'
+  | 'broadcast'
   | 'donation'
   | 'video-alerts'
   | 'timer'
@@ -125,6 +130,8 @@ export type DashboardTab =
   | 'leaderboard'
   | 'goal'
   | 'wheel'
+  | 'chat'
+  | 'subscribers'
   | 'pokemon'
   | 'payments'
   | 'telegram'
@@ -244,6 +251,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [showOverlayToken, setShowOverlayToken] = useState(false);
   const [testFiring, setTestFiring] = useState(false);
   const [selectedMediaForOverlay, setSelectedMediaForOverlay] = useState<MediaItem | null>(null);
+  const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
+  const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    const handleUnsaved = (e: any) => {
+      setChatHasUnsavedChanges(Boolean(e.detail?.hasUnsavedChanges));
+    };
+    window.addEventListener('chat-unsaved-changes', handleUnsaved);
+    return () => window.removeEventListener('chat-unsaved-changes', handleUnsaved);
+  }, []);
 
   // Account Profile Form State
   const [profileUsername, setProfileUsername] = useState(user?.username || '');
@@ -505,18 +522,31 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const currentObsConfig = useMemo(() => {
     const effectiveToken = user?.overlayToken || 'demo_token';
     const isAssetCategory = ([
+      'broadcast',
       'leaderboard',
       'goal',
       'timer',
       'video-alerts',
       'wheel',
       'pokemon',
+      'chat',
       'account'
     ] as DashboardTab[]).includes(activeTab);
 
     if (!isAssetCategory) return null;
 
     switch (activeTab) {
+      case 'broadcast':
+        return {
+          featureKey: 'broadcast',
+          label: 'Broadcast /tv Channel',
+          shortLabel: 'Broadcast',
+          url: `${origin}/tv?=${user?.username || ''}`,
+          icon: Radio,
+          color: '#EF4444', // Red
+          bgGlow: 'hover:border-red-500/50',
+          copyMessage: 'Copied Broadcast /tv URL!'
+        };
       case 'account':
         return {
           featureKey: 'qr',
@@ -582,6 +612,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           color: '#8B5CF6', // Purple
           bgGlow: 'hover:border-purple-500/50',
           copyMessage: 'Copied Wheel OBS URL!'
+        };
+      case 'chat':
+        return {
+          featureKey: 'chat',
+          label: 'Live Chat OBS',
+          shortLabel: 'Live Chat',
+          url: `${origin}/widget/chat/${effectiveToken}`,
+          icon: MessageSquare,
+          color: '#00F0FF', // Cyan
+          bgGlow: 'hover:border-cyan-500/50',
+          copyMessage: 'Copied Live Chat OBS URL!'
         };
       case 'pokemon':
         return {
@@ -1065,6 +1106,27 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     {
       category: 'ASSETS',
       items: [
+        {
+          id: 'broadcast' as DashboardTab,
+          label: 'Broadcast Stream',
+          icon: Radio,
+          badge: 'LIVE',
+          isLocked: false
+        },
+        {
+          id: 'chat' as DashboardTab,
+          label: 'Live Chat',
+          icon: MessageSquare,
+          badge: 'NEW',
+          isLocked: currentPlan === 'free' && !isAdmin
+        },
+        {
+          id: 'subscribers' as DashboardTab,
+          label: 'Subscribers',
+          icon: Crown,
+          badge: 'NEW',
+          isLocked: currentPlan === 'free' && !isAdmin
+        },
         {
           id: 'donation' as DashboardTab,
           label: 'Donations Alerts',
@@ -1589,12 +1651,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 onUnreadCountChange={setUnreadMailCount}
               />
             </div>
+
+            {/* Live Chat Settings Toggle Menu Button (Top Navbar Right Side - Mobile Only) */}
+            {activeTab === 'chat' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChatSettingsOpen((prev) => !prev);
+                }}
+                className={`lg:hidden relative flex items-center justify-center p-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  isChatSettingsOpen
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border-slate-750 hover:border-cyan-500/50 shadow-sm'
+                }`}
+                title="Toggle Chat Settings"
+                aria-label="Toggle Live Chat Settings"
+              >
+                <Sliders size={16} className={isChatSettingsOpen ? 'text-slate-950' : 'text-cyan-400'} />
+                {chatHasUnsavedChanges && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
+                )}
+              </button>
+            )}
           </div>
         </header>
 
         {/* Dynamic Workbench Views (Internally Scrollable Container Only) */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-        <div className="p-3 xs:p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6 sm:space-y-8 animate-fadeIn pb-16">
+        <div className={`flex-1 min-h-0 ${activeTab === 'chat' ? 'flex flex-col overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
+        <div className={activeTab === 'chat'
+          ? 'w-full h-full p-2.5 sm:p-4 lg:p-5 flex-1 flex flex-col min-h-0'
+          : 'p-3 xs:p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6 sm:space-y-8 animate-fadeIn pb-16'
+        }>
           {loading ? (
             <FeatureTabSkeleton tab={activeTab} />
           ) : (
@@ -1751,9 +1838,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           )}
 
           {/* ============================================================== */}
-          {/* PRO PLAN STREAM ASSETS (LEADERBOARD, GOALS, TIMER, SOUNDBOARD, VIDEO ALERTS, WHEELS) */}
+          {/* PRO PLAN STREAM ASSETS (LEADERBOARD, GOALS, TIMER, SOUNDBOARD, VIDEO ALERTS, WHEELS, LIVE CHAT, SUBSCRIBERS) */}
           {/* ============================================================== */}
-          {(['leaderboard', 'goal', 'timer', 'soundboard', 'video-alerts', 'wheel'] as DashboardTab[]).includes(activeTab) &&
+          {(['leaderboard', 'goal', 'timer', 'soundboard', 'video-alerts', 'wheel', 'chat', 'subscribers'] as DashboardTab[]).includes(activeTab) &&
             currentPlan === 'free' &&
             !isAdmin && (
               <div className="p-8 sm:p-12 rounded-2xl bg-gradient-to-b from-[#0e1424] to-[#090D18] border border-amber-500/30 text-center max-w-2xl mx-auto space-y-6 my-8 shadow-2xl">
@@ -1768,7 +1855,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     {currentTabTitle} is Available on Pro Plan
                   </h3>
                   <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
-                    Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels are included in the{' '}
+                    Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, Spinning Wheels, and Live Chat are included in the{' '}
                     <strong className="text-white">Pro Plan ($4.99/mo)</strong> along with 100MB storage and removed donation page watermark.
                   </p>
                 </div>
@@ -1827,6 +1914,34 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {activeTab === 'wheel' && (currentPlan !== 'free' || isAdmin) && (
             <SpinningWheelManager
               streamerToken={user?.overlayToken}
+              isLocked={false}
+              onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'broadcast' && (
+            <BroadcastStreamManager
+              user={user}
+              onRefreshUser={refreshUser}
+              onNavigateToTab={(tab) => setActiveTab(tab as DashboardTab)}
+            />
+          )}
+
+          {activeTab === 'chat' && (currentPlan !== 'free' || isAdmin) && (
+            <LiveChatWidgetManager
+              streamerToken={user?.overlayToken}
+              isLocked={false}
+              onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
+              isRightbarOpen={isChatSettingsOpen}
+              onToggleRightbar={() => setIsChatSettingsOpen((prev) => !prev)}
+              onCloseRightbar={() => setIsChatSettingsOpen(false)}
+            />
+          )}
+
+          {activeTab === 'subscribers' && (currentPlan !== 'free' || isAdmin) && (
+            <SubscribersManager
+              streamerToken={user?.overlayToken}
+              streamerUsername={user?.username}
               isLocked={false}
               onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
             />
@@ -1940,225 +2055,96 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
                   </div>
 
-                  {/* 2. Unique Username Changer Card */}
-                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                          Unique Streamer Username
-                        </h3>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Your public donation URL: <span className="font-mono text-cyan-400">{origin}/@{profileUsername || user.username}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                      <div
-                        className={`flex-1 flex items-center rounded-xl bg-slate-950 border transition-colors overflow-hidden ${
-                          usernameStatus === 'taken'
-                            ? 'border-red-500/60 focus-within:border-red-400'
-                            : usernameStatus === 'available'
-                            ? 'border-emerald-500/60 focus-within:border-emerald-400'
-                            : 'border-slate-800 focus-within:border-cyan-400'
-                        }`}
-                      >
-                        <span className="px-3.5 py-2.5 bg-slate-900/80 text-slate-400 font-mono text-xs border-r border-slate-800 select-none font-bold">
-                          @
-                        </span>
-                        <input
-                          type="text"
-                          value={profileUsername}
-                          onChange={(e) =>
-                            setProfileUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
-                          }
-                          placeholder="your_username"
-                          className="w-full px-3.5 py-2.5 bg-transparent text-cyan-400 font-bold text-xs font-mono focus:outline-none"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleChangeUsername}
-                        disabled={
-                          changingUsername ||
-                          usernameStatus === 'taken' ||
-                          usernameStatus === 'checking' ||
-                          profileUsername.trim().toLowerCase() === user.username.toLowerCase()
-                        }
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-extrabold text-xs font-mono uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap shadow-md shadow-cyan-500/10"
-                      >
-                        {changingUsername ? 'Checking & Saving...' : 'Change Username'}
-                      </button>
-                    </div>
-
-                    {/* Live Uniqueness Status Feedback */}
-                    <div className="flex items-center justify-between text-[11px] font-mono">
-                      {usernameStatusMsg ? (
-                        <span
-                          className={`flex items-center gap-1.5 font-semibold ${
-                            usernameStatus === 'taken'
-                              ? 'text-red-400'
-                              : usernameStatus === 'available'
-                              ? 'text-emerald-400'
-                              : 'text-slate-400'
-                          }`}
-                        >
-                          {usernameStatus === 'taken' && <AlertCircle size={13} />}
-                          {usernameStatus === 'available' && <CheckCircle2 size={13} />}
-                          <span>{usernameStatusMsg}</span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">
-                          3–24 characters (letters, numbers, underscores). Must be unique.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 3. YouTube Live Stream for /tv Broadcast Card */}
-                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0 shadow-lg shadow-red-500/10">
-                          <Youtube size={22} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                              YouTube Live Stream URL
-                            </h3>
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                              FOR /TV BROADCAST
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Attach your YouTube Live Stream URL so viewers can watch your live broadcast on{' '}
-                            <span className="font-mono text-cyan-400 font-semibold">/tv?={user.username}</span>.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* View on /tv Link Button */}
-                      <a
-                        href={`/tv?=${user.username}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/50 text-slate-300 hover:text-white text-xs font-mono transition-colors shrink-0 cursor-pointer self-start sm:self-auto"
-                        title="View your channel live on /tv"
-                      >
-                        <Radio size={13} className="text-red-400 animate-pulse" />
-                        <span>Watch on /tv</span>
-                        <ArrowUpRight size={13} className="text-slate-500" />
-                      </a>
-                    </div>
-
-                    {/* Input Field & Save Button */}
-                    <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <div className="flex-1 flex items-center rounded-xl bg-slate-950 border border-slate-800 focus-within:border-red-500/60 overflow-hidden">
-                          <span className="px-3.5 py-2.5 bg-slate-900/80 text-slate-400 font-mono text-xs border-r border-slate-800 select-none flex items-center gap-1.5 shrink-0">
-                            <Youtube size={14} className="text-red-400" />
-                            <span className="hidden xs:inline">Stream URL</span>
-                          </span>
-                          <input
-                            type="url"
-                            value={profileLiveStreamUrl}
-                            onChange={(e) => setProfileLiveStreamUrl(e.target.value)}
-                            placeholder="https://www.youtube.com/watch?v=... or https://youtube.com/live/..."
-                            className="w-full px-3.5 py-2.5 bg-transparent text-white font-mono text-xs focus:outline-none placeholder-slate-600"
-                          />
-                          {profileLiveStreamUrl && (
-                            <button
-                              type="button"
-                              onClick={() => setProfileLiveStreamUrl('')}
-                              className="p-2 text-slate-500 hover:text-white transition-colors cursor-pointer mr-1 shrink-0"
-                              title="Clear URL"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleSaveLiveStreamUrl}
-                          disabled={savingLiveStreamUrl}
-                          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white font-extrabold text-xs font-mono uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40 whitespace-nowrap shadow-md shadow-red-500/20 flex items-center justify-center gap-1.5"
-                        >
-                          {savingLiveStreamUrl ? (
-                            <span>Saving...</span>
-                          ) : (
-                            <>
-                              <CheckCircle2 size={13} />
-                              <span>Save Live URL</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Video Validation & Embedded Preview */}
-                      {detectedLiveYoutubeId ? (
-                        <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-                          <div className="flex items-center justify-between text-xs font-mono">
-                            <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
-                              <CheckCircle2 size={14} />
-                              <span>Valid YouTube Live Stream Connected (Video ID: {detectedLiveYoutubeId})</span>
-                            </span>
-                            <span className="text-slate-500 text-[11px]">Broadcasting to /tv</span>
-                          </div>
-
-                          {/* Live Video Preview Box */}
-                          <div className="relative w-full aspect-video max-w-md rounded-xl bg-black border border-slate-800 overflow-hidden shadow-2xl">
-                            <iframe
-                              src={`https://www.youtube.com/embed/${detectedLiveYoutubeId}?autoplay=0&playsinline=1`}
-                              title="YouTube Live Stream Preview"
-                              className="w-full h-full border-0"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                            />
-                          </div>
-                        </div>
-                      ) : profileLiveStreamUrl.trim() ? (
-                        <div className="text-xs text-amber-400 font-mono flex items-center gap-1.5 pt-1">
-                          <AlertCircle size={13} />
-                          <span>Could not detect a valid YouTube Video ID. Please paste a standard YouTube watch, live, or short link.</span>
-                        </div>
-                      ) : (
-                        <p className="text-[11px] font-mono text-slate-500">
-                          Paste your YouTube stream link (e.g. <code className="text-slate-400">youtube.com/watch?v=...</code> or <code className="text-slate-400">youtube.com/live/...</code>). This will automatically be used as your video screen on <strong>/tv</strong>.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 4. Channel Display Name & Bio Form */}
+                  {/* 2. Channel Profile Details (Merged with Username) */}
                   <form
                     onSubmit={handleSaveProfile}
-                    className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4"
+                    className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-5"
                   >
-                    <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider border-b border-slate-800/80 pb-3">
-                      Channel Profile Details
-                    </h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                          Channel Profile Details
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Configure your unique handle, creator display name, bio, and donor thank you message.
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-mono text-cyan-400 font-semibold self-start sm:self-auto bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-800/40">
+                        {origin}/@{profileUsername || user.username}
+                      </span>
+                    </div>
 
                     <div className="space-y-4 text-xs">
-                      {/* Streamer Display Name */}
-                      <div>
-                        <label className="block text-slate-300 mb-1.5 font-semibold font-mono">
-                          Display Name
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={profileName}
-                          onChange={(e) => setProfileName(e.target.value)}
-                          placeholder="e.g. Sokha Streamer"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors"
-                        />
-                        <span className="text-[10px] text-slate-500 mt-1 block font-mono">
-                          Friendly creator name displayed on alerts, receipts, and headers.
-                        </span>
+                      {/* Unified Row: Username & Display Name */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* 1. Streamer Username */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5 font-mono">
+                            <label className="text-slate-300 font-semibold flex items-center gap-1">
+                              <span>Username</span>
+                              <span className="text-cyan-400">*</span>
+                            </label>
+                            {usernameStatusMsg && (
+                              <span
+                                className={`text-[10px] font-mono flex items-center gap-1 font-semibold ${
+                                  usernameStatus === 'taken'
+                                    ? 'text-red-400'
+                                    : usernameStatus === 'available'
+                                    ? 'text-emerald-400'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {usernameStatus === 'taken' && <AlertCircle size={10} />}
+                                {usernameStatus === 'available' && <CheckCircle2 size={10} />}
+                                <span>{usernameStatusMsg}</span>
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className={`flex items-center rounded-xl bg-slate-950 border transition-colors overflow-hidden ${
+                              usernameStatus === 'taken'
+                                ? 'border-red-500/60 focus-within:border-red-400'
+                                : usernameStatus === 'available'
+                                ? 'border-emerald-500/60 focus-within:border-emerald-400'
+                                : 'border-slate-800 focus-within:border-cyan-400'
+                            }`}
+                          >
+                            <span className="px-3.5 py-2.5 bg-slate-900/80 text-slate-400 font-mono text-xs border-r border-slate-800 select-none font-bold">
+                              @
+                            </span>
+                            <input
+                              type="text"
+                              required
+                              value={profileUsername}
+                              onChange={(e) =>
+                                setProfileUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+                              }
+                              placeholder="your_username"
+                              className="w-full px-3.5 py-2.5 bg-transparent text-cyan-400 font-bold text-xs font-mono focus:outline-none placeholder-slate-600"
+                            />
+                          </div>
+                          <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                            3–24 characters (letters, numbers, underscores). Public URL handle.
+                          </span>
+                        </div>
+
+                        {/* 2. Streamer Display Name */}
+                        <div>
+                          <label className="block text-slate-300 mb-1.5 font-semibold font-mono">
+                            Display Name <span className="text-cyan-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={profileName}
+                            onChange={(e) => setProfileName(e.target.value)}
+                            placeholder="e.g. Sokha Streamer"
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors"
+                          />
+                          <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                            Friendly creator name displayed on alerts, receipts, and headers.
+                          </span>
+                        </div>
                       </div>
 
                       {/* Description / Channel Bio */}
@@ -2394,75 +2380,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                 {/* Right col: Plan Status, Media Storage Quota, and Tip QR Code */}
                 <div className="space-y-6">
-                  {/* Plan & Media Storage Quota Card */}
-                  <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono uppercase text-slate-400 font-bold">
-                        CURRENT PLAN
-                      </span>
-                      <span
-                        className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                          currentPlan === 'pro'
-                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        }`}
-                      >
-                        {currentPlan === 'pro' ? 'Pro (100MB)' : 'Free (20MB)'}
-                      </span>
-                    </div>
-
-                    {/* Storage Limit & Usage Bar */}
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-                          <ImageIcon size={14} className="text-cyan-400" />
-                          Media Storage
-                        </span>
-                        <span className="font-mono text-white font-bold">
-                          {storageInfo
-                            ? `${(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB / ${(storageInfo.limitBytes / (1024 * 1024)).toFixed(0)}MB`
-                            : currentPlan === 'pro'
-                            ? '0 MB / 100MB'
-                            : '0 MB / 20MB'}
-                        </span>
-                      </div>
-
-                      <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-300 rounded-full ${
-                            (storageInfo?.percentUsed || 0) > 85
-                              ? 'bg-red-500'
-                              : (storageInfo?.percentUsed || 0) > 60
-                              ? 'bg-amber-400'
-                              : 'bg-cyan-400'
-                          }`}
-                          style={{
-                            width: `${Math.min(100, storageInfo?.percentUsed || 0)}%`
-                          }}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                        <span>
-                          {storageInfo
-                            ? `${(storageInfo.remainingBytes / (1024 * 1024)).toFixed(1)} MB available`
-                            : currentPlan === 'pro'
-                            ? '100 MB available'
-                            : '20 MB available'}
-                        </span>
-                        <span>{storageInfo ? `${storageInfo.percentUsed}% used` : '0% used'}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('billing')}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-cyan-400 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <Sparkles size={13} />
-                      <span>Manage / Upgrade Plan</span>
-                    </button>
-                  </div>
 
                   {/* Public Tip QR Code & OBS Browser Source Card */}
                   <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col space-y-4">

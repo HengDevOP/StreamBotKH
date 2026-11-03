@@ -46,6 +46,7 @@ export const PokemonStreamOverlay: React.FC<PokemonStreamOverlayProps> = ({
 }) => {
   const { socket } = useSocket();
   const [avatars, setAvatars] = useState<Map<string, ActiveAvatar>>(new Map());
+  const [isLocked, setIsLocked] = useState<boolean>(false);
   const [settings, setSettings] = useState<PokemonSettings>({
     defaultPokemon: 1, // Bulbasaur
     allowedPokemon: [1, 4, 7, 25, 39, 54, 94, 133, 143, 149, 151, 448],
@@ -76,6 +77,11 @@ export const PokemonStreamOverlay: React.FC<PokemonStreamOverlayProps> = ({
     fetch(`/api/widgets/pokemon?token=${token}`)
       .then((res) => res.json())
       .then((data) => {
+        if (data.isLocked || !data.success) {
+          setIsLocked(true);
+          return;
+        }
+        setIsLocked(false);
         if (data.success && data.settings) {
           setSettings((prev) => ({
             ...prev,
@@ -475,8 +481,11 @@ export const PokemonStreamOverlay: React.FC<PokemonStreamOverlayProps> = ({
         }
       `}</style>
 
+      {/* If streamer is not on Pro Plan, lock overlay and render nothing */}
+      {isLocked && <div className="w-full h-full bg-transparent" />}
+
       {/* Render Active Pokémon Avatars */}
-      {Array.from(avatars.values()).map((av) => {
+      {!isLocked && Array.from(avatars.values()).map((av) => {
         const isFacingLeft = av.facing === 'left';
         const isBouncing = av.state === 'bouncing';
         const isFarLeft = av.x < 15;

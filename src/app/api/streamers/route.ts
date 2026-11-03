@@ -49,6 +49,7 @@ export async function GET(_req: NextRequest) {
     const khqrStreamerIds = new Set<string>();
     const videoMaxDurationMap = new Map<string, number>();
     const videoMinTipMap = new Map<string, number>();
+    const videoEnabledMap = new Map<string, boolean>();
 
     try {
       const [sessionsCol, groupsCol, gatewayCol, videoCol] = await Promise.all([
@@ -81,6 +82,7 @@ export async function GET(_req: NextRequest) {
           const minTip = Number(v.minTipAmount ?? (v as any).min_tip_amount ?? 2.0);
           videoMaxDurationMap.set(key, maxDur);
           videoMinTipMap.set(key, minTip);
+          videoEnabledMap.set(key, Boolean(v.isEnabled ?? (v as any).is_enabled ?? true));
         }
       }
     } catch (e) {
@@ -136,6 +138,15 @@ export async function GET(_req: NextRequest) {
         const videoMinTipAmount =
           videoMinTipMap.get(uidLower) ?? videoMinTipMap.get(unameLower) ?? 2.0;
 
+        const streamerPlan = String(u.plan || 'free').toLowerCase();
+        const isStreamerAdmin = Boolean(
+          u.is_admin || u.isAdmin ||
+          (u.email && String(u.email).trim().toLowerCase() === 'hchenheng@gmail.com')
+        );
+        const isVideoAlertsUnlocked = streamerPlan !== 'free' || isStreamerAdmin;
+        const isVideoSettingEnabled = videoEnabledMap.get(uidLower) ?? videoEnabledMap.get(unameLower) ?? true;
+        const videoAlertEnabled = isVideoAlertsUnlocked && isVideoSettingEnabled;
+
         return {
           id: String(u.id || username),
           name,
@@ -155,6 +166,8 @@ export async function GET(_req: NextRequest) {
           hasTelegramGroup,
           hasMasterKhqr,
           isTipConfigured,
+          videoAlertEnabled,
+          hasVideoOverlay: videoAlertEnabled,
           videoMinTipAmount,
           videoMaxDurationSeconds
         };

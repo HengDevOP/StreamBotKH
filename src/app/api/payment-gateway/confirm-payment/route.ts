@@ -341,42 +341,45 @@ export async function POST(req: NextRequest) {
       paid_at: now.toISOString()
     });
 
-    // 5b. Update Active Stream Goal in Real Time if active in MongoDB
-    try {
-      const goalsCol = await getStreamGoalsCollection();
-      const activeGoal = await goalsCol.findOne({
-        $or: [
-          { streamerId: resolvedStreamerId },
-          ...(resolvedOverlayToken ? [{ streamerToken: resolvedOverlayToken as any }] : [])
-        ],
-        isActive: true
-      });
+    // 5b. Update Active Stream Goal in Real Time if active in MongoDB (ONLY for Pro Plan streamers)
+    const isStreamerPro = streamer && (String(streamer.plan || 'free').toLowerCase() !== 'free' || Boolean((streamer as any).isAdmin));
+    if (isStreamerPro) {
+      try {
+        const goalsCol = await getStreamGoalsCollection();
+        const activeGoal = await goalsCol.findOne({
+          $or: [
+            { streamerId: resolvedStreamerId },
+            ...(resolvedOverlayToken ? [{ streamerToken: resolvedOverlayToken as any }] : [])
+          ],
+          isActive: true
+        });
 
-      if (activeGoal) {
-        const addedUsd = effectiveCurrency === 'KHR' ? (effectiveAmount / 4100) : effectiveAmount;
-        const newGoalAmount = (activeGoal.currentAmount || 0) + addedUsd;
-        await goalsCol.updateOne(
-          { _id: activeGoal._id },
-          { $set: { currentAmount: newGoalAmount, updatedAt: new Date() } }
-        );
+        if (activeGoal) {
+          const addedUsd = effectiveCurrency === 'KHR' ? (effectiveAmount / 4100) : effectiveAmount;
+          const newGoalAmount = (activeGoal.currentAmount || 0) + addedUsd;
+          await goalsCol.updateOne(
+            { _id: activeGoal._id },
+            { $set: { currentAmount: newGoalAmount, updatedAt: new Date() } }
+          );
 
-        const io = getIO();
-        if (io && resolvedOverlayToken) {
-          io.to(`overlay:${resolvedOverlayToken}`).emit('goal:update', {
-            id: activeGoal._id.toString(),
-            token: resolvedOverlayToken,
-            title: activeGoal.title,
-            targetAmount: Number(activeGoal.targetAmount),
-            currentAmount: newGoalAmount,
-            theme: activeGoal.theme,
-            isActive: true,
-            donorName: effectiveDonorName,
-            addedAmount: addedUsd
-          });
+          const io = getIO();
+          if (io && resolvedOverlayToken) {
+            io.to(`overlay:${resolvedOverlayToken}`).emit('goal:update', {
+              id: activeGoal._id.toString(),
+              token: resolvedOverlayToken,
+              title: activeGoal.title,
+              targetAmount: Number(activeGoal.targetAmount),
+              currentAmount: newGoalAmount,
+              theme: activeGoal.theme,
+              isActive: true,
+              donorName: effectiveDonorName,
+              addedAmount: addedUsd
+            });
+          }
         }
+      } catch (e) {
+        console.warn('[PaymentGateway] Could not update active goal:', e);
       }
-    } catch (e) {
-      console.warn('[PaymentGateway] Could not update active goal:', e);
     }
 
     // 6. Calculate total updated revenue from MongoDB

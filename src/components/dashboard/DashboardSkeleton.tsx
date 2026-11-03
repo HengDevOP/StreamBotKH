@@ -24,6 +24,7 @@ import {
 
 export type DashboardTab =
   | 'overview'
+  | 'broadcast'
   | 'donations'
   | 'donation'
   | 'alerts'
@@ -715,6 +716,7 @@ export const FeatureTabSkeleton: React.FC<{ tab: DashboardTab | string }> = ({ t
       return <DonationAlertsSkeleton />;
     case 'media':
       return <MediaLibrarySkeleton />;
+    case 'broadcast':
     case 'video-alerts':
       return <VideoAlertsSkeleton />;
     case 'leaderboard':

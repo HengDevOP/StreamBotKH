@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getUsersCollection, getGatewayConfigCollection, getTemporaryDonationsCollection } from '@/server/database/mongo';
+import { getUsersCollection, getGatewayConfigCollection, getTemporaryDonationsCollection, getStreamChatSettingsCollection } from '@/server/database/mongo';
 import { sanitizeSocialLinks } from '@/utils/socialPlatforms';
 import { extractYoutubeId, getYoutubeLiveStats } from '@/utils/youtube';
 import { broadcastTvStreamerUpdated } from '@/server/services/socketService';
@@ -252,6 +252,25 @@ export async function PUT(req: NextRequest) {
             isLive: stats.isLive,
             viewers: stats.isLive ? stats.viewers : 0
           });
+
+          // Sync YouTube Live URL to Live Chat overlay settings and start listener
+          const overlayToken = updated?.overlayToken || current.overlayToken;
+          if (overlayToken) {
+            try {
+              const chatCol = await getStreamChatSettingsCollection();
+              await chatCol.updateOne(
+                { streamerToken: overlayToken },
+                { $set: { youtubeUrl: savedLiveUrl, updatedAt: new Date() } },
+                { upsert: true }
+              );
+              if (savedYtId) {
+                const { youtubeChatService } = await import('@/server/services/youtubeChatService');
+                youtubeChatService.startListener(overlayToken, savedLiveUrl);
+              }
+            } catch (chatSyncErr) {
+              console.warn('[Profile PUT] Live chat sync warning:', chatSyncErr);
+            }
+          }
         } catch (e) {}
       })();
     }

@@ -18,7 +18,13 @@ import {
   Sliders,
   Landmark,
   Lock,
-  ExternalLink
+  ExternalLink,
+  Crown,
+  Star,
+  Flame,
+  Zap,
+  Heart,
+  Check
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
@@ -26,6 +32,7 @@ import { PublicStreamerInfo } from '../../services/donationService';
 import { VideoPlayerWithProgressBar } from '../common/VideoPlayerWithProgressBar';
 import { VideoClipScrubberLine } from './VideoClipScrubberLine';
 import { detectPlatform } from '../../utils/socialPlatforms';
+import { SubscriberTier } from '../../types/subscriber';
 
 export interface DonorFormData {
   donorName: string;
@@ -37,11 +44,24 @@ export interface DonorFormData {
   videoTitle?: string;
   videoStartTime?: number;
   videoEndTime?: number;
+  isSubscription?: boolean;
+  tierId?: string;
+  tierName?: string;
+  badgeText?: string;
+  badgeColor?: string;
+  badgeBg?: string;
+  badgeBorder?: string;
+  badgeIcon?: string;
+  badgeGifUrl?: string;
+  badgeImage?: string;
 }
+
+import { getBadgeIconComponent } from '../../data/badgeIcons';
 
 interface DonorFormProps {
   streamer: PublicStreamerInfo;
   onSubmit: (data: DonorFormData) => Promise<void>;
+  onSetupRequired?: () => void;
   loading?: boolean;
   isModalOpen?: boolean;
 }
@@ -66,7 +86,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
-export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loading, isModalOpen }) => {
+export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetupRequired, loading, isModalOpen }) => {
   const storageKey = `streambotkh_draft_${streamer.username || 'neonstreamer'}`;
   const isLoadedRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -92,6 +112,45 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
   // Live video preview playback state
   const [isPlayingPreview, setIsPlayingPreview] = useState<boolean>(false);
   const [previewKey, setPreviewKey] = useState<number>(0);
+
+  // Subscriber / Membership State
+  const [donationType, setDonationType] = useState<'tip' | 'subscribe'>('tip');
+  const [subscriberSettings, setSubscriberSettings] = useState<{ enabled: boolean; tiers: SubscriberTier[] } | null>(null);
+  const [selectedTierId, setSelectedTierId] = useState<string>('');
+
+  // Fetch streamer subscriber settings
+  useEffect(() => {
+    if (!streamer?.username) return;
+    fetch(`/api/streamer/${encodeURIComponent(streamer.username)}/subscribers`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.enabled && Array.isArray(data.tiers) && data.tiers.length > 0) {
+          const activeTiers = data.tiers.filter((t: SubscriberTier) => t.enabled !== false);
+          if (activeTiers.length > 0) {
+            setSubscriberSettings({ enabled: true, tiers: activeTiers });
+            setSelectedTierId(activeTiers[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [streamer?.username]);
+
+  const handleModeChange = (mode: 'tip' | 'subscribe') => {
+    setDonationType(mode);
+    if (mode === 'subscribe' && subscriberSettings?.tiers?.length) {
+      const activeTier = subscriberSettings.tiers.find((t) => t.id === selectedTierId) || subscriberSettings.tiers[0];
+      if (activeTier) {
+        setAmount(activeTier.price);
+        setCurrency(activeTier.currency || 'USD');
+      }
+    }
+  };
+
+  const handleSelectTier = (tier: SubscriberTier) => {
+    setSelectedTierId(tier.id);
+    setAmount(tier.price);
+    setCurrency(tier.currency || 'USD');
+  };
 
   // 1. Restore draft from localStorage on mount safely
   useEffect(() => {
@@ -300,6 +359,10 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (streamer.isTipConfigured === false) {
+      onSetupRequired?.();
+      return;
+    }
     const cleanDonor = donorName.trim();
     const cleanBanking = bankingName.trim();
     if (!cleanDonor && !cleanBanking) return;
@@ -307,17 +370,34 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
     // Auto pause preview video immediately when viewer clicks Tip to show Bakong KHQR modal
     setIsPlayingPreview(false);
 
+    const selectedTier = donationType === 'subscribe' && subscriberSettings?.tiers
+      ? subscriberSettings.tiers.find((t) => t.id === selectedTierId) || subscriberSettings.tiers[0]
+      : null;
+
+    const finalAmount = donationType === 'subscribe' && selectedTier ? selectedTier.price : (amount || 0);
+    const finalCurrency = donationType === 'subscribe' && selectedTier ? (selectedTier.currency || 'USD') : (currency || 'USD');
+
     // Show donor username on alerts and TTS, and pass bankingName for bank payment matching
     await onSubmit({
       donorName: cleanDonor || cleanBanking || 'Supporter',
       bankingName: cleanBanking || cleanDonor,
       donorMessage: donorMessage.trim(),
-      amount: amount || 0,
-      currency: currency || 'USD',
-      videoUrl: videoUrl.trim() ? videoUrl.trim() : undefined,
-      videoTitle: videoTitle.trim() ? videoTitle.trim() : undefined,
-      videoStartTime: videoUrl.trim() ? Math.max(0, videoStartTime) : undefined,
-      videoEndTime: videoUrl.trim() ? Math.max(videoStartTime + 5, videoEndTime) : undefined
+      amount: finalAmount,
+      currency: finalCurrency,
+      videoUrl: donationType === 'tip' && videoUrl.trim() ? videoUrl.trim() : undefined,
+      videoTitle: donationType === 'tip' && videoTitle.trim() ? videoTitle.trim() : undefined,
+      videoStartTime: donationType === 'tip' && videoUrl.trim() ? Math.max(0, videoStartTime) : undefined,
+      videoEndTime: donationType === 'tip' && videoUrl.trim() ? Math.max(videoStartTime + 5, videoEndTime) : undefined,
+      isSubscription: donationType === 'subscribe',
+      tierId: selectedTier?.id,
+      tierName: selectedTier?.name,
+      badgeText: selectedTier?.badgeText,
+      badgeColor: selectedTier?.badgeColor,
+      badgeBg: selectedTier?.badgeBg,
+      badgeBorder: selectedTier?.badgeBorder,
+      badgeIcon: selectedTier?.badgeIcon,
+      badgeGifUrl: selectedTier?.badgeGifUrl || selectedTier?.badgeImage,
+      badgeImage: selectedTier?.badgeImage || selectedTier?.badgeGifUrl
     });
   };
 
@@ -325,8 +405,13 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
   const totalClipSeconds = Math.max(5, videoEndTime - videoStartTime);
   const activeVideoId = extractYouTubeId(videoUrl);
 
-  // Video alert configuration constraints from streamer settings (disabled by default unless explicitly enabled)
-  const isVideoAlertsEnabled = Boolean(streamer.videoAlertEnabled) && streamer.hasVideoOverlay !== false;
+  // Check if streamer has a valid live stream video URL configured in My Account
+  const validLiveVideoId = extractYouTubeId(streamer.liveStreamUrl || '');
+  const isStreamerLive = Boolean(validLiveVideoId);
+
+  // Video alert configuration constraints from streamer settings (unlocked only if streamer is Pro/Admin and enabled)
+  const isStreamerPlanUnlocked = (streamer.plan ? streamer.plan.toLowerCase() !== 'free' : false) || Boolean((streamer as any).isAdmin);
+  const isVideoAlertsEnabled = isStreamerPlanUnlocked && Boolean(streamer.videoAlertEnabled) && streamer.hasVideoOverlay !== false;
   const videoMinTip = Number(streamer.videoMinTipAmount ?? 0.25);
   const videoMaxDuration = Number(streamer.videoMaxDurationSeconds ?? 300); // up to 5 minutes
   const currentAmountInUsd = currency === 'KHR' ? (amount || 0) / 4000 : (amount || 0);
@@ -350,21 +435,40 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
       {/* 1. Streamer Profile & Bio Header */}
       <div className="flex items-start justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-800/80">
         <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
-          <div className="relative flex-shrink-0">
-            <div className="w-11 h-11 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl p-0.5 bg-gradient-to-tr from-cyan-500 via-indigo-500 to-pink-500 shadow-md">
-              <img
-                src={streamer.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamer.username}`}
-                alt={streamer.displayName}
-                className="w-full h-full rounded-[10px] bg-slate-900 object-cover"
-              />
+          {/* Streamer Avatar / Logo - clickable to /tv in a new window only if valid live stream URL is set */}
+          {isStreamerLive ? (
+            <a
+              href={`/tv?=${streamer.username}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Watch @${streamer.username} live on /tv`}
+              className="relative flex-shrink-0 group cursor-pointer transition-transform duration-200 hover:scale-105"
+            >
+              <div className="w-11 h-11 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl p-0.5 bg-gradient-to-tr from-cyan-500 via-indigo-500 to-pink-500 shadow-md group-hover:shadow-cyan-500/40 transition-shadow">
+                <img
+                  src={streamer.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamer.username}`}
+                  alt={streamer.displayName}
+                  className="w-full h-full rounded-[10px] bg-slate-900 object-cover"
+                />
+              </div>
+              <div className="absolute -bottom-1.5 inset-x-0 flex justify-center">
+                <span className="px-1.5 py-0.2 rounded-full bg-red-600 group-hover:bg-red-500 text-white font-mono font-bold text-[8px] uppercase tracking-wider flex items-center gap-0.5 shadow transition-colors">
+                  <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+                  LIVE
+                </span>
+              </div>
+            </a>
+          ) : (
+            <div className="relative flex-shrink-0">
+              <div className="w-11 h-11 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-xl p-0.5 bg-gradient-to-tr from-cyan-500 via-indigo-500 to-pink-500 shadow-md">
+                <img
+                  src={streamer.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamer.username}`}
+                  alt={streamer.displayName}
+                  className="w-full h-full rounded-[10px] bg-slate-900 object-cover"
+                />
+              </div>
             </div>
-            <div className="absolute -bottom-1.5 inset-x-0 flex justify-center">
-              <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white font-mono font-bold text-[8px] uppercase tracking-wider flex items-center gap-0.5 shadow">
-                <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
-                LIVE
-              </span>
-            </div>
-          </div>
+          )}
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -417,16 +521,201 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
         </div>
       </div>
 
+      {/* Donation Type Switch: One-Time Tip vs Subscribe / Membership */}
+      {subscriberSettings?.enabled && subscriberSettings.tiers.length > 0 && (
+        <div className="grid grid-cols-2 p-1 bg-slate-950/80 border border-slate-800 rounded-xl gap-1">
+          <button
+            type="button"
+            onClick={() => handleModeChange('tip')}
+            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all ${
+              donationType === 'tip'
+                ? 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 border border-pink-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Heart size={14} className={donationType === 'tip' ? 'text-pink-400 fill-pink-400/40' : ''} />
+            <span>One-Time Tip</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('subscribe')}
+            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all relative ${
+              donationType === 'subscribe'
+                ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Crown size={14} className={donationType === 'subscribe' ? 'text-amber-400' : ''} />
+            <span>Subscribe</span>
+            <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
+              VIP BADGE
+            </span>
+          </button>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* MEMBERSHIP TIERS (Rendered in Subscribe Mode) */}
+        {donationType === 'subscribe' && subscriberSettings?.tiers && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-amber-400 font-['Chakra_Petch'] flex items-center gap-1.5">
+                <Crown size={14} className="text-amber-400" />
+                <span>Select Membership Tier</span>
+              </label>
+              <span className="text-[10px] font-mono text-slate-400">30-day active badge</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {subscriberSettings.tiers.map((tier) => {
+                const isSelected = (selectedTierId || subscriberSettings.tiers[0].id) === tier.id;
+                const IconComp = getBadgeIconComponent(tier.badgeIcon);
+                const formattedPrice = tier.currency === 'KHR'
+                  ? `${tier.price.toLocaleString()} ៛`
+                  : `$${tier.price.toFixed(2)}`;
+
+                return (
+                  <div
+                    key={tier.id}
+                    onClick={() => handleSelectTier(tier)}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between text-left relative ${
+                      isSelected
+                        ? 'bg-gradient-to-b from-amber-500/10 to-amber-950/20 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                        : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white font-['Chakra_Petch'] truncate">
+                          {tier.name}
+                        </span>
+                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                          isSelected ? 'border-amber-400 bg-amber-400 text-slate-950' : 'border-slate-600'
+                        }`}>
+                          {isSelected && <Check size={10} className="stroke-[3]" />}
+                        </div>
+                      </div>
+
+                      <div className="text-sm font-extrabold text-amber-400 font-mono">
+                        {formattedPrice} <span className="text-[10px] text-slate-400 font-normal">/mo</span>
+                      </div>
+
+                      {/* Live Vector Badge */}
+                      <div>
+                        <div
+                          className="inline-flex items-center gap-1.5 text-xs font-bold font-mono tracking-wider"
+                          style={{
+                            color: tier.badgeColor || '#00F0FF'
+                          }}
+                        >
+                          {tier.badgeImage || tier.badgeGifUrl ? (
+                            <img
+                              src={tier.badgeImage || tier.badgeGifUrl}
+                              alt="Badge"
+                              className="w-3.5 h-3.5 object-contain flex-shrink-0"
+                            />
+                          ) : (
+                            <IconComp
+                              className="w-3.5 h-3.5 flex-shrink-0"
+                              style={{ color: tier.badgeColor || '#00F0FF' }}
+                            />
+                          )}
+                          {tier.badgeText ? (
+                            <span className="truncate max-w-[90px]">{tier.badgeText}</span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Perks */}
+                      {tier.perks && tier.perks.length > 0 && (
+                        <ul className="text-[10px] text-slate-400 space-y-1 pt-1.5 border-t border-slate-800/80">
+                          {tier.perks.slice(0, 3).map((perk, idx) => (
+                            <li key={idx} className="flex items-center gap-1 truncate">
+                              <span className="text-amber-400">✓</span> {perk}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2 text-[11px] text-amber-300 font-mono">
+              <Crown size={14} className="text-amber-400 shrink-0" />
+              <span>Your VIP badge will display next to your username in stream chat and alerts!</span>
+            </div>
+          </div>
+        )}
+
+        {/* TIP AMOUNT PRESETS (Rendered in Tip Mode) */}
+        {donationType === 'tip' && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex items-center gap-1.5">
+                <DollarSign size={13} className="text-cyan-400" />
+                <span>Tip Amount</span>
+              </label>
+              <div className="inline-flex rounded-lg p-0.5 bg-slate-950 border border-slate-800 text-[10px] font-mono">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrency('USD');
+                    setAmount(5);
+                  }}
+                  className={`px-2 py-0.5 rounded font-bold transition-colors ${currency === 'USD' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                >
+                  USD ($)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrency('KHR');
+                    setAmount(20000);
+                  }}
+                  className={`px-2 py-0.5 rounded font-bold transition-colors ${currency === 'KHR' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                >
+                  KHR (៛)
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-1.5">
+              {(currency === 'USD' ? [1, 2, 5, 10, 20] : [4000, 10000, 20000, 40000, 100000]).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setAmount(preset)}
+                  className={`py-1.5 text-xs font-mono font-bold border transition-colors ${
+                    amount === preset
+                      ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300'
+                      : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
+                  }`}
+                >
+                  {currency === 'USD' ? `$${preset}` : `${preset.toLocaleString()}៛`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Row with Username & Bank Name */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* FIELD 1: Username */}
+          {/* FIELD 1: Username / YouTube Account Name */}
           <div className="space-y-1">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <User size={13} className="text-cyan-400" />
-                <span>Username *</span>
+                <User size={13} className={donationType === 'subscribe' ? 'text-amber-400' : 'text-cyan-400'} />
+                <span>
+                  {donationType === 'subscribe' ? 'YouTube Account Name (for Chat Badge) *' : 'Username *'}
+                </span>
               </span>
+              {donationType === 'subscribe' && (
+                <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                  MATCH LIVE CHAT
+                </span>
+              )}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -435,12 +724,22 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
               <input
                 type="text"
                 required
-                placeholder="Tra Gamer"
+                placeholder={donationType === 'subscribe' ? 'e.g. SokhaGamer or @sokhagamer' : 'Tra Gamer'}
                 value={donorName}
                 onChange={(e) => setDonorName(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-none bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-cyan-400 transition-colors placeholder:text-slate-500"
+                className={`w-full pl-9 pr-3 py-2 rounded-none bg-slate-950 border text-white text-xs sm:text-sm font-medium focus:outline-none transition-colors placeholder:text-slate-500 ${
+                  donationType === 'subscribe'
+                    ? 'border-amber-500/40 focus:border-amber-400'
+                    : 'border-slate-800 focus:border-cyan-400'
+                }`}
               />
             </div>
+            {donationType === 'subscribe' && (
+              <p className="text-[10px] text-amber-300/90 font-mono mt-1 flex items-start gap-1 leading-tight">
+                <span className="text-amber-400">⚡</span>
+                <span>Enter your exact YouTube channel name or @handle so your VIP badge displays automatically in live stream chat.</span>
+              </p>
+            )}
           </div>
 
           {/* FIELD 2: Payer Name (Bank Account) */}
@@ -487,8 +786,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
           />
         </div>
 
-        {/* FIELD 4: Video URL (Media Share) - Only rendered if enabled by streamer */}
-        {isVideoAlertsEnabled && (
+        {/* FIELD 4: Video URL (Media Share) - Only rendered in Tip mode if enabled by streamer */}
+        {isVideoAlertsEnabled && donationType === 'tip' && (
           <div className="space-y-2">
             <div className="flex items-start sm:items-center justify-between gap-2">
               <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
@@ -616,18 +915,46 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, loadin
           </div>
         )}
 
-        {/* Tips CTA Button */}
+        {/* Submit CTA Button */}
         <div className="pt-2">
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            loading={loading}
-            disabled={!donorName.trim()}
-            className="w-full py-3 text-sm sm:text-base font-bold bg-cyan-400 hover:bg-cyan-300 text-slate-950 rounded-none shadow-lg shadow-cyan-500/20 transition-all font-['Chakra_Petch']"
-          >
-            Tips
-          </Button>
+          {(() => {
+            const selectedTier = donationType === 'subscribe' && subscriberSettings?.tiers
+              ? subscriberSettings.tiers.find((t) => t.id === selectedTierId) || subscriberSettings.tiers[0]
+              : null;
+            const subPriceLabel = selectedTier
+              ? (selectedTier.currency === 'KHR' ? `${selectedTier.price.toLocaleString()} ៛` : `$${selectedTier.price.toFixed(2)}`)
+              : '';
+
+            return (
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                loading={loading}
+                disabled={streamer.isTipConfigured === false ? false : !donorName.trim()}
+                onClick={(e) => {
+                  if (streamer.isTipConfigured === false) {
+                    e.preventDefault();
+                    onSetupRequired?.();
+                  }
+                }}
+                className={`w-full py-3.5 text-sm sm:text-base font-bold text-slate-950 rounded-none shadow-lg transition-all font-['Chakra_Petch'] flex items-center justify-center gap-2 ${
+                  donationType === 'subscribe'
+                    ? 'bg-gradient-to-r from-amber-400 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 shadow-amber-500/20'
+                    : 'bg-cyan-400 hover:bg-cyan-300 shadow-cyan-500/20'
+                }`}
+              >
+                {donationType === 'subscribe' ? (
+                  <>
+                    <Crown size={18} className="fill-slate-950/20" />
+                    <span>Subscribe with Bakong KHQR {subPriceLabel ? `(${subPriceLabel})` : ''}</span>
+                  </>
+                ) : (
+                  <span>Send Tip ({currency === 'KHR' ? `${(amount || 0).toLocaleString()} ៛` : `$${Number(amount || 0).toFixed(2)}`})</span>
+                )}
+              </Button>
+            );
+          })()}
         </div>
       </form>
     </Card>
