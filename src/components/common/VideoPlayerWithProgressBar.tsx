@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Volume2, Tv, Clock } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Tv, Clock } from 'lucide-react';
+
+export type TextAlignMode = 'left' | 'center' | 'justify' | 'right';
 
 export interface VideoPlayerWithProgressBarProps {
   videoId: string;
@@ -9,6 +11,7 @@ export interface VideoPlayerWithProgressBarProps {
   endTime?: number;
   autoplay?: boolean;
   muted?: boolean;
+  volume?: number;
   isPaused?: boolean;
   videoTitle?: string;
   donorName?: string;
@@ -18,6 +21,13 @@ export interface VideoPlayerWithProgressBarProps {
   glowColor?: string;
   showControls?: boolean;
   isPreview?: boolean;
+  donorMessage?: string;
+  headerColor?: string;
+  headerBgColor?: string;
+  footerColor?: string;
+  footerBgColor?: string;
+  headerTextAlign?: TextAlignMode;
+  footerTextAlign?: TextAlignMode;
   onEnded?: () => void;
   onPlayStateChange?: (isPlaying: boolean) => void;
   className?: string;
@@ -51,6 +61,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   endTime = 30,
   autoplay = true,
   muted = false,
+  volume = 85,
   isPaused = false,
   videoTitle,
   donorName,
@@ -60,16 +71,32 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   glowColor = '#00F0FF',
   showControls = false,
   isPreview = false,
+  donorMessage,
+  headerColor,
+  headerBgColor,
+  footerColor,
+  footerBgColor,
+  headerTextAlign = 'left',
+  footerTextAlign = 'left',
   onEnded,
   onPlayStateChange,
   className = ''
 }) => {
+  const cleanDonorMessage = typeof donorMessage === 'string' ? donorMessage.trim() : '';
+  const hasMeaningfulMessage = Boolean(
+    cleanDonorMessage &&
+    cleanDonorMessage.toLowerCase() !== 'none' &&
+    cleanDonorMessage.toLowerCase() !== '(none)' &&
+    cleanDonorMessage.toLowerCase() !== 'null' &&
+    cleanDonorMessage.toLowerCase() !== 'undefined'
+  );
+
   const safeStart = Math.max(0, startTime);
   const safeEnd = Math.max(safeStart + 1, endTime);
   const totalDuration = safeEnd - safeStart;
 
-  const [isPlaying, setIsPlaying] = useState<boolean>((autoplay || isPreview) && !isPaused);
-  const [mountAutoplay, setMountAutoplay] = useState<boolean>((autoplay || isPreview) && !isPaused);
+  const [isPlaying, setIsPlaying] = useState<boolean>(Boolean(autoplay && !isPaused));
+  const [mountAutoplay, setMountAutoplay] = useState<boolean>(Boolean(autoplay && !isPaused));
   const [renderKey, setRenderKey] = useState<number>(0);
 
   const barRef = useRef<HTMLDivElement>(null);
@@ -82,7 +109,9 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
   const pausedProgressRef = useRef<number>(0);
   const startTimeRef = useRef<number | null>(null);
   const onEndedFiredRef = useRef<boolean>(false);
-  const isFirstClipEffectRef = useRef<boolean>(true);
+  const prevVideoIdRef = useRef<string>(videoId);
+  const prevStartTimeRef = useRef<number>(safeStart);
+  const prevEndTimeRef = useRef<number>(safeEnd);
 
   isPlayingRef.current = isPlaying;
   isPausedRef.current = isPaused;
@@ -95,40 +124,61 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
     onPlayStateChangeRef.current = onPlayStateChange;
   }, [onPlayStateChange]);
 
-  const sendPlayerCommand = (func: string, args: unknown[] | string = '') => {
+  const sendPlayerCommand = (func: string, args: unknown[] = []) => {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
     try {
-      win.postMessage(JSON.stringify({ event: 'listening' }), '*');
-      win.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+      const safeArgs = Array.isArray(args) ? args : [];
+      win.postMessage(JSON.stringify({ event: 'command', func, args: safeArgs }), '*');
     } catch {}
   };
 
-  // Handle external pause / autoplay state changes without reloading the iframe
+  // Dynamically update audio mute & volume without iframe reloads
+  useEffect(() => {
+    if (muted) {
+      sendPlayerCommand('mute', []);
+    } else {
+      sendPlayerCommand('unMute', []);
+      sendPlayerCommand('setVolume', [Math.max(0, Math.min(100, volume))]);
+    }
+  }, [muted, volume]);
+
+  // Handle external pause / autoplay state changes cleanly without duplicate commands
   useEffect(() => {
     if (isPaused) {
       setIsPlaying(false);
-      sendPlayerCommand('pauseVideo', '');
-    } else if (autoplay && !isPlayingRef.current && pausedProgressRef.current < 1) {
+      sendPlayerCommand('pauseVideo', []);
+    } else if (autoplay && !isPlayingRef.current) {
+      if (pausedProgressRef.current >= 1) {
+        pausedProgressRef.current = 0;
+        startTimeRef.current = null;
+        onEndedFiredRef.current = false;
+        if (barRef.current) {
+          barRef.current.style.width = '100%';
+        }
+        sendPlayerCommand('seekTo', [safeStart, true]);
+      }
       setIsPlaying(true);
-      sendPlayerCommand('playVideo', '');
+      if (!muted) {
+        sendPlayerCommand('unMute', []);
+        sendPlayerCommand('setVolume', [Math.max(0, Math.min(100, volume))]);
+      }
+      sendPlayerCommand('seekTo', [safeStart, true]);
+      sendPlayerCommand('playVideo', []);
+    } else if (!autoplay && isPlayingRef.current && isPreview) {
+      setIsPlaying(false);
+      sendPlayerCommand('pauseVideo', []);
     }
-  }, [isPaused, autoplay]);
+  }, [isPaused, autoplay, muted, volume, safeStart, isPreview]);
 
+  // Reset timer & handle clip changes without glitching or duplicate mounts
   useEffect(() => {
-    if (isPlaying && !isPaused) {
-      sendPlayerCommand('playVideo', '');
-    } else {
-      sendPlayerCommand('pauseVideo', '');
-    }
-  }, [isPlaying, isPaused]);
+    const videoChanged = prevVideoIdRef.current !== videoId;
+    const timesChanged = prevStartTimeRef.current !== safeStart || prevEndTimeRef.current !== safeEnd;
 
-  // Reset timer & remount clip ONLY when videoId, startTime, or endTime changes
-  useEffect(() => {
-    if (isFirstClipEffectRef.current) {
-      isFirstClipEffectRef.current = false;
-      return;
-    }
+    prevVideoIdRef.current = videoId;
+    prevStartTimeRef.current = safeStart;
+    prevEndTimeRef.current = safeEnd;
 
     pausedProgressRef.current = 0;
     startTimeRef.current = null;
@@ -136,10 +186,20 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
     if (barRef.current) {
       barRef.current.style.width = '100%';
     }
-    const shouldPlay = (autoplay || isPreview) && !isPaused;
-    setIsPlaying(shouldPlay);
-    setMountAutoplay(shouldPlay);
-    setRenderKey((k) => k + 1);
+
+    if (videoChanged) {
+      // Remount iframe only when the video URL / ID changes
+      const shouldPlay = Boolean(autoplay && !isPaused);
+      setIsPlaying(shouldPlay);
+      setMountAutoplay(shouldPlay);
+      setRenderKey((k) => k + 1);
+    } else if (timesChanged) {
+      // Timeline scrubbed: smoothly seek without tearing down the iframe
+      sendPlayerCommand('seekTo', [safeStart, true]);
+      if (!isPlaying) {
+        sendPlayerCommand('pauseVideo', []);
+      }
+    }
   }, [videoId, safeStart, safeEnd]);
 
   // Real-time smooth 60fps countdown animation loop
@@ -180,7 +240,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
             }
             if (isPreview) {
               setIsPlaying(false);
-              sendPlayerCommand('pauseVideo', '');
+              sendPlayerCommand('pauseVideo', []);
               onPlayStateChangeRef.current?.(false);
             }
             setTimeout(() => {
@@ -220,9 +280,12 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
     }
     setMountAutoplay(true);
     setIsPlaying(true);
+    if (!muted) {
+      sendPlayerCommand('unMute', []);
+      sendPlayerCommand('setVolume', [Math.max(0, Math.min(100, volume))]);
+    }
     sendPlayerCommand('seekTo', [safeStart, true]);
-    sendPlayerCommand('playVideo', '');
-    setRenderKey((k) => k + 1);
+    sendPlayerCommand('playVideo', []);
   };
 
   const handleTogglePlay = (e?: React.MouseEvent) => {
@@ -236,9 +299,13 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
     setIsPlaying(next);
     onPlayStateChangeRef.current?.(next);
     if (next) {
-      sendPlayerCommand('playVideo', '');
+      if (!muted) {
+        sendPlayerCommand('unMute', []);
+        sendPlayerCommand('setVolume', [Math.max(0, Math.min(100, volume))]);
+      }
+      sendPlayerCommand('playVideo', []);
     } else {
-      sendPlayerCommand('pauseVideo', '');
+      sendPlayerCommand('pauseVideo', []);
     }
   };
 
@@ -263,17 +330,29 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       {/* Top Header: Show ONLY the donor name (No emojis, no "DONOR:") */}
       {donorName && (
         <div
-          className={`w-full px-4 py-2 flex items-center justify-between text-xs font-mono ${
-            isPreview ? 'bg-slate-950/95 border-b border-slate-800/80' : 'bg-transparent'
-          }`}
+          className="w-full px-4 py-2.5 text-xs font-mono border-b border-slate-800/80 backdrop-blur-md flex-shrink-0"
+          style={{
+            backgroundColor: headerBgColor || (isPreview ? 'rgba(2, 6, 23, 0.95)' : 'rgba(0, 0, 0, 0.85)'),
+            textAlign: headerTextAlign
+          }}
         >
-          <div className="flex items-center">
+          <div
+            className={`w-full flex items-center ${
+              headerTextAlign === 'center'
+                ? 'justify-center text-center'
+                : headerTextAlign === 'right'
+                ? 'justify-end text-right'
+                : headerTextAlign === 'justify'
+                ? 'justify-between text-justify'
+                : 'justify-start text-left'
+            }`}
+          >
             <span
-              className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] tracking-wide"
+              className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] tracking-wide inline-block"
               style={{
-                ...getGradientOrColorStyle(donorColor || glowColor || '#00F0FF'),
-                textShadow: glowColor
-                  ? `0 0 10px ${glowColor}88, 0 2px 4px rgba(0,0,0,0.95)`
+                ...getGradientOrColorStyle(headerColor || donorColor || glowColor || '#00F0FF'),
+                textShadow: (headerColor || glowColor)
+                  ? `0 0 10px ${(headerColor || glowColor)}88, 0 2px 4px rgba(0,0,0,0.95)`
                   : '0 2px 4px rgba(0,0,0,0.95)'
               }}
             >
@@ -284,7 +363,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       )}
 
       {/* 100% Clean Video Area (No Amount, No Title, No Message) */}
-      <div className={`relative w-full aspect-video overflow-hidden ${isPreview ? 'bg-black' : 'bg-transparent'}`}>
+      <div className={`relative w-full aspect-video overflow-hidden flex-shrink-0 ${isPreview ? 'bg-black' : 'bg-transparent'}`}>
         <iframe
           ref={iframeRef}
           key={renderKey}
@@ -301,25 +380,31 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
                 '*'
               );
             } catch {}
+            if (muted) {
+              sendPlayerCommand('mute', []);
+            } else {
+              sendPlayerCommand('unMute', []);
+              sendPlayerCommand('setVolume', [Math.max(0, Math.min(100, volume))]);
+            }
             if (isPlayingRef.current && !isPausedRef.current) {
               sendPlayerCommand('seekTo', [safeStart, true]);
-              sendPlayerCommand('playVideo', '');
+              sendPlayerCommand('playVideo', []);
             } else {
-              sendPlayerCommand('pauseVideo', '');
+              sendPlayerCommand('pauseVideo', []);
             }
           }}
         />
 
-        {/* Optional Preview Play/Pause button on preview screen only */}
+        {/* Preview Overlay with Play Button */}
         {isPreview && (
           <button
             type="button"
             onClick={handleTogglePlay}
-            className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 hover:bg-black/10 transition-colors pointer-events-auto cursor-pointer"
-            title={isPlaying ? 'Pause preview' : 'Play preview'}
+            className="absolute inset-0 z-10 flex items-center justify-center bg-black/25 hover:bg-black/15 transition-colors pointer-events-auto cursor-pointer"
+            title={isPlaying ? 'Pause preview' : 'Play preview with sound'}
           >
             {!isPlaying && (
-              <div className="w-14 h-14 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-2xl backdrop-blur-sm transform hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center shadow-2xl backdrop-blur-sm transform hover:scale-110 transition-transform">
                 <Play size={24} className="fill-white ml-1" />
               </div>
             )}
@@ -331,7 +416,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       {/* SMOOTH RED COUNTDOWN PROGRESS DURATION BAR                      */}
       {/* ============================================================== */}
       <div
-        className={`w-full h-1.5 sm:h-2 relative overflow-hidden ${
+        className={`w-full h-1.5 sm:h-2 relative overflow-hidden flex-shrink-0 ${
           isPreview ? 'bg-slate-950 border-t border-slate-800/80' : 'bg-transparent'
         }`}
       >
@@ -345,6 +430,38 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
           }}
         />
       </div>
+
+      {/* ============================================================== */}
+      {/* ATTACHED DONOR MESSAGE SECTION (BOTTOM VIDEO SCREEN)           */}
+      {/* ============================================================== */}
+      {hasMeaningfulMessage && (
+        <div
+          className="w-full p-2.5 sm:p-3.5 text-xs sm:text-sm animate-fadeIn border-t border-slate-800/80 backdrop-blur-md flex-shrink-0"
+          style={{
+            backgroundColor: footerBgColor || (isPreview ? 'rgba(2, 6, 23, 0.95)' : 'rgba(0, 0, 0, 0.90)'),
+            boxShadow: '0 4px 20px rgba(0,0,0,0.85)',
+            textAlign: footerTextAlign
+          }}
+        >
+          <p
+            className={`w-full text-xs sm:text-sm font-sans italic leading-snug break-words ${
+              footerTextAlign === 'center'
+                ? 'text-center'
+                : footerTextAlign === 'right'
+                ? 'text-right'
+                : footerTextAlign === 'justify'
+                ? 'text-justify'
+                : 'text-left'
+            }`}
+            style={{
+              ...getGradientOrColorStyle(footerColor || '#FFFFFF'),
+              textAlign: footerTextAlign
+            }}
+          >
+            {cleanDonorMessage}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

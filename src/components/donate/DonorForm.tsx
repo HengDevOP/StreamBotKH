@@ -711,11 +711,14 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                   {donationType === 'subscribe' ? 'YouTube Account Name (for Chat Badge) *' : 'Username *'}
                 </span>
               </span>
-              {donationType === 'subscribe' && (
-                <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-                  MATCH LIVE CHAT
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {donationType === 'subscribe' && (
+                  <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                    MATCH LIVE CHAT
+                  </span>
+                )}
+                <span className="text-[10px] font-mono text-slate-500">{donorName.length}/25</span>
+              </div>
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -724,9 +727,10 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
               <input
                 type="text"
                 required
+                maxLength={25}
                 placeholder={donationType === 'subscribe' ? 'e.g. SokhaGamer or @sokhagamer' : 'Tra Gamer'}
                 value={donorName}
-                onChange={(e) => setDonorName(e.target.value)}
+                onChange={(e) => setDonorName(e.target.value.slice(0, 25))}
                 className={`w-full pl-9 pr-3 py-2 rounded-none bg-slate-950 border text-white text-xs sm:text-sm font-medium focus:outline-none transition-colors placeholder:text-slate-500 ${
                   donationType === 'subscribe'
                     ? 'border-amber-500/40 focus:border-amber-400'
@@ -749,6 +753,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                 <Landmark size={13} className="text-cyan-400" />
                 <span>Payer Name (Bank Account) *</span>
               </span>
+              <span className="text-[10px] font-mono text-slate-500">{bankingName.length}/30</span>
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -757,9 +762,10 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
               <input
                 type="text"
                 required
+                maxLength={30}
                 placeholder="SOKPHEAK TRA"
                 value={bankingName}
-                onChange={(e) => setBankingName(e.target.value)}
+                onChange={(e) => setBankingName(e.target.value.slice(0, 30))}
                 className="w-full pl-9 pr-3 py-2 rounded-none bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-cyan-400 transition-colors placeholder:text-slate-500 uppercase"
               />
             </div>
@@ -781,7 +787,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             maxLength={200}
             placeholder="Drop a cheer or message to be broadcasted on stream..."
             value={donorMessage}
-            onChange={(e) => setDonorMessage(e.target.value)}
+            onChange={(e) => setDonorMessage(e.target.value.slice(0, 200))}
             className="w-full p-2.5 rounded-none bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-cyan-400 transition-colors resize-none placeholder:text-slate-500 leading-relaxed"
           />
         </div>
@@ -892,6 +898,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                       amount={amount}
                       currency={currency}
                       isPreview={true}
+                      donorMessage={donorMessage}
                       onPlayStateChange={setIsPlayingPreview}
                     />
 

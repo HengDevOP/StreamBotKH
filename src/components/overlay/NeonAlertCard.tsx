@@ -253,6 +253,16 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
   // 1. CINEMATIC VIDEO ALERT (MEDIA SHARE - STAGE 2)
   // ==============================================================
   if (ytId && isSecondStageVideo) {
+    const videoHeaderColor = (alert as any).videoHeaderColor || donorColor || glowColor || '#00F0FF';
+    const videoHeaderBgColor = (alert as any).videoHeaderBgColor || 'rgba(0, 0, 0, 0.85)';
+    const videoFooterColor = (alert as any).videoFooterColor || textColor || '#FFFFFF';
+    const videoFooterBgColor = (alert as any).videoFooterBgColor || 'rgba(0, 0, 0, 0.90)';
+    const videoHeaderTextAlign = (alert as any).videoHeaderTextAlign || 'left';
+    const videoFooterTextAlign = (alert as any).videoFooterTextAlign || 'left';
+    const videoVolume = (alert as any).video?.volume !== undefined
+      ? Number((alert as any).video.volume)
+      : ((alert as any).videoVolume !== undefined ? Number((alert as any).videoVolume) : 85);
+
     return (
       <div
         className={`relative flex flex-col items-center justify-center p-4 text-center transition-all duration-700 ${
@@ -274,12 +284,20 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
             endTime={videoEndTime}
             autoplay={true}
             muted={false}
+            volume={videoVolume}
             videoTitle={videoTitle}
             donorName={donorName}
             donorColor={donorColor}
             amount={amount}
             currency={currency}
             glowColor={glowColor}
+            donorMessage={cleanDonorMessage}
+            headerColor={videoHeaderColor}
+            headerBgColor={videoHeaderBgColor}
+            footerColor={videoFooterColor}
+            footerBgColor={videoFooterBgColor}
+            headerTextAlign={videoHeaderTextAlign}
+            footerTextAlign={videoFooterTextAlign}
             onEnded={handleVideoEnded}
           />
         </div>

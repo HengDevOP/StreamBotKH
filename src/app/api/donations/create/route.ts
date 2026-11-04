@@ -35,8 +35,10 @@ export async function POST(req: NextRequest) {
     const numAmount = amount ? Math.max(0, parseFloat(amount) || 0) : 0;
     const validCurrency = currency === 'KHR' ? 'KHR' : 'USD';
     const donationId = uuidv4();
+    const cleanDonorName = String(donorName).slice(0, 25).trim();
+    const cleanDonorMessage = donorMessage ? String(donorMessage).slice(0, 200).trim() : '';
     const cleanBankingName = (bankingName && typeof bankingName === 'string')
-      ? bankingName.slice(0, 60).trim()
+      ? bankingName.slice(0, 30).trim()
       : 'Bakong KHQR';
 
     let cleanVideoUrl = videoUrl && typeof videoUrl === 'string' ? videoUrl.trim() : null;
@@ -151,8 +153,8 @@ export async function POST(req: NextRequest) {
         id: donationId,
         streamerId: resolvedStreamerId,
         streamerUsername: resolvedUsername || undefined,
-        donorName: donorName.slice(0, 50),
-        donorMessage: (donorMessage || '').slice(0, 250),
+        donorName: cleanDonorName,
+        donorMessage: cleanDonorMessage,
         amount: numAmount,
         currency: validCurrency,
         bankingName: cleanBankingName,
@@ -177,8 +179,8 @@ export async function POST(req: NextRequest) {
         id: donationId,
         streamerId: resolvedStreamerId,
         streamerUsername: resolvedUsername || undefined,
-        donorName: donorName.slice(0, 50),
-        donorMessage: (donorMessage || '').slice(0, 250),
+        donorName: cleanDonorName,
+        donorMessage: cleanDonorMessage,
         amount: numAmount,
         currency: validCurrency,
         bankingName: cleanBankingName,

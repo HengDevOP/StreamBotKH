@@ -28,6 +28,7 @@ import {
   Cpu,
   Layers,
   Palette,
+  AlertTriangle,
   Bell,
   VolumeX,
   Flame,
@@ -580,6 +581,47 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     serializeBoxState(name, liveConditionsSnapshot) !==
       serializeBoxState(savedBaseline.name, savedBaseline.conditions);
 
+  const [isEarthquake, setIsEarthquake] = useState(false);
+  const earthquakeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Broadcast unsaved changes status to global dashboard
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('dashboard-unsaved-changes', { detail: { tab: 'donation', hasUnsaved: hasUnsavedChanges } })
+    );
+    window.dispatchEvent(
+      new CustomEvent('dashboard-unsaved-changes', { detail: { tab: 'alerts', hasUnsaved: hasUnsavedChanges } })
+    );
+    if (!hasUnsavedChanges) {
+      setIsEarthquake(false);
+    }
+  }, [hasUnsavedChanges]);
+
+  // Listen for earthquake trigger when user attempts to navigate away without saving
+  useEffect(() => {
+    const handleEarthquake = (e: any) => {
+      const tab = e.detail?.tab;
+      if (tab && tab !== 'donation' && tab !== 'alerts' && tab !== 'donations') return;
+      if (!hasUnsavedChanges) return;
+
+      setIsEarthquake(false);
+      requestAnimationFrame(() => {
+        setIsEarthquake(true);
+      });
+
+      if (earthquakeTimerRef.current) clearTimeout(earthquakeTimerRef.current);
+      earthquakeTimerRef.current = setTimeout(() => {
+        setIsEarthquake(false);
+      }, 2800);
+    };
+
+    window.addEventListener('dashboard-unsaved-earthquake', handleEarthquake);
+    return () => {
+      window.removeEventListener('dashboard-unsaved-earthquake', handleEarthquake);
+      if (earthquakeTimerRef.current) clearTimeout(earthquakeTimerRef.current);
+    };
+  }, [hasUnsavedChanges]);
+
   // Prevent accidental browser reload / tab close when there are unsaved changes
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -593,6 +635,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   }, [hasUnsavedChanges]);
 
   const handleResetChanges = () => {
+    setIsEarthquake(false);
     setName(savedBaseline.name);
     setConditions(savedBaseline.conditions);
     const target =
@@ -985,6 +1028,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          setIsEarthquake(false);
           setSavedBaseline({
             name: name.trim().slice(0, 16),
             conditions: finalConditions
@@ -1001,6 +1045,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         });
         const data = await res.json();
         if (res.ok && data.success) {
+          setIsEarthquake(false);
           setSavedBaseline({
             name: name.trim().slice(0, 16),
             conditions: finalConditions
@@ -2875,14 +2920,40 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
           hasUnsavedChanges
             ? 'translate-y-0 opacity-100 pointer-events-auto'
             : 'translate-y-24 opacity-0 pointer-events-none'
-        }`}
+        } ${isEarthquake ? 'animate-toast-earthquake' : ''}`}
       >
-        <div className="rounded-2xl px-4 py-3 bg-[#0B101E]/95 backdrop-blur-xl border border-cyan-500/40 shadow-[0_14px_45px_rgba(0,0,0,0.85),0_0_25px_rgba(0,240,255,0.18)] flex items-center justify-between gap-3">
+        <div
+          className={`rounded-2xl px-4 py-3 backdrop-blur-xl transition-all duration-300 flex items-center justify-between gap-3 ${
+            isEarthquake
+              ? 'bg-gradient-to-r from-red-950/95 via-rose-950/95 to-red-950/95 border-2 border-red-500 shadow-[0_0_35px_rgba(239,68,68,0.7),0_14px_45px_rgba(0,0,0,0.95)] animate-toast-red-pulse'
+              : 'bg-[#0B101E]/95 border border-cyan-500/40 shadow-[0_14px_45px_rgba(0,0,0,0.85),0_0_25px_rgba(0,240,255,0.18)]'
+          }`}
+        >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse flex-shrink-0 shadow-[0_0_8px_rgba(0,240,255,0.8)]" />
-            <span className="text-xs font-mono font-bold text-slate-100 truncate">
-              Careful — you have unsaved changes!
-            </span>
+            {isEarthquake ? (
+              <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 flex-shrink-0 shadow-[0_0_12px_rgba(239,68,68,0.5)]">
+                <AlertTriangle size={16} className="animate-bounce" />
+              </div>
+            ) : (
+              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse flex-shrink-0 shadow-[0_0_8px_rgba(0,240,255,0.8)]" />
+            )}
+            <div className="min-w-0">
+              <div className={`text-xs font-bold truncate flex items-center gap-1.5 ${isEarthquake ? 'text-red-200' : 'text-slate-100'}`}>
+                {isEarthquake ? (
+                  <>
+                    <span className="font-black text-red-400 uppercase tracking-wider">Unsaved Changes!</span>
+                    <span className="hidden sm:inline text-red-200 font-medium">— Navigation blocked</span>
+                  </>
+                ) : (
+                  <span>Careful — you have unsaved changes!</span>
+                )}
+              </div>
+              <p className={`text-[10px] truncate hidden xs:block ${isEarthquake ? 'text-red-300 font-semibold' : 'text-slate-400'}`}>
+                {isEarthquake
+                  ? 'Please Save or Reset changes before switching to another feature!'
+                  : 'Save this donation alert box to sync with live OBS overlay'}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -2891,7 +2962,11 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 type="button"
                 disabled={saving}
                 onClick={handleResetChanges}
-                className="px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                  isEarthquake
+                    ? 'bg-red-950/80 border border-red-500/40 text-red-300 hover:bg-red-900/60 hover:text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
               >
                 Reset
               </button>
@@ -2902,9 +2977,13 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
               size="sm"
               onClick={handleSave}
               loading={saving}
-              className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold font-mono text-xs px-4 shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+              className={`font-bold font-mono text-xs px-4 transition-all shadow-md active:scale-95 ${
+                isEarthquake
+                  ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.6)] animate-pulse border-0'
+                  : 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.3)]'
+              }`}
             >
-              <Save size={13} className="text-slate-950" />
+              <Save size={13} className={isEarthquake ? 'text-white' : 'text-slate-950'} />
               <span>Save Changes</span>
             </Button>
           </div>

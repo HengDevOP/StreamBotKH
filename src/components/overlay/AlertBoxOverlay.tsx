@@ -622,7 +622,13 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
           videoEndTime: Number(payload.videoEndTime) || 30,
           durationSeconds: clipDuration + 6,
           soundUrl: '',
-          ttsEnabled: false
+          ttsEnabled: false,
+          videoHeaderColor: payload.videoHeaderColor || (overlayConfig as any)?.videoHeaderColor,
+          videoHeaderBgColor: payload.videoHeaderBgColor || (overlayConfig as any)?.videoHeaderBgColor,
+          videoFooterColor: payload.videoFooterColor || (overlayConfig as any)?.videoFooterColor,
+          videoFooterBgColor: payload.videoFooterBgColor || (overlayConfig as any)?.videoFooterBgColor,
+          videoHeaderTextAlign: payload.videoHeaderTextAlign || (overlayConfig as any)?.videoHeaderTextAlign,
+          videoFooterTextAlign: payload.videoFooterTextAlign || (overlayConfig as any)?.videoFooterTextAlign
         };
 
         const key = payload.donationId || alertId;
@@ -691,7 +697,13 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
           videoEndTime: Number(payload.videoEndTime) || 30,
           durationSeconds: clipDuration + 6,
           soundUrl: '',
-          ttsEnabled: false
+          ttsEnabled: false,
+          videoHeaderColor: payload.videoHeaderColor || (overlayConfig as any)?.videoHeaderColor,
+          videoHeaderBgColor: payload.videoHeaderBgColor || (overlayConfig as any)?.videoHeaderBgColor,
+          videoFooterColor: payload.videoFooterColor || (overlayConfig as any)?.videoFooterColor,
+          videoFooterBgColor: payload.videoFooterBgColor || (overlayConfig as any)?.videoFooterBgColor,
+          videoHeaderTextAlign: payload.videoHeaderTextAlign || (overlayConfig as any)?.videoHeaderTextAlign,
+          videoFooterTextAlign: payload.videoFooterTextAlign || (overlayConfig as any)?.videoFooterTextAlign
         });
       } else {
         // Standard single alert for regular tips without video
@@ -710,12 +722,31 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       handleAlert(payload);
     };
 
+    const handleVideoSettingsUpdated = (settings: any) => {
+      console.log('⚡ [Overlay] Received live video alert settings update:', settings);
+      setOverlayConfig((prev: any) => ({
+        ...prev,
+        videoAlertEnabled: settings.isEnabled !== undefined ? settings.isEnabled : prev?.videoAlertEnabled,
+        videoMinTipAmount: settings.minTipAmount !== undefined ? settings.minTipAmount : prev?.videoMinTipAmount,
+        videoMaxDurationSeconds: settings.maxDurationSeconds !== undefined ? settings.maxDurationSeconds : prev?.videoMaxDurationSeconds,
+        videoVolume: settings.videoVolume !== undefined ? settings.videoVolume : prev?.videoVolume,
+        videoHeaderColor: settings.headerColor || prev?.videoHeaderColor,
+        videoHeaderBgColor: settings.headerBgColor || prev?.videoHeaderBgColor,
+        videoFooterColor: settings.footerColor || prev?.videoFooterColor,
+        videoFooterBgColor: settings.footerBgColor || prev?.videoFooterBgColor,
+        videoHeaderTextAlign: settings.headerTextAlign || prev?.videoHeaderTextAlign,
+        videoFooterTextAlign: settings.footerTextAlign || prev?.videoFooterTextAlign
+      }));
+    };
+
     socket.on('donation:alert', handleAlert);
     socket.on('donation:alert:test', handleTestAlert);
+    socket.on('streamer_video_settings_updated', handleVideoSettingsUpdated);
 
     return () => {
       socket.off('donation:alert', handleAlert);
       socket.off('donation:alert:test', handleTestAlert);
+      socket.off('streamer_video_settings_updated', handleVideoSettingsUpdated);
       socket.off('donation:alert_finished', handleAlertFinished);
       socket.off('donation:video_finished', handleVideoFinished);
       if (videoWaitingTimerRef.current) clearTimeout(videoWaitingTimerRef.current);

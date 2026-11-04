@@ -218,7 +218,11 @@ export const PaymentGatewaySkeleton: React.FC = () => {
   );
 };
 
-export const PaymentGatewayAdmin: React.FC = () => {
+export interface PaymentGatewayAdminProps {
+  onStatusChange?: (isIncomplete: boolean) => void;
+}
+
+export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStatusChange }) => {
   const { showConfirm, showAlert } = useModal();
   const { user } = useAuth();
   const currentStreamerUsername = user?.username || 'neonstreamer';
@@ -483,6 +487,30 @@ export const PaymentGatewayAdmin: React.FC = () => {
   const isStep3Done = Boolean(userClientStatus.isConnected && targetGroups.length > 0);
 
   const completedStepsCount = (isStep1Done ? 1 : 0) + (isStep2Done ? 1 : 0) + (isStep3Done ? 1 : 0);
+  const isPaymentGatewayIncomplete = !isStep1Done || !isStep2Done || !isStep3Done;
+
+  // Propagate incomplete status upwards to Dashboard navigation and global events
+  useEffect(() => {
+    if (onStatusChange) {
+      onStatusChange(isPaymentGatewayIncomplete);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('payment-gateway-status', {
+          detail: {
+            isIncomplete: isPaymentGatewayIncomplete,
+            isComplete: !isPaymentGatewayIncomplete,
+            completedStepsCount,
+            steps: {
+              gramjs: isStep1Done,
+              khqr: isStep2Done,
+              group: isStep3Done
+            }
+          }
+        })
+      );
+    }
+  }, [isPaymentGatewayIncomplete, isStep1Done, isStep2Done, isStep3Done, completedStepsCount, onStatusChange]);
 
   // 2-minute (120s) cooldown timer for resending verification code
   useEffect(() => {
@@ -1116,6 +1144,48 @@ export const PaymentGatewayAdmin: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* ============================================================== */}
+      {/* ACTION REQUIRED BANNER (SIMPLE, NO ANIMATION)                  */}
+      {/* ============================================================== */}
+      {isPaymentGatewayIncomplete && (
+        <div className="p-3.5 sm:p-4 rounded-xl bg-rose-950/20 border border-rose-500/30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-rose-400 min-w-0">
+            <AlertCircle size={18} className="text-rose-500 flex-shrink-0 stroke-[2.5]" />
+            <span className="text-sm font-bold font-['Chakra_Petch'] tracking-wide uppercase text-rose-400">
+              Action Required
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {!isStep1Done ? (
+              <button
+                type="button"
+                onClick={() => goToStep(1)}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer font-['Chakra_Petch']"
+              >
+                <span>Connect</span>
+              </button>
+            ) : !isStep2Done ? (
+              <button
+                type="button"
+                onClick={() => goToStep(2)}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer font-['Chakra_Petch']"
+              >
+                <span>Upload KHQR</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => goToStep(3)}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer font-['Chakra_Petch']"
+              >
+                <span>Connect Group</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
       {/* 3-STEP ANIMATED LINE PROGRESS TASK BAR                         */}
       {/* ============================================================== */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#090D18] border border-slate-800/90 shadow-2xl relative overflow-hidden">
@@ -1152,7 +1222,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             className="group relative z-10 flex flex-col items-center text-center cursor-pointer focus:outline-none"
           >
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 relative ${
                 isStep1Done
                   ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.5)] ring-4 ring-emerald-500/20'
                   : activeStep === 1
@@ -1161,6 +1231,14 @@ export const PaymentGatewayAdmin: React.FC = () => {
               }`}
             >
               {isStep1Done ? <Check size={18} className="stroke-[3]" /> : '1'}
+              {!isStep1Done && (
+                <span
+                  title="Action Required: GramJS client disconnected"
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center ring-2 ring-[#090D18]"
+                >
+                  <AlertCircle size={10} className="stroke-[3]" />
+                </span>
+              )}
             </div>
 
             <div className="mt-2.5">
@@ -1170,7 +1248,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     ? 'text-cyan-400'
                     : isStep1Done
                     ? 'text-emerald-400'
-                    : 'text-slate-400'
+                    : 'text-rose-400'
                 }`}
               >
                 Connect
@@ -1185,7 +1263,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             className="group relative z-10 flex flex-col items-center text-center cursor-pointer focus:outline-none"
           >
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 relative ${
                 isStep2Done
                   ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.5)] ring-4 ring-emerald-500/20'
                   : activeStep === 2
@@ -1194,6 +1272,14 @@ export const PaymentGatewayAdmin: React.FC = () => {
               }`}
             >
               {isStep2Done ? <Check size={18} className="stroke-[3]" /> : '2'}
+              {!isStep2Done && (
+                <span
+                  title="Action Required: KHQR image missing"
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center ring-2 ring-[#090D18]"
+                >
+                  <AlertCircle size={10} className="stroke-[3]" />
+                </span>
+              )}
             </div>
 
             <div className="mt-2.5">
@@ -1203,7 +1289,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     ? 'text-cyan-400'
                     : isStep2Done
                     ? 'text-emerald-400'
-                    : 'text-slate-400'
+                    : 'text-rose-400'
                 }`}
               >
                 KHQR
@@ -1218,7 +1304,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
             className="group relative z-10 flex flex-col items-center text-center cursor-pointer focus:outline-none"
           >
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 relative ${
                 isStep3Done
                   ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.5)] ring-4 ring-emerald-500/20'
                   : activeStep === 3
@@ -1227,6 +1313,14 @@ export const PaymentGatewayAdmin: React.FC = () => {
               }`}
             >
               {isStep3Done ? <Check size={18} className="stroke-[3]" /> : '3'}
+              {!isStep3Done && (
+                <span
+                  title="Action Required: Telegram bank group not connected"
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center ring-2 ring-[#090D18]"
+                >
+                  <AlertCircle size={10} className="stroke-[3]" />
+                </span>
+              )}
             </div>
 
             <div className="mt-2.5">
@@ -1236,7 +1330,7 @@ export const PaymentGatewayAdmin: React.FC = () => {
                     ? 'text-cyan-400'
                     : isStep3Done
                     ? 'text-emerald-400'
-                    : 'text-slate-400'
+                    : 'text-rose-400'
                 }`}
               >
                 GROUP

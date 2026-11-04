@@ -121,6 +121,14 @@ export interface VideoAlertSettingsDoc {
   showProgressBar?: boolean;
   allowViewerControl?: boolean;
   blacklistedKeywords?: string;
+  videoVolume?: number;
+  autoDucking?: boolean;
+  headerColor?: string;
+  headerBgColor?: string;
+  footerColor?: string;
+  footerBgColor?: string;
+  headerTextAlign?: 'left' | 'center' | 'justify' | 'right';
+  footerTextAlign?: 'left' | 'center' | 'justify' | 'right';
   createdAt?: Date;
   updatedAt?: Date;
 }

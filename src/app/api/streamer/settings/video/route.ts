@@ -1,13 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getUsersCollection, getVideoAlertSettingsCollection } from '@/server/database/mongo';
+import {
+  getUsersCollection,
+  getVideoAlertSettingsCollection,
+  getOverlaysCollection
+} from '@/server/database/mongo';
 
 export const dynamic = 'force-dynamic';
 
 async function resolveStreamerMongo(req: NextRequest, bodyToken?: string) {
-  const user = getAuthenticatedUser(req);
-  if (user) {
-    return { streamerId: user.id, overlayToken: (user as any).overlay_token || (user as any).overlayToken };
+  const usersCol = await getUsersCollection();
+  const authUser = getAuthenticatedUser(req);
+
+  if (authUser) {
+    const mongoUser = await usersCol.findOne({
+      $or: [
+        { userId: authUser.id },
+        { id: authUser.id as any },
+        { _id: authUser.id as any },
+        ...(authUser.email ? [{ email: authUser.email }] : []),
+        ...(authUser.username ? [{ username: authUser.username }] : [])
+      ]
+    });
+
+    if (mongoUser) {
+      const sId = mongoUser.userId || (mongoUser as any).id || String(mongoUser._id);
+      return {
+        streamerId: sId,
+        username: mongoUser.username,
+        overlayToken: mongoUser.overlayToken || mongoUser.overlay_token,
+        mongoUser
+      };
+    }
+
+    return {
+      streamerId: authUser.id,
+      username: authUser.username,
+      overlayToken: undefined,
+      mongoUser: null
+    };
   }
 
   const { searchParams } = new URL(req.url);
@@ -15,7 +46,6 @@ async function resolveStreamerMongo(req: NextRequest, bodyToken?: string) {
 
   if (token) {
     try {
-      const usersCol = await getUsersCollection();
       const escaped = String(token).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const streamer = await usersCol.findOne({
         $or: [
@@ -28,39 +58,60 @@ async function resolveStreamerMongo(req: NextRequest, bodyToken?: string) {
       });
 
       if (streamer) {
+        const sId = streamer.userId || (streamer as any).id || String(streamer._id);
         return {
-          streamerId: streamer.userId || (streamer as any).id || String(streamer._id),
-          overlayToken: streamer.overlayToken || streamer.overlay_token
+          streamerId: sId,
+          username: streamer.username,
+          overlayToken: streamer.overlayToken || streamer.overlay_token,
+          mongoUser: streamer
         };
       }
     } catch (e) {}
   }
 
-  return { streamerId: 'demo-streamer-id-1001', overlayToken: 'ovl_3223c099b5884ff788670103' };
+  return {
+    streamerId: 'demo-streamer-id-1001',
+    username: 'streamer',
+    overlayToken: 'ovl_3223c099b5884ff788670103',
+    mongoUser: null
+  };
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const { streamerId } = await resolveStreamerMongo(req);
+    const { streamerId, username } = await resolveStreamerMongo(req);
 
     const videoCol = await getVideoAlertSettingsCollection();
     let doc = await videoCol.findOne({
-      $or: [{ streamerId }, { streamer_id: streamerId as any }]
+      $or: [
+        { streamerId },
+        { streamer_id: streamerId as any },
+        ...(username ? [{ streamerId: username }] : [])
+      ]
     });
 
     if (!doc) {
-      await videoCol.insertOne({
+      const defaultDoc = {
         streamerId,
         isEnabled: false,
         minTipAmount: 2.0,
         maxDurationSeconds: 30,
+        videoVolume: 85,
+        autoDucking: true,
+        headerColor: '#00F0FF',
+        headerBgColor: 'rgba(2, 6, 23, 0.95)',
+        footerColor: '#FFFFFF',
+        footerBgColor: 'rgba(0, 0, 0, 0.90)',
+        headerTextAlign: 'left',
+        footerTextAlign: 'left',
         autoPlay: true,
         showProgressBar: true,
         allowViewerControl: false,
         createdAt: new Date(),
         updatedAt: new Date()
-      });
-      doc = await videoCol.findOne({ streamerId });
+      };
+      await videoCol.insertOne(defaultDoc);
+      doc = defaultDoc as any;
     }
 
     return NextResponse.json({
@@ -71,7 +122,13 @@ export async function GET(req: NextRequest) {
         minTipAmount: Number(doc?.minTipAmount ?? (doc as any)?.min_tip_amount ?? 2.0),
         maxDurationSeconds: Number(doc?.maxDurationSeconds ?? (doc as any)?.max_duration_seconds ?? 30),
         videoVolume: Number((doc as any)?.videoVolume ?? (doc as any)?.video_volume ?? 85),
-        autoDucking: Boolean((doc as any)?.autoDucking ?? (doc as any)?.auto_ducking ?? true)
+        autoDucking: Boolean((doc as any)?.autoDucking ?? (doc as any)?.auto_ducking ?? true),
+        headerColor: String((doc as any)?.headerColor ?? '#00F0FF'),
+        headerBgColor: String((doc as any)?.headerBgColor ?? 'rgba(2, 6, 23, 0.95)'),
+        footerColor: String((doc as any)?.footerColor ?? '#FFFFFF'),
+        footerBgColor: String((doc as any)?.footerBgColor ?? 'rgba(0, 0, 0, 0.90)'),
+        headerTextAlign: (['left', 'center', 'justify', 'right'].includes((doc as any)?.headerTextAlign) ? (doc as any).headerTextAlign : 'left') as 'left' | 'center' | 'justify' | 'right',
+        footerTextAlign: (['left', 'center', 'justify', 'right'].includes((doc as any)?.footerTextAlign) ? (doc as any).footerTextAlign : 'left') as 'left' | 'center' | 'justify' | 'right'
       }
     });
   } catch (err: any) {
@@ -83,7 +140,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { streamerId } = await resolveStreamerMongo(req, body.token);
+    const { streamerId, username, overlayToken } = await resolveStreamerMongo(req, body.token);
 
     const isEnabled = body.isEnabled !== undefined ? Boolean(body.isEnabled) : false;
     const rawMinTip = body.minTipAmount !== undefined ? Number(body.minTipAmount) : 2.0;
@@ -97,10 +154,26 @@ export async function POST(req: NextRequest) {
 
     const autoDucking = body.autoDucking !== undefined ? Boolean(body.autoDucking) : true;
 
+    const validAligns = ['left', 'center', 'justify', 'right'] as const;
+    const headerColor = typeof body.headerColor === 'string' && body.headerColor.trim() ? body.headerColor.trim() : '#00F0FF';
+    const headerBgColor = typeof body.headerBgColor === 'string' && body.headerBgColor.trim() ? body.headerBgColor.trim() : 'rgba(2, 6, 23, 0.95)';
+    const footerColor = typeof body.footerColor === 'string' && body.footerColor.trim() ? body.footerColor.trim() : '#FFFFFF';
+    const footerBgColor = typeof body.footerBgColor === 'string' && body.footerBgColor.trim() ? body.footerBgColor.trim() : 'rgba(0, 0, 0, 0.90)';
+    const headerTextAlign = validAligns.includes(body.headerTextAlign) ? body.headerTextAlign : 'left';
+    const footerTextAlign = validAligns.includes(body.footerTextAlign) ? body.footerTextAlign : 'left';
+
     const now = new Date();
     const videoCol = await getVideoAlertSettingsCollection();
+
+    // 1. Upsert into video_alert_settings collection
     await videoCol.updateOne(
-      { streamerId },
+      {
+        $or: [
+          { streamerId },
+          { streamer_id: streamerId as any },
+          ...(username ? [{ streamerId: username }] : [])
+        ]
+      },
       {
         $set: {
           streamerId,
@@ -114,12 +187,69 @@ export async function POST(req: NextRequest) {
           video_volume: videoVolume,
           autoDucking,
           auto_ducking: autoDucking ? 1 : 0,
+          headerColor,
+          headerBgColor,
+          footerColor,
+          footerBgColor,
+          headerTextAlign,
+          footerTextAlign,
           updatedAt: now
         },
         $setOnInsert: { createdAt: now }
       },
       { upsert: true }
     );
+
+    // 2. Update users collection so the public donation page instantly gets updated constraints
+    try {
+      const usersCol = await getUsersCollection();
+      await usersCol.updateOne(
+        {
+          $or: [
+            { userId: streamerId },
+            { _id: streamerId as any },
+            ...(username ? [{ username }] : [])
+          ]
+        },
+        {
+          $set: {
+            videoAlertEnabled: isEnabled,
+            videoMinTipAmount: minTipAmount,
+            videoMaxDurationSeconds: maxDurationSeconds,
+            updatedAt: now
+          }
+        }
+      );
+    } catch (e) {}
+
+    // 3. Update overlays collection so OBS browser sources instantly receive latest configs
+    try {
+      const overlaysCol = await getOverlaysCollection();
+      await overlaysCol.updateMany(
+        {
+          $or: [
+            { streamerId },
+            ...(username ? [{ streamerId: username }] : []),
+            ...(overlayToken ? [{ overlayToken }] : [])
+          ]
+        },
+        {
+          $set: {
+            videoAlertEnabled: isEnabled,
+            videoMinTipAmount: minTipAmount,
+            videoMaxDurationSeconds: maxDurationSeconds,
+            videoVolume: videoVolume,
+            videoHeaderColor: headerColor,
+            videoHeaderBgColor: headerBgColor,
+            videoFooterColor: footerColor,
+            videoFooterBgColor: footerBgColor,
+            videoHeaderTextAlign: headerTextAlign,
+            videoFooterTextAlign: footerTextAlign,
+            updatedAt: now
+          }
+        }
+      );
+    } catch (e) {}
 
     return NextResponse.json({
       success: true,
@@ -130,7 +260,13 @@ export async function POST(req: NextRequest) {
         minTipAmount,
         maxDurationSeconds,
         videoVolume,
-        autoDucking
+        autoDucking,
+        headerColor,
+        headerBgColor,
+        footerColor,
+        footerBgColor,
+        headerTextAlign,
+        footerTextAlign
       }
     });
   } catch (err: any) {

@@ -341,6 +341,44 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       broadcastToAllStreamerRooms(token, 'donation:alert', testPayload);
     });
 
+    // Test video alert trigger from dashboard video alert manager
+    socket.on('test_video_alert', async (payload: any) => {
+      const token = payload?.overlayToken || 'demo-token';
+      console.log(`[Socket] Received test_video_alert for overlay token: ${token}`);
+      const alertPayload: any = {
+        id: payload.id || `test_video_${Date.now()}`,
+        donorName: payload.donorName || 'Supporter',
+        amount: payload.amount || 5.0,
+        currency: payload.currency || 'USD',
+        message: payload.message || '',
+        videoUrl: payload.video?.youtubeUrl || payload.youtubeUrl || payload.videoUrl,
+        videoTitle: payload.videoTitle || 'Live Video Alert',
+        videoStartTime: payload.video?.startTime ?? payload.videoStartTime ?? 0,
+        videoEndTime: payload.video?.endTime ?? payload.videoEndTime ?? 30,
+        videoVolume: payload.video?.volume ?? payload.videoVolume ?? 85,
+        videoHeaderColor: payload.headerColor || payload.videoHeaderColor,
+        videoHeaderBgColor: payload.headerBgColor || payload.videoHeaderBgColor,
+        videoFooterColor: payload.footerColor || payload.videoFooterColor,
+        videoFooterBgColor: payload.footerBgColor || payload.videoFooterBgColor,
+        videoHeaderTextAlign: payload.headerTextAlign || payload.videoHeaderTextAlign,
+        videoFooterTextAlign: payload.footerTextAlign || payload.videoFooterTextAlign,
+        isTest: true,
+        isTestVideo: true,
+        overlayToken: token
+      };
+
+      io?.to(`overlay:${token}`).emit('donation:alert', alertPayload);
+      broadcastToAllStreamerRooms(token, 'donation:alert', alertPayload);
+    });
+
+    // Broadcast live video alert settings update to overlay rooms
+    socket.on('streamer_video_settings_updated', (data: { token?: string; settings?: any }) => {
+      const token = data?.token || 'demo-token';
+      console.log(`[Socket] Broadcasting video settings update for token: ${token}`);
+      io?.to(`overlay:${token}`).emit('streamer_video_settings_updated', data?.settings || {});
+      broadcastToAllStreamerRooms(token, 'streamer_video_settings_updated', data?.settings || {});
+    });
+
     // Notify overlay room that a donation alert has finished so video sources can start immediately
     socket.on('overlay:alert_finished', (data: { donationId: string; overlayToken: string }) => {
       const token = data?.overlayToken || 'demo-token';

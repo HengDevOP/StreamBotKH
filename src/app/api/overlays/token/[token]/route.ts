@@ -70,10 +70,16 @@ export async function GET(
 
     const isVideoAlertEnabled = videoSettings
       ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true)
-      : true;
-    const videoMinTipAmount = videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25;
-    const videoMaxDurationSeconds = videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300;
+      : false;
+    const videoMinTipAmount = videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 2.0) : 2.0;
+    const videoMaxDurationSeconds = videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 30) : 30;
     const videoVolume = videoSettings ? Number(videoSettings.videoVolume ?? videoSettings.video_volume ?? 85) : 85;
+    const videoHeaderColor = videoSettings?.headerColor || '#00F0FF';
+    const videoHeaderBgColor = videoSettings?.headerBgColor || 'rgba(2, 6, 23, 0.95)';
+    const videoFooterColor = videoSettings?.footerColor || '#FFFFFF';
+    const videoFooterBgColor = videoSettings?.footerBgColor || 'rgba(0, 0, 0, 0.90)';
+    const videoHeaderTextAlign = videoSettings?.headerTextAlign || 'left';
+    const videoFooterTextAlign = videoSettings?.footerTextAlign || 'left';
 
     if (!overlay) {
       if (streamer || token === 'demo-token' || token === 'ovl_token_neon_demo_9921') {
@@ -94,6 +100,12 @@ export async function GET(
             videoMinTipAmount,
             videoMaxDurationSeconds,
             videoVolume,
+            videoHeaderColor,
+            videoHeaderBgColor,
+            videoFooterColor,
+            videoFooterBgColor,
+            videoHeaderTextAlign,
+            videoFooterTextAlign,
             width: 1080,
             height: 720
           }
@@ -107,10 +119,16 @@ export async function GET(
       success: true,
       overlay: {
         ...overlay,
-        videoAlertEnabled: (overlay as any).videoAlertEnabled !== undefined ? (overlay as any).videoAlertEnabled : isVideoAlertEnabled,
-        videoMinTipAmount: (overlay as any).videoMinTipAmount !== undefined ? (overlay as any).videoMinTipAmount : videoMinTipAmount,
-        videoMaxDurationSeconds: (overlay as any).videoMaxDurationSeconds !== undefined ? (overlay as any).videoMaxDurationSeconds : videoMaxDurationSeconds,
-        videoVolume: (overlay as any).videoVolume !== undefined ? (overlay as any).videoVolume : videoVolume
+        videoAlertEnabled: isVideoAlertEnabled,
+        videoMinTipAmount: videoMinTipAmount,
+        videoMaxDurationSeconds: videoMaxDurationSeconds,
+        videoVolume: videoVolume,
+        videoHeaderColor: videoHeaderColor,
+        videoHeaderBgColor: videoHeaderBgColor,
+        videoFooterColor: videoFooterColor,
+        videoFooterBgColor: videoFooterBgColor,
+        videoHeaderTextAlign: videoHeaderTextAlign,
+        videoFooterTextAlign: videoFooterTextAlign
       }
     });
   } catch (err: any) {

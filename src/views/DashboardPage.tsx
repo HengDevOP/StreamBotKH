@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   LayoutDashboard,
@@ -159,6 +159,36 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [selectedDonationId, setSelectedDonationId] = useState<string | null>(initialSelectedId || null);
   const [activePromo, setActivePromo] = useState<PromotionConfig | null>(null);
 
+  // Payment Gateway health status (displays red exclamation mark if any prerequisite is missing)
+  const [isPaymentGatewayIncomplete, setIsPaymentGatewayIncomplete] = useState<boolean>(false);
+
+  // Check Payment Gateway health on mount & tab switches
+  const loadPaymentGatewayHealth = React.useCallback(async () => {
+    try {
+      const res = await request<any>('/payment-gateway/health');
+      if (res && res.success) {
+        setIsPaymentGatewayIncomplete(Boolean(res.isIncomplete));
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      loadPaymentGatewayHealth();
+    }
+  }, [user, loadPaymentGatewayHealth, activeTab]);
+
+  // Listen for real-time payment gateway status updates from PaymentGatewayAdmin
+  useEffect(() => {
+    const handlePgStatus = (e: any) => {
+      if (e.detail) {
+        setIsPaymentGatewayIncomplete(Boolean(e.detail.isIncomplete));
+      }
+    };
+    window.addEventListener('payment-gateway-status', handlePgStatus);
+    return () => window.removeEventListener('payment-gateway-status', handlePgStatus);
+  }, []);
+
   // 7-Day Free Pro Trial state
   const [trialSettings, setTrialSettings] = useState<{
     isEnabled: boolean;
@@ -261,6 +291,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     }
   }, [initialSelectedId]);
 
+  const activeTabRef = useRef<DashboardTab>(activeTab);
+  activeTabRef.current = activeTab;
+
+  const isCurrentTabDirtyRef = useRef(false);
+
   useEffect(() => {
     const handlePopState = () => {
       const search = window.location.search;
@@ -275,7 +310,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       if (search.includes('tab=')) {
         let rawTab = search.split('tab=')[1]?.split('&')[0]?.split('?')[0];
         if (rawTab === 'alerts' || rawTab === 'donations') rawTab = 'donation';
-        if (rawTab) setActiveTab(rawTab as DashboardTab);
+        if (rawTab) {
+          if (isCurrentTabDirtyRef.current) {
+            window.history.pushState(null, '', `/dashboard?tab=${activeTabRef.current}`);
+            window.dispatchEvent(
+              new CustomEvent('dashboard-unsaved-earthquake', {
+                detail: { tab: activeTabRef.current }
+              })
+            );
+            return;
+          }
+          setActiveTab(rawTab as DashboardTab);
+        }
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -315,7 +361,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [testFiring, setTestFiring] = useState(false);
   const [selectedMediaForOverlay, setSelectedMediaForOverlay] = useState<MediaItem | null>(null);
   const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
+  const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(false);
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
+  const [videoHasUnsavedChanges, setVideoHasUnsavedChanges] = useState(false);
+  const [unsavedTabs, setUnsavedTabs] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const handleUnsaved = (e: any) => {
@@ -324,6 +373,74 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     window.addEventListener('chat-unsaved-changes', handleUnsaved);
     return () => window.removeEventListener('chat-unsaved-changes', handleUnsaved);
   }, []);
+
+  useEffect(() => {
+    const handleVideoUnsaved = (e: any) => {
+      setVideoHasUnsavedChanges(Boolean(e.detail?.hasUnsavedChanges));
+    };
+    window.addEventListener('video-unsaved-changes', handleVideoUnsaved);
+    return () => window.removeEventListener('video-unsaved-changes', handleVideoUnsaved);
+  }, []);
+
+  // Central dashboard unsaved changes registry
+  useEffect(() => {
+    const handleDashboardUnsaved = (e: any) => {
+      const { tab, hasUnsaved } = e.detail || {};
+      if (tab) {
+        setUnsavedTabs((prev) => ({ ...prev, [tab]: Boolean(hasUnsaved) }));
+      }
+    };
+    window.addEventListener('dashboard-unsaved-changes', handleDashboardUnsaved);
+    return () => window.removeEventListener('dashboard-unsaved-changes', handleDashboardUnsaved);
+  }, []);
+
+  // Determine if the currently active tab has pending unsaved changes
+  const isCurrentTabDirty = useMemo(() => {
+    if (activeTab === 'video-alerts' && (videoHasUnsavedChanges || unsavedTabs['video-alerts'])) return true;
+    if (activeTab === 'chat' && (chatHasUnsavedChanges || unsavedTabs['chat'])) return true;
+    if (activeTab === 'donation' && (unsavedTabs['donation'] || unsavedTabs['alerts'] || unsavedTabs['donations'])) return true;
+    if (activeTab === 'alerts' && (unsavedTabs['donation'] || unsavedTabs['alerts'] || unsavedTabs['donations'])) return true;
+    if (activeTab === 'donations' && (unsavedTabs['donation'] || unsavedTabs['alerts'] || unsavedTabs['donations'])) return true;
+    if (activeTab === 'leaderboard' && unsavedTabs['leaderboard']) return true;
+    if (activeTab === 'subscribers' && unsavedTabs['subscribers']) return true;
+    return Boolean(unsavedTabs[activeTab]);
+  }, [activeTab, videoHasUnsavedChanges, chatHasUnsavedChanges, unsavedTabs]);
+  isCurrentTabDirtyRef.current = isCurrentTabDirty;
+
+  // Trigger earthquake vibration and red warning on the active unsaved changes toast bar
+  const triggerBlockedNavigationEarthquake = () => {
+    window.dispatchEvent(
+      new CustomEvent('dashboard-unsaved-earthquake', {
+        detail: { tab: activeTab }
+      })
+    );
+  };
+
+  // Safe tab navigation interceptor: blocks switching away if current tab has unsaved changes
+  const handleTabNavigation = (targetTab: DashboardTab) => {
+    if (targetTab === activeTab) return;
+    if (isCurrentTabDirty) {
+      triggerBlockedNavigationEarthquake();
+      return;
+    }
+    setActiveTab(targetTab);
+    setMobileDrawerOpen(false);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', `/dashboard?tab=${targetTab}`);
+    }
+  };
+
+  // Prevent accidental browser reload or closing tab when there are unsaved changes
+  useEffect(() => {
+    if (!isCurrentTabDirty) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isCurrentTabDirty]);
 
   // Account Profile Form State
   const [profileUsername, setProfileUsername] = useState(user?.username || '');
@@ -1346,11 +1463,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       setIsVideoUpgradeModalOpen(true);
                       return;
                     }
-                    setActiveTab(item.id);
-                    setMobileDrawerOpen(false);
-                    if (typeof window !== 'undefined') {
-                      window.history.pushState(null, '', `/dashboard?tab=${item.id}`);
-                    }
+                    handleTabNavigation(item.id);
                   }}
                   className={`w-full flex items-center ${
                     isCollapsed ? 'justify-center px-0 py-2.5 relative' : 'justify-between px-3 py-2'
@@ -1375,6 +1488,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                   {!isCollapsed && (
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {item.id === 'payments' && isPaymentGatewayIncomplete && (
+                        <span
+                          title="Action Required"
+                          className="flex items-center justify-center ml-2 text-rose-500"
+                        >
+                          <AlertCircle size={15} className="text-rose-500 stroke-[2.5]" />
+                        </span>
+                      )}
                       {(item as any).isLocked ? (
                         <span className="p-0.5 text-amber-400 flex items-center justify-center ml-2" title="Pro Plan Feature">
                           <Lock size={14} className="text-amber-400" />
@@ -1398,7 +1519,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <Lock size={10} className="text-amber-400" />
                     </span>
                   )}
-                  {isCollapsed && !(item as any).isLocked && item.badge && (
+                  {isCollapsed && !(item as any).isLocked && item.id === 'payments' && isPaymentGatewayIncomplete && (
+                    <span
+                      title="Action Required"
+                      className="absolute top-1.5 right-1.5 flex items-center justify-center text-rose-500"
+                    >
+                      <AlertCircle size={12} className="text-rose-500 stroke-[2.5]" />
+                    </span>
+                  )}
+                  {isCollapsed && !(item as any).isLocked && (!isPaymentGatewayIncomplete || item.id !== 'payments') && item.badge && (
                     <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-cyan-400" />
                   )}
                 </button>
@@ -1416,8 +1545,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       {!isCollapsed && (
         <div
           onClick={() => {
-            setActiveTab('account');
-            setMobileDrawerOpen(false);
+            handleTabNavigation('account');
           }}
           className="p-2 rounded-xl bg-slate-900 flex items-center justify-between cursor-pointer hover:bg-slate-800 transition-colors"
           title="Open My Account"
@@ -1490,11 +1618,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           onSelectBoxId={(id) => setSelectedDonationId(id)}
           onRegenerateToken={handleRegenerateToken}
           onNavigateToMedia={() => {
-            setSelectedDonationId(null);
-            setActiveTab('media');
-            if (typeof window !== 'undefined') {
-              window.history.pushState(null, '', '/dashboard?tab=media');
+            if (isCurrentTabDirty) {
+              triggerBlockedNavigationEarthquake();
+              return;
             }
+            setSelectedDonationId(null);
+            handleTabNavigation('media');
           }}
         />
       </div>
@@ -1658,9 +1787,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 <CurrentTabIcon size={18} />
               </div>
               <div className="flex flex-col justify-center min-w-0">
-                <h1 className="text-sm xs:text-base sm:text-lg font-black text-white font-['Chakra_Petch'] tracking-tight truncate">
-                  {currentTabTitle}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm xs:text-base sm:text-lg font-black text-white font-['Chakra_Petch'] tracking-tight truncate">
+                    {currentTabTitle}
+                  </h1>
+                  {(activeTab === 'payments' || activeTab === 'telegram') && isPaymentGatewayIncomplete && (
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[11px] font-semibold"
+                      title="Action Required"
+                    >
+                      <AlertCircle size={13} className="text-rose-500 stroke-[2.5] flex-shrink-0" />
+                      <span className="hidden xs:inline">Action Required</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1723,10 +1863,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 onClose={() => setIsMailboxDropdownOpen(false)}
                 onOpenFullMailbox={() => {
                   setIsMailboxDropdownOpen(false);
-                  setActiveTab('mailbox');
-                  if (typeof window !== 'undefined') {
-                    window.history.pushState(null, '', '/dashboard?tab=mailbox');
-                  }
+                  handleTabNavigation('mailbox');
                 }}
                 onUnreadCountChange={setUnreadMailCount}
               />
@@ -1753,12 +1890,38 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 )}
               </button>
             )}
+
+            {/* Video Alerts Settings Toggle Menu Button (Top Navbar Right Side - Mobile Only) */}
+            {activeTab === 'video-alerts' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsVideoSettingsOpen((prev) => !prev);
+                }}
+                className={`lg:hidden relative flex items-center justify-center p-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  isVideoSettingsOpen
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border-slate-750 hover:border-cyan-500/50 shadow-sm'
+                }`}
+                title="Toggle Video Settings"
+                aria-label="Toggle Video Alert Settings"
+              >
+                {isVideoSettingsOpen ? (
+                  <X size={16} />
+                ) : (
+                  <Menu size={16} className="text-cyan-400" />
+                )}
+                {videoHasUnsavedChanges && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
+                )}
+              </button>
+            )}
           </div>
         </header>
 
         {/* Dynamic Workbench Views (Internally Scrollable Container Only) */}
-        <div className={`flex-1 min-h-0 ${activeTab === 'chat' ? 'flex flex-col overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
-        <div className={activeTab === 'chat'
+        <div className={`flex-1 min-h-0 ${activeTab === 'chat' || activeTab === 'video-alerts' ? 'flex flex-col overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
+        <div className={activeTab === 'chat' || activeTab === 'video-alerts'
           ? 'w-full h-full p-2.5 sm:p-4 lg:p-5 flex-1 flex flex-col min-h-0'
           : 'p-3 xs:p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6 sm:space-y-8 animate-fadeIn pb-16'
         }>
@@ -1889,11 +2052,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* ============================================================== */}
           {activeTab === 'media' && (
             <MediaLibraryManager
+              currentPlan={currentPlan}
+              isTrialActive={isTrialActive}
+              isAdmin={isAdmin}
+              onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
               onSelectForOverlay={(media) => {
-                setActiveTab('donation');
-                if (typeof window !== 'undefined') {
-                  window.history.pushState(null, '', '/dashboard?tab=donation');
-                }
+                handleTabNavigation('donation');
               }}
             />
           )}
@@ -1908,11 +2072,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               onSelectBoxId={(id) => setSelectedDonationId(id)}
               onRegenerateToken={handleRegenerateToken}
               onNavigateToMedia={() => {
-                setSelectedDonationId(null);
-                setActiveTab('media');
-                if (typeof window !== 'undefined') {
-                  window.history.pushState(null, '', '/dashboard?tab=media');
+                if (isCurrentTabDirty) {
+                  triggerBlockedNavigationEarthquake();
+                  return;
                 }
+                setSelectedDonationId(null);
+                handleTabNavigation('media');
               }}
             />
           )}
@@ -2006,6 +2171,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               currentPlan={currentPlan}
               onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
               onRegenerateToken={handleRegenerateToken}
+              isRightbarOpen={isVideoSettingsOpen}
+              onToggleRightbar={() => setIsVideoSettingsOpen((prev) => !prev)}
+              onCloseRightbar={() => setIsVideoSettingsOpen(false)}
+              onUnsavedChangesChange={setVideoHasUnsavedChanges}
             />
           )}
 
@@ -2021,7 +2190,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <BroadcastStreamManager
               user={user}
               onRefreshUser={refreshUser}
-              onNavigateToTab={(tab) => setActiveTab(tab as DashboardTab)}
+              onNavigateToTab={(tab) => handleTabNavigation(tab as DashboardTab)}
             />
           )}
 
@@ -2053,7 +2222,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* TAB 6: PAYMENT GATEWAY (AVAILABLE FOR ALL PLANS)               */}
           {/* ============================================================== */}
           {(activeTab === 'payments' || activeTab === 'telegram') && (
-            <PaymentGatewayAdmin />
+            <PaymentGatewayAdmin
+              onStatusChange={(isIncomplete) => setIsPaymentGatewayIncomplete(isIncomplete)}
+            />
           )}
 
           {/* ============================================================== */}
@@ -2962,10 +3133,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {activeTab === 'mailbox' && (
             <MailboxManager
               onNavigateTab={(tab) => {
-                setActiveTab(tab as any);
-                if (typeof window !== 'undefined') {
-                  window.history.pushState(null, '', `/dashboard?tab=${tab}`);
-                }
+                handleTabNavigation(tab as any);
               }}
               onUnreadCountChange={setUnreadMailCount}
             />
@@ -3000,8 +3168,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         isOpen={isMediaPickerOpen}
         onClose={() => setIsMediaPickerOpen(false)}
         currentUrl={profileAvatar}
+        currentPlan={currentPlan}
+        isTrialActive={isTrialActive}
+        isAdmin={isAdmin}
+        onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
         title="Choose Profile Logo from Media Library"
-        subtitle="Select an image or GIF from your library, or upload a new file directly."
+        subtitle="Select an image, sticker, or GIF from presets or your library, or upload a file directly."
         onSelect={async (selectedUrl) => {
           setProfileAvatar(selectedUrl);
           try {
@@ -3030,10 +3202,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         isOpen={isMailboxOpen}
         onClose={() => setIsMailboxOpen(false)}
         onNavigateTab={(tab) => {
-          setActiveTab(tab as DashboardTab);
-          if (typeof window !== 'undefined') {
-            window.history.pushState(null, '', `/dashboard?tab=${tab}`);
-          }
+          handleTabNavigation(tab as DashboardTab);
         }}
         onUnreadCountChange={(count) => setUnreadMailCount(count)}
       />

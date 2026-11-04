@@ -726,13 +726,10 @@ export const HomeFeatureShowcase: React.FC = () => {
               {/* ============================================================== */}
               {/* 4. THE MESSAGES SECTION (WHAT THE DONOR SAY AT BOTTOM)         */}
               {/* ============================================================== */}
-              <div className="w-full p-3 sm:p-3.5 rounded-b-2xl bg-slate-950/95 border border-t-0 border-slate-800/90 backdrop-blur-md flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center flex-shrink-0 text-red-400">
-                  <MessageSquare size={14} className="fill-red-400/20" />
-                </div>
+              <div className="w-full p-3 sm:p-3.5 rounded-b-2xl bg-slate-950/95 border border-t-0 border-slate-800/90 backdrop-blur-md flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-slate-200 leading-snug font-sans italic truncate">
-                    &ldquo;{currentMediaClip.donorMessage}&rdquo;
+                    {currentMediaClip.donorMessage}
                   </p>
                 </div>
                 <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1 flex-shrink-0">

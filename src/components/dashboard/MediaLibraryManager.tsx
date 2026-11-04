@@ -14,33 +14,34 @@ import {
   Video,
   Volume2,
   FileText,
-  Globe,
   Play,
   Pause,
   Search,
   Sparkles,
-  Flame,
-  DollarSign,
-  Megaphone,
-  Trophy,
-  Skull,
-  Bell,
-  Activity,
-  Radio,
-  Music,
-  Gamepad2,
-  Heart,
-  Frown,
-  Zap
+  Crown,
+  Smile,
+  Film,
+  Music
 } from 'lucide-react';
 import { useModal } from '../../context/ModalContext';
-import { POPULAR_ALERT_SOUNDS, ONLINE_MEDIA_CATEGORIES, OnlineMediaItem } from '../../data/onlineMedia';
 import { mediaService, MediaItem, StorageInfo } from '../../services/mediaService';
+import {
+  PRESET_GIFS,
+  PRESET_STICKERS,
+  PRESET_SOUNDS,
+  PRESET_STICKER_GROUPS,
+  PresetMediaItem
+} from '../../data/presetsData';
+import { ProUpgradeModal } from './ProUpgradeModal';
 
 export type { MediaItem, StorageInfo };
 
 interface MediaLibraryManagerProps {
   onSelectForOverlay?: (media: MediaItem | { url: string; filename: string; _id?: string }) => void;
+  currentPlan?: 'free' | 'pro' | string;
+  isTrialActive?: boolean;
+  isAdmin?: boolean;
+  onUpgrade?: () => void;
 }
 
 export function isVideoAsset(item: Pick<MediaItem, 'fileType' | 'url' | 'filename'>): boolean {
@@ -61,30 +62,12 @@ export function isImageAsset(item: Pick<MediaItem, 'fileType' | 'url' | 'filenam
   return ft.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|avif|bmp|ico)$/i.test(name);
 }
 
-export function renderOnlineIcon(iconName: string, size = 18) {
-  switch (iconName) {
-    case 'DollarSign': return <DollarSign size={size} />;
-    case 'Sparkles': return <Sparkles size={size} />;
-    case 'Volume2': return <Volume2 size={size} />;
-    case 'Flame': return <Flame size={size} />;
-    case 'Zap': return <Zap size={size} />;
-    case 'Megaphone': return <Megaphone size={size} />;
-    case 'Trophy': return <Trophy size={size} />;
-    case 'Skull': return <Skull size={size} />;
-    case 'Bell': return <Bell size={size} />;
-    case 'AlertCircle': return <AlertCircle size={size} />;
-    case 'Activity': return <Activity size={size} />;
-    case 'Radio': return <Radio size={size} />;
-    case 'Music': return <Music size={size} />;
-    case 'Gamepad2': return <Gamepad2 size={size} />;
-    case 'Heart': return <Heart size={size} />;
-    case 'Frown': return <Frown size={size} />;
-    default: return <Volume2 size={size} />;
-  }
-}
-
 export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
-  onSelectForOverlay
+  onSelectForOverlay,
+  currentPlan,
+  isTrialActive,
+  isAdmin,
+  onUpgrade
 }) => {
   const { showConfirm, showAlert } = useModal();
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => mediaService.getCachedMedia());
@@ -96,20 +79,48 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(() => mediaService.getCachedStorage());
 
-  // Online Media State
-  const [activeSection, setActiveSection] = useState<'uploads' | 'online'>('uploads');
-  const [onlineCategory, setOnlineCategory] = useState<string>('All');
-  const [onlineSearch, setOnlineSearch] = useState<string>('');
-  const [playingOnlineId, setPlayingOnlineId] = useState<string | null>(null);
-  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Pro Plan / Trial Guard
+  const [showProModal, setShowProModal] = useState(false);
+  const [proModalFeature, setProModalFeature] = useState('Presets Library');
 
-  const handleTogglePlayOnline = (sound: OnlineMediaItem) => {
-    if (playingOnlineId === sound.id) {
+  const isProOrTrial =
+    currentPlan === 'pro' ||
+    currentPlan === 'starter' ||
+    Boolean(isTrialActive) ||
+    Boolean(isAdmin) ||
+    storageInfo?.plan === 'pro';
+
+  // Section Selector: 'uploads' | 'stickers' | 'gifs' | 'sounds'
+  const [activeSection, setActiveSection] = useState<'uploads' | 'stickers' | 'gifs' | 'sounds'>('uploads');
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [stickerGroup, setStickerGroup] = useState<string>('All');
+  const [playingSoundId, setPlayingSoundId] = useState<string | null>(null);
+  const [visibleStickersCount, setVisibleStickersCount] = useState(60);
+  const [visibleGifsCount, setVisibleGifsCount] = useState(48);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setVisibleStickersCount(60);
+  }, [stickerGroup, searchQuery]);
+
+  useEffect(() => {
+    setVisibleGifsCount(48);
+  }, [searchQuery]);
+
+  const handleTogglePlaySound = (sound: PresetMediaItem, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (playingSoundId === sound.id) {
       if (activeAudioRef.current) {
         activeAudioRef.current.pause();
         activeAudioRef.current = null;
       }
-      setPlayingOnlineId(null);
+      setPlayingSoundId(null);
       return;
     }
 
@@ -120,20 +131,20 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
     const audio = new Audio(sound.url);
     activeAudioRef.current = audio;
-    setPlayingOnlineId(sound.id);
+    setPlayingSoundId(sound.id);
 
     audio.onended = () => {
-      setPlayingOnlineId(null);
+      setPlayingSoundId(null);
       activeAudioRef.current = null;
     };
     audio.onerror = () => {
-      setPlayingOnlineId(null);
+      setPlayingSoundId(null);
       activeAudioRef.current = null;
     };
 
     audio.play().catch((err) => {
       console.warn('Audio play error:', err);
-      setPlayingOnlineId(null);
+      setPlayingSoundId(null);
     });
   };
 
@@ -146,25 +157,43 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     };
   }, []);
 
-  const filteredOnlineMedia = useMemo(() => {
-    return POPULAR_ALERT_SOUNDS.filter((item) => {
-      const matchCat = onlineCategory === 'All' || item.category === onlineCategory;
-      const q = onlineSearch.trim().toLowerCase();
+  // Filtered Stickers
+  const filteredStickers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return PRESET_STICKERS.filter((item) => {
+      const matchGroup = stickerGroup === 'All' || item.group === stickerGroup;
       const matchQuery =
         !q ||
         item.name.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q) ||
         item.tags.some((t) => t.toLowerCase().includes(q));
-      return matchCat && matchQuery;
+      return matchGroup && matchQuery;
     });
-  }, [onlineCategory, onlineSearch]);
+  }, [stickerGroup, searchQuery]);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Filtered GIFs
+  const filteredGifs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return PRESET_GIFS.filter((item) => {
+      if (!q) return true;
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    });
+  }, [searchQuery]);
 
-  const getAuthHeaders = (): Record<string, string> => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
+  // Filtered Sounds
+  const filteredSounds = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return PRESET_SOUNDS.filter((item) => {
+      if (!q) return true;
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.group.toLowerCase().includes(q) ||
+        item.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    });
+  }, [searchQuery]);
 
   const fetchMedia = async (force = false) => {
     try {
@@ -184,7 +213,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   };
 
   useEffect(() => {
-    // 1. Subscribe to real-time WebSocket updates and cache events
     const unsubscribe = mediaService.subscribe((data) => {
       setMediaList(data.media || []);
       if (data.storage) {
@@ -193,7 +221,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
       setLoading(false);
     });
 
-    // 2. Fetch or revalidate in background without blocking UI
     fetchMedia(false);
 
     return () => {
@@ -214,7 +241,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    // Bounded only by total remaining storage quota (no per-upload size restriction)
     const incomingSize = Number(file.size) || 0;
     if (storageInfo && (storageInfo.usedBytes + incomingSize > storageInfo.limitBytes || incomingSize > storageInfo.remainingBytes)) {
       const totalMb = ((storageInfo.usedBytes + incomingSize) / (1024 * 1024)).toFixed(1);
@@ -283,7 +309,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
       type: 'danger',
       confirmText: 'Delete Asset',
       onConfirm: async () => {
-        // Optimistically prune from state immediately
         setMediaList((prev) => prev.filter((m) => m._id !== id));
         try {
           await mediaService.deleteMedia(id);
@@ -310,6 +335,26 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handlePresetAction = (item: PresetMediaItem, action: 'copy' | 'use') => {
+    if (!isProOrTrial) {
+      setProModalFeature(
+        item.category === 'Stickers'
+          ? '500+ Sticker Presets'
+          : item.category === 'GIFs'
+          ? '100 Popular GIF Presets'
+          : 'Sound Presets'
+      );
+      setShowProModal(true);
+      return;
+    }
+
+    if (action === 'copy') {
+      copyUrl(item.url, item.id);
+    } else if (action === 'use' && onSelectForOverlay) {
+      onSelectForOverlay({ url: item.url, filename: item.name, _id: item.id });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -317,51 +362,113 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <ImageIcon size={22} className="text-cyan-400" />
-            Media Library
+            Media Library &amp; Presets
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Upload MP4, GIF, MP3, WAV, PNG, JPG, WEBP for your live OBS overlays &amp; soundboard.
+            Upload custom MP4/GIF/audio, or use 500+ Facebook stickers, 100 alert GIFs, and stream sounds.
           </p>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-mono">
           <span className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300">
-            {mediaList.length} {mediaList.length === 1 ? 'file' : 'files'}
+            {mediaList.length} uploads
+          </span>
+          <span className="px-2.5 py-1 rounded-md bg-pink-950/80 text-pink-300 border border-pink-800/50">
+            500 Stickers
           </span>
           <span className="px-2.5 py-1 rounded-md bg-cyan-950 text-cyan-300">
-            All Formats Supported
+            100 GIFs
           </span>
         </div>
       </div>
 
-      {/* Section Switcher Tabs: Icon-only for My Uploads and Online Media */}
-      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-800 w-fit">
+      {/* Plan Pro Notice Banner for Free Users */}
+      {!isProOrTrial && (
+        <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-200">
+          <div className="flex items-center gap-2.5">
+            <Crown size={18} className="text-amber-400 fill-amber-400 flex-shrink-0 animate-pulse" />
+            <span>
+              <strong>500 Stickers, 100 GIFs &amp; Sounds</strong> are available for free to <strong>Pro Plan</strong> and <strong>Trial</strong> users. Free users will see the yellow King icon.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setProModalFeature('Presets Library (500 Stickers, 100 GIFs & Sounds)');
+              setShowProModal(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors cursor-pointer shadow-md shadow-amber-500/20 flex-shrink-0"
+          >
+            <Crown size={13} className="fill-current" />
+            <span>Upgrade to Pro</span>
+          </button>
+        </div>
+      )}
+
+      {/* Section Switcher Tabs */}
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-800 w-fit overflow-x-auto no-scrollbar">
         <button
           type="button"
           onClick={() => setActiveSection('uploads')}
-          title={`My Uploads (${mediaList.length})`}
-          aria-label={`My Uploads (${mediaList.length})`}
-          className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
             activeSection === 'uploads'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Layers size={16} />
+          <Layers size={14} />
+          <span>My Uploads ({mediaList.length})</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveSection('online')}
-          title="Online Media Library"
-          aria-label="Online Media Library"
-          className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
-            activeSection === 'online'
+          onClick={() => setActiveSection('stickers')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            activeSection === 'stickers'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Globe size={16} />
+          <Smile size={14} />
+          <span>Stickers (500)</span>
+          {!isProOrTrial && (
+            <Crown size={12} className="text-amber-400 fill-amber-400" />
+          )}
+          <span className="px-1.5 py-0.2 rounded bg-pink-500 text-white text-[8px] font-bold uppercase tracking-wider">
+            FB
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('gifs')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            activeSection === 'gifs'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Film size={14} />
+          <span>GIFs (100)</span>
+          {!isProOrTrial && (
+            <Crown size={12} className="text-amber-400 fill-amber-400" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('sounds')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            activeSection === 'sounds'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Music size={14} />
+          <span>Sounds ({PRESET_SOUNDS.length})</span>
+          {!isProOrTrial && (
+            <Crown size={12} className="text-amber-400 fill-amber-400" />
+          )}
         </button>
       </div>
 
@@ -391,7 +498,9 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
         </div>
       )}
 
-      {/* My Uploads Section */}
+      {/* ============================================================== */}
+      {/* SECTION 1: MY UPLOADS                                          */}
+      {/* ============================================================== */}
       {activeSection === 'uploads' && (
         <div className="space-y-6 animate-fadeIn">
           {/* Storage Quota Usage Bar */}
@@ -504,7 +613,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                 <ImageIcon size={32} className="mx-auto text-slate-600" />
                 <div className="text-sm font-medium text-slate-400">No media uploaded yet</div>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Upload your stream MP4 clips, reaction GIFs, MP3/WAV sound effects, or logos above.
+                  Upload your stream MP4 clips, reaction GIFs, MP3/WAV sound effects, or switch to the Stickers and GIFs tabs above.
                 </p>
               </div>
             ) : (
@@ -520,7 +629,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                       key={item._id}
                       className="group rounded-xl bg-slate-900/60 border border-slate-800/80 overflow-hidden flex flex-col justify-between hover:border-slate-700 transition-all shadow-sm"
                     >
-                      {/* Media Preview (Image / GIF / Video / Audio) */}
                       <div className="w-full aspect-square bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden p-3">
                         {isVideo ? (
                           <video
@@ -559,7 +667,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                         </span>
                       </div>
 
-                      {/* Info Bar */}
                       <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
                         <div>
                           <div className="text-xs font-semibold text-slate-200 truncate" title={item.filename}>
@@ -571,12 +678,11 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                           </div>
                         </div>
 
-                        {/* Actions */}
                         <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between gap-1">
                           <button
                             onClick={() => copyUrl(item.url, item._id)}
                             title="Copy Public URL"
-                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono flex items-center gap-1 transition-colors flex-1 justify-center"
+                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono flex items-center gap-1 transition-colors flex-1 justify-center cursor-pointer"
                           >
                             {copiedId === item._id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                             <span>{copiedId === item._id ? 'Copied' : 'Copy'}</span>
@@ -586,7 +692,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                             <button
                               onClick={() => onSelectForOverlay(item)}
                               title="Use in Overlay"
-                              className="px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/60 text-[11px] font-mono flex items-center gap-1 transition-colors"
+                              className="px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/60 text-[11px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               <Layers size={12} />
                               <span>Use</span>
@@ -596,7 +702,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                           <button
                             onClick={() => handleDelete(item._id, item.filename)}
                             title="Delete from Cloud"
-                            className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -611,54 +717,65 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
         </div>
       )}
 
-      {/* Online Media Section */}
-      {activeSection === 'online' && (
+      {/* ============================================================== */}
+      {/* SECTION 2: STICKERS (500)                                      */}
+      {/* ============================================================== */}
+      {activeSection === 'stickers' && (
         <div className="space-y-6 animate-fadeIn">
-          {/* Search & Category Filter Toolbar */}
+          {/* Search & Filter Toolbar */}
           <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              {/* Search Bar */}
-              <div className="relative flex-1">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={onlineSearch}
-                  onChange={(e) => setOnlineSearch(e.target.value)}
-                  placeholder="Search sounds by title, tags (e.g. money, mario, meme, discord, nuke)..."
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
-                />
-                {onlineSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setOnlineSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+            <div className="relative">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search 500+ stickers (e.g. pusheen, cat, pepe, panda, troll, doge)..."
+                className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
-            {/* Category Pills */}
+            {/* Sticker Groups */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-              {ONLINE_MEDIA_CATEGORIES.map((cat) => {
-                const count =
-                  cat === 'All'
-                    ? POPULAR_ALERT_SOUNDS.length
-                    : POPULAR_ALERT_SOUNDS.filter((s) => s.category === cat).length;
-                const isSelected = onlineCategory === cat;
+              <button
+                type="button"
+                onClick={() => setStickerGroup('All')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                  stickerGroup === 'All'
+                    ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                    : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <span>All Stickers</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-slate-950/30">
+                  {PRESET_STICKERS.length}
+                </span>
+              </button>
+
+              {PRESET_STICKER_GROUPS.map((grp) => {
+                const count = PRESET_STICKERS.filter((s) => s.group === grp).length;
+                const isSelected = stickerGroup === grp;
                 return (
                   <button
-                    key={cat}
+                    key={grp}
                     type="button"
-                    onClick={() => setOnlineCategory(cat)}
+                    onClick={() => setStickerGroup(grp)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                       isSelected
-                        ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/20'
+                        ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
                         : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
                     }`}
                   >
-                    <span>{cat}</span>
+                    <span>{grp}</span>
                     <span
                       className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
                         isSelected ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
@@ -672,29 +789,294 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
             </div>
           </div>
 
-          {/* Sound Cards Grid */}
-          {filteredOnlineMedia.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl bg-slate-900/30 border border-slate-800 text-slate-400 space-y-2">
-              <Search size={28} className="mx-auto text-slate-600" />
-              <div className="text-sm font-semibold text-white">No alert sounds match your filter</div>
-              <p className="text-xs text-slate-500">
-                Try searching for something else or reset category filters.
-              </p>
+          {/* Stickers Grid */}
+          {filteredStickers.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-slate-900/30 border border-slate-800 text-slate-400">
+              No stickers found matching &ldquo;{searchQuery}&rdquo;
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3.5">
+                {filteredStickers.slice(0, visibleStickersCount).map((sticker) => {
+                  const isCopied = copiedId === sticker.id;
+
+                  return (
+                    <div
+                      key={sticker.id}
+                      onClick={() => !isProOrTrial && handlePresetAction(sticker, 'copy')}
+                      className="group rounded-xl bg-slate-900/60 border border-slate-800/80 overflow-hidden flex flex-col justify-between hover:border-slate-700 transition-all shadow-sm relative"
+                    >
+                      <div className="aspect-square w-full p-2.5 flex items-center justify-center relative bg-slate-950">
+                        <img
+                          src={sticker.url}
+                          alt={sticker.name}
+                          loading="lazy"
+                          className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-200"
+                        />
+
+                        {/* Yellow King Icon for Free Users (Pro Plan Required) */}
+                        {!isProOrTrial && (
+                          <div
+                            title="Pro Plan Required"
+                            className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/25 border border-amber-400/60 shadow-lg shadow-amber-500/20 backdrop-blur-md"
+                          >
+                            <Crown size={12} className="text-amber-400 fill-amber-400" />
+                            <span className="text-[9px] font-black tracking-wider text-amber-300 font-mono">PRO</span>
+                          </div>
+                        )}
+
+                        {sticker.isAnimated && (
+                          <span className="absolute bottom-1.5 left-1.5 px-1 py-0.2 rounded bg-black/75 text-[8px] font-mono font-bold text-pink-400 uppercase">
+                            GIF
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-2 bg-[#0B0F19] border-t border-slate-800/60 space-y-1.5">
+                        <div className="text-[11px] font-semibold text-slate-200 truncate" title={sticker.name}>
+                          {sticker.name}
+                        </div>
+
+                        <div className="flex items-center gap-1 pt-1 border-t border-slate-800/40">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePresetAction(sticker, 'copy');
+                            }}
+                            title="Copy Image URL"
+                            className="flex-1 py-1 px-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                          >
+                            {!isProOrTrial ? (
+                              <>
+                                <Crown size={11} className="text-amber-400 fill-amber-400" />
+                                <span>Unlock</span>
+                              </>
+                            ) : isCopied ? (
+                              <>
+                                <Check size={11} className="text-emerald-400" />
+                                <span>Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={11} />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+
+                          {onSelectForOverlay && isProOrTrial && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePresetAction(sticker, 'use');
+                              }}
+                              title="Use in Alert Box"
+                              className="px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 text-[10px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <Layers size={11} />
+                              <span>Use</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {visibleStickersCount < filteredStickers.length && (
+                <div className="pt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleStickersCount((prev) => Math.min(prev + 60, filteredStickers.length))}
+                    className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-cyan-300 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Load More Stickers ({visibleStickersCount} of {filteredStickers.length})
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* SECTION 3: GIFS (100)                                          */}
+      {/* ============================================================== */}
+      {activeSection === 'gifs' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Search */}
+          <div className="relative">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search 100 popular alert GIFs..."
+              className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+            />
+            {searchQuery && (
               <button
                 type="button"
-                onClick={() => {
-                  setOnlineSearch('');
-                  setOnlineCategory('All');
-                }}
-                className="mt-2 px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 text-xs font-mono hover:bg-cyan-500/30 transition-colors cursor-pointer"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
               >
-                Reset Filters
+                ✕
               </button>
+            )}
+          </div>
+
+          {/* GIFs Grid */}
+          {filteredGifs.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-slate-900/30 border border-slate-800 text-slate-400">
+              No GIFs found matching &ldquo;{searchQuery}&rdquo;
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {filteredGifs.slice(0, visibleGifsCount).map((gif) => {
+                  const isCopied = copiedId === gif.id;
+
+                  return (
+                    <div
+                      key={gif.id}
+                      onClick={() => !isProOrTrial && handlePresetAction(gif, 'copy')}
+                      className="group rounded-xl bg-slate-900/60 border border-slate-800/80 overflow-hidden flex flex-col justify-between hover:border-slate-700 transition-all shadow-sm relative"
+                    >
+                      <div className="aspect-square w-full p-2.5 flex items-center justify-center relative bg-slate-950">
+                        <img
+                          src={gif.url}
+                          alt={gif.name}
+                          loading="lazy"
+                          className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                        />
+
+                        {/* Yellow King Icon for Free Users (Pro Plan Required) */}
+                        {!isProOrTrial && (
+                          <div
+                            title="Pro Plan Required"
+                            className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/25 border border-amber-400/60 shadow-lg shadow-amber-500/20 backdrop-blur-md"
+                          >
+                            <Crown size={12} className="text-amber-400 fill-amber-400" />
+                            <span className="text-[9px] font-black tracking-wider text-amber-300 font-mono">PRO</span>
+                          </div>
+                        )}
+
+                        <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono font-bold text-cyan-300 uppercase">
+                          GIF
+                        </span>
+                      </div>
+
+                      <div className="p-2.5 bg-[#0B0F19] border-t border-slate-800/60 space-y-1.5">
+                        <div className="text-[11px] font-semibold text-slate-200 truncate" title={gif.name}>
+                          {gif.name}
+                        </div>
+                        <div className="text-[10px] font-mono text-slate-500">
+                          {gif.group}
+                        </div>
+
+                        <div className="flex items-center gap-1 pt-1.5 border-t border-slate-800/40">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePresetAction(gif, 'copy');
+                            }}
+                            title="Copy GIF URL"
+                            className="flex-1 py-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                          >
+                            {!isProOrTrial ? (
+                              <>
+                                <Crown size={11} className="text-amber-400 fill-amber-400" />
+                                <span>Unlock</span>
+                              </>
+                            ) : isCopied ? (
+                              <>
+                                <Check size={11} className="text-emerald-400" />
+                                <span>Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={11} />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+
+                          {onSelectForOverlay && isProOrTrial && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePresetAction(gif, 'use');
+                              }}
+                              title="Use in Alert Box"
+                              className="px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 text-[10px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <Layers size={11} />
+                              <span>Use</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {visibleGifsCount < filteredGifs.length && (
+                <div className="pt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleGifsCount((prev) => Math.min(prev + 48, filteredGifs.length))}
+                    className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-cyan-300 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Load More GIFs ({visibleGifsCount} of {filteredGifs.length})
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* SECTION 4: SOUNDS (18)                                         */}
+      {/* ============================================================== */}
+      {activeSection === 'sounds' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Search */}
+          <div className="relative">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search sounds (e.g. kaching, victory, coin, meme, oof)..."
+              className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Sound Cards */}
+          {filteredSounds.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-slate-900/30 border border-slate-800 text-slate-400">
+              No sounds found matching &ldquo;{searchQuery}&rdquo;
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredOnlineMedia.map((sound) => {
-                const isPlaying = playingOnlineId === sound.id;
+              {filteredSounds.map((sound) => {
+                const isPlaying = playingSoundId === sound.id;
                 const isCopied = copiedId === sound.id;
 
                 return (
@@ -706,44 +1088,38 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                         : 'border-slate-800/90 hover:border-slate-700 hover:shadow-md'
                     }`}
                   >
-                    {/* Top Preview Area */}
                     <div className="p-4 bg-gradient-to-b from-slate-900/80 to-transparent flex flex-col gap-3">
                       <div className="flex items-start justify-between gap-3">
-                        {/* Icon Avatar */}
-                        <div
-                          className="w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-105 shadow-inner"
-                          style={{
-                            backgroundColor: `${sound.color}20`,
-                            borderColor: `${sound.color}50`,
-                            borderWidth: 1,
-                            color: sound.color
-                          }}
-                        >
-                          {renderOnlineIcon(sound.icon, 22)}
+                        <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 flex-shrink-0">
+                          <Volume2 size={22} />
                         </div>
 
-                        {/* Category & Duration Badges */}
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
-                            {sound.category}
-                          </span>
-                          <span className="text-[10px] font-mono text-cyan-400 font-bold">
-                            {sound.durationSeconds}s
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {!isProOrTrial && (
+                            <div
+                              title="Pro Plan Required"
+                              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/25 border border-amber-400/60 shadow-sm"
+                            >
+                              <Crown size={12} className="text-amber-400 fill-amber-400" />
+                              <span className="text-[9px] font-black text-amber-300 font-mono">PRO</span>
+                            </div>
+                          )}
+
+                          <span className="text-[10px] font-mono text-cyan-400 font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                            {sound.duration || 1.5}s
                           </span>
                         </div>
                       </div>
 
-                      {/* Title & Description */}
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors line-clamp-1">
                           {sound.name}
                         </h4>
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                          {sound.description}
+                        <p className="text-xs text-slate-400 font-mono">
+                          {sound.group}
                         </p>
                       </div>
 
-                      {/* Tags */}
                       <div className="flex flex-wrap gap-1">
                         {sound.tags.slice(0, 3).map((tag) => (
                           <span
@@ -756,12 +1132,10 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                       </div>
                     </div>
 
-                    {/* Bottom Action Controls */}
                     <div className="p-3 bg-slate-950/80 border-t border-slate-800/80 flex items-center gap-2">
-                      {/* Play / Pause Interactive Button */}
                       <button
                         type="button"
-                        onClick={() => handleTogglePlayOnline(sound)}
+                        onClick={(e) => handleTogglePlaySound(sound, e)}
                         className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                           isPlaying
                             ? 'bg-cyan-400 text-slate-950 shadow-md shadow-cyan-400/30 animate-pulse'
@@ -781,21 +1155,25 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                         )}
                       </button>
 
-                      {/* Copy Link Button */}
                       <button
                         type="button"
-                        onClick={() => copyUrl(sound.url, sound.id)}
+                        onClick={() => handlePresetAction(sound, 'copy')}
                         title="Copy Audio URL"
                         className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
                       >
-                        {isCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                        {!isProOrTrial ? (
+                          <Crown size={14} className="text-amber-400 fill-amber-400" />
+                        ) : isCopied ? (
+                          <Check size={14} className="text-emerald-400" />
+                        ) : (
+                          <Copy size={14} />
+                        )}
                       </button>
 
-                      {/* Select / Use in Overlay Button */}
-                      {onSelectForOverlay && (
+                      {onSelectForOverlay && isProOrTrial && (
                         <button
                           type="button"
-                          onClick={() => onSelectForOverlay({ url: sound.url, filename: sound.name, _id: sound.id })}
+                          onClick={() => handlePresetAction(sound, 'use')}
                           title="Use in Alert Box"
                           className="px-3 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/80 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
@@ -811,6 +1189,15 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
           )}
         </div>
       )}
+
+      {/* Pro Plan Required Modal */}
+      <ProUpgradeModal
+        isOpen={showProModal}
+        onClose={() => setShowProModal(false)}
+        featureName={proModalFeature}
+        title="This preset is available on Pro plan"
+        telegramContactUrl="https://t.me/hchenheng"
+      />
     </div>
   );
 };

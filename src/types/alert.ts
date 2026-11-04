@@ -100,7 +100,7 @@ export interface LiveAlertPayload {
   showImage?: boolean;
   fontFamily?: string;
   fontSize?: number;
-  layoutMode?: 'top' | 'left' | 'right' | 'banner';
+  layoutMode?: 'top' | 'left' | 'right' | 'bottom' | 'banner';
   animationStyle?: string;
   capcutAnimation?: string;
   capcutLabel?: string;
@@ -114,6 +114,12 @@ export interface LiveAlertPayload {
   videoAlertEnabled?: boolean;
   videoMinTipAmount?: number;
   videoMaxDurationSeconds?: number;
+  videoHeaderColor?: string;
+  videoHeaderBgColor?: string;
+  videoFooterColor?: string;
+  videoFooterBgColor?: string;
+  videoHeaderTextAlign?: 'left' | 'center' | 'justify' | 'right';
+  videoFooterTextAlign?: 'left' | 'center' | 'justify' | 'right';
   isVideoTest?: boolean;
   directVideo?: boolean;
   isTest?: boolean;

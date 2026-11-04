@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: 'No subscription tier configured by streamer' }, { status: 400 });
       }
 
-      const cleanSubName = String(subscriberName).trim();
+      const cleanSubName = String(subscriberName).slice(0, 25).trim();
       const youtubeHandle = cleanSubName.replace(/^@+/, '').trim();
       const subscribedAt = new Date();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30-day membership
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
         status: 'active',
         subscribedAt,
         expiresAt,
-        donorMessage: donorMessage ? String(donorMessage).trim() : undefined,
+        donorMessage: donorMessage ? String(donorMessage).slice(0, 200).trim() : undefined,
         transactionId
       };
 
