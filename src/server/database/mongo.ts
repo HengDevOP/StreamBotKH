@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import { generateSecureOverlayToken } from '../utils/crypto';
 
 export interface UserDoc {
   _id?: ObjectId;
@@ -453,6 +454,8 @@ export interface AlertConditionTierDoc {
   amountColor?: string;
   layoutMode?: string;
   animationStyle?: string;
+  capcutAnimation?: string;
+  capcutLabel?: string;
 }
 
 export interface AlertBoxDoc {
@@ -482,6 +485,8 @@ export interface AlertBoxDoc {
   messageTemplate?: string;
   layoutMode?: string;
   animationStyle?: string;
+  capcutAnimation?: string;
+  capcutLabel?: string;
   conditions?: AlertConditionTierDoc[];
   createdAt: Date;
   updatedAt: Date;
@@ -523,6 +528,13 @@ export interface VoiceCloneDoc {
   voiceName: string;
   sampleUrl: string;
   sampleDurationSeconds: number;
+  baseModel?: 'kiritts-male' | 'kiritts-female';
+  pitch?: string; // e.g. "+5Hz" or "-6Hz"
+  rate?: string;  // e.g. "+0%" or "+4%"
+  volume?: string;
+  detectedGender?: 'male' | 'female';
+  averagePitchHz?: number;
+  timbre?: string;
   clonedAt: Date;
 }
 
@@ -1271,7 +1283,7 @@ export async function initMongo() {
       ]
     }).toArray();
     for (const u of usersMissingTokens) {
-      const newToken = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+      const newToken = generateSecureOverlayToken();
       await db.collection('users').updateOne({ _id: u._id }, { $set: { overlayToken: newToken, updatedAt: new Date() } });
     }
 

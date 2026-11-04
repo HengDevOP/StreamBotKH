@@ -298,8 +298,24 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
+    // Track test alert rate limit per socket connection
+    const socketAlertTimes: number[] = [];
+
     // Test alert trigger from dashboard
     socket.on('trigger:test_alert', async (payload: AlertPayload & { overlayToken: string }) => {
+      const now = Date.now();
+      // Sliding window: max 5 test alerts per 5 seconds, max 20 per minute per socket
+      while (socketAlertTimes.length > 0 && now - socketAlertTimes[0] > 60000) {
+        socketAlertTimes.shift();
+      }
+      const recentFiveSec = socketAlertTimes.filter(t => now - t < 5000).length;
+      if (recentFiveSec >= 5 || socketAlertTimes.length >= 20) {
+        console.warn(`[Socket RateLimit] Blocked test alert spam from socket ${socket.id}`);
+        socket.emit('error', { message: 'Test alert rate limit reached. Please wait a few seconds before triggering another test.' });
+        return;
+      }
+      socketAlertTimes.push(now);
+
       const token = payload?.overlayToken || 'demo-token';
       console.log(`[Socket] Triggering test alert for overlay token: ${token}`);
       const testPayload: any = {
@@ -323,11 +339,6 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
 
       // Also broadcast to streamer's master overlay room and active overlay token
       broadcastToAllStreamerRooms(token, 'donation:alert', testPayload);
-
-      // If token is specific, also send to demo-token room in case preview overlay uses demo-token
-      if (token !== 'demo-token') {
-        io?.to('overlay:demo-token').emit('donation:alert', testPayload);
-      }
     });
 
     // Notify overlay room that a donation alert has finished so video sources can start immediately

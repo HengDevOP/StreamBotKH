@@ -12,8 +12,14 @@ const ALLOWED_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
 export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || 'demo-streamer-id-1001';
-    const streamerUsername = authUser?.username || '';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please sign in to upload payment KHQR.' },
+        { status: 401 }
+      );
+    }
+    const streamerId = authUser.id;
+    const streamerUsername = authUser.username || '';
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;

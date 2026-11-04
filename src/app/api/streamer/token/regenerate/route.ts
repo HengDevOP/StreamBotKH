@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
+import { generateSecureOverlayToken } from '@/server/utils/crypto';
 import {
   getUsersCollection,
   getOverlayTokenHistoryCollection,
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     });
 
     const oldToken = currentStreamer?.overlayToken || currentStreamer?.overlay_token;
-    const newToken = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+    const newToken = generateSecureOverlayToken();
 
     // Save old and new tokens to history collection in MongoDB
     try {

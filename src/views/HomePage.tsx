@@ -22,6 +22,7 @@ import {
   Heart
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
+import { HomeFeatureShowcase } from '../components/home/HomeFeatureShowcase';
 
 interface HomePageProps {
   onNavigate: (page: string, params?: any) => void;
@@ -38,6 +39,117 @@ interface VerifiedCreatorCard {
 }
 
 const GLOW_COLORS = ['#00F0FF', '#EC4899', '#10B981', '#A855F7', '#F59E0B', '#38BDF8'];
+
+const DEFAULT_VERIFIED_CREATORS: VerifiedCreatorCard[] = [
+  {
+    name: 'Heng Farm 07',
+    username: 'hengfarm07',
+    tag: 'MLBB & Variety Live',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=hengfarm07',
+    supporters: '1.4k Tips',
+    verified: true,
+    glowColor: '#00F0FF'
+  },
+  {
+    name: 'Neon Master VIP',
+    username: 'neonstreamer',
+    tag: 'Valorant & Tournament Caster',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=neonmaster',
+    supporters: '3.8k Tips',
+    verified: true,
+    glowColor: '#EC4899'
+  },
+  {
+    name: 'Sokha Gaming KH',
+    username: 'sokhagaming',
+    tag: 'PUBG Mobile Cambodia',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=sokhagaming',
+    supporters: '890 Tips',
+    verified: true,
+    glowColor: '#10B981'
+  },
+  {
+    name: 'Dara Esports Live',
+    username: 'daraesports',
+    tag: 'FPS & Community Tournaments',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=daraesports',
+    supporters: '2.1k Tips',
+    verified: true,
+    glowColor: '#A855F7'
+  },
+  {
+    name: 'Sreypov Streamer',
+    username: 'sreypovlive',
+    tag: 'Just Chatting & Mobile Legends',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=sreypovlive',
+    supporters: '950 Tips',
+    verified: true,
+    glowColor: '#F59E0B'
+  },
+  {
+    name: 'ProGamerKH',
+    username: 'progamerkh',
+    tag: 'Apex Legends & Warzone 2',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=progamerkh',
+    supporters: '1.2k Tips',
+    verified: true,
+    glowColor: '#38BDF8'
+  },
+  {
+    name: 'KompongGamer',
+    username: 'komponggamer',
+    tag: 'GTA V Roleplay Cambodia',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=komponggamer',
+    supporters: '1.7k Tips',
+    verified: true,
+    glowColor: '#10B981'
+  },
+  {
+    name: 'CyberNinja99',
+    username: 'cyberninja99',
+    tag: 'Speedruns & Retro Games',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=cyberninja99',
+    supporters: '720 Tips',
+    verified: true,
+    glowColor: '#00F0FF'
+  },
+  {
+    name: 'Piseth Live Cast',
+    username: 'pisethlive',
+    tag: 'E-Sports Analyst & Podcast',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=pisethlive',
+    supporters: '2.5k Tips',
+    verified: true,
+    glowColor: '#EC4899'
+  },
+  {
+    name: 'Apsara Gaming TV',
+    username: 'apsaragaming',
+    tag: 'League of Legends & Wild Rift',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=apsaragaming',
+    supporters: '1.9k Tips',
+    verified: true,
+    glowColor: '#8B5CF6'
+  },
+  {
+    name: 'Vannak Playz',
+    username: 'vannakplayz',
+    tag: 'Free Fire & Mobile Tournaments',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=vannakplayz',
+    supporters: '1.1k Tips',
+    verified: true,
+    glowColor: '#06B6D4'
+  },
+  {
+    name: 'Phnom Penh Streamers',
+    username: 'ppstreamers',
+    tag: 'IRL Street Food & City Walks',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=ppstreamers',
+    supporters: '3.1k Tips',
+    verified: true,
+    glowColor: '#F43F5E'
+  }
+];
 
 // Helper to repeat items to ensure seamless CSS marquee loop without gaps
 const repeatForMarquee = (items: VerifiedCreatorCard[], targetMin = 8): VerifiedCreatorCard[] => {
@@ -65,31 +177,38 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   }, []);
 
   const allVerifiedCards = React.useMemo<VerifiedCreatorCard[]>(() => {
-    return (dbVerifiedStreamers || []).map((s, idx) => ({
+    const dbCards: VerifiedCreatorCard[] = (dbVerifiedStreamers || []).map((s, idx) => ({
       name: s.displayName || s.username,
       username: s.username,
-      tag: s.bio || 'Verified Streamer',
-      avatar: s.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${s.username}`,
-      supporters: s.totalTips > 0 ? `${s.totalTips} Tips` : 'Verified Creator',
+      tag: s.bio || (s.plan === 'pro' ? 'PRO Verified Streamer' : 'Verified Content Creator'),
+      avatar: s.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(s.username)}`,
+      supporters: s.supporters || (s.totalTips > 0 ? `${s.totalTips} ${s.totalTips === 1 ? 'Tip' : 'Tips'}` : (s.plan === 'pro' ? 'PRO Creator' : 'Verified Creator')),
       verified: true,
       glowColor: GLOW_COLORS[idx % GLOW_COLORS.length]
     }));
+
+    // If real database streamers exist, prioritize and use real database data exclusively!
+    if (dbCards.length > 0) {
+      return dbCards;
+    }
+
+    return DEFAULT_VERIFIED_CREATORS;
   }, [dbVerifiedStreamers]);
 
   const lane1List = React.useMemo(() => {
     if (allVerifiedCards.length === 0) return [];
-    const source = allVerifiedCards.length > 1
+    const source = allVerifiedCards.length >= 6
       ? allVerifiedCards.filter((_, i) => i % 2 === 0)
       : allVerifiedCards;
-    return repeatForMarquee(source, 6);
+    return repeatForMarquee(source, 8);
   }, [allVerifiedCards]);
 
   const lane2List = React.useMemo(() => {
     if (allVerifiedCards.length === 0) return [];
-    const source = allVerifiedCards.length > 1
+    const source = allVerifiedCards.length >= 6
       ? allVerifiedCards.filter((_, i) => i % 2 === 1)
-      : allVerifiedCards;
-    return repeatForMarquee(source, 6);
+      : [...allVerifiedCards].reverse();
+    return repeatForMarquee(source, 8);
   }, [allVerifiedCards]);
 
   const renderStreamerCard = (creator: VerifiedCreatorCard, key: string) => (
@@ -142,10 +261,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
   return (
     <div className="relative overflow-hidden space-y-28 pb-32">
-      {/* Dynamic Ambient Radiant Background Glows */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[550px] ambient-glow-cyan pointer-events-none -z-10" />
-      <div className="absolute top-[650px] right-0 w-[600px] h-[600px] ambient-glow-pink pointer-events-none -z-10" />
-      <div className="absolute top-[1600px] left-0 w-[600px] h-[600px] ambient-glow-purple pointer-events-none -z-10" />
+      {/* Animated Subtle Ambient Gradient Background (adds soft living color) */}
+      <div className="absolute inset-0 animated-home-gradient pointer-events-none -z-10" />
+
+      {/* Dynamic Ambient Radiant Background Glows with Smooth Aurora Drift */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[600px] ambient-glow-cyan animate-aurora-1 pointer-events-none -z-10 opacity-75" />
+      <div className="absolute top-[650px] -right-16 w-[650px] h-[650px] ambient-glow-pink animate-aurora-2 pointer-events-none -z-10 opacity-65" />
+      <div className="absolute top-[1600px] -left-16 w-[700px] h-[700px] ambient-glow-purple animate-aurora-3 pointer-events-none -z-10 opacity-70" />
+      <div className="absolute top-[2800px] right-[10%] w-[650px] h-[650px] ambient-glow-cyan animate-aurora-1 pointer-events-none -z-10 opacity-55" />
 
       {/* Cyber Grid Pattern */}
       <div className="absolute inset-0 cyber-grid opacity-25 pointer-events-none -z-10" />
@@ -228,135 +351,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </section>
       )}
 
-      {/* ===================== HOW IT WORKS PIPELINE ===================== */}
-      <section className="max-w-6xl mx-auto px-4 space-y-10 sm:space-y-12 relative">
-        {/* Subtle Ambient Radial Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-cyan-500/5 blur-[120px] pointer-events-none rounded-full" />
-
-        <div className="text-center space-y-3 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-mono font-bold tracking-widest uppercase">
-            <Sparkles size={13} className="text-cyan-400" />
-            <span>ZERO CONFIGURATION SETUP</span>
-          </div>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-white font-['Chakra_Petch'] uppercase tracking-tight">
-            HOW STREAMBOTKH WORKS
-          </h2>
-          <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto leading-relaxed">
-            From zero to broadcasting in less than 2 minutes. No complicated banking merchant setup required.
-          </p>
-        </div>
-
-        {/* 3 Steps Pipeline Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-          {/* Step 1 */}
-          <div className="p-7 rounded-2xl bg-[#090D18]/90 border border-slate-800/80 hover:border-cyan-500/40 backdrop-blur-sm transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1 shadow-lg hover:shadow-cyan-500/10 relative overflow-hidden">
-            {/* Top Accent Gradient Line */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-400/80 via-cyan-400/20 to-transparent group-hover:h-[3px] transition-all" />
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-mono font-bold text-lg group-hover:scale-105 transition-transform">
-                  01
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-cyan-400 transition-colors">
-                  <Tv size={16} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] group-hover:text-cyan-300 transition-colors">
-                  Add Browser Source to OBS
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Copy your private 60 FPS overlay link from your Streamer Deck and paste it directly into OBS Studio or Streamlabs as a transparent Browser Source.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-mono text-[11px]">
-              <span className="text-slate-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="text-cyan-300">ovl_token_••••••••</span>
-              </span>
-              <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-semibold">
-                60 FPS Overlay
-              </span>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="p-7 rounded-2xl bg-[#090D18]/90 border border-slate-800/80 hover:border-pink-500/40 backdrop-blur-sm transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1 shadow-lg hover:shadow-pink-500/10 relative overflow-hidden">
-            {/* Top Accent Gradient Line */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-pink-400/80 via-pink-400/20 to-transparent group-hover:h-[3px] transition-all" />
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-pink-400 font-mono font-bold text-lg group-hover:scale-105 transition-transform">
-                  02
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-pink-400 transition-colors">
-                  <Send size={16} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] group-hover:text-pink-300 transition-colors">
-                  Share Your Tip Page Link
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Pin your custom URL (<code className="text-white font-semibold">streambotkh.com/@username</code>) in your chat or bio. Viewers select their bank and enter their cheer message.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-mono text-[11px]">
-              <span className="text-slate-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
-                <span className="text-pink-300">/@username</span>
-              </span>
-              <span className="px-2 py-0.5 rounded bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[10px] font-semibold">
-                Bakong KHQR
-              </span>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div className="p-7 rounded-2xl bg-[#090D18]/90 border border-slate-800/80 hover:border-emerald-500/40 backdrop-blur-sm transition-all duration-300 flex flex-col justify-between group hover:-translate-y-1 shadow-lg hover:shadow-emerald-500/10 relative overflow-hidden">
-            {/* Top Accent Gradient Line */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-400/80 via-emerald-400/20 to-transparent group-hover:h-[3px] transition-all" />
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-mono font-bold text-lg group-hover:scale-105 transition-transform">
-                  03
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-emerald-400 transition-colors">
-                  <Zap size={16} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] group-hover:text-emerald-300 transition-colors">
-                  Instant Alerts &amp; Direct Deposit
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  When viewers scan the Bakong KHQR code with ABA Mobile, alerts instantly flash on your stream screen, TTS reads the message, and money deposits directly to your bank.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-mono text-[11px]">
-              <span className="text-slate-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-emerald-300">Direct to Bank</span>
-              </span>
-              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
-                Live TTS &amp; Audio SFX
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ===================== INTERACTIVE 60 FPS OVERLAY SHOWCASE ===================== */}
+      <HomeFeatureShowcase />
 
       {/* ===================== FEATURE BENTO GRID ===================== */}
       <section className="max-w-6xl mx-auto px-4 space-y-12">

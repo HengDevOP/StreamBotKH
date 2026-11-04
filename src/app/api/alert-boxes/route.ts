@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 import { getAlertBoxesCollection, AlertBoxDoc, getUsersCollection, getAlertSettingsCollection } from '@/server/database/mongo';
 import { getAuthenticatedUser } from '@/server/auth';
 
@@ -57,8 +59,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const authUser = getAuthenticatedUser(req);
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required. Please sign in to create alert boxes.' },
+        { status: 401 }
+      );
+    }
+    const userId = authUser.id;
     const body = await req.json();
-    const userId = await resolveStreamerUserId(req, body.token);
     const {
       name,
       minAmountCondition = 0.01,
@@ -84,6 +93,8 @@ export async function POST(req: NextRequest) {
       messageTemplate,
       layoutMode = 'top',
       animationStyle = 'fade',
+      capcutAnimation = '',
+      capcutLabel = '',
       conditions
     } = body;
 
@@ -93,6 +104,29 @@ export async function POST(req: NextRequest) {
 
     const sanitizedName = String(name).trim().slice(0, 16);
     const resolvedMinAmount = Math.max(0.001, Number(minAmountCondition) > 0 ? Number(minAmountCondition) : 0.01);
+
+    const cleanSampleUrl = (url?: string): string | undefined => {
+      if (!url) return undefined;
+      if (typeof url === 'string' && url.startsWith('data:audio')) {
+        try {
+          const matches = url.match(/^data:audio\/([a-zA-Z0-9_-]+);base64,(.+)$/);
+          if (matches && matches[2]) {
+            const ext = matches[1] === 'webm' ? 'webm' : matches[1] === 'mp3' ? 'mp3' : 'wav';
+            const fileName = `box_voice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+            const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'voices');
+            if (!fs.existsSync(uploadDir)) {
+              fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            fs.writeFileSync(path.join(uploadDir, fileName), Buffer.from(matches[2], 'base64'));
+            return `/uploads/voices/${fileName}`;
+          }
+        } catch (_) {}
+        return '';
+      }
+      return url.length < 250 ? url : '';
+    };
+
+    const sanitizedSampleUrl = cleanSampleUrl(clonedVoiceSampleUrl);
 
     const sanitizedConditions = Array.isArray(conditions) && conditions.length > 0
       ? conditions.map((c: any, idx: number) => ({
@@ -112,13 +146,15 @@ export async function POST(req: NextRequest) {
           ttsMinAmount: Number(c?.ttsMinAmount ?? ttsMinAmount ?? 0.01),
           ttsType: c?.ttsType || ttsType || 'google',
           clonedVoiceName: c?.clonedVoiceName ?? clonedVoiceName,
-          clonedVoiceSampleUrl: c?.clonedVoiceSampleUrl ?? clonedVoiceSampleUrl,
+          clonedVoiceSampleUrl: cleanSampleUrl(c?.clonedVoiceSampleUrl) ?? sanitizedSampleUrl,
           textTemplate: c?.textTemplate || textTemplate,
           textColor: c?.textColor || textColor,
           donorColor: c?.donorColor || donorColor || undefined,
           amountColor: c?.amountColor || amountColor || undefined,
           layoutMode: c?.layoutMode || layoutMode || 'top',
-          animationStyle: c?.animationStyle || animationStyle || 'fade'
+          animationStyle: c?.animationStyle || animationStyle || 'fade',
+          capcutAnimation: c?.capcutAnimation || capcutAnimation || '',
+          capcutLabel: c?.capcutLabel || capcutLabel || ''
         }))
       : [
           {
@@ -138,13 +174,15 @@ export async function POST(req: NextRequest) {
             ttsMinAmount: Number(ttsMinAmount) || 0.01,
             ttsType: ttsType || 'google',
             clonedVoiceName,
-            clonedVoiceSampleUrl,
+            clonedVoiceSampleUrl: sanitizedSampleUrl,
             textTemplate,
             textColor,
             donorColor: donorColor || undefined,
             amountColor: amountColor || undefined,
             layoutMode,
-            animationStyle
+            animationStyle,
+            capcutAnimation,
+            capcutLabel
           }
         ];
 
@@ -177,6 +215,8 @@ export async function POST(req: NextRequest) {
       messageTemplate,
       layoutMode,
       animationStyle,
+      capcutAnimation,
+      capcutLabel,
       conditions: sanitizedConditions,
       createdAt: new Date(),
       updatedAt: new Date()

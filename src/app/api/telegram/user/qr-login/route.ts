@@ -7,11 +7,13 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId =
-      authUser?.id ||
-      req.nextUrl.searchParams.get('streamerId') ||
-      req.nextUrl.searchParams.get('streamer_id') ||
-      'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required.' },
+        { status: 401 }
+      );
+    }
+    const streamerId = authUser.id;
 
     const result = await telegramUserManager.pollQrLogin(streamerId);
     return NextResponse.json(result);
@@ -27,7 +29,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required.' },
+        { status: 401 }
+      );
+    }
+    const streamerId = authUser.id;
     const body = await req.json().catch(() => ({}));
 
     if (body?.action === 'password') {
@@ -65,7 +73,13 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required.' },
+        { status: 401 }
+      );
+    }
+    const streamerId = authUser.id;
 
     const result = await telegramUserManager.cancelQrLogin(streamerId);
     return NextResponse.json(result);

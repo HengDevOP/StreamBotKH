@@ -219,8 +219,18 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       }
 
       let audioUrl = '';
-      if (type === 'cloned' && clonedUrl) {
-        audioUrl = clonedUrl;
+      if (type === 'cloned') {
+        // High quality Neural KiriTTS Voice Clone matching streamer's exact voice
+        const safeSamplePath =
+          clonedUrl && !clonedUrl.startsWith('data:') && clonedUrl.length < 250
+            ? clonedUrl
+            : '';
+
+        audioUrl = `/api/tts?type=cloned&clonedVoiceName=${encodeURIComponent(
+          alert.clonedVoiceName || ''
+        )}&clonedVoiceSampleUrl=${encodeURIComponent(
+          safeSamplePath
+        )}&text=${encodeURIComponent(speechText.slice(0, 250))}`;
       } else {
         // Use our high-fidelity Neural TTS API (Edge-TTS Piseth & Sreymom Khmer models)
         audioUrl = `/api/tts?type=${encodeURIComponent(type)}&text=${encodeURIComponent(

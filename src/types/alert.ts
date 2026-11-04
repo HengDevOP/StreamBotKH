@@ -36,7 +36,9 @@ export interface AlertConditionTier {
   donorColor?: string;
   amountColor?: string;
   layoutMode?: 'top' | 'left' | 'right' | 'banner';
-  animationStyle?: 'bounce' | 'fade' | 'pulse' | 'glitch' | 'slide' | 'zoom';
+  animationStyle?: string;
+  capcutAnimation?: string;
+  capcutLabel?: string;
 }
 
 export interface AlertBox {
@@ -65,7 +67,9 @@ export interface AlertBox {
   amountColor?: string;
   messageTemplate?: string;
   layoutMode?: 'top' | 'left' | 'right' | 'banner';
-  animationStyle?: 'bounce' | 'fade' | 'pulse' | 'glitch' | 'slide' | 'zoom';
+  animationStyle?: string;
+  capcutAnimation?: string;
+  capcutLabel?: string;
   conditions?: AlertConditionTier[];
   createdAt: string;
   updatedAt: string;
@@ -97,7 +101,9 @@ export interface LiveAlertPayload {
   fontFamily?: string;
   fontSize?: number;
   layoutMode?: 'top' | 'left' | 'right' | 'banner';
-  animationStyle?: 'bounce' | 'fade' | 'pulse' | 'glitch' | 'slide' | 'zoom';
+  animationStyle?: string;
+  capcutAnimation?: string;
+  capcutLabel?: string;
   overlayToken?: string;
   videoUrl?: string;
   videoTitle?: string;

@@ -11,7 +11,10 @@ import { telegramUserManager } from '@backend/telegram/telegramUserClient';
 export async function GET(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || req.nextUrl.searchParams.get('streamerId') || req.nextUrl.searchParams.get('streamer_id') || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
+    }
+    const streamerId = authUser.id;
 
     const status = await telegramUserManager.getStatus(streamerId);
     if (!status.isConnected) {
@@ -66,7 +69,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
+    }
+    const streamerId = authUser.id;
 
     const body = await req.json().catch(() => ({}));
     const { chatId, title, username } = body;
@@ -143,7 +149,10 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || req.nextUrl.searchParams.get('streamerId') || req.nextUrl.searchParams.get('streamer_id') || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
+    }
+    const streamerId = authUser.id;
 
     const url = new URL(req.url);
     let id = url.searchParams.get('id');

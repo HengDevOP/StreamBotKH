@@ -50,6 +50,8 @@ import { useAudio } from '../../hooks/useAudio';
 import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
 import { VoiceClonerModal } from './VoiceClonerModal';
+import { AlertPresetModal } from './AlertPresetModal';
+import { AlertPreset } from '../../data/donationAlertPresets';
 import { MediaItem } from './MediaLibraryManager';
 import { mediaService } from '../../services/mediaService';
 import { normalizeCurrencyAndSymbols, khmerNumberToWords } from '../../utils/ttsHelper';
@@ -243,7 +245,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [textTemplate, setTextTemplate] = useState<string>(
     firstTier.textTemplate || '{donator} donated {amount} through superchat!'
   );
-  const [animationStyle, setAnimationStyle] = useState<'fade' | 'pulse' | 'glitch' | 'slide' | 'zoom'>(
+  const [animationStyle, setAnimationStyle] = useState<string>(
     firstTier.animationStyle === 'bounce' ? 'fade' : (firstTier.animationStyle as any) || 'fade'
   );
 
@@ -261,6 +263,23 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [isVoiceClonerOpen, setIsVoiceClonerOpen] = useState(false);
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+
+  const handleApplyPreset = (preset: AlertPreset | null) => {
+    if (!preset) return;
+    setTemplateStyle(preset.templateStyle);
+    setAnimationStyle(preset.capcutAnimation || (preset.animationStyle === 'bounce' ? 'fade' : preset.animationStyle));
+    setGlowColor(preset.glowColor);
+    setMediaUrl(preset.mediaUrl);
+    setSoundUrl(preset.soundUrl);
+    setFontFamily(preset.fontFamily);
+    if (preset.fontSize) setFontSize(preset.fontSize);
+    if (preset.textColor) setTextColor(preset.textColor);
+    if (preset.donorColor) setDonorColor(preset.donorColor);
+    if (preset.amountColor) setAmountColor(preset.amountColor);
+    if (preset.textTemplate) setTextTemplate(preset.textTemplate);
+    if (preset.layoutMode) setLayoutMode(preset.layoutMode);
+  };
   
   // Storage Media Picker & In-Modal Upload State
   const [storagePickerMode, setStoragePickerMode] = useState<'image' | 'sound' | null>(null);
@@ -879,8 +898,20 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       const fullSpeech = normalizedMsg ? `${headline}. ${normalizedMsg}` : headline;
 
       let ttsAudioUrl = '';
-      if (ttsType === 'cloned' && clonedVoiceSampleUrl) {
-        ttsAudioUrl = clonedVoiceSampleUrl;
+      if (ttsType === 'cloned') {
+        // High quality Neural KiriTTS Voice Clone matching streamer's exact voice
+        const safeSamplePath =
+          clonedVoiceSampleUrl &&
+          !clonedVoiceSampleUrl.startsWith('data:') &&
+          clonedVoiceSampleUrl.length < 250
+            ? clonedVoiceSampleUrl
+            : '';
+
+        ttsAudioUrl = `/api/tts?type=cloned&clonedVoiceName=${encodeURIComponent(
+          clonedVoiceName || ''
+        )}&clonedVoiceSampleUrl=${encodeURIComponent(
+          safeSamplePath
+        )}&text=${encodeURIComponent(fullSpeech.slice(0, 250))}`;
       } else {
         // High quality Neural TTS synthesizing Piseth, Sreymom, Jenny, Christopher voices
         ttsAudioUrl = `/api/tts?type=${encodeURIComponent(ttsType)}&text=${encodeURIComponent(
@@ -1550,6 +1581,30 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                     </div>
                   </div>
 
+                  {/* 100+ Style Presets Instant Gallery Launcher */}
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-500/15 via-purple-500/15 to-amber-500/10 border border-cyan-400/40 flex items-center justify-between gap-3 shadow-lg shadow-cyan-500/10">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 rounded-xl bg-cyan-400/20 text-cyan-300 shrink-0">
+                        <Sparkles size={18} className="animate-pulse" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-white font-['Chakra_Petch']">
+                          100+ Unique Style Presets
+                        </h4>
+                        <p className="text-[10px] text-slate-300 font-mono truncate">
+                          Preview live animations &amp; apply to this tier
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsPresetModalOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-mono font-extrabold text-xs shrink-0 shadow-md shadow-cyan-400/20 cursor-pointer"
+                    >
+                      Browse 100+
+                    </button>
+                  </div>
+
                   {/* Card Hologram Frame Style */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-mono font-bold text-slate-300 block">
@@ -1579,24 +1634,79 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                   </div>
 
                   {/* Entrance Animation Style */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-mono font-bold text-slate-300 block">
-                      Entrance Animation Style
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-slate-300 block">
+                        Entrance Animation Style
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsPresetModalOpen(true)}
+                        className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer font-bold"
+                      >
+                        <Sparkles size={12} />
+                        <span>Browse 100 Presets</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Selection Dropdown */}
+                    <div className="relative">
+                      <select
+                        value={animationStyle}
+                        onChange={(e) => setAnimationStyle(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-400 text-white font-mono text-xs focus:outline-none cursor-pointer appearance-none"
+                      >
+                        <optgroup label="🎬 CapCut Video Animations">
+                          <option value="capcut-zoom-in">🎬 Zoom 1 Rebound (CapCut)</option>
+                          <option value="capcut-zoom-out">🎬 Zoom 2 Into Focus (CapCut)</option>
+                          <option value="capcut-shake">🎬 Camera Shake Impact (CapCut)</option>
+                          <option value="capcut-3d-flip-x">🎬 3D Flip Horizontal (CapCut)</option>
+                          <option value="capcut-3d-flip-y">🎬 3D Flip Vertical (CapCut)</option>
+                          <option value="capcut-swing-down">🎬 Pendulum Swing Down (CapCut)</option>
+                          <option value="capcut-wobble-jello">🎬 Jello Elastic Bounce (CapCut)</option>
+                          <option value="capcut-roll-in">🎬 360 Spin Roll In (CapCut)</option>
+                          <option value="capcut-glitch-split">🎬 RGB Glitch Split (CapCut)</option>
+                          <option value="capcut-slide-up-bounce">🎬 Slide Up Spring Bounce (CapCut)</option>
+                          <option value="capcut-slide-down-bounce">🎬 Cascade Drop Bounce (CapCut)</option>
+                          <option value="capcut-flash-burst">🎬 White Flash Strobe (CapCut)</option>
+                          <option value="capcut-origami-fold">🎬 Origami Paper Unfold (CapCut)</option>
+                          <option value="capcut-spiral-zoom">🎬 Spiral In Vortex (CapCut)</option>
+                          <option value="capcut-heartbeat-pulse">🎬 Heartbeat Double Pulse (CapCut)</option>
+                          <option value="capcut-pop-spring">🎬 Pop Up Spring (CapCut)</option>
+                          <option value="capcut-skew-dash">🎬 Skew Speed Dash (CapCut)</option>
+                          <option value="capcut-shutter-slice">🎬 Cinema Shutter Slice (CapCut)</option>
+                          <option value="capcut-whirlpool">🎬 Whirlpool Vortex (CapCut)</option>
+                        </optgroup>
+                        <optgroup label="✨ Classic Alert Animations">
+                          <option value="fade">✨ Smooth Fade In / Out</option>
+                          <option value="pulse">⚡ Cyber Pulse Glow</option>
+                          <option value="glitch">👾 Digital Glitch Warp</option>
+                          <option value="slide">➡️ Smooth Lateral Slide</option>
+                        </optgroup>
+                      </select>
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                        ▼
+                      </div>
+                    </div>
+
+                    {/* Quick Popular Pills */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-mono scrollbar-none no-scrollbar">
                       {[
-                        { id: 'fade', label: 'Smooth Fade In / Out' },
-                        { id: 'pulse', label: 'Cyber Pulse' },
-                        { id: 'glitch', label: 'Glitch Pop' },
-                        { id: 'slide', label: 'Smooth Slide' }
+                        { id: 'capcut-shake', label: 'Shake' },
+                        { id: 'capcut-zoom-in', label: 'Zoom Rebound' },
+                        { id: 'capcut-3d-flip-x', label: '3D Flip' },
+                        { id: 'capcut-glitch-split', label: 'RGB Glitch' },
+                        { id: 'capcut-wobble-jello', label: 'Jello Bounce' },
+                        { id: 'capcut-swing-down', label: 'Swing' },
+                        { id: 'fade', label: 'Fade' }
                       ].map((anim) => (
                         <button
                           key={anim.id}
                           type="button"
-                          onClick={() => setAnimationStyle(anim.id as any)}
-                          className={`py-2 px-2.5 rounded-xl border text-xs font-mono font-semibold transition-all text-left ${
+                          onClick={() => setAnimationStyle(anim.id)}
+                          className={`px-2.5 py-1 rounded-lg border whitespace-nowrap transition-all cursor-pointer ${
                             animationStyle === anim.id
-                              ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold'
                               : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                           }`}
                         >
@@ -2098,7 +2208,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                             <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
                               <div>
                                 <div className="font-mono font-bold text-xs text-white">{clonedVoiceName}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">Trained Streamer Voice Sample</div>
+                                <div className="text-[10px] text-cyan-300 font-mono">KiriTTS Neural Cloned Voice Model</div>
                               </div>
                               <Button
                                 type="button"
@@ -2107,13 +2217,13 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                                 onClick={() => setIsVoiceClonerOpen(true)}
                                 className="text-[10px] font-mono"
                               >
-                                Re-record (≥10s)
+                                Re-record (15s)
                               </Button>
                             </div>
                           ) : (
                             <div className="space-y-2">
                               <p className="text-[11px] text-slate-400">
-                                Record at least 10 seconds of clear speech to let our AI clone your voice for stream donation announcements!
+                                Record 15 seconds of clean voice to calibrate your Neural KiriTTS voice clone for stream donation announcements!
                               </p>
                               <Button
                                 type="button"
@@ -2123,7 +2233,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                                 className="w-full bg-cyan-400 text-slate-950 font-bold font-mono text-xs"
                               >
                                 <Mic size={13} />
-                                <span>Record Speech & Clone Voice (≥10s)</span>
+                                <span>Record 15s Clean Voice &amp; Clone Voice</span>
                               </Button>
                             </div>
                           )}
@@ -2746,6 +2856,15 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
           setTtsType('cloned');
           setIsVoiceClonerOpen(false);
         }}
+      />
+
+      {/* ============================================================== */}
+      {/* 100 UNIQUE STYLE PRESETS GALLERY MODAL                         */}
+      {/* ============================================================== */}
+      <AlertPresetModal
+        isOpen={isPresetModalOpen}
+        onClose={() => setIsPresetModalOpen(false)}
+        onSelectPreset={handleApplyPreset}
       />
 
       {/* ============================================================== */}

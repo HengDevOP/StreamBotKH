@@ -12,7 +12,8 @@ import {
   Trash2,
   Mic,
   Monitor,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
@@ -21,6 +22,8 @@ import { useAudio } from '../../hooks/useAudio';
 import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
 import { DonationAlertStudio } from './DonationAlertStudio';
+import { AlertPresetModal } from './AlertPresetModal';
+import { AlertPreset } from '../../data/donationAlertPresets';
 
 interface DonationAlertsManagerProps {
   streamerToken?: string;
@@ -47,6 +50,8 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
   const [newBoxName, setNewBoxName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreatingBox, setIsCreatingBox] = useState(false);
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<AlertPreset | null>(null);
   const createInputRef = useRef<HTMLInputElement | null>(null);
 
   // Active target selected for studio management (null = list view)
@@ -177,6 +182,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
         headers.Authorization = `Bearer ${authToken}`;
       }
 
+      const preset = selectedPreset;
       const res = await fetch('/api/alert-boxes', {
         method: 'POST',
         headers,
@@ -184,21 +190,23 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
           name: trimmed,
           minAmountCondition: 0.01,
           isEnabled: true,
-          templateStyle: 'neon-box',
+          templateStyle: preset?.templateStyle || 'neon-box',
           showImage: true,
-          mediaUrl: 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
-          layoutMode: 'top',
-          soundUrl: '/sounds/cash-register-kaching.mp3',
+          mediaUrl: preset?.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+          layoutMode: preset?.layoutMode || 'top',
+          soundUrl: preset?.soundUrl || '/sounds/cash-register-kaching.mp3',
           soundVolume: 0.85,
           durationSeconds: 8,
-          glowColor: '#00F0FF',
-          fontFamily: 'Kh Ang Bokor',
-          fontSize: 28,
-          textColor: '#FFFFFF',
-          donorColor: 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)',
-          amountColor: 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)',
-          textTemplate: '{donator} donated {amount} through superchat!',
-          animationStyle: 'fade',
+          glowColor: preset?.glowColor || '#00F0FF',
+          fontFamily: preset?.fontFamily || 'Kh Ang Bokor',
+          fontSize: preset?.fontSize || 28,
+          textColor: preset?.textColor || '#FFFFFF',
+          donorColor: preset?.donorColor || 'linear-gradient(135deg, #00F0FF 0%, #7000FF 100%)',
+          amountColor: preset?.amountColor || 'linear-gradient(135deg, #FFE600 0%, #FF5E00 100%)',
+          textTemplate: preset?.textTemplate || '{donator} donated {amount} through superchat!',
+          animationStyle: preset?.capcutAnimation || preset?.animationStyle || 'fade',
+          capcutAnimation: preset?.capcutAnimation || '',
+          capcutLabel: preset?.capcutLabel || '',
           ttsEnabled: true,
           ttsMinAmount: 0.01,
           ttsType: 'google',
@@ -211,6 +219,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
         setAlertBoxes((prev) => [...prev, data.alertBox]);
         setIsCreateModalOpen(false);
         setNewBoxName('');
+        setSelectedPreset(null);
       } else {
         setCreateError(data.error || 'Failed to create donation box.');
       }
@@ -649,6 +658,93 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
               )}
             </div>
 
+            {/* Style Preset Selector Section */}
+            <div className="space-y-2 pt-2 border-t border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-cyan-400" />
+                  <span>Choose Style Preset (Optional)</span>
+                </label>
+                <span className="text-[11px] font-mono text-slate-500">
+                  {selectedPreset ? '1 style chosen' : 'Leave blank for default'}
+                </span>
+              </div>
+
+              {selectedPreset ? (
+                <div className="p-3 rounded-xl bg-slate-900/90 border border-cyan-400/50 flex items-center justify-between gap-3 shadow-lg shadow-cyan-500/10">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img
+                      src={selectedPreset.mediaUrl}
+                      alt={selectedPreset.name}
+                      className="w-10 h-10 object-contain rounded-lg bg-black/50 p-1 border border-slate-800 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase"
+                          style={{
+                            backgroundColor: `${selectedPreset.badgeColor}22`,
+                            color: selectedPreset.badgeColor
+                          }}
+                        >
+                          {selectedPreset.badge}
+                        </span>
+                        <h4 className="text-xs font-bold text-white font-['Chakra_Petch'] truncate">
+                          {selectedPreset.name}
+                        </h4>
+                      </div>
+                      <p className="text-[10px] font-mono text-cyan-300 truncate flex items-center gap-1">
+                        <span>🎬 {selectedPreset.capcutLabel}</span>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-400">{selectedPreset.category}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsPresetModalOpen(true)}
+                      className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 text-cyan-300 text-xs font-mono font-semibold transition-colors cursor-pointer"
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPreset(null)}
+                      title="Clear preset and leave blank"
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsPresetModalOpen(true)}
+                  className="w-full p-3.5 rounded-xl bg-gradient-to-r from-slate-900 via-cyan-950/20 to-purple-950/20 hover:from-slate-850 hover:via-cyan-950/30 hover:to-purple-950/30 border border-dashed border-slate-700 hover:border-cyan-400/60 text-slate-300 hover:text-white transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500/20 transition-colors">
+                      <Sparkles size={16} />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-xs font-bold font-['Chakra_Petch'] group-hover:text-cyan-300 transition-colors">
+                        Choose from 100 Unique Style Presets
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        Gaming, Cyberpunk, Anime, Luxury, Retro &amp; more
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-cyan-400 group-hover:translate-x-0.5 transition-transform">
+                    Browse &rarr;
+                  </span>
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center justify-end gap-2.5 pt-1">
               <Button
                 type="button"
@@ -674,6 +770,19 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
           </form>
         </div>
       )}
+
+      {/* 100 Unique Style Presets Gallery Modal */}
+      <AlertPresetModal
+        isOpen={isPresetModalOpen}
+        onClose={() => setIsPresetModalOpen(false)}
+        selectedPresetId={selectedPreset?.id || null}
+        onSelectPreset={(preset) => {
+          setSelectedPreset(preset);
+          if (preset && !newBoxName.trim()) {
+            setNewBoxName(preset.name.slice(0, 16));
+          }
+        }}
+      />
     </div>
   );
 };

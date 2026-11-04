@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   generateToken,
+  isAllowedRedirectOrigin,
   isGoogleOAuthConfigured,
   resolveFrontendOrigin,
   resolveRedirectUri,
@@ -15,10 +16,10 @@ export async function GET(req: NextRequest) {
   if (stateParam) {
     try {
       const parsed = JSON.parse(Buffer.from(stateParam, 'base64url').toString('utf8'));
-      if (parsed.origin && /^https?:\/\//i.test(parsed.origin)) {
+      if (parsed.origin && isAllowedRedirectOrigin(parsed.origin, req)) {
         frontendOrigin = parsed.origin.replace(/\/$/, '');
       }
-      if (parsed.redirectUri && /^https?:\/\//i.test(parsed.redirectUri)) {
+      if (parsed.redirectUri && isAllowedRedirectOrigin(parsed.redirectUri, req)) {
         redirectUri = parsed.redirectUri;
       }
     } catch {

@@ -1767,62 +1767,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           ) : (
             <>
           {/* ============================================================== */}
-          {/* 7-DAY FREE TRIAL BANNERS                                       */}
-          {/* ============================================================== */}
-          {trialSettings?.isEnabled && ((!hasUsedTrial && currentPlan === 'free') || isAdmin) && !isTrialActive && (
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-cyan-500/10 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl shadow-amber-500/5">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shrink-0 shadow-lg shadow-amber-500/10">
-                  <Gift size={22} className="animate-bounce" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                      {trialSettings.durationDays || 7}-Day Free Pro Trial Available!
-                    </h3>
-                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      SPECIAL OFFER
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Admin has unlocked a free {trialSettings.durationDays || 7}-day Pro trial! Experience all Pro widgets, overlays, alert boxes, and 100MB storage at $0.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={claimingTrial}
-                onClick={handleClaimTrial}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-lg shadow-amber-500/20"
-              >
-                <Sparkles size={14} />
-                <span>{claimingTrial ? 'Activating...' : `Start Free ${trialSettings.durationDays || 7}-Day Trial`}</span>
-              </button>
-            </div>
-          )}
-
-          {isTrialActive && (
-            <div className="px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-cyan-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-                <span className="text-amber-300 font-bold uppercase tracking-wide">
-                  7-Day Free Pro Trial Active
-                </span>
-                <span className="text-slate-300">
-                  • Full Pro plan features unlocked ({trialRemainingDays} days left)
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab('billing')}
-                className="text-xs text-cyan-300 hover:text-cyan-200 underline font-semibold cursor-pointer shrink-0"
-              >
-                View Plans &amp; Billing &rarr;
-              </button>
-            </div>
-          )}
-
-          {/* ============================================================== */}
           {/* TAB 1: OVERVIEW & HUD                                          */}
           {/* ============================================================== */}
           {activeTab === 'overview' && (

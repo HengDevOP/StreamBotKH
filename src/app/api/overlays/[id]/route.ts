@@ -57,7 +57,13 @@ export async function DELETE(
 ) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const userId = authUser?.id || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please sign in.' },
+        { status: 401 }
+      );
+    }
+    const userId = authUser.id;
 
     const overlayId = params.id;
     if (!overlayId || !ObjectId.isValid(overlayId)) {
@@ -99,7 +105,13 @@ export async function PATCH(
 ) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const userId = authUser?.id || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please sign in.' },
+        { status: 401 }
+      );
+    }
+    const userId = authUser.id;
 
     const overlayId = params.id;
     if (!overlayId || !ObjectId.isValid(overlayId)) {

@@ -13,19 +13,61 @@ import fs from 'fs';
 import { NextRequest } from 'next/server';
 import { initMongo, cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo } from '../src/server/database/mongo';
 import { initSocketServer } from '../src/server/services/socketService';
+import { globalRateLimiterMiddleware } from '../src/server/utils/rateLimiter';
 
 const app = express();
-const server = http.createServer(app);
+const server = http.createServer({ maxHeaderSize: 65536 }, app);
 
 // Keep-alive timeouts to prevent idle connection stalls
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
 
-// CORS support for OBS Studio, external origins & Vite dev server
+// CORS configuration: allow OBS Studio, local development, and configured production origins
+const allowedOrigins = [
+  process.env.NEXT_PUBLIC_APP_URL,
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()) : [])
+].filter(Boolean);
+
 app.use(cors({
-  origin: true,
+  origin: (requestOrigin, callback) => {
+    // Requests with no origin (e.g. mobile apps, curl, OBS Browser Source)
+    if (!requestOrigin || requestOrigin === 'null') {
+      return callback(null, true);
+    }
+
+    try {
+      const parsed = new URL(requestOrigin);
+      // Whitelist local development ports
+      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+        return callback(null, true);
+      }
+
+      // Whitelist configured production / deployment domains
+      const isAllowed = allowedOrigins.some(ao => {
+        try {
+          return new URL(ao!).host.toLowerCase() === parsed.host.toLowerCase();
+        } catch {
+          return false;
+        }
+      });
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+    } catch (e) {}
+
+    // Disallow unknown external origins from making credentialed requests
+    return callback(new Error(`CORS blocked for untrusted origin: ${requestOrigin}`), false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
+}));
+
+// 0. Global Rate Limiter & Anti-Flood Shield (protects against DDoS, scraping, and brute force)
+app.use(globalRateLimiterMiddleware({
+  windowMs: 60000,
+  maxRequests: 180,
+  autoBanThreshold: 350
 }));
 
 // Body parsers

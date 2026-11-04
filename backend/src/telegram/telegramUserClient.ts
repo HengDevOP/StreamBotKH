@@ -21,6 +21,7 @@ import {
   cleanupExpiredPendingDonationsMongo
 } from '../../../src/server/database/mongo';
 import { ObjectId } from 'mongodb';
+import { encryptTelegramSession, decryptTelegramSession, maskPhoneNumber, generateSecureOverlayToken } from '../../../src/server/utils/crypto';
 
 // ============================================================================
 // FIX GramJS PING_INTERVAL_TO_WAKE_UP BUG:
@@ -219,7 +220,8 @@ class TelegramUserClientManager {
   }
 
   public createClient(session: StringSession | string, apiId: number, apiHash: string): TelegramClient {
-    const s = typeof session === 'string' ? new StringSession(session) : session;
+    const rawSession = typeof session === 'string' ? decryptTelegramSession(session) : session;
+    const s = typeof rawSession === 'string' ? new StringSession(rawSession) : rawSession;
     const client = new TelegramClient(s, apiId, apiHash, {
       connectionRetries: Infinity,
       autoReconnect: true,
@@ -327,7 +329,7 @@ class TelegramUserClientManager {
               phoneNumber: cleanPhone,
               pendingPhone: cleanPhone,
               pendingHash: sendResult.phoneCodeHash,
-              sessionString: pendingSession,
+              sessionString: encryptTelegramSession(pendingSession),
               apiId,
               apiHash,
               isConnected: false,
@@ -384,11 +386,8 @@ class TelegramUserClientManager {
       const clean = phoneNumber.replace(/[\s\-\(\)]/g, '');
       pending = this.pendingAuth.get(clean) || this.pendingAuth.get('+' + clean.replace(/^\+/, ''));
     }
-    if (!pending && this.pendingAuth.size > 0) {
-      pending = this.pendingAuth.values().next().value;
-    }
 
-    // 2. Fallback: Restore from MongoDB or SQLite if memory was purged or compiled separately
+    // 2. Fallback: Restore from MongoDB if memory was purged or reloaded
     if (!pending) {
       console.log(`🔍 [TelegramJS] Checking MongoDB for pending login: streamerId=${streamerId}, hash=${phoneCodeHash}...`);
       try {
@@ -405,7 +404,8 @@ class TelegramUserClientManager {
           const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
           const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
 
-          const restoredClient = this.createClient(doc.sessionString, apiId, apiHash);
+          const plainSession = decryptTelegramSession(doc.sessionString);
+          const restoredClient = this.createClient(plainSession, apiId, apiHash);
           await restoredClient.connect();
 
           pending = {
@@ -563,7 +563,8 @@ class TelegramUserClientManager {
         }
       }
 
-      const sessionString = client.session.save() as unknown as string;
+      const rawSessionString = client.session.save() as unknown as string;
+      const sessionString = encryptTelegramSession(rawSessionString);
       const displayName = user?.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : pending.phoneNumber;
 
       // Save authenticated GramJS session in MongoDB
@@ -669,7 +670,8 @@ class TelegramUserClientManager {
       ? `@${user.username}`
       : phoneNumber || 'Connected Streamer';
 
-    const sessionString = client.session.save() as unknown as string;
+    const rawSessionString = client.session.save() as unknown as string;
+    const sessionString = encryptTelegramSession(rawSessionString);
 
     try {
       const sessionsCol = await getTelegramSessionsCollection();
@@ -1309,7 +1311,7 @@ class TelegramUserClientManager {
       if (targetStreamer) {
         // Ensure streamer has a valid overlayToken
         if (!targetStreamer.overlayToken && !targetStreamer.overlay_token) {
-          const newTok = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+          const newTok = generateSecureOverlayToken();
           targetStreamer.overlayToken = newTok;
           try {
             const usersCol = await getUsersCollection();
@@ -1760,7 +1762,8 @@ class TelegramUserClientManager {
         if (doc && doc.sessionString && !doc.isSimulation && !doc.sessionString.startsWith('sim_session')) {
           const apiId = doc.apiId ? Number(doc.apiId) : (process.env.TELEGRAM_API_ID ? parseInt(process.env.TELEGRAM_API_ID, 10) : 32427800);
           const apiHash = doc.apiHash || process.env.TELEGRAM_API_HASH || '8f8e70605256a4e08a81bd5e45481ceb';
-          const client = this.createClient(doc.sessionString, apiId, apiHash);
+          const plainSession = decryptTelegramSession(doc.sessionString);
+          const client = this.createClient(plainSession, apiId, apiHash);
           await client.connect();
           if (await client.isUserAuthorized()) {
             this.attachMessageListener(streamerId, client);
@@ -1943,7 +1946,7 @@ class TelegramUserClientManager {
 
     return {
       isConnected: hasActiveClient || hasSession,
-      phoneNumber,
+      phoneNumber: phoneNumber ? maskPhoneNumber(phoneNumber) : undefined,
       userName,
       monitoredChats: chats,
       isSimulation,
@@ -2009,10 +2012,12 @@ class TelegramUserClientManager {
           continue;
         }
 
-        if (seenSessions.has(doc.sessionString) || (doc.phoneNumber && seenPhones.has(doc.phoneNumber))) {
+        const plainSession = decryptTelegramSession(doc.sessionString);
+        if (seenSessions.has(plainSession) || seenSessions.has(doc.sessionString) || (doc.phoneNumber && seenPhones.has(doc.phoneNumber))) {
           console.warn(`⚠️ [MongoDB] Skipping duplicate session for [${doc.streamerId}] to prevent AUTH_KEY_DUPLICATED.`);
           continue;
         }
+        seenSessions.add(plainSession);
         seenSessions.add(doc.sessionString);
         if (doc.phoneNumber) seenPhones.add(doc.phoneNumber);
 
@@ -2021,7 +2026,7 @@ class TelegramUserClientManager {
 
         try {
           console.log(`⚡ [MongoDB] Restoring GramJS session for streamer [${doc.streamerId}] (${doc.phoneNumber || ''})...`);
-          const client = this.createClient(doc.sessionString, apiId, apiHash);
+          const client = this.createClient(plainSession, apiId, apiHash);
           await client.connect();
 
           if (await client.isUserAuthorized()) {

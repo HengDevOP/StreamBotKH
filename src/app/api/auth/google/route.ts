@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { getUsersCollection, getOverlaysCollection, getAlertSettingsCollection, getPaymentSettingsCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
+import { getJwtSecret } from '@/server/auth';
+import { generateSecureOverlayToken } from '@/server/utils/crypto';
 
 function reloadEnv() {
   const savedPort = process.env.PORT;
@@ -12,11 +14,55 @@ function reloadEnv() {
   }
 }
 
+export function isAllowedRedirectOrigin(candidateOrigin: string, req?: NextRequest): boolean {
+  if (!candidateOrigin || typeof candidateOrigin !== 'string') return false;
+  try {
+    const parsed = new URL(candidateOrigin);
+    // Allow localhost and 127.0.0.1 on any port (local dev)
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      return true;
+    }
+
+    // Allow configured app URL
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').trim();
+    if (appUrl) {
+      try {
+        const appParsed = new URL(appUrl);
+        if (appParsed.host.toLowerCase() === parsed.host.toLowerCase()) {
+          return true;
+        }
+      } catch (e) {}
+    }
+
+    // Allow current request host if provided
+    if (req) {
+      const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || req.nextUrl?.host;
+      if (host && host.toLowerCase() === parsed.host.toLowerCase()) {
+        return true;
+      }
+    }
+
+    // Allow explicitly whitelisted origins from ALLOWED_ORIGINS env
+    const allowedEnv = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+    for (const allowed of allowedEnv) {
+      try {
+        const allowedParsed = new URL(allowed);
+        if (allowedParsed.host.toLowerCase() === parsed.host.toLowerCase()) {
+          return true;
+        }
+      } catch (e) {}
+    }
+  } catch (e) {
+    return false;
+  }
+  return false;
+}
+
 export function generateToken(user: { id: string; username: string; email: string }) {
   reloadEnv();
   return jwt.sign(
     { id: user.id, username: user.username, email: user.email },
-    process.env.JWT_SECRET || 'streamneon_super_secret_jwt_key_2026',
+    getJwtSecret(),
     { expiresIn: '30d' }
   );
 }
@@ -35,12 +81,12 @@ export function isGoogleOAuthConfigured(): boolean {
 
 export function resolveFrontendOrigin(req: NextRequest): string {
   const queryOrigin = req.nextUrl.searchParams.get('origin');
-  if (queryOrigin && /^https?:\/\//i.test(queryOrigin)) {
+  if (queryOrigin && isAllowedRedirectOrigin(queryOrigin, req)) {
     return queryOrigin.replace(/\/$/, '');
   }
 
   const headerOrigin = req.headers.get('origin');
-  if (headerOrigin && /^https?:\/\//i.test(headerOrigin)) {
+  if (headerOrigin && isAllowedRedirectOrigin(headerOrigin, req)) {
     return headerOrigin.replace(/\/$/, '');
   }
 
@@ -177,7 +223,7 @@ export async function upsertGoogleStreamer(profile: {
 
   // Ensure unique overlayToken
   if (!overlayToken) {
-    overlayToken = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+    overlayToken = generateSecureOverlayToken();
   }
 
   // Ensure unique pairingCode

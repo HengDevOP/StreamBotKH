@@ -76,7 +76,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
       },
       {
         title: 'Khmer & English Neural TTS + Voice Clone',
-        desc: 'Supports Google Cloud Neural TTS, KiriTTS Male/Female Cambodian voices, and 10-second custom streamer AI Voice Cloning.'
+        desc: 'Supports Google Cloud Neural TTS, KiriTTS Male/Female Cambodian voices, and 15-second custom streamer AI Voice Cloning.'
       },
       {
         title: 'Custom Fonts, Reaction GIFs & Chimes',

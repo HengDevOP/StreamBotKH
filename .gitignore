@@ -41,6 +41,8 @@ Thumbs.db
 
 # Ephemeral TTS generated audio
 public/uploads/tts/
+public/uploads/voices/*
+!public/uploads/voices/.gitkeep
 public/uploads/media/*
 !public/uploads/media/.gitkeep
 public/uploads/payment/*

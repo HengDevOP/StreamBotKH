@@ -169,15 +169,85 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
     });
   };
 
-  // Animation class mapping
-  const animClass =
-    animationStyle === 'pulse'
-      ? 'animate-pulse'
-      : 'animate-alert-fade';
+  // Animation class mapping (supports classic + CapCut video editing animations)
+  const resolveAnimationClass = () => {
+    const anim = (alert as any).capcutAnimation || animationStyle;
+    switch (anim) {
+      case 'zoom':
+      case 'zoom-in':
+      case 'capcut-zoom-in':
+        return 'animate-capcut-zoom-in';
+      case 'zoom-out':
+      case 'capcut-zoom-out':
+        return 'animate-capcut-zoom-out';
+      case 'shake':
+      case 'capcut-shake':
+        return 'animate-capcut-shake';
+      case 'flip':
+      case 'flip-x':
+      case 'capcut-3d-flip-x':
+        return 'animate-capcut-3d-flip-x';
+      case 'flip-y':
+      case 'capcut-3d-flip-y':
+        return 'animate-capcut-3d-flip-y';
+      case 'swing':
+      case 'capcut-swing-down':
+        return 'animate-capcut-swing-down';
+      case 'bounce':
+      case 'jello':
+      case 'capcut-wobble-jello':
+        return 'animate-capcut-wobble-jello';
+      case 'roll':
+      case 'capcut-roll-in':
+        return 'animate-capcut-roll-in';
+      case 'glitch':
+      case 'capcut-glitch-split':
+        return 'animate-capcut-glitch-split';
+      case 'slide':
+      case 'slide-up':
+      case 'capcut-slide-up-bounce':
+        return 'animate-capcut-slide-up-bounce';
+      case 'slide-down':
+      case 'capcut-slide-down-bounce':
+        return 'animate-capcut-slide-down-bounce';
+      case 'flash':
+      case 'capcut-flash-burst':
+        return 'animate-capcut-flash-burst';
+      case 'origami':
+      case 'capcut-origami-fold':
+        return 'animate-capcut-origami-fold';
+      case 'spiral':
+      case 'capcut-spiral-zoom':
+        return 'animate-capcut-spiral-zoom';
+      case 'pulse':
+      case 'heartbeat':
+      case 'capcut-heartbeat-pulse':
+        return 'animate-capcut-heartbeat-pulse';
+      case 'pop':
+      case 'capcut-pop-spring':
+        return 'animate-capcut-pop-spring';
+      case 'skew':
+      case 'capcut-skew-dash':
+        return 'animate-capcut-skew-dash';
+      case 'shutter':
+      case 'capcut-shutter-slice':
+        return 'animate-capcut-shutter-slice';
+      case 'whirlpool':
+      case 'capcut-whirlpool':
+        return 'animate-capcut-whirlpool';
+      case 'fade':
+        return 'animate-fadeIn';
+      default:
+        return 'animate-capcut-zoom-in';
+    }
+  };
+
+  const animClass = resolveAnimationClass();
 
   // Layout arrangement
   const isSideBySide = layoutMode === 'left' || layoutMode === 'right';
   const isRightLayout = layoutMode === 'right';
+  const isBottomLayout = layoutMode === 'bottom';
 
   // ==============================================================
   // 1. CINEMATIC VIDEO ALERT (MEDIA SHARE - STAGE 2)
@@ -233,13 +303,15 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
       <div
         className={`w-full relative p-4 bg-transparent ${
           isSideBySide
-            ? `flex ${isRightLayout ? 'flex-row-reverse' : 'flex-row'} items-center gap-4 text-left`
+            ? `flex ${isRightLayout ? 'flex-row-reverse' : 'flex-row'} items-center gap-5 text-left`
+            : isBottomLayout
+            ? 'flex flex-col-reverse items-center text-center space-y-reverse space-y-3'
             : 'flex flex-col items-center text-center space-y-2'
         }`}
       >
         {/* Reaction Mascot GIF */}
         {shouldShowImage && displayGif ? (
-          <div className={`relative flex justify-center ${isSideBySide ? 'flex-shrink-0' : 'mb-3'}`}>
+          <div className={`relative flex justify-center ${isSideBySide ? 'flex-shrink-0' : isBottomLayout ? 'mt-3' : 'mb-3'}`}>
             <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden drop-shadow-2xl">
               <img
                 src={displayGif}

@@ -5,8 +5,14 @@ import { telegramUserManager } from '@backend/telegram/telegramUserClient';
 export async function GET(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || req.nextUrl.searchParams.get('streamerId') || req.nextUrl.searchParams.get('streamer_id') || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required to view Telegram user status.' },
+        { status: 401 }
+      );
+    }
 
+    const streamerId = authUser.id;
     const status = await telegramUserManager.getStatus(streamerId);
     return NextResponse.json(status);
   } catch (err: any) {

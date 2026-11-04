@@ -119,11 +119,20 @@ export function resolveVoice(type?: string, text?: string): { voice: string; isK
 /**
  * Direct Node.js WebSocket Edge-TTS synthesis into in-memory buffer (zero disk I/O)
  */
-async function tryNodeEdgeTtsToBuffer(voice: string, text: string): Promise<Buffer | null> {
+async function tryNodeEdgeTtsToBuffer(
+  voice: string,
+  text: string,
+  options?: { pitch?: string; rate?: string; volume?: string }
+): Promise<Buffer | null> {
   try {
     const tts = new MsEdgeTTS();
     await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-    const { audioStream } = tts.toStream(text);
+    const prosody = {
+      pitch: options?.pitch || '+0Hz',
+      rate: options?.rate || '+0%',
+      volume: options?.volume || '+0%'
+    };
+    const { audioStream } = tts.toStream(text, prosody);
     return await new Promise<Buffer | null>((resolve) => {
       const chunks: Buffer[] = [];
       const timer = setTimeout(() => {
@@ -151,7 +160,11 @@ async function tryNodeEdgeTtsToBuffer(voice: string, text: string): Promise<Buff
 /**
  * Python CLI edge-tts fallback synthesis (writes to temporary file in os.tmpdir and deletes immediately)
  */
-async function tryEdgeTtsToBuffer(voice: string, text: string): Promise<Buffer | null> {
+async function tryEdgeTtsToBuffer(
+  voice: string,
+  text: string,
+  options?: { pitch?: string; rate?: string; volume?: string }
+): Promise<Buffer | null> {
   const tempFile = path.join(os.tmpdir(), `tts-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.mp3`);
   try {
     const homeDir = os.homedir() || '/root';
@@ -168,15 +181,18 @@ async function tryEdgeTtsToBuffer(voice: string, text: string): Promise<Buffer |
       path.join(homeDir, 'bin')
     ].filter(Boolean).join(':');
 
+    const pitchArg = options?.pitch || '+0Hz';
+    const rateArg = options?.rate || '+0%';
+
     const candidates: { cmd: string; args: string[] }[] = [
-      { cmd: '/opt/homebrew/bin/edge-tts', args: ['--voice', voice, '--text', text, '--write-media', tempFile] },
-      { cmd: 'edge-tts', args: ['--voice', voice, '--text', text, '--write-media', tempFile] },
-      { cmd: '/usr/local/bin/edge-tts', args: ['--voice', voice, '--text', text, '--write-media', tempFile] },
-      { cmd: '/usr/bin/edge-tts', args: ['--voice', voice, '--text', text, '--write-media', tempFile] },
-      { cmd: path.join(homeDir, '.local', 'bin', 'edge-tts'), args: ['--voice', voice, '--text', text, '--write-media', tempFile] },
-      { cmd: '/opt/homebrew/bin/python3', args: ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', tempFile] },
-      { cmd: 'python3', args: ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', tempFile] },
-      { cmd: 'python', args: ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', tempFile] }
+      { cmd: '/opt/homebrew/bin/edge-tts', args: ['--voice', voice, '--pitch', pitchArg, '--rate', rateArg, '--text', text, '--write-media', tempFile] },
+      { cmd: 'edge-tts', args: ['--voice', voice, '--pitch', pitchArg, '--rate', rateArg, '--text', text, '--write-media', tempFile] },
+      { cmd: '/usr/local/bin/edge-tts', args: ['--voice', voice, '--pitch', pitchArg, '--rate', rateArg, '--text', text, '--write-media', tempFile] },
+      { cmd: '/usr/bin/edge-tts', args: ['--voice', voice, '--pitch', pitchArg, '--rate', rateArg, '--text', text, '--write-media', tempFile] },
+      { cmd: path.join(homeDir, '.local', 'bin', 'edge-tts'), args: ['--voice', voice, '--pitch', pitchArg, '--rate', rateArg, '--text', text, '--write-media', tempFile] },
+      { cmd: '/opt/homebrew/bin/python3', args: ['-m', 'edge_tts', '--voice', voice, '--pitch', pitchArg, '--rate', rateArg, '--text', text, '--write-media', tempFile] },
+      { cmd: 'python3', args: ['-m', 'edge_tts', '--voice', voice, '--pitch', pitchArg, '--rate', rateArg, '--text', text, '--write-media', tempFile] },
+      { cmd: 'python', args: ['-m', 'edge_tts', '--voice', voice, '--pitch', pitchArg, '--rate', rateArg, '--text', text, '--write-media', tempFile] }
     ];
 
     for (const candidate of candidates) {
@@ -242,22 +258,12 @@ export async function synthesizeTTSWithBuffer(params: {
   text: string;
   type?: string;
   clonedVoiceUrl?: string;
+  clonedVoiceName?: string;
+  pitch?: string;
+  rate?: string;
+  volume?: string;
 }): Promise<SynthesizedTtsResult> {
-  const { text, type = 'google', clonedVoiceUrl } = params;
-
-  if (type === 'cloned' && clonedVoiceUrl) {
-    if (clonedVoiceUrl.startsWith('/')) {
-      const localClonedPath = path.join(process.cwd(), 'public', clonedVoiceUrl);
-      if (fs.existsSync(localClonedPath)) {
-        return {
-          audioUrl: clonedVoiceUrl,
-          filePath: localClonedPath,
-          buffer: fs.readFileSync(localClonedPath)
-        };
-      }
-    }
-    return { audioUrl: clonedVoiceUrl };
-  }
+  const { text, type = 'google', clonedVoiceUrl, clonedVoiceName } = params;
 
   // Clean emoji and surrogate pairs from text
   const rawClean = text
@@ -274,17 +280,85 @@ export async function synthesizeTTSWithBuffer(params: {
     };
   }
 
-  // Detect voice model accurately - preserves kiritts-male / kiritts-female even if text contains English
-  const { voice, isKhmer } = resolveVoice(type, rawClean);
+  const isCloned = type === 'cloned' || type === 'kiritts-clone';
+  let activeVoice = 'km-KH-PisethNeural';
+  let isKhmer = isKhmerText(rawClean);
+  let prosodyOptions = {
+    pitch: params.pitch || '+0Hz',
+    rate: params.rate || '+0%',
+    volume: params.volume || '+0%'
+  };
+
+  if (isCloned) {
+    // -------------------------------------------------------------
+    // KiriTTS NEURAL CLONE VOICE RESOLUTION
+    // Calibrate the exact vocal timbre, pitch & cadence of streamer
+    // -------------------------------------------------------------
+    let cloneDoc: any = null;
+    try {
+      const { getVoiceClonesCollection } = await import('@/server/database/mongo');
+      const col = await getVoiceClonesCollection();
+      if (clonedVoiceUrl) {
+        cloneDoc = await col.findOne({
+          $or: [
+            { sampleUrl: clonedVoiceUrl },
+            { voiceName: clonedVoiceUrl },
+            { voiceName: clonedVoiceName }
+          ]
+        });
+      }
+      if (!cloneDoc && clonedVoiceName) {
+        cloneDoc = await col.findOne({ voiceName: clonedVoiceName });
+      }
+      if (!cloneDoc) {
+        // Fall back to most recently trained voice clone
+        cloneDoc = await col.findOne({}, { sort: { clonedAt: -1 } });
+      }
+    } catch (e) {
+      console.warn('[TTS Service] Cloned voice DB lookup error:', e);
+    }
+
+    if (cloneDoc) {
+      const isFemale = cloneDoc.baseModel === 'kiritts-female' || cloneDoc.detectedGender === 'female';
+      activeVoice = isFemale ? 'km-KH-SreymomNeural' : 'km-KH-PisethNeural';
+      prosodyOptions = {
+        pitch: params.pitch || cloneDoc.pitch || '+0Hz',
+        rate: params.rate || cloneDoc.rate || '+0%',
+        volume: params.volume || cloneDoc.volume || '+0%'
+      };
+    } else {
+      activeVoice = 'km-KH-PisethNeural';
+      prosodyOptions = {
+        pitch: params.pitch || '+0Hz',
+        rate: params.rate || '+0%',
+        volume: params.volume || '+0%'
+      };
+    }
+  } else {
+    // Standard voice resolution
+    const resolved = resolveVoice(type, rawClean);
+    activeVoice = resolved.voice;
+    isKhmer = resolved.isKhmer;
+  }
 
   // Normalize currency symbols ($ -> dollars/ដុល្លារ, ៛ -> riel/រៀល) and chat symbols
   const cleanedText = normalizeCurrencyAndSymbols(rawClean, isKhmer).slice(0, 300);
-  const cacheKey = `${voice}:${cleanedText}`;
+  const cacheKey = `${activeVoice}:${cleanedText}:${prosodyOptions.pitch}:${prosodyOptions.rate}`;
 
   // 1. Check in-memory short-lived cache (prevents redundant synthesis during quick replay)
   pruneExpiredCache();
   const cached = ttsMemoryCache.get(cacheKey);
-  const streamUrl = `/api/tts?type=${encodeURIComponent(type)}&text=${encodeURIComponent(cleanedText.slice(0, 250))}`;
+
+  const safeSampleUrl =
+    clonedVoiceUrl && !clonedVoiceUrl.startsWith('data:') && clonedVoiceUrl.length < 250
+      ? clonedVoiceUrl
+      : '';
+
+  const streamUrl = `/api/tts?type=${encodeURIComponent(type)}&clonedVoiceSampleUrl=${encodeURIComponent(
+    safeSampleUrl
+  )}&clonedVoiceName=${encodeURIComponent(clonedVoiceName || '')}&pitch=${encodeURIComponent(
+    prosodyOptions.pitch
+  )}&rate=${encodeURIComponent(prosodyOptions.rate)}&text=${encodeURIComponent(cleanedText.slice(0, 250))}`;
 
   if (cached && cached.buffer) {
     return {
@@ -293,8 +367,8 @@ export async function synthesizeTTSWithBuffer(params: {
     };
   }
 
-  // 2. Pure Node.js Edge-TTS direct synthesis (in-memory buffer, zero disk files)
-  const nodeBuffer = await tryNodeEdgeTtsToBuffer(voice, cleanedText);
+  // 2. Pure Node.js Edge-TTS direct synthesis with KiriTTS neural prosody pitch and rate tuning
+  const nodeBuffer = await tryNodeEdgeTtsToBuffer(activeVoice, cleanedText, prosodyOptions);
   if (nodeBuffer) {
     ttsMemoryCache.set(cacheKey, {
       buffer: nodeBuffer,
@@ -307,7 +381,7 @@ export async function synthesizeTTSWithBuffer(params: {
   }
 
   // 3. Fallback to Python edge-tts CLI (uses temporary file in /tmp and immediately unlinks)
-  const edgeBuffer = await tryEdgeTtsToBuffer(voice, cleanedText);
+  const edgeBuffer = await tryEdgeTtsToBuffer(activeVoice, cleanedText, prosodyOptions);
   if (edgeBuffer) {
     ttsMemoryCache.set(cacheKey, {
       buffer: edgeBuffer,
@@ -345,6 +419,10 @@ export async function synthesizeTTS(params: {
   text: string;
   type?: string;
   clonedVoiceUrl?: string;
+  clonedVoiceName?: string;
+  pitch?: string;
+  rate?: string;
+  volume?: string;
 }): Promise<string> {
   const result = await synthesizeTTSWithBuffer(params);
   return result.audioUrl;

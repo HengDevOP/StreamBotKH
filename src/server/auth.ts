@@ -1,9 +1,38 @@
 import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
 import { getUsersCollection } from './database/mongo';
 
+let cachedEphemeralSecret: string | null = null;
+
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  const isDefaultOrInsecure =
+    !secret ||
+    secret === 'streamneon_super_secret_jwt_key_2026' ||
+    secret === 'your_jwt_secret_here';
+
+  if (process.env.NODE_ENV === 'production' && isDefaultOrInsecure) {
+    throw new Error(
+      '[CRITICAL SECURITY ERROR] Insecure or default JWT_SECRET is not permitted in production. Please set a strong JWT_SECRET in .env.'
+    );
+  }
+
+  if (isDefaultOrInsecure) {
+    if (!cachedEphemeralSecret) {
+      cachedEphemeralSecret = crypto.randomBytes(32).toString('hex');
+      console.warn(
+        '⚠️ [Security Warning] Using generated ephemeral JWT secret because no strong JWT_SECRET was configured in .env.'
+      );
+    }
+    return cachedEphemeralSecret;
+  }
+
+  return secret;
+}
+
 export function generateToken(user: { id: string; username: string; email: string }) {
-  const jwtSecret = process.env.JWT_SECRET || 'streamneon_super_secret_jwt_key_2026';
+  const jwtSecret = getJwtSecret();
   return jwt.sign(
     { id: user.id, username: user.username, email: user.email },
     jwtSecret,
@@ -28,7 +57,7 @@ export function getAuthenticatedUser(req: NextRequest) {
   }
 
   try {
-    const jwtSecret = process.env.JWT_SECRET || 'streamneon_super_secret_jwt_key_2026';
+    const jwtSecret = getJwtSecret();
     const decoded = jwt.verify(token, jwtSecret) as any;
     if (!decoded || !decoded.id) {
       return null;

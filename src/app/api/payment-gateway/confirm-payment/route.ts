@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { broadcastAlertToOverlay, broadcastDonationToDashboard, getIO } from '@/server/services/socketService';
 import { findMatchingTemporaryDonation, isGenericBankKeyword } from '@/server/utils/nameMatching';
+import { getAuthenticatedUser } from '@/server/auth';
+import { generateSecureOverlayToken } from '@/server/utils/crypto';
 import {
   getUsersCollection,
   getDonationsCollection,
@@ -15,6 +17,26 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Authorization check: internal gateway secret, authenticated streamer, or local development
+    const gatewaySecret = (process.env.PAYMENT_GATEWAY_SECRET || process.env.INTERNAL_API_SECRET || '').trim();
+    const providedSecret =
+      req.headers.get('x-gateway-secret') ||
+      req.headers.get('x-internal-secret') ||
+      req.nextUrl.searchParams.get('secret');
+
+    const hasValidSecret = Boolean(gatewaySecret && providedSecret && providedSecret === gatewaySecret);
+    const authUser = getAuthenticatedUser(req);
+    const host = req.headers.get('host') || '';
+    const isLocalDev = process.env.NODE_ENV !== 'production' && (host.includes('localhost') || host.includes('127.0.0.1'));
+
+    if (!hasValidSecret && !authUser && !isLocalDev) {
+      console.warn('[PaymentGateway] Rejected unauthorized confirm-payment request.');
+      return NextResponse.json(
+        { error: 'Unauthorized: Valid payment gateway secret or streamer authentication required.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const {
       streamerUsername,
@@ -26,7 +48,7 @@ export async function POST(req: NextRequest) {
       bankingName = 'ABA Bank'
     } = body;
 
-    // 1. Resolve streamer from MongoDB
+    // 2. Resolve streamer from MongoDB
     const usersCol = await getUsersCollection();
     let streamer: any = null;
     if (streamerUsername) {
@@ -41,15 +63,6 @@ export async function POST(req: NextRequest) {
         $or: [{ userId: streamerId }, { id: streamerId as any }]
       });
     }
-    if (!streamer) {
-      // Default fallback
-      streamer = await usersCol.findOne({
-        $or: [{ username: 'streambotkh' }, { username: 'neonstreamer' }]
-      });
-      if (!streamer) {
-        streamer = await usersCol.findOne({});
-      }
-    }
 
     if (!streamer) {
       return NextResponse.json(
@@ -58,9 +71,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // If caller is authenticated user (not gateway secret), verify they own this channel
+    if (authUser && !hasValidSecret) {
+      const streamerUserId = streamer.userId || streamer.id || String(streamer._id);
+      if (streamerUserId !== authUser.id && streamer.username !== authUser.username) {
+        return NextResponse.json(
+          { error: 'Forbidden: You can only confirm payments for your own channel.' },
+          { status: 403 }
+        );
+      }
+    }
+
     const resolvedStreamerId = streamer.userId || streamer.id || String(streamer._id);
     if (!streamer.overlayToken && !streamer.overlay_token) {
-      const newTok = 'ovl_' + uuidv4().replace(/-/g, '').slice(0, 24);
+      const newTok = generateSecureOverlayToken();
       streamer.overlayToken = newTok;
       try {
         await usersCol.updateOne({ _id: streamer._id }, { $set: { overlayToken: newTok, updatedAt: new Date() } });

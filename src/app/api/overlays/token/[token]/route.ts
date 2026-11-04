@@ -76,7 +76,7 @@ export async function GET(
     const videoVolume = videoSettings ? Number(videoSettings.videoVolume ?? videoSettings.video_volume ?? 85) : 85;
 
     if (!overlay) {
-      if (streamer || token.startsWith('ovl_') || token === 'demo-token' || token === 'ovl_token_neon_demo_9921') {
+      if (streamer || token === 'demo-token' || token === 'ovl_token_neon_demo_9921') {
         return NextResponse.json({
           success: true,
           overlay: {

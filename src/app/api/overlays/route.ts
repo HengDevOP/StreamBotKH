@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { getAuthenticatedUser } from '@/server/auth';
 import { getOverlaysCollection, OverlayDoc } from '@/server/database/mongo';
+import { generateSecureOverlayToken } from '@/server/utils/crypto';
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,7 +28,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const userId = authUser?.id || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please sign in.' },
+        { status: 401 }
+      );
+    }
+    const userId = authUser.id;
 
     const body = await req.json();
     const {
@@ -50,7 +57,7 @@ export async function POST(req: NextRequest) {
       ? name.trim()
       : `Overlay (${width}x${height})`;
 
-    const overlayToken = `ovl_${uuidv4().replace(/-/g, '')}`;
+    const overlayToken = generateSecureOverlayToken();
 
     const newOverlay: OverlayDoc = {
       userId,

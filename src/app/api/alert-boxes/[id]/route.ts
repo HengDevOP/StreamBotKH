@@ -1,5 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 import { getAlertBoxesCollection, getUsersCollection, getAlertSettingsCollection } from '@/server/database/mongo';
+import { getAuthenticatedUser } from '@/server/auth';
 import { ObjectId } from 'mongodb';
 
 export const dynamic = 'force-dynamic';
@@ -32,9 +35,29 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
+    const authUser = getAuthenticatedUser(req as any);
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required. Please sign in.' },
+        { status: 401 }
+      );
+    }
+
     const { id } = params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ success: false, error: 'Invalid alert box ID' }, { status: 400 });
+    }
+
+    const col = await getAlertBoxesCollection();
+    const existing = await col.findOne({ _id: new ObjectId(id) });
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Alert box not found' }, { status: 404 });
+    }
+    if (existing.userId !== authUser.id) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to modify this alert box.' },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
@@ -64,6 +87,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       'messageTemplate',
       'layoutMode',
       'animationStyle',
+      'capcutAnimation',
+      'capcutLabel',
       'conditions'
     ];
 
@@ -77,6 +102,27 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           updateFields[key] = trimmed;
         } else if (key === 'minAmountCondition') {
           updateFields[key] = Math.max(0.001, Number(body[key]) > 0 ? Number(body[key]) : 0.01);
+        } else if (key === 'clonedVoiceSampleUrl') {
+          const val = body[key];
+          if (typeof val === 'string' && val.startsWith('data:audio')) {
+            try {
+              const matches = val.match(/^data:audio\/([a-zA-Z0-9_-]+);base64,(.+)$/);
+              if (matches && matches[2]) {
+                const ext = matches[1] === 'webm' ? 'webm' : matches[1] === 'mp3' ? 'mp3' : 'wav';
+                const fileName = `box_voice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+                const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'voices');
+                if (!fs.existsSync(uploadDir)) {
+                  fs.mkdirSync(uploadDir, { recursive: true });
+                }
+                fs.writeFileSync(path.join(uploadDir, fileName), Buffer.from(matches[2], 'base64'));
+                updateFields[key] = `/uploads/voices/${fileName}`;
+              }
+            } catch (_) {
+              updateFields[key] = '';
+            }
+          } else {
+            updateFields[key] = typeof val === 'string' && val.length < 250 ? val : '';
+          }
         } else if (key === 'conditions' && Array.isArray(body.conditions)) {
           const sanitized = body.conditions.map((c: any, idx: number) => ({
             ...c,
@@ -94,9 +140,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       }
     }
 
-    const col = await getAlertBoxesCollection();
     const result = await col.findOneAndUpdate(
-      { _id: new ObjectId(id) },
+      { _id: new ObjectId(id), userId: authUser.id },
       { $set: updateFields },
       { returnDocument: 'after' }
     );
@@ -142,13 +187,32 @@ export const PUT = PATCH;
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
+    const authUser = getAuthenticatedUser(req as any);
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required. Please sign in.' },
+        { status: 401 }
+      );
+    }
+
     const { id } = params;
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ success: false, error: 'Invalid alert box ID' }, { status: 400 });
     }
 
     const col = await getAlertBoxesCollection();
-    const result = await col.deleteOne({ _id: new ObjectId(id) });
+    const existing = await col.findOne({ _id: new ObjectId(id) });
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Alert box not found' }, { status: 404 });
+    }
+    if (existing.userId !== authUser.id) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: You do not have permission to delete this alert box.' },
+        { status: 403 }
+      );
+    }
+
+    const result = await col.deleteOne({ _id: new ObjectId(id), userId: authUser.id });
     if (result.deletedCount === 0) {
       return NextResponse.json({ success: false, error: 'Alert box not found' }, { status: 404 });
     }

@@ -5,7 +5,13 @@ import { telegramUserManager } from '@backend/telegram/telegramUserClient';
 export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthenticatedUser(req);
-    const streamerId = authUser?.id || 'demo-streamer-id-1001';
+    if (!authUser || !authUser.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Authentication required to connect Telegram account.' },
+        { status: 401 }
+      );
+    }
+    const streamerId = authUser.id;
 
     const body = await req.json();
     const { phoneNumber, apiId, apiHash } = body;

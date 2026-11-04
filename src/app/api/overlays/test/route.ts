@@ -1,10 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { broadcastAlertToOverlay, getIO } from '@/server/services/socketService';
+import { getAuthenticatedUser } from '@/server/auth';
+import { checkRateLimit, getClientIp } from '@/server/utils/rateLimiter';
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rl = checkRateLimit(`overlay_test:${clientIp}`, 20, 60000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded: Please wait a moment before sending another test alert.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const overlayToken = body.overlayToken || 'demo-token';
+
+    // Protect against cross-streamer overlay spoofing
+    if (overlayToken !== 'demo-token' && overlayToken !== 'ovl_token_neon_demo_9921') {
+      const authUser = getAuthenticatedUser(req);
+      if (!authUser || !authUser.id) {
+        return NextResponse.json(
+          { error: 'Unauthorized: Authentication required to test live streamer overlays.' },
+          { status: 401 }
+        );
+      }
+
+      const ownToken = authUser.overlayToken || (authUser as any).overlay_token;
+      if (ownToken && ownToken !== overlayToken && authUser.email !== 'hchenheng@gmail.com') {
+        return NextResponse.json(
+          { error: 'Forbidden: You cannot trigger test alerts on another streamer\'s overlay.' },
+          { status: 403 }
+        );
+      }
+    }
 
     const testPayload = {
       donationId: 'test-' + Date.now(),
