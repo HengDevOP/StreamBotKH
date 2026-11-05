@@ -35,121 +35,11 @@ interface VerifiedCreatorCard {
   avatar: string;
   supporters?: string;
   verified: boolean;
+  isLive?: boolean;
   glowColor?: string;
 }
 
 const GLOW_COLORS = ['#00F0FF', '#EC4899', '#10B981', '#A855F7', '#F59E0B', '#38BDF8'];
-
-const DEFAULT_VERIFIED_CREATORS: VerifiedCreatorCard[] = [
-  {
-    name: 'Heng Farm 07',
-    username: 'hengfarm07',
-    tag: 'MLBB & Variety Live',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=hengfarm07',
-    supporters: '1.4k Tips',
-    verified: true,
-    glowColor: '#00F0FF'
-  },
-  {
-    name: 'Neon Master VIP',
-    username: 'neonstreamer',
-    tag: 'Valorant & Tournament Caster',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=neonmaster',
-    supporters: '3.8k Tips',
-    verified: true,
-    glowColor: '#EC4899'
-  },
-  {
-    name: 'Sokha Gaming KH',
-    username: 'sokhagaming',
-    tag: 'PUBG Mobile Cambodia',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=sokhagaming',
-    supporters: '890 Tips',
-    verified: true,
-    glowColor: '#10B981'
-  },
-  {
-    name: 'Dara Esports Live',
-    username: 'daraesports',
-    tag: 'FPS & Community Tournaments',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=daraesports',
-    supporters: '2.1k Tips',
-    verified: true,
-    glowColor: '#A855F7'
-  },
-  {
-    name: 'Sreypov Streamer',
-    username: 'sreypovlive',
-    tag: 'Just Chatting & Mobile Legends',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=sreypovlive',
-    supporters: '950 Tips',
-    verified: true,
-    glowColor: '#F59E0B'
-  },
-  {
-    name: 'ProGamerKH',
-    username: 'progamerkh',
-    tag: 'Apex Legends & Warzone 2',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=progamerkh',
-    supporters: '1.2k Tips',
-    verified: true,
-    glowColor: '#38BDF8'
-  },
-  {
-    name: 'KompongGamer',
-    username: 'komponggamer',
-    tag: 'GTA V Roleplay Cambodia',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=komponggamer',
-    supporters: '1.7k Tips',
-    verified: true,
-    glowColor: '#10B981'
-  },
-  {
-    name: 'CyberNinja99',
-    username: 'cyberninja99',
-    tag: 'Speedruns & Retro Games',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=cyberninja99',
-    supporters: '720 Tips',
-    verified: true,
-    glowColor: '#00F0FF'
-  },
-  {
-    name: 'Piseth Live Cast',
-    username: 'pisethlive',
-    tag: 'E-Sports Analyst & Podcast',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=pisethlive',
-    supporters: '2.5k Tips',
-    verified: true,
-    glowColor: '#EC4899'
-  },
-  {
-    name: 'Apsara Gaming TV',
-    username: 'apsaragaming',
-    tag: 'League of Legends & Wild Rift',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=apsaragaming',
-    supporters: '1.9k Tips',
-    verified: true,
-    glowColor: '#8B5CF6'
-  },
-  {
-    name: 'Vannak Playz',
-    username: 'vannakplayz',
-    tag: 'Free Fire & Mobile Tournaments',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=vannakplayz',
-    supporters: '1.1k Tips',
-    verified: true,
-    glowColor: '#06B6D4'
-  },
-  {
-    name: 'Phnom Penh Streamers',
-    username: 'ppstreamers',
-    tag: 'IRL Street Food & City Walks',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=ppstreamers',
-    supporters: '3.1k Tips',
-    verified: true,
-    glowColor: '#F43F5E'
-  }
-];
 
 // Helper to repeat items to ensure seamless CSS marquee loop without gaps
 const repeatForMarquee = (items: VerifiedCreatorCard[], targetMin = 8): VerifiedCreatorCard[] => {
@@ -162,38 +52,62 @@ const repeatForMarquee = (items: VerifiedCreatorCard[], targetMin = 8): Verified
 };
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
-  // Dynamic Verified Streamers State from Database
+  // Await backend completion before displaying streamer cards (prevents showing seed cards)
+  const [isLoadingStreamers, setIsLoadingStreamers] = useState<boolean>(true);
   const [dbVerifiedStreamers, setDbVerifiedStreamers] = useState<any[]>([]);
 
   React.useEffect(() => {
+    let isMounted = true;
+    setIsLoadingStreamers(true);
+
     fetch('/api/streamer/verified')
       .then((res) => res.json())
       .then((data) => {
+        if (!isMounted) return;
         if (data.success && Array.isArray(data.streamers)) {
-          setDbVerifiedStreamers(data.streamers);
+          // Strictly accept only verified streamers
+          const verifiedOnly = data.streamers.filter((s: any) => s.isVerified === true);
+          setDbVerifiedStreamers(verifiedOnly);
+        } else {
+          setDbVerifiedStreamers([]);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[HomePage] Error loading verified streamers:', err);
+        if (isMounted) setDbVerifiedStreamers([]);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingStreamers(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const allVerifiedCards = React.useMemo<VerifiedCreatorCard[]>(() => {
-    const dbCards: VerifiedCreatorCard[] = (dbVerifiedStreamers || []).map((s, idx) => ({
-      name: s.displayName || s.username,
-      username: s.username,
-      tag: s.bio || (s.plan === 'pro' ? 'PRO Verified Streamer' : 'Verified Content Creator'),
-      avatar: s.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(s.username)}`,
-      supporters: s.supporters || (s.totalTips > 0 ? `${s.totalTips} ${s.totalTips === 1 ? 'Tip' : 'Tips'}` : (s.plan === 'pro' ? 'PRO Creator' : 'Verified Creator')),
-      verified: true,
-      glowColor: GLOW_COLORS[idx % GLOW_COLORS.length]
-    }));
-
-    // If real database streamers exist, prioritize and use real database data exclusively!
-    if (dbCards.length > 0) {
-      return dbCards;
+    // While awaiting backend completion, do not return any cards to prevent flash of seed cards
+    if (isLoadingStreamers) {
+      return [];
     }
 
-    return DEFAULT_VERIFIED_CREATORS;
-  }, [dbVerifiedStreamers]);
+    const dbCards: VerifiedCreatorCard[] = (dbVerifiedStreamers || [])
+      .filter((s: any) => s.isVerified === true)
+      .map((s, idx) => ({
+        name: s.displayName || s.username,
+        username: s.username,
+        tag: s.bio || (s.plan === 'pro' ? 'PRO Verified Streamer' : 'Verified Content Creator'),
+        avatar: s.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(s.username)}`,
+        supporters: s.supporters || (s.totalTips > 0 ? `${s.totalTips} ${s.totalTips === 1 ? 'Tip' : 'Tips'}` : (s.plan === 'pro' ? 'PRO Creator' : 'Verified Creator')),
+        verified: true,
+        isLive: Boolean(s.isLive),
+        glowColor: GLOW_COLORS[idx % GLOW_COLORS.length]
+      }));
+
+    return dbCards;
+  }, [dbVerifiedStreamers, isLoadingStreamers]);
 
   const lane1List = React.useMemo(() => {
     if (allVerifiedCards.length === 0) return [];
@@ -237,6 +151,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               {creator.name}
             </h4>
             <BadgeCheck size={14} className="text-cyan-400 fill-cyan-400/20 flex-shrink-0" />
+            {creator.isLive && (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/50 text-[9px] font-mono text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                LIVE
+              </span>
+            )}
           </div>
           <p className="text-[11px] font-mono text-cyan-400 truncate">@{creator.username}</p>
           <p className="text-[11px] text-slate-400 truncate mt-0.5">{creator.tag}</p>
@@ -304,7 +224,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       </section>
 
       {/* ===================== VERIFIED STREAMERS SEAMLESS CARDS MARQUEE (2 SECTIONS) ===================== */}
-      {allVerifiedCards.length > 0 && (
+      {(isLoadingStreamers || allVerifiedCards.length > 0) && (
         <section className="space-y-8 py-6 relative overflow-hidden">
           {/* Subtle Ambient Radial Glow */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-cyan-500/5 blur-[120px] pointer-events-none rounded-full" />
@@ -324,30 +244,89 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </p>
           </div>
 
-          {/* 2-Section Seamless Moving Tickers */}
-          <div className="relative w-full space-y-4 overflow-hidden py-3">
-            {/* Left and Right Smooth Edge Fade Vignettes */}
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-16 sm:w-44 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-transparent z-20" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-44 bg-gradient-to-l from-[#070A12] via-[#070A12]/85 to-transparent z-20" />
+          {/* Loading Skeleton State while awaiting backend data (prevents showing seed streamer cards) */}
+          {isLoadingStreamers ? (
+            <div className="relative w-full space-y-4 overflow-hidden py-3">
+              {/* Left and Right Smooth Edge Fade Vignettes */}
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-16 sm:w-44 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-transparent z-20" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-44 bg-gradient-to-l from-[#070A12] via-[#070A12]/85 to-transparent z-20" />
 
-            {/* Section 1: Seamless moving right-to-left */}
-            <div className="overflow-hidden w-full flex">
-              <div className="animate-marquee flex items-center gap-4 py-1">
-                {lane1List.concat(lane1List).map((creator, idx) =>
-                  renderStreamerCard(creator, `lane1-${creator.username}-${idx}`)
-                )}
+              {/* Skeleton Row 1 */}
+              <div className="overflow-hidden w-full flex">
+                <div className="flex items-center gap-4 py-1 animate-pulse">
+                  {Array.from({ length: 6 }).map((_, idx) => (
+                    <div
+                      key={`skeleton-lane1-${idx}`}
+                      className="w-[250px] xs:w-[280px] sm:w-[320px] flex-shrink-0 p-3.5 sm:p-4 rounded-2xl bg-[#0C101C]/80 border border-slate-800/80 shadow-xl flex flex-col justify-between space-y-3 sm:space-y-3.5 select-none"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-xl bg-slate-800/80 flex-shrink-0" />
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="h-4 w-3/4 rounded bg-slate-800" />
+                          <div className="h-3 w-1/2 rounded bg-slate-800/60" />
+                          <div className="h-3 w-4/5 rounded bg-slate-800/40" />
+                        </div>
+                      </div>
+                      <div className="pt-2.5 border-t border-slate-800/60 flex items-center justify-between">
+                        <div className="h-3 w-20 rounded bg-slate-800/60" />
+                        <div className="h-3 w-14 rounded bg-slate-800/60" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Skeleton Row 2 */}
+              <div className="overflow-hidden w-full flex">
+                <div className="flex items-center gap-4 py-1 animate-pulse">
+                  {Array.from({ length: 6 }).map((_, idx) => (
+                    <div
+                      key={`skeleton-lane2-${idx}`}
+                      className="w-[250px] xs:w-[280px] sm:w-[320px] flex-shrink-0 p-3.5 sm:p-4 rounded-2xl bg-[#0C101C]/80 border border-slate-800/80 shadow-xl flex flex-col justify-between space-y-3 sm:space-y-3.5 select-none"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-xl bg-slate-800/80 flex-shrink-0" />
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="h-4 w-3/4 rounded bg-slate-800" />
+                          <div className="h-3 w-1/2 rounded bg-slate-800/60" />
+                          <div className="h-3 w-4/5 rounded bg-slate-800/40" />
+                        </div>
+                      </div>
+                      <div className="pt-2.5 border-t border-slate-800/60 flex items-center justify-between">
+                        <div className="h-3 w-20 rounded bg-slate-800/60" />
+                        <div className="h-3 w-14 rounded bg-slate-800/60" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+          ) : (
+            /* 2-Section Seamless Moving Tickers with Verified Streamers */
+            <div className="relative w-full space-y-4 overflow-hidden py-3 animate-fade-in">
+              {/* Left and Right Smooth Edge Fade Vignettes */}
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-16 sm:w-44 bg-gradient-to-r from-[#070A12] via-[#070A12]/85 to-transparent z-20" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-44 bg-gradient-to-l from-[#070A12] via-[#070A12]/85 to-transparent z-20" />
 
-            {/* Section 2: Seamless moving left-to-right (opposite direction) */}
-            <div className="overflow-hidden w-full flex">
-              <div className="animate-marquee-reverse flex items-center gap-4 py-1">
-                {lane2List.concat(lane2List).map((creator, idx) =>
-                  renderStreamerCard(creator, `lane2-${creator.username}-${idx}`)
-                )}
+              {/* Section 1: Seamless moving right-to-left */}
+              <div className="overflow-hidden w-full flex">
+                <div className="animate-marquee flex items-center gap-4 py-1">
+                  {lane1List.concat(lane1List).map((creator, idx) =>
+                    renderStreamerCard(creator, `lane1-${creator.username}-${idx}`)
+                  )}
+                </div>
+              </div>
+
+              {/* Section 2: Seamless moving left-to-right (opposite direction) */}
+              <div className="overflow-hidden w-full flex">
+                <div className="animate-marquee-reverse flex items-center gap-4 py-1">
+                  {lane2List.concat(lane2List).map((creator, idx) =>
+                    renderStreamerCard(creator, `lane2-${creator.username}-${idx}`)
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </section>
       )}
 

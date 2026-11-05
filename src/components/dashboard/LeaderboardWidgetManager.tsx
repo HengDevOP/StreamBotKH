@@ -17,7 +17,8 @@ import {
   Crown,
   Eye,
   RotateCcw,
-  AlertTriangle
+  AlertTriangle,
+  Flame
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import {
@@ -235,6 +236,56 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
     []
   );
 
+  // Live Ranking Overtake / Rank Up Simulation State
+  const [simulatedOvertaker, setSimulatedOvertaker] = useState<string | null>(null);
+  const [simulatedDonors, setSimulatedDonors] = useState<LeaderboardDonor[] | null>(null);
+  const overtakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleSimulateOvertake = async () => {
+    if (overtakeTimeoutRef.current) {
+      clearTimeout(overtakeTimeoutRef.current);
+    }
+
+    const currentList = topDonors && topDonors.length > 0 ? [...topDonors] : [];
+    if (currentList.length < 2) return;
+
+    // Rank 2 overtakes Rank 1
+    const secondDonor = currentList[1];
+    const firstDonor = currentList[0];
+    const newLeadAmount = Math.round(((firstDonor.amount || 50) + 25) * 100) / 100;
+
+    const modifiedList: LeaderboardDonor[] = [
+      { ...secondDonor, rank: 1, amount: newLeadAmount, count: (secondDonor.count || 1) + 1 },
+      { ...firstDonor, rank: 2 },
+      ...currentList.slice(2).map((d, idx) => ({ ...d, rank: idx + 3 }))
+    ];
+
+    setSimulatedDonors(modifiedList);
+    setSimulatedOvertaker(secondDonor.name);
+
+    // Broadcast live test overtake event to OBS Browser Source Overlay
+    try {
+      fetch('/api/widgets/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: effectiveToken,
+          testOvertake: true,
+          donorName: secondDonor.name,
+          oldRank: 2,
+          newRank: 1,
+          amount: newLeadAmount
+        })
+      }).catch(() => {});
+    } catch (_) {}
+
+    // Reset simulation back to normal after 5 seconds
+    overtakeTimeoutRef.current = setTimeout(() => {
+      setSimulatedOvertaker(null);
+      setSimulatedDonors(null);
+    }, 5000);
+  };
+
   // 3. Save Settings to Database & Broadcast over Socket
   const handleSaveSettings = async () => {
     setIsSaving(true);
@@ -331,7 +382,7 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
         />
 
         {/* Top-Left OBS Action Controls (Positioned at top-left to avoid conflict with top-right navbar mailbox popover) */}
-        <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 flex items-center gap-2">
+        <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 flex items-center gap-2 flex-wrap">
           {/* Copy OBS Overlay URL */}
           <button
             type="button"
@@ -341,6 +392,17 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
           >
             {copiedUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
             <span>{copiedUrl ? 'Copied' : 'Copy OBS URL'}</span>
+          </button>
+
+          {/* Test Ranking Overtake Simulation Button */}
+          <button
+            type="button"
+            onClick={handleSimulateOvertake}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 hover:text-white font-mono text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+            title="Test rank overtake / pass ranking animation on live preview & OBS"
+          >
+            <Flame size={13} className="text-amber-400 animate-pulse fill-amber-400" />
+            <span>Test Rank Overtake</span>
           </button>
 
           {/* Open Standalone Overlay in New Tab */}
@@ -361,13 +423,14 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
             templateStyle={templateStyle}
             title={title}
             period={period}
-            topDonors={topDonors}
+            topDonors={simulatedDonors || topDonors}
             accentColor={accentColor}
             showBackground={showBackground}
             showAnimation={showAnimation}
             showRankBadges={showRankBadges}
             maxRows={maxRows}
             fontFamily={fontFamily}
+            overtakingDonorName={simulatedOvertaker}
           />
         </div>
       </div>
@@ -425,7 +488,7 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
                   className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold font-mono text-xs flex-shrink-0 border-0 shadow-md"
                 >
                   <Eye size={13} className="mr-1.5" />
-                  Browse 40 Styles
+                  Browse 80 Styles
                 </Button>
               </div>
             </div>
@@ -651,7 +714,7 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
       </div>
 
       {/* ============================================================== */}
-      {/* 3. 40 UNIQUE STYLES SELECTION MODAL                            */}
+      {/* 3. 80 UNIQUE STYLES SELECTION MODAL                            */}
       {/* ============================================================== */}
       {isTemplateModalOpen &&
         typeof document !== 'undefined' &&
@@ -666,10 +729,10 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] truncate">
-                      Select From 40 Unique Leaderboard Displays
+                      Select From 80 Unique Leaderboard Displays
                     </h3>
                     <p className="text-xs text-slate-400 font-mono hidden sm:block truncate">
-                      Click any style to apply. Each template features custom geometry, animated accents, and live visual rank styling.
+                      Click any style to apply. Includes animated flame, frost outlines, laser beams, and live rank-up overtake animations.
                     </p>
                   </div>
                 </div>
@@ -681,7 +744,7 @@ export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> =
                       type="text"
                       value={templateSearchQuery}
                       onChange={(e) => setTemplateSearchQuery(e.target.value)}
-                      placeholder="Search 40 styles..."
+                      placeholder="Search 80 styles (e.g. flame, frost)..."
                       className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-amber-400"
                     />
                   </div>

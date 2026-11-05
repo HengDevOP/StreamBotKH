@@ -4,16 +4,32 @@ import { getUsersCollection, getDonationsCollection } from '@/server/database/mo
 export async function GET(_req: NextRequest) {
   try {
     const usersCol = await getUsersCollection();
-    // Query registered streamers, prioritizing verified, admin, and active users
+    // Query ONLY registered verified streamers
     const users = await usersCol
-      .find({ username: { $exists: true, $ne: '' } })
-      .sort({ isVerified: -1, createdAt: -1 })
+      .find({
+        username: { $exists: true, $ne: '' },
+        $or: [
+          { isVerified: true },
+          { is_verified: true },
+          { isAdmin: true }
+        ],
+        isVerified: { $ne: false },
+        is_verified: { $ne: false }
+      })
+      .sort({ createdAt: -1 })
       .toArray();
 
     const donationsCol = await getDonationsCollection();
     const streamers: any[] = [];
 
     for (const u of users) {
+      // Strictly enforce verified check
+      const isVerified = Boolean(
+        (u.isVerified === true || u.is_verified === true || u.isAdmin === true) &&
+        u.isVerified !== false &&
+        u.is_verified !== false
+      );
+      if (!isVerified) continue;
       const uId = u.userId || (u as any).id || String(u._id);
       const paidDonations = await donationsCol.find({
         $or: [
@@ -72,7 +88,7 @@ export async function GET(_req: NextRequest) {
         avatarUrl: u.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.username)}`,
         bio,
         plan: u.plan || 'free',
-        isVerified: Boolean(u.isVerified !== false && (u.isVerified || u.isAdmin || u.plan === 'pro' || totalTips > 0)),
+        isVerified: true,
         isLive: Boolean(u.liveStreamUrl),
         liveStreamUrl: u.liveStreamUrl || '',
         totalVolume: totalVolumeUSD,

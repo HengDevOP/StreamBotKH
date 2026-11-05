@@ -2,20 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  DollarSign,
-  Flame,
-  Users,
-  TrendingUp,
-  Sparkles,
   ShieldAlert,
   RotateCcw,
-  Clock,
   CheckCircle2,
   Loader2,
-  Calendar,
-  Zap
+  ChevronDown
 } from 'lucide-react';
-import { Card } from '../common/Card';
 import { TimeframeMetrics } from '../../types/streamer';
 
 export type TimeframeOption = 'today' | '1d' | '3d' | 'last_week' | 'last_month';
@@ -40,10 +32,6 @@ interface OverviewStatsProps {
 
 export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAnalytics }) => {
   const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeOption>('today');
-
-  const totalUsd = stats?.totalRevenueUsd ?? 0;
-  const totalKhr = stats?.totalRevenueKhr ?? 0;
-  const totalCount = stats?.totalDonationsCount ?? 0;
 
   // Number & currency locale formatters (e.g. 12,123.60, 4,000 ៛)
   const formatUSD = (val: number) =>
@@ -116,189 +104,142 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
 
   return (
     <div className="space-y-4">
-      {/* Timeframe Analytics Filter Bar */}
-      <div className="p-3.5 sm:p-4 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 font-mono shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-            <Calendar size={16} />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-white uppercase tracking-wider font-['Chakra_Petch']">
-              Analytics &amp; Earning Potential
-            </span>
-            <p className="text-[11px] text-slate-400">
-              Filter by timeframe to evaluate tips velocity and projected run-rate
-            </p>
-          </div>
+      {/* Top Header Bar & Timeframe Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-0.5">
+        <div>
+          <h2 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] tracking-wide">
+            Performance &amp; Approximate Earnings
+          </h2>
+          <p className="text-xs text-slate-400">
+            Real-time tip velocity and projected monthly run-rate for {currentTab.periodLabel.toLowerCase()}
+          </p>
         </div>
 
-        {/* 5 Timeframe Buttons: Today, 1d, 3d, Last Week, Last Month */}
-        <div className="inline-flex items-center p-1 rounded-xl bg-slate-950 border border-slate-800 self-start md:self-auto overflow-x-auto max-w-full">
-          {timeframeTabs.map((tab) => {
-            const isActive = selectedTimeframe === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setSelectedTimeframe(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                  isActive
-                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+        {/* Timeframe Filter Dropdown */}
+        <div className="relative self-start sm:self-auto">
+          <select
+            value={selectedTimeframe}
+            onChange={(e) => setSelectedTimeframe(e.target.value as TimeframeOption)}
+            aria-label="Filter timeframe"
+            className="appearance-none pl-3.5 pr-9 py-2 rounded-xl bg-[#090D18] border border-slate-800 text-xs font-mono font-bold text-white hover:border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer shadow-sm"
+          >
+            {timeframeTabs.map((tab) => (
+              <option key={tab.key} value={tab.key} className="bg-slate-950 text-white py-1">
+                {tab.label} ({tab.periodLabel})
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
       </div>
 
-      {/* Dynamic Timeframe Analytics Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Period Revenue USD */}
-        <Card glow="cyan" className="group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Tips (USD) • {currentTab.label}
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
-              <DollarSign size={18} />
+      {/* 4 Stat Cards Row (Primary Approximate Earnings: 2 cols, Others: 1 col each) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 items-stretch">
+        {/* Primary: Approximate Earnings (spans 2 cols, bigger, monochrome clean design, no icon) */}
+        <div className="col-span-1 md:col-span-2 lg:col-span-2 rounded-2xl bg-[#090D18] border border-slate-800 p-5 flex flex-col justify-between shadow-sm">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider font-['Chakra_Petch']">
+                Approximate Earnings ({currentTab.label})
+              </span>
+              <span className="text-[10px] font-mono text-slate-400 font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 whitespace-nowrap">
+                Projected Monthly
+              </span>
             </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
-              ${formatUSD(activeMetrics.usd)}
-            </span>
-          </div>
-          <div className="mt-2 flex items-center text-xs text-slate-400 font-mono">
-            <span className="text-cyan-400 font-semibold mr-1.5 flex items-center gap-0.5">
-              <TrendingUp size={12} /> ${formatUSD(activeMetrics.avgPerDayUsd)}/day
-            </span>
-            velocity
-          </div>
-        </Card>
 
-        {/* Period Revenue KHR */}
-        <Card glow="pink" className="group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Tips (KHR) • {currentTab.label}
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-pink-400 group-hover:scale-110 transition-transform">
-              <Sparkles size={18} />
+            <div className="mt-3.5 flex items-baseline gap-2">
+              <span className="text-3xl sm:text-4xl font-black tracking-tight text-white font-mono">
+                ${formatUSD(activeMetrics.potentialMonthlyUsd)}
+              </span>
+              <span className="text-xs font-mono text-slate-400 font-bold">/mo</span>
             </div>
           </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
-              {formatKHR(activeMetrics.khr)} <span className="text-base sm:text-lg font-bold text-pink-400">៛</span>
-            </span>
-          </div>
-          <div className="mt-2 flex items-center text-xs text-slate-400 font-mono">
-            <span className="text-pink-400 font-semibold mr-1.5">
-              ~{formatKHR(activeMetrics.avgPerDayKhr)} ៛/day
-            </span>
-            daily rate
-          </div>
-        </Card>
 
-        {/* Tips Activity */}
-        <Card glow="purple" className="group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Tips Received • {currentTab.label}
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-              <Flame size={18} />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
-              {formatCount(activeMetrics.count)}
-            </span>
-            <span className="text-xs text-slate-400 font-mono">paid tips</span>
-          </div>
-          <div className="mt-2 flex items-center text-xs text-slate-400 font-mono">
-            <span className="text-purple-300 font-semibold mr-1.5">{currentTab.periodLabel}</span>
-          </div>
-        </Card>
-
-        {/* Earning Potential (Projected Monthly Run-Rate) */}
-        <Card glow="cyan" className="group border-cyan-500/40 bg-gradient-to-br from-[#090D18] via-[#0D1527] to-[#090D18]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Zap size={14} className="text-cyan-400" />
-              <span>Earning Potential</span>
-            </span>
-            <div className="w-9 h-9 rounded-xl bg-cyan-400/15 border border-cyan-400/40 flex items-center justify-center text-cyan-300 group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(0,240,255,0.2)]">
-              <TrendingUp size={18} />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-1.5">
-            <span className="text-2xl xs:text-3xl font-black tracking-tight text-white font-mono">
-              ${formatUSD(activeMetrics.potentialMonthlyUsd)}
-            </span>
-            <span className="text-[11px] font-mono text-cyan-400 font-bold">/mo</span>
-          </div>
-          <div className="mt-2 flex items-center text-xs text-slate-400 font-mono truncate">
+          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 text-[11px] text-slate-400 font-mono">
             {activeMetrics.potentialMonthlyKhr > 0 ? (
-              <span className="text-emerald-400 font-semibold">
+              <span className="text-slate-300 font-medium truncate">
                 + {formatKHR(activeMetrics.potentialMonthlyKhr)} ៛/mo projected
               </span>
             ) : (
-              <span className="text-slate-400">Based on {currentTab.label} stream velocity</span>
+              <span className="text-slate-400 truncate">
+                ${formatUSD(activeMetrics.avgPerDayUsd)}/day velocity
+              </span>
             )}
-          </div>
-        </Card>
-      </div>
-
-      {/* All-Time Lifetime Summary Banner */}
-      <div className="px-4 py-3 rounded-xl bg-[#090D18] border border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-        <div className="flex items-center gap-2 text-slate-400">
-          <Users size={14} className="text-cyan-400 flex-shrink-0" />
-          <span>Lifetime Community Total:</span>
-          <span className="font-bold text-white">${formatUSD(totalUsd)}</span>
-          {totalKhr > 0 && (
-            <>
-              <span>+</span>
-              <span className="font-bold text-pink-400">{formatKHR(totalKhr)} ៛</span>
-            </>
-          )}
-          <span className="text-slate-500">({formatCount(totalCount)} completed tips)</span>
-        </div>
-        <span className="text-[11px] text-slate-500">Auto-calculated from paid transactions</span>
-      </div>
-
-      {/* Pending Session Management & Auto-Expiry Monitor Bar */}
-      <div className="p-4 rounded-2xl bg-[#090D18] border border-slate-800/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 font-mono select-none">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-cyan-400 flex-shrink-0">
-            <ShieldAlert size={18} />
-          </div>
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-white uppercase tracking-wider font-['Chakra_Petch']">
-                Active Pending Sessions Monitor
-              </span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1.5 ${
-                  pendingCount > 0
-                    ? 'bg-amber-500/15 border border-amber-500/40 text-amber-300 animate-pulse'
-                    : 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${pendingCount > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                {pendingCount} Pending
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-              <Clock size={11} className="text-cyan-400 flex-shrink-0" />
-              <span>5-minute cache timer active: Stale pending sessions auto-clear after 5 mins to prevent unknown alerts.</span>
-            </p>
+            <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">Auto-projected</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        {/* Supporting Card 1: Tips USD */}
+        <div className="col-span-1 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Tips (USD)
+          </span>
+          <div className="my-2.5">
+            <span className="text-2xl font-black tracking-tight text-white font-mono">
+              ${formatUSD(activeMetrics.usd)}
+            </span>
+          </div>
+          <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
+            ${formatUSD(activeMetrics.avgPerDayUsd)}/day rate
+          </div>
+        </div>
+
+        {/* Supporting Card 2: Tips KHR */}
+        <div className="col-span-1 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Tips (KHR)
+          </span>
+          <div className="my-2.5">
+            <span className="text-2xl font-black tracking-tight text-white font-mono">
+              {formatKHR(activeMetrics.khr)} <span className="text-xs font-bold text-slate-400">៛</span>
+            </span>
+          </div>
+          <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
+            ~{formatKHR(activeMetrics.avgPerDayKhr)} ៛/day rate
+          </div>
+        </div>
+
+        {/* Supporting Card 3: Tips Count */}
+        <div className="col-span-1 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Tips Count
+          </span>
+          <div className="my-2.5">
+            <span className="text-2xl font-black tracking-tight text-white font-mono">
+              {formatCount(activeMetrics.count)}
+            </span>
+          </div>
+          <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
+            {currentTab.periodLabel}
+          </div>
+        </div>
+      </div>
+
+      {/* Pending Session Management & Auto-Expiry Monitor Bar (Compact) */}
+      <div className="px-4 py-2.5 rounded-xl bg-[#090D18] border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 font-mono text-xs select-none shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <ShieldAlert size={15} className="text-cyan-400 flex-shrink-0" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-white uppercase tracking-wider font-['Chakra_Petch'] text-[11px]">
+              Pending Sessions
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1.5 ${
+                pendingCount > 0
+                  ? 'bg-amber-500/15 border border-amber-500/40 text-amber-300 animate-pulse'
+                  : 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${pendingCount > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+              {pendingCount} Pending
+            </span>
+            <span className="text-[11px] text-slate-400 hidden md:inline">
+              • 5m auto-clear active
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           {resetMsg && (
             <span className="text-xs text-emerald-400 font-bold flex items-center gap-1 animate-fadeIn">
               <CheckCircle2 size={13} />
@@ -309,7 +250,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
             type="button"
             onClick={handleResetPending}
             disabled={isResetting}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto border ${
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border cursor-pointer ${
               pendingCount > 0
                 ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700/60'
@@ -318,13 +259,13 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
           >
             {isResetting ? (
               <>
-                <Loader2 size={13} className="animate-spin" />
+                <Loader2 size={12} className="animate-spin" />
                 <span>Resetting...</span>
               </>
             ) : (
               <>
-                <RotateCcw size={13} />
-                <span>Reset All Pending</span>
+                <RotateCcw size={12} />
+                <span>Reset Pending</span>
               </>
             )}
           </button>

@@ -17,6 +17,9 @@ import {
   RefreshCw,
   LogOut,
   Menu,
+  Sun,
+  Moon,
+  Home,
   X,
   ShieldCheck,
   BadgeCheck,
@@ -32,8 +35,8 @@ import {
   Volume2,
   Eye,
   EyeOff,
-  ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Download,
   Search,
   Filter,
@@ -365,6 +368,48 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
   const [videoHasUnsavedChanges, setVideoHasUnsavedChanges] = useState(false);
   const [unsavedTabs, setUnsavedTabs] = useState<Record<string, boolean>>({});
+
+  // Theme Mode (Night / Day Mode)
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
+    try {
+      return (localStorage.getItem('streambot_theme_mode') as 'dark' | 'light') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  const toggleThemeMode = () => {
+    setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('streambot_theme_mode', themeMode);
+      if (themeMode === 'light') {
+        document.documentElement.classList.add('light-mode');
+      } else {
+        document.documentElement.classList.remove('light-mode');
+      }
+    } catch (e) {}
+  }, [themeMode]);
+
+  // User Profile Dropdown State
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setIsProfileDropdownOpen(false);
+      }
+    }
+    if (isProfileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileDropdownOpen]);
 
   useEffect(() => {
     const handleUnsaved = (e: any) => {
@@ -1436,9 +1481,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const CurrentTabIcon = currentTabItem?.icon || Tv;
   const currentTabTitle = currentTabItem?.label || 'Dashboard';
 
-  // Shared Scrollable Nav Categories (Clean, Minimal, No Border)
+  // Shared Scrollable Nav Categories (Clean, Minimal, No Border, Hidden Scrollbar)
   const renderSidebarNav = (isCollapsed: boolean) => (
-    <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-none">
+    <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5 no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
       {sidebarSections.map((section, sIdx) => (
         <div key={sIdx} className="space-y-1">
           {!isCollapsed && (
@@ -1539,74 +1584,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     </div>
   );
 
-  // Shared Sidebar Footer (Clean, No Border)
-  const renderSidebarFooter = (isCollapsed: boolean) => (
-    <div className="p-3 bg-[#0B0F19] space-y-3 flex-shrink-0">
-      {!isCollapsed && (
-        <div
-          onClick={() => {
-            handleTabNavigation('account');
-          }}
-          className="p-2 rounded-xl bg-slate-900 flex items-center justify-between cursor-pointer hover:bg-slate-800 transition-colors"
-          title="Open My Account"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="relative">
-              <img
-                src={user.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=neon'}
-                alt="avatar"
-                className="w-8 h-8 rounded-lg bg-slate-950 object-cover"
-              />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400" />
-            </div>
-            <div className="flex flex-col min-w-0 text-left">
-              <span className="text-xs font-semibold text-white truncate leading-tight">
-                {user.displayName || user.username}
-              </span>
-              <span className="text-[10px] font-mono text-slate-400 truncate leading-none mt-0.5">
-                @{user.username}
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              logout();
-              onNavigate('home');
-            }}
-            title="Sign Out"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-          >
-            <LogOut size={15} />
-          </button>
-        </div>
-      )}
-
-      {isCollapsed && (
-        <div className="flex items-center justify-center flex-col gap-2 text-[10px] font-mono text-slate-500">
-          <button
-            onClick={() => setSidebarCollapsed(false)}
-            className="p-1.5 rounded bg-slate-900 text-slate-400 hover:text-white transition-colors"
-            title="Expand"
-          >
-            <ChevronRight size={14} />
-          </button>
-          <button
-            onClick={() => {
-              logout();
-              onNavigate('home');
-            }}
-            title="Sign Out"
-            className="p-1.5 rounded text-slate-500 hover:text-red-400 transition-colors"
-          >
-            <LogOut size={14} />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
   // When a target donation box is selected, render the dedicated Target Donation Studio as a new dashboard
   // (The main sidebar is completely hidden and replaced by our new sidebar, with the top back button)
   if (selectedDonationId && (activeTab === 'donation' || activeTab === 'alerts' || activeTab === 'donations')) {
@@ -1664,21 +1641,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   setMobileDrawerOpen(false);
                   onNavigate('home');
                 }}
-                className="flex items-center gap-3.5 group cursor-pointer text-left focus:outline-none min-w-0"
+                className="flex items-center gap-3 group cursor-pointer text-left focus:outline-none min-w-0"
                 title="Return to streambotkh.com"
               >
-                <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
                   <img
                     src="/images/logo-192.png"
-                    alt="streambotkh.com"
-                    className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
+                    alt="Dashboard Panel"
+                    className="w-9 h-9 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
                   />
                 </div>
                 <div className="flex items-center min-w-0 leading-tight">
-                  <span className="text-base font-bold tracking-tight text-white font-['Chakra_Petch']">
-                    streambot<span className="text-cyan-400">kh</span>
-                  </span>
-                  <span className="text-xs font-mono text-slate-500 ml-0.5">.com</span>
+                  <h1 className="text-base font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
+                    Dashboard <span className="text-cyan-400">Panel</span>
+                  </h1>
                 </div>
               </button>
               <button
@@ -1692,9 +1668,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
             {/* Scrollable Nav Items */}
             {renderSidebarNav(false)}
-
-            {/* Mobile Footer */}
-            {renderSidebarFooter(false)}
           </aside>
         </div>,
         document.body
@@ -1711,48 +1684,49 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         {/* Desktop Sidebar Brand Header */}
         <div
           className={`h-20 bg-[#0B0F19] flex items-center flex-shrink-0 transition-all ${
-            sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-5'
+            sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-4'
           }`}
         >
-          <button
-            onClick={() => onNavigate('home')}
-            className={`flex items-center ${
-              sidebarCollapsed ? 'justify-center w-full' : 'gap-3 min-w-0'
-            } group cursor-pointer text-left focus:outline-none transition-opacity hover:opacity-90`}
-            title="Return to streambotkh.com"
-          >
-            <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
-              <img
-                src="/images/logo-192.png"
-                alt="streambotkh.com"
-                className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
-              />
-            </div>
-            {!sidebarCollapsed && (
-              <div className="flex items-center min-w-0 leading-tight">
-                <span className="text-base font-bold tracking-tight text-white font-['Chakra_Petch']">
-                  streambot<span className="text-cyan-400">kh</span>
-                </span>
-                <span className="text-xs font-mono text-slate-500 ml-0.5">.com</span>
-              </div>
-            )}
-          </button>
           {!sidebarCollapsed && (
             <button
-              onClick={() => setSidebarCollapsed(true)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
-              title="Collapse Sidebar"
+              onClick={() => onNavigate('home')}
+              className="flex items-center gap-3 min-w-0 group cursor-pointer text-left focus:outline-none transition-opacity hover:opacity-90"
+              title="Return to Home"
             >
-              <ChevronLeft size={16} />
+              <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
+                <img
+                  src="/images/logo-192.png"
+                  alt="Dashboard Panel"
+                  className="w-9 h-9 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
+                />
+              </div>
+              <div className="flex items-center min-w-0 leading-tight">
+                <h1 className="text-base font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
+                  Dashboard <span className="text-cyan-400">Panel</span>
+                </h1>
+              </div>
             </button>
           )}
+
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className={`p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-all cursor-pointer flex-shrink-0 ${
+              sidebarCollapsed ? 'bg-slate-900/80 border-slate-800 text-cyan-400' : ''
+            }`}
+            title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            <Menu
+              size={19}
+              className={`transform transition-transform duration-300 ease-in-out ${
+                sidebarCollapsed ? 'rotate-90 text-cyan-400' : 'rotate-0'
+              }`}
+            />
+          </button>
         </div>
 
         {/* Scrollable Nav Items */}
         {renderSidebarNav(sidebarCollapsed)}
-
-        {/* Desktop Footer */}
-        {renderSidebarFooter(sidebarCollapsed)}
       </aside>
 
       {/* ============================================================== */}
@@ -1771,16 +1745,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               {mobileDrawerOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
 
-            {/* Desktop Sidebar Toggle Hamburger */}
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden md:flex p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors focus:outline-none flex-shrink-0 cursor-pointer"
-              aria-label={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-              title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            >
-              <Menu size={18} />
-            </button>
-
             {/* Active Section Title */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <div className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-700/80 items-center justify-center text-cyan-400 flex-shrink-0 shadow-inner">
@@ -1791,15 +1755,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   <h1 className="text-sm xs:text-base sm:text-lg font-black text-white font-['Chakra_Petch'] tracking-tight truncate">
                     {currentTabTitle}
                   </h1>
-                  {(activeTab === 'payments' || activeTab === 'telegram') && isPaymentGatewayIncomplete && (
-                    <span
-                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[11px] font-semibold"
-                      title="Action Required"
-                    >
-                      <AlertCircle size={13} className="text-rose-500 stroke-[2.5] flex-shrink-0" />
-                      <span className="hidden xs:inline">Action Required</span>
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -1839,6 +1794,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 </button>
               </div>
             )}
+
+            {/* Mode Feature Toggle (Night Mode / Day Mode) */}
+            <button
+              type="button"
+              onClick={toggleThemeMode}
+              className={`relative p-2 sm:p-2.5 rounded-xl border transition-all shadow-sm cursor-pointer group flex items-center justify-center ${
+                themeMode === 'light'
+                  ? 'bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                  : 'bg-slate-900/90 hover:bg-slate-800 border-slate-750 hover:border-cyan-500/50 text-slate-200 hover:text-white'
+              }`}
+              title={themeMode === 'light' ? 'Switch to Night Mode' : 'Switch to Day Mode'}
+              aria-label="Toggle Night or Day Mode"
+            >
+              {themeMode === 'light' ? (
+                <Sun size={16} className="text-amber-400 group-hover:scale-110 group-hover:rotate-45 transition-transform" />
+              ) : (
+                <Moon size={16} className="text-cyan-400 group-hover:scale-110 group-hover:-rotate-12 transition-transform" />
+              )}
+            </button>
 
             {/* Streamer Mailbox: Dropdown Popover from Navbar Icon */}
             <div className="relative">
@@ -1916,6 +1890,98 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 )}
               </button>
             )}
+
+            {/* User Profile Rounded Avatar (Image Only) & Dropdown Menu */}
+            {user && (
+              <div className="relative" ref={profileDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                  className={`relative p-0.5 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center focus:outline-none ${
+                    isProfileDropdownOpen
+                      ? 'border-cyan-400 shadow-[0_0_12px_rgba(0,240,255,0.4)]'
+                      : 'border-slate-700 hover:border-cyan-400 shadow-sm'
+                  }`}
+                  title={user.displayName || user.username}
+                  aria-label="User Profile Menu"
+                  aria-expanded={isProfileDropdownOpen}
+                >
+                  <img
+                    src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
+                    alt={user.displayName || 'Profile'}
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-900 object-cover"
+                  />
+                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#060911]" />
+                </button>
+
+                {isProfileDropdownOpen && (
+                  <div
+                    className="absolute right-0 mt-2.5 w-56 sm:w-60 rounded-2xl bg-[#0B0F19]/95 backdrop-blur-xl border border-slate-800 shadow-2xl p-2 z-50 animate-fadeIn"
+                    style={{ boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 240, 255, 0.1)' }}
+                  >
+                    {/* User Profile Header */}
+                    <div className="px-3 py-2.5 border-b border-slate-800/80 mb-1 flex items-center gap-2.5">
+                      <img
+                        src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
+                        alt="Avatar"
+                        className="w-9 h-9 rounded-full bg-slate-950 object-cover ring-1 ring-cyan-500/30 flex-shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs sm:text-sm font-bold text-white truncate font-['Chakra_Petch'] leading-tight">
+                          {user.displayName || user.username}
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
+                          @{user.username}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="space-y-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileDropdownOpen(false);
+                          handleTabNavigation('account');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors text-left cursor-pointer group"
+                      >
+                        <User size={14} className="text-cyan-400 group-hover:scale-110 transition-transform" />
+                        <span>My Account</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileDropdownOpen(false);
+                          onNavigate('home');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors text-left cursor-pointer group"
+                      >
+                        <Home size={14} className="text-slate-400 group-hover:text-cyan-400 group-hover:scale-110 transition-transform" />
+                        <span>Return to Website</span>
+                      </button>
+                    </div>
+
+                    <div className="my-1 border-t border-slate-800/80" />
+
+                    {/* Log Out Option */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        logout();
+                        onNavigate('home');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 transition-all text-left cursor-pointer group"
+                    >
+                      <LogOut size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+                      <span>Log Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -1923,7 +1989,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         <div className={`flex-1 min-h-0 ${activeTab === 'chat' || activeTab === 'video-alerts' ? 'flex flex-col overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
         <div className={activeTab === 'chat' || activeTab === 'video-alerts'
           ? 'w-full h-full p-2.5 sm:p-4 lg:p-5 flex-1 flex flex-col min-h-0'
-          : 'p-3 xs:p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6 sm:space-y-8 animate-fadeIn pb-16'
+          : 'p-3 xs:p-4 sm:p-6 lg:p-7 max-w-7xl 2xl:max-w-[1600px] w-full mx-auto space-y-6 animate-fadeIn pb-16'
         }>
           {loading ? (
             <FeatureTabSkeleton tab={activeTab} />
@@ -1933,7 +1999,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* TAB 1: OVERVIEW & HUD                                          */}
           {/* ============================================================== */}
           {activeTab === 'overview' && (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {/* Summary Stats Grid & Analytics Timeframe Filter */}
               <OverviewStats stats={stats?.summary} timeframeAnalytics={stats?.timeframeAnalytics} />
 
@@ -1942,7 +2008,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 donations={stats?.recentDonations}
                 limit={10}
                 title="Recent Donations"
-                subtitle="Live incoming tips from ABA Bank & Bakong KHQR (Paid Only)"
                 onReplayAlert={handleReplayAlert}
                 onDeleteDonation={handleDeleteDonation}
                 deletingId={deletingDonationId}
@@ -2001,36 +2066,38 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                 {/* Filters */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Currency Filter */}
-                  <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs font-mono">
-                    {(['ALL', 'USD', 'KHR'] as const).map((curr) => (
-                      <button
-                        key={curr}
-                        onClick={() => setCurrencyFilter(curr)}
-                        className={`px-3 py-1 rounded-lg font-bold transition-colors ${
-                          currencyFilter === curr
-                            ? 'bg-cyan-500 text-slate-950'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        {curr}
-                      </button>
-                    ))}
+                  {/* Currency Filter Dropdown */}
+                  <div className="relative">
+                    <select
+                      value={currencyFilter}
+                      onChange={(e) => setCurrencyFilter(e.target.value as 'ALL' | 'USD' | 'KHR')}
+                      aria-label="Filter currency"
+                      className="appearance-none pl-3.5 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-slate-300 hover:border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer"
+                    >
+                      <option value="ALL" className="bg-slate-950 text-white">All Currencies</option>
+                      <option value="USD" className="bg-slate-950 text-white">USD ($)</option>
+                      <option value="KHR" className="bg-slate-950 text-white">KHR (៛)</option>
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   </div>
 
-                  {/* Bank Filter */}
-                  <select
-                    value={bankFilter}
-                    onChange={(e) => setBankFilter(e.target.value)}
-                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-400"
-                  >
-                    <option value="ALL">All Cambodian Banks</option>
-                    <option value="ABA">ABA Bank</option>
-                    <option value="Bakong">Bakong KHQR</option>
-                    <option value="Acleda">ACLEDA Bank</option>
-                    <option value="Wing">Wing Bank</option>
-                    <option value="Canadia">Canadia Bank</option>
-                  </select>
+                  {/* Bank Filter Dropdown */}
+                  <div className="relative">
+                    <select
+                      value={bankFilter}
+                      onChange={(e) => setBankFilter(e.target.value)}
+                      aria-label="Filter Cambodian bank"
+                      className="appearance-none pl-3.5 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 hover:border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer"
+                    >
+                      <option value="ALL" className="bg-slate-950 text-white">All Cambodian Banks</option>
+                      <option value="ABA" className="bg-slate-950 text-white">ABA Bank</option>
+                      <option value="Bakong" className="bg-slate-950 text-white">Bakong KHQR</option>
+                      <option value="Acleda" className="bg-slate-950 text-white">ACLEDA Bank</option>
+                      <option value="Wing" className="bg-slate-950 text-white">Wing Bank</option>
+                      <option value="Canadia" className="bg-slate-950 text-white">Canadia Bank</option>
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
                 </div>
               </div>
 

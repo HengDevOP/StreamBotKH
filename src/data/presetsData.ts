@@ -9687,6 +9687,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-kaching",
     "name": "Cash Register (Ka-Ching!)",
+    "category": "Sounds",
     "group": "Cash & Tips",
     "url": "/uploads/presets/sounds/cash-register-kaching.mp3",
     "duration": 1.4,
@@ -9700,6 +9701,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-mario",
     "name": "Super Mario Coin Drop",
+    "category": "Sounds",
     "group": "Gaming",
     "url": "/uploads/presets/sounds/mario-coin.mp3",
     "duration": 0.7,
@@ -9713,6 +9715,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-neon",
     "name": "Neon Cyber Synth Chime",
+    "category": "Sounds",
     "group": "Alerts & Chimes",
     "url": "/uploads/presets/sounds/neon-chime.mp3",
     "duration": 2.2,
@@ -9726,6 +9729,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-vine-boom",
     "name": "Vine Boom Bass Drop",
+    "category": "Sounds",
     "group": "Memes",
     "url": "/uploads/presets/sounds/memes/meme-vine-boom.mp3",
     "duration": 0.7,
@@ -9739,6 +9743,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-emotional",
     "name": "Emotional Damage!",
+    "category": "Sounds",
     "group": "Memes",
     "url": "/uploads/presets/sounds/memes/meme-emotional-damage.mp3",
     "duration": 1.7,
@@ -9752,6 +9757,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-fbi",
     "name": "FBI OPEN UP! Door Breach",
+    "category": "Sounds",
     "group": "Memes",
     "url": "/uploads/presets/sounds/memes/meme-fbi-open-up.mp3",
     "duration": 2.4,
@@ -9765,6 +9771,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-john-cena",
     "name": "John Cena Fanfare Trumpets",
+    "category": "Sounds",
     "group": "Hype & Cheers",
     "url": "/uploads/presets/sounds/memes/meme-john-cena.mp3",
     "duration": 5,
@@ -9778,6 +9785,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-among-us",
     "name": "Among Us Emergency Reveal",
+    "category": "Sounds",
     "group": "Gaming",
     "url": "/uploads/presets/sounds/memes/meme-among-us.mp3",
     "duration": 3.1,
@@ -9791,6 +9799,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-discord",
     "name": "Discord Notification Ping",
+    "category": "Sounds",
     "group": "Alerts & Chimes",
     "url": "/uploads/presets/sounds/memes/meme-discord-ping.mp3",
     "duration": 0.4,
@@ -9804,6 +9813,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-win-xp",
     "name": "Windows XP Startup Chime",
+    "category": "Sounds",
     "group": "Alerts & Chimes",
     "url": "/uploads/presets/sounds/memes/meme-windows-startup.mp3",
     "duration": 3.7,
@@ -9817,6 +9827,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-metal-pipe",
     "name": "Metal Pipe Clang Drop",
+    "category": "Sounds",
     "group": "Memes",
     "url": "/uploads/presets/sounds/memes/meme-metal-pipe.mp3",
     "duration": 1.4,
@@ -9830,6 +9841,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-nuke",
     "name": "Tactical Nuke Incoming Siren",
+    "category": "Sounds",
     "group": "Gaming",
     "url": "/uploads/presets/sounds/memes/meme-tactical-nuke.mp3",
     "duration": 4.8,
@@ -9843,6 +9855,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-jojo",
     "name": "To Be Continued (Roundabout JoJo)",
+    "category": "Sounds",
     "group": "Memes",
     "url": "/uploads/presets/sounds/memes/meme-to-be-continued.mp3",
     "duration": 4.8,
@@ -9856,6 +9869,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-minecraft-oof",
     "name": "Minecraft Classic OOF",
+    "category": "Sounds",
     "group": "Gaming",
     "url": "/uploads/presets/sounds/memes/oh-minecraft-oof.mp3",
     "duration": 0.4,
@@ -9869,6 +9883,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-roblox-oof",
     "name": "Roblox Original OOF",
+    "category": "Sounds",
     "group": "Gaming",
     "url": "/uploads/presets/sounds/memes/oh-roblox-oof.mp3",
     "duration": 0.5,
@@ -9882,6 +9897,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-crowd",
     "name": "Stadium Crowd Standing Ovation",
+    "category": "Sounds",
     "group": "Hype & Cheers",
     "url": "/uploads/presets/sounds/memes/oh-crowd.mp3",
     "duration": 2.8,
@@ -9895,6 +9911,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-sad-violin",
     "name": "Sad Violin Dramatic Solo",
+    "category": "Sounds",
     "group": "Memes",
     "url": "/uploads/presets/sounds/memes/meme-sad-violin.mp3",
     "duration": 2.3,
@@ -9908,6 +9925,7 @@ export const PRESET_SOUNDS: PresetMediaItem[] = [
   {
     "id": "snd-spongebob",
     "name": "SpongeBob Fail (Womp Womp)",
+    "category": "Sounds",
     "group": "Memes",
     "url": "/uploads/presets/sounds/memes/meme-spongebob-fail.mp3",
     "duration": 1.7,

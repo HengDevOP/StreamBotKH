@@ -228,12 +228,14 @@ body:has(.app-viewport-lock),
 }
 
 /* Hide scrollbar utility for chat feeds & stream overlays */
-.no-scrollbar::-webkit-scrollbar {
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
 }
-.no-scrollbar {
+.no-scrollbar,
+.scrollbar-none {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
@@ -1017,4 +1019,436 @@ body:has(.app-viewport-lock),
               radial-gradient(circle at 20% 85%, rgba(16, 185, 129, 0.06) 0%, transparent 45%);
   background-size: 150% 150%;
   animation: homeGradientShift 30s ease infinite;
+}
+
+/* ============================================================== */
+/* DAY / LIGHT MODE COMPREHENSIVE RECOLOR & STYLING               */
+/* ============================================================== */
+html.light-mode {
+  color-scheme: light;
+}
+
+/* Base Canvas & Viewport */
+html.light-mode body {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+html.light-mode #root,
+html.light-mode main {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+html.light-mode .bg-\[\#060911\],
+html.light-mode .bg-\[\#070A12\] {
+  background-color: #F1F5F9 !important;
+}
+
+/* ============================================================== */
+/* SIDEBAR (Crisp Studio White with Refined Borders & Active Tabs) */
+/* ============================================================== */
+html.light-mode aside.bg-\[\#0B0F19\],
+html.light-mode aside {
+  background-color: #FFFFFF !important;
+  border-right: 1px solid #E2E8F0 !important;
+  box-shadow: 1px 0 6px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light-mode aside .h-20.bg-\[\#0B0F19\],
+html.light-mode aside .h-20 {
+  background-color: #FFFFFF !important;
+  border-bottom: 1px solid #F1F5F9 !important;
+}
+
+/* Brand Logo Text */
+html.light-mode aside h1 {
+  color: #0F172A !important;
+}
+html.light-mode aside h1 .text-cyan-400 {
+  color: #0284C7 !important;
+}
+
+/* Category Headers */
+html.light-mode aside span.text-slate-500 {
+  color: #94A3B8 !important;
+  font-weight: 700 !important;
+}
+
+/* Inactive Nav Items */
+html.light-mode aside button.text-slate-400 {
+  color: #475569 !important;
+}
+html.light-mode aside button.text-slate-400:hover {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+html.light-mode aside button.text-slate-400 .text-slate-400 {
+  color: #64748B !important;
+}
+
+/* Active Nav Item (Elevated Sky Accent) */
+html.light-mode aside button.bg-slate-800 {
+  background-color: #E0F2FE !important;
+  color: #0369A1 !important;
+  font-weight: 700 !important;
+  border: 1px solid #BAE6FD !important;
+  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.08) !important;
+}
+html.light-mode aside button.bg-slate-800 .text-cyan-400 {
+  color: #0284C7 !important;
+}
+
+/* Sidebar Toggle Menu Button */
+html.light-mode aside button.hover\:bg-slate-900:hover {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+html.light-mode aside button.bg-slate-900\/80 {
+  background-color: #F1F5F9 !important;
+  border-color: #E2E8F0 !important;
+}
+
+/* ============================================================== */
+/* TOP WORKBENCH APPLICATION HEADER                               */
+/* ============================================================== */
+html.light-mode header.bg-\[\#060911\]\/95,
+html.light-mode header {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light-mode header h1 {
+  color: #0F172A !important;
+}
+
+/* Current Tab Icon Container */
+html.light-mode header .bg-slate-900.border-slate-700\/80 {
+  background-color: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
+  color: #0284C7 !important;
+}
+
+/* Action Icon Buttons (Mailbox, Copy, Mode) */
+html.light-mode header .bg-slate-900\/90,
+html.light-mode header .bg-slate-900 {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+  color: #334155 !important;
+}
+html.light-mode header .bg-slate-900\/90:hover,
+html.light-mode header .bg-slate-900:hover {
+  background-color: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+/* Profile Dropdown Popover */
+html.light-mode .bg-\[\#0B0F19\]\/95 {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+}
+html.light-mode .bg-\[\#0B0F19\]\/95 .text-white {
+  color: #0F172A !important;
+}
+html.light-mode .bg-\[\#0B0F19\]\/95 .text-slate-300 {
+  color: #475569 !important;
+}
+html.light-mode .bg-\[\#0B0F19\]\/95 .text-slate-400 {
+  color: #64748B !important;
+}
+html.light-mode .bg-\[\#0B0F19\]\/95 button:hover {
+  background-color: #F1F5F9 !important;
+}
+
+/* ============================================================== */
+/* DASHBOARD CARDS & WIDGET PANELS                                */
+/* ============================================================== */
+html.light-mode .bg-\[\#0B0F19\],
+html.light-mode .bg-\[\#090D18\] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02) !important;
+}
+
+html.light-mode aside.lg\:bg-\[\#090D18\] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Card Section Header Bars */
+html.light-mode .border-b.border-slate-800,
+html.light-mode .border-b.border-slate-800\/80,
+html.light-mode .border-b.border-slate-800\/60,
+html.light-mode .border-b.border-slate-700,
+html.light-mode .border-b.border-slate-750 {
+  border-bottom-color: #E2E8F0 !important;
+}
+
+html.light-mode .border-t.border-slate-800,
+html.light-mode .border-t.border-slate-800\/80,
+html.light-mode .border-t.border-slate-700 {
+  border-top-color: #E2E8F0 !important;
+}
+
+html.light-mode .border-slate-800,
+html.light-mode .border-slate-800\/80,
+html.light-mode .border-slate-750,
+html.light-mode .border-slate-700,
+html.light-mode .border-slate-700\/80 {
+  border-color: #E2E8F0 !important;
+}
+
+/* Rightbar / Drawer Top Header Deck */
+html.light-mode .bg-\[\#060911\]\/90 {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+}
+
+/* Inner Wells & Sub-panels (e.g. Analytics timeframe well, presets box) */
+html.light-mode .bg-slate-950,
+html.light-mode .bg-slate-950\/90,
+html.light-mode .bg-slate-950\/80,
+html.light-mode .bg-slate-950\/60,
+html.light-mode .bg-slate-950\/50,
+html.light-mode .bg-slate-950\/40 {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+}
+
+html.light-mode .bg-slate-900,
+html.light-mode .bg-slate-900\/90,
+html.light-mode .bg-slate-900\/80,
+html.light-mode .bg-slate-900\/60,
+html.light-mode .bg-slate-900\/50,
+html.light-mode .bg-slate-900\/40 {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+}
+
+html.light-mode .bg-slate-800:not(button):not(aside button) {
+  background-color: #F1F5F9 !important;
+  border-color: #E2E8F0 !important;
+}
+
+/* ============================================================== */
+/* TYPOGRAPHY HIERARCHY (HIGH CONTRAST & LEGIBILITY)              */
+/* ============================================================== */
+html.light-mode h1,
+html.light-mode h2,
+html.light-mode h3,
+html.light-mode h4,
+html.light-mode h5,
+html.light-mode h6 {
+  color: #0F172A !important;
+}
+
+/* Primary Card Text and Numbers (preserving colored button text!) */
+html.light-mode .font-black.text-white,
+html.light-mode .font-bold.text-white:not(button):not(.bg-cyan-500):not(.bg-pink-600),
+html.light-mode .font-semibold.text-white:not(button) {
+  color: #0F172A !important;
+}
+
+/* Card titles & Stat numbers */
+html.light-mode .text-xl.text-white,
+html.light-mode .text-2xl.text-white,
+html.light-mode .text-3xl.text-white,
+html.light-mode .text-4xl.text-white {
+  color: #0F172A !important;
+}
+
+/* Descriptions & Secondary text */
+html.light-mode p.text-slate-400,
+html.light-mode span.text-slate-400 {
+  color: #64748B !important;
+}
+
+html.light-mode p.text-slate-300,
+html.light-mode span.text-slate-300 {
+  color: #475569 !important;
+}
+
+html.light-mode .text-slate-500 {
+  color: #64748B !important;
+}
+
+/* Monospace text */
+html.light-mode .font-mono.text-slate-400,
+html.light-mode .font-mono.text-slate-500 {
+  color: #64748B !important;
+}
+
+/* ============================================================== */
+/* FORM INPUTS, SELECTS, AND TEXTAREAS                            */
+/* ============================================================== */
+html.light-mode input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+html.light-mode select,
+html.light-mode textarea {
+  background-color: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0F172A !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light-mode input:focus,
+html.light-mode select:focus,
+html.light-mode textarea:focus {
+  border-color: #0284C7 !important;
+  outline: 2px solid rgba(2, 132, 199, 0.15) !important;
+}
+
+html.light-mode input::placeholder,
+html.light-mode textarea::placeholder {
+  color: #94A3B8 !important;
+}
+
+html.light-mode input[type="range"] {
+  background-color: #E2E8F0 !important;
+}
+
+/* ============================================================== */
+/* TABLES (RECENT DONATIONS & SUBSCRIBERS)                        */
+/* ============================================================== */
+html.light-mode table thead tr,
+html.light-mode table thead th {
+  background-color: #F8FAFC !important;
+  color: #475569 !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  font-weight: 700 !important;
+}
+
+html.light-mode table tbody tr {
+  border-bottom: 1px solid #F1F5F9 !important;
+}
+
+html.light-mode table tbody tr:hover {
+  background-color: #F8FAFC !important;
+}
+
+html.light-mode table tbody td {
+  color: #0F172A !important;
+}
+
+html.light-mode td .font-bold.text-white,
+html.light-mode .donor-name {
+  color: #0F172A !important;
+}
+
+html.light-mode td .font-mono.text-emerald-400 {
+  color: #059669 !important;
+  font-weight: 800 !important;
+}
+
+html.light-mode td .font-mono.text-cyan-400 {
+  color: #0284C7 !important;
+  font-weight: 800 !important;
+}
+
+html.light-mode .divide-slate-800\/60,
+html.light-mode .divide-slate-800 {
+  border-color: #E2E8F0 !important;
+}
+
+/* ============================================================== */
+/* BUTTONS & BADGES                                               */
+/* ============================================================== */
+/* Secondary Action Buttons */
+html.light-mode button.bg-slate-800:not(aside button) {
+  background-color: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04) !important;
+}
+html.light-mode button.bg-slate-800:not(aside button):hover {
+  background-color: #F8FAFC !important;
+  border-color: #94A3B8 !important;
+  color: #0F172A !important;
+}
+
+/* Primary Cyan Action Buttons (Preserve Crisp White Text) */
+html.light-mode button.bg-cyan-400,
+html.light-mode button.bg-cyan-500 {
+  background-color: #0284C7 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.3) !important;
+}
+html.light-mode button.bg-cyan-400:hover,
+html.light-mode button.bg-cyan-500:hover {
+  background-color: #0369A1 !important;
+  color: #FFFFFF !important;
+}
+
+/* Danger Buttons */
+html.light-mode button.bg-red-500\/20,
+html.light-mode button.hover\:bg-red-500\/10:hover {
+  background-color: #FEE2E2 !important;
+  border-color: #FCA5A5 !important;
+  color: #DC2626 !important;
+}
+
+/* Soft Badges */
+html.light-mode .bg-purple-500\/10 {
+  background-color: #F3E8FF !important;
+  border-color: #D8B4FE !important;
+  color: #7E22CE !important;
+}
+html.light-mode .bg-amber-500\/10 {
+  background-color: #FEF3C7 !important;
+  border-color: #FDE68A !important;
+  color: #B45309 !important;
+}
+html.light-mode .bg-emerald-500\/10 {
+  background-color: #D1FAE5 !important;
+  border-color: #A7F3D0 !important;
+  color: #047857 !important;
+}
+html.light-mode .bg-cyan-500\/10 {
+  background-color: #E0F2FE !important;
+  border-color: #BAE6FD !important;
+  color: #0369A1 !important;
+}
+
+/* Ambient glow orbs muted in light mode to prevent murkiness */
+html.light-mode .ambient-glow-cyan,
+html.light-mode .ambient-glow-pink,
+html.light-mode .ambient-glow-purple {
+  opacity: 0.15 !important;
+}
+
+/* Subtle Cyber Grid in Light Mode */
+html.light-mode .cyber-grid {
+  background-image: 
+    linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px) !important;
+}
+
+/* ============================================================== */
+/* PRESERVE OBS STREAM PREVIEW CANVAS (KEEP DARK MONITOR FRAME!)  */
+/* ============================================================== */
+html.light-mode .from-slate-950.via-\[\#060911\].to-slate-950,
+html.light-mode [class*="bg-gradient-to-b from-slate-950 via-[#060911] to-slate-950"] {
+  background: #0B0F19 !important;
+  border-color: #334155 !important;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.7) !important;
+}
+
+html.light-mode [class*="bg-gradient-to-b from-slate-950 via-[#060911] to-slate-950"] .text-white {
+  color: #FFFFFF !important;
+}
+
+/* ============================================================== */
+/* PRESERVE OBS OVERLAYS STRICTLY TRANSPARENT IN ALL MODES        */
+/* ============================================================== */
+html.light-mode.obs-transparent,
+html.light-mode.obs-transparent body,
+html.light-mode.obs-transparent #root,
+html.light-mode:has(.obs-overlay),
+html.light-mode body:has(.obs-overlay) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
 }

@@ -169,6 +169,7 @@ export interface StreamGoalDoc {
   showBalance?: boolean;
   showBackground?: boolean;
   showAnimation?: boolean;
+  showGradientShader?: boolean;
   endDate?: string | null;
   currency?: string;
   theme?: string;

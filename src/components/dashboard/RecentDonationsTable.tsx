@@ -32,7 +32,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
   donations = [],
   limit = 10,
   title = 'Recent Donations',
-  subtitle = 'Live incoming tips from ABA Bank & Bakong KHQR (Paid Only)',
+  subtitle,
   onReplayAlert,
   onDeleteDonation,
   deletingId
@@ -126,21 +126,13 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
       {/* Header Bar */}
       <div className="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
-            <span>{title}</span>
+          <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
+            {title}
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+          {subtitle ? <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p> : null}
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-xs font-mono text-emerald-400 flex items-center gap-1.5 shadow-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Live Realtime</span>
-          </div>
           <div className="px-3 py-1 rounded-full bg-slate-800/80 text-xs font-mono text-cyan-400 border border-slate-700/80 shadow-sm">
             Latest {paidDonations.length} records {limit ? `(Max ${limit})` : ''}
           </div>

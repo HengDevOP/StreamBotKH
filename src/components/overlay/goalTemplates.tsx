@@ -32,6 +32,13 @@ export interface GoalTemplateMeta {
 
 export const GOAL_TEMPLATES: GoalTemplateMeta[] = [
   {
+    id: 'liquid-gradient-shader',
+    name: 'Liquid Gradient Shader',
+    category: 'Cyber',
+    previewColor: '#EC4899',
+    description: 'Hyper-dynamic liquid gradient mesh shader with continuous iridescent flow, caustics light sweep, and chromatic aura.'
+  },
+  {
     id: 'cyber-neon',
     name: 'Cyberpunk Neon',
     category: 'Cyber',
@@ -182,10 +189,70 @@ export interface GoalRenderProps {
   showBalance?: boolean;
   showBackground?: boolean;
   showAnimation?: boolean;
+  showGradientShader?: boolean;
   endDate?: string | null;
   recentDonor?: string | null;
   addedAmount?: number | null;
 }
+
+export const ProgressBarGradientShader: React.FC<{
+  show?: boolean;
+  accentColor?: string;
+  roundedClass?: string;
+}> = ({ show = true, accentColor = '#10B981', roundedClass = 'rounded' }) => {
+  if (!show) return null;
+  return (
+    <div className={`absolute inset-0 pointer-events-none overflow-hidden z-[5] ${roundedClass}`}>
+      {/* Dynamic iridescent liquid gradient flow layer */}
+      <div
+        className="absolute inset-0 opacity-85 mix-blend-screen"
+        style={{
+          backgroundImage: `linear-gradient(120deg, ${accentColor} 0%, #38BDF8 20%, #A855F7 40%, #EC4899 60%, #F59E0B 80%, ${accentColor} 100%)`,
+          backgroundSize: '300% 300%',
+          animation: 'goalGradientShaderFlow 3.5s ease infinite, goalGradientShaderHue 12s linear infinite'
+        }}
+      />
+      {/* Secondary chromatic plasma overlay */}
+      <div
+        className="absolute inset-0 opacity-40 mix-blend-overlay"
+        style={{
+          backgroundImage: 'radial-gradient(ellipse at center, rgba(255,255,255,0.8) 0%, transparent 70%)',
+          backgroundSize: '150% 150%',
+          animation: 'goalShaderPlasmaPulse 2.4s ease-in-out infinite'
+        }}
+      />
+      {/* Glinting specular liquid caustics beam */}
+      <div
+        className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none"
+        style={{
+          animation: 'goalShaderBeamSweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+        }}
+      />
+      {/* Top 3D glass gloss curvature highlight */}
+      <div className="absolute top-0 inset-x-0 h-[40%] bg-gradient-to-b from-white/40 via-white/10 to-transparent pointer-events-none" />
+    </div>
+  );
+};
+
+export const ContainerGradientShaderAura: React.FC<{
+  show?: boolean;
+  showBackground?: boolean;
+  accentColor?: string;
+  borderRadius?: string;
+}> = ({ show = true, showBackground = true, accentColor = '#10B981', borderRadius = '1rem' }) => {
+  if (!show || !showBackground) return null;
+  return (
+    <div
+      className="absolute -inset-1.5 pointer-events-none opacity-45 blur-xl transition-opacity duration-700 -z-10"
+      style={{
+        borderRadius,
+        backgroundImage: `linear-gradient(125deg, ${accentColor} 0%, #38BDF8 25%, #8B5CF6 50%, #EC4899 75%, #F59E0B 100%)`,
+        backgroundSize: '300% 300%',
+        animation: 'goalGradientShaderFlow 5s ease infinite, goalGradientShaderHue 14s linear infinite'
+      }}
+    />
+  );
+};
 
 export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   title,
@@ -196,6 +263,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   showBalance = true,
   showBackground = true,
   showAnimation = true,
+  showGradientShader = true,
   endDate,
   recentDonor,
   addedAmount
@@ -292,6 +360,29 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         0% { transform: translateX(-100%); }
         100% { transform: translateX(200%); }
       }
+      @keyframes goalGradientShaderFlow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      @keyframes goalGradientShaderHue {
+        0% { filter: hue-rotate(0deg); }
+        50% { filter: hue-rotate(180deg); }
+        100% { filter: hue-rotate(360deg); }
+      }
+      @keyframes goalShaderBeamSweep {
+        0% { transform: translateX(-160%) skewX(-20deg); }
+        100% { transform: translateX(260%) skewX(-20deg); }
+      }
+      @keyframes goalShaderPlasmaPulse {
+        0%, 100% { opacity: 0.55; }
+        50% { opacity: 0.95; }
+      }
+      @keyframes goalShaderBorderFlow {
+        0% { background-position: 0% 0%; }
+        50% { background-position: 100% 100%; }
+        100% { background-position: 0% 0%; }
+      }
     `}</style>
   );
 
@@ -306,6 +397,50 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
     </div>
   );
 
+  // 0. LIQUID GRADIENT SHADER (Special Dedicated Shader Template)
+  if (templateStyle === 'liquid-gradient-shader') {
+    return (
+      <div
+        className={`w-full max-w-lg rounded-2xl p-5 sm:p-6 space-y-3.5 relative transition-all duration-300 ${
+          showBackground
+            ? 'bg-slate-950/90 backdrop-blur-2xl border border-white/20 shadow-[0_0_40px_rgba(236,72,153,0.3)]'
+            : 'bg-transparent border-transparent shadow-none'
+        }`}
+      >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor={accentColor} borderRadius="1rem" />
+        {animationStyles}
+        {bonusPopup}
+        <div className="flex items-center justify-between gap-3 relative z-10">
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles size={16} className="text-pink-400 animate-pulse flex-shrink-0" />
+            <h3 className="text-base font-extrabold font-['Chakra_Petch'] truncate bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
+              {title}
+            </h3>
+          </div>
+          {showBalance && (
+            <div className="text-sm sm:text-base font-extrabold font-mono text-cyan-300 text-right flex-shrink-0">
+              ${currentAmount.toFixed(2)}{' '}
+              <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+        <div className="w-full h-6 rounded-xl bg-slate-950 border border-white/20 p-0.5 overflow-hidden relative shadow-inner">
+          <div
+            className="h-full rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 transition-all duration-700 ease-out relative flex items-center justify-end pr-2 overflow-hidden shadow-[0_0_20px_rgba(236,72,153,0.6)]"
+            style={{ width: `${Math.max(5, percent)}%` }}
+          >
+            <ProgressBarGradientShader show={showGradientShader} accentColor={accentColor} roundedClass="rounded-lg" />
+            {percent >= 12 && (
+              <span className="relative z-10 text-[10px] font-mono font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                {percent}%
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 1. CYBERPUNK NEON
   if (templateStyle === 'cyber-neon') {
     return (
@@ -319,6 +454,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
           clipPath: showBackground ? 'polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px))' : undefined
         }}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor={accentColor} borderRadius="0.5rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -338,6 +474,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             className="h-full rounded-sm transition-all duration-700 ease-out relative flex items-center justify-end pr-2 overflow-hidden"
             style={{ width: `${Math.max(4, percent)}%`, backgroundColor: accentColor, boxShadow: `0 0 15px ${accentColor}80` }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor={accentColor} roundedClass="rounded-sm" />
             <div
               className="absolute inset-0 opacity-30 pointer-events-none"
               style={{
@@ -363,6 +500,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#F59E0B" borderRadius="1rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -382,6 +520,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             className="h-full rounded-lg bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 transition-all duration-700 ease-out relative flex items-center justify-end pr-2 overflow-hidden shadow-[0_0_15px_rgba(251,191,36,0.6)]"
             style={{ width: `${Math.max(5, percent)}%` }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#F59E0B" roundedClass="rounded-lg" />
             {showAnimation && (
               <div
                 className="absolute inset-0 w-2/3 bg-gradient-to-r from-transparent via-white/60 to-transparent pointer-events-none"
@@ -405,6 +544,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#10B981" borderRadius="0" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -424,13 +564,15 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             return (
               <div
                 key={idx}
-                className={`flex-1 h-full transition-all duration-300 ${
+                className={`flex-1 h-full transition-all duration-300 relative overflow-hidden ${
                   filled ? 'bg-emerald-400 shadow-[0_0_6px_#10B981]' : 'bg-slate-900 border border-slate-800'
                 }`}
                 style={{
                   animation: showAnimation && filled ? 'arcadeStrobeFlash 1.2s steps(2, start) infinite' : 'none'
                 }}
-              />
+              >
+                {filled && <ProgressBarGradientShader show={showGradientShader} accentColor="#10B981" roundedClass="rounded-none" />}
+              </div>
             );
           })}
         </div>
@@ -448,6 +590,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#A855F7" borderRadius="1.5rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -471,6 +614,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
               animation: showAnimation ? 'frostAuroraFlow 3.5s ease infinite' : 'none'
             }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#A855F7" roundedClass="rounded-full" />
             {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-bold text-slate-950">{percent}%</span>}
           </div>
         </div>
@@ -488,6 +632,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#F97316" borderRadius="0" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -507,6 +652,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500 flex items-center justify-end pr-1.5 shadow-[0_0_12px_rgba(249,115,22,0.7)] relative overflow-hidden"
             style={{ width: `${Math.max(4, percent)}%` }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#F97316" roundedClass="rounded-none" />
             {showAnimation && (
               <div
                 className="absolute inset-y-0 w-8 bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none"
@@ -530,6 +676,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#EC4899" borderRadius="1.5rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -552,6 +699,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
               animation: showAnimation ? 'kawaiiGlowOscillate 2s ease-in-out infinite' : 'none'
             }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#EC4899" roundedClass="rounded-full" />
             {percent >= 15 && <span className="text-[10px] font-bold text-pink-950">💖 {percent}%</span>}
           </div>
         </div>
@@ -569,6 +717,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#D946EF" borderRadius="1rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -585,14 +734,15 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         </div>
         <div className="w-full h-6 rounded-lg bg-slate-950 border border-fuchsia-500/40 p-0.5 overflow-hidden">
           <div
-            className="h-full rounded-md bg-gradient-to-r from-fuchsia-500 via-pink-500 to-amber-400 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#D946EF]"
+            className="h-full rounded-md bg-gradient-to-r from-fuchsia-500 via-pink-500 to-amber-400 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#D946EF] relative overflow-hidden"
             style={{
               width: `${Math.max(5, percent)}%`,
               backgroundSize: '200% 200%',
               animation: showAnimation ? 'synthwaveGradientFlow 3s ease infinite' : 'none'
             }}
           >
-            {percent >= 12 && <span className="text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#D946EF" roundedClass="rounded-md" />
+            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
           </div>
         </div>
       </div>
@@ -607,6 +757,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
           showBackground ? 'bg-black/95 border border-slate-800 shadow-xl' : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor={accentColor} borderRadius="0.75rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -620,9 +771,10 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         </div>
         <div className="w-full h-2.5 rounded-full bg-slate-900 overflow-hidden relative">
           <div
-            className="h-full rounded-full bg-white transition-all duration-500 relative"
+            className="h-full rounded-full bg-white transition-all duration-500 relative overflow-hidden"
             style={{ width: `${percent}%` }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor={accentColor} roundedClass="rounded-full" />
             {showAnimation && (
               <div
                 className="absolute right-0 top-0 bottom-0 w-2 bg-cyan-300 rounded-full"
@@ -645,6 +797,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'p-0 bg-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#10B981" borderRadius="1rem" />
         {animationStyles}
         {bonusPopup}
         <div className={`w-full rounded-2xl p-5 space-y-3.5 ${showBackground ? 'bg-[#090D18]' : 'bg-transparent'}`}>
@@ -662,13 +815,14 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
           </div>
           <div className="w-full h-6 rounded-lg bg-slate-950 border border-slate-800 p-0.5 overflow-hidden">
             <div
-              className="h-full rounded bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 transition-all duration-500 flex items-center justify-end pr-2"
+              className="h-full rounded bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 transition-all duration-500 flex items-center justify-end pr-2 relative overflow-hidden"
               style={{
                 width: `${Math.max(5, percent)}%`,
                 animation: showAnimation ? 'chromaHueRotation 3s linear infinite' : 'none'
               }}
             >
-              {percent >= 12 && <span className="text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+              <ProgressBarGradientShader show={showGradientShader} accentColor="#10B981" roundedClass="rounded" />
+              {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
             </div>
           </div>
         </div>
@@ -686,6 +840,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#10B981" borderRadius="0" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -705,13 +860,14 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             className="h-full bg-emerald-500 transition-all duration-500 flex items-center justify-end pr-1 text-slate-950 font-black text-[10px] shadow-[0_0_10px_#10B981] relative overflow-hidden"
             style={{ width: `${Math.max(5, percent)}%` }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#10B981" roundedClass="rounded-none" />
             {showAnimation && (
               <div
                 className="absolute inset-y-0 w-6 bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none"
                 style={{ animation: 'matrixPhosphorSweep 1.6s linear infinite' }}
               />
             )}
-            {percent >= 12 && `${percent}%`}
+            <span className="relative z-10">{percent >= 12 && `${percent}%`}</span>
           </div>
         </div>
       </div>
@@ -728,6 +884,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#EA580C" borderRadius="1rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -744,14 +901,15 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         </div>
         <div className="w-full h-6 rounded-xl bg-black border border-orange-500/40 p-0.5 overflow-hidden">
           <div
-            className="h-full rounded-lg bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 transition-all duration-500 flex items-center justify-end pr-2 shadow-[0_0_15px_#EA580C]"
+            className="h-full rounded-lg bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 transition-all duration-500 flex items-center justify-end pr-2 shadow-[0_0_15px_#EA580C] relative overflow-hidden"
             style={{
               width: `${Math.max(5, percent)}%`,
               backgroundSize: '200% 200%',
               animation: showAnimation ? 'lavaSurgeWave 2.5s ease-in-out infinite' : 'none'
             }}
           >
-            {percent >= 12 && <span className="text-[10px] font-mono font-black text-slate-950">🔥 {percent}%</span>}
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#EA580C" roundedClass="rounded-lg" />
+            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">🔥 {percent}%</span>}
           </div>
         </div>
       </div>
@@ -768,6 +926,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#8B5CF6" borderRadius="1rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -784,13 +943,14 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         </div>
         <div className="w-full h-6 rounded-full bg-slate-950 border border-purple-500/30 p-1 overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-400 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#8B5CF6]"
+            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-400 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#8B5CF6] relative overflow-hidden"
             style={{
               width: `${Math.max(6, percent)}%`,
               animation: showAnimation ? 'cosmicStarTwinkle 2.5s ease-in-out infinite' : 'none'
             }}
           >
-            {percent >= 12 && <span className="text-[10px] font-mono font-black text-slate-950">✨ {percent}%</span>}
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#8B5CF6" roundedClass="rounded-full" />
+            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">✨ {percent}%</span>}
           </div>
         </div>
       </div>
@@ -807,6 +967,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#06B6D4" borderRadius="0.25rem" />
         {animationStyles}
         {bonusPopup}
         <div className="bg-gradient-to-r from-blue-900 to-teal-700 text-white px-2.5 py-1 flex items-center justify-between text-xs font-bold mb-2.5 select-none rounded-t-sm">
@@ -824,11 +985,13 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
               return (
                 <div
                   key={i}
-                  className={`flex-1 h-full ${active ? 'bg-teal-600' : 'bg-transparent'}`}
+                  className={`flex-1 h-full relative overflow-hidden ${active ? 'bg-teal-600' : 'bg-transparent'}`}
                   style={{
                     animation: showAnimation && active ? 'win95BlockPulse 1.2s ease-in-out infinite' : 'none'
                   }}
-                />
+                >
+                  {active && <ProgressBarGradientShader show={showGradientShader} accentColor="#0D9488" roundedClass="rounded-none" />}
+                </div>
               );
             })}
           </div>
@@ -847,6 +1010,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#84CC16" borderRadius="0" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -860,13 +1024,14 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         </div>
         <div className="w-full h-6 bg-black border border-lime-400 p-0.5 overflow-hidden">
           <div
-            className="h-full bg-lime-400 transition-all duration-300 flex items-center justify-end pr-2 text-black font-mono font-black text-[10px]"
+            className="h-full bg-lime-400 transition-all duration-300 flex items-center justify-end pr-2 text-black font-mono font-black text-[10px] relative overflow-hidden"
             style={{
               width: `${Math.max(5, percent)}%`,
               animation: showAnimation ? 'glitchTwitchStatic 2.5s steps(1) infinite' : 'none'
             }}
           >
-            {percent >= 10 && `${percent}%`}
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#84CC16" roundedClass="rounded-sm" />
+            <span className="relative z-10">{percent >= 10 && `${percent}%`}</span>
           </div>
         </div>
       </div>
@@ -883,6 +1048,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#0EA5E9" borderRadius="1rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -899,14 +1065,15 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         </div>
         <div className="w-full h-6 rounded-xl bg-slate-950 border border-cyan-500/40 p-0.5 overflow-hidden">
           <div
-            className="h-full rounded-lg bg-gradient-to-r from-teal-400 via-cyan-400 to-sky-300 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#06B6D4]"
+            className="h-full rounded-lg bg-gradient-to-r from-teal-400 via-cyan-400 to-sky-300 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#06B6D4] relative overflow-hidden"
             style={{
               width: `${Math.max(5, percent)}%`,
               backgroundSize: '200% 200%',
               animation: showAnimation ? 'oceanSwellDrift 3.5s ease-in-out infinite' : 'none'
             }}
           >
-            {percent >= 12 && <span className="text-[10px] font-mono font-black text-slate-950">🌊 {percent}%</span>}
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#0EA5E9" roundedClass="rounded-lg" />
+            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">🌊 {percent}%</span>}
           </div>
         </div>
       </div>
@@ -923,6 +1090,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#DC2626" borderRadius="1rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -939,13 +1107,14 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         </div>
         <div className="w-full h-5 rounded bg-black border border-red-800 p-0.5 overflow-hidden">
           <div
-            className="h-full rounded-sm bg-gradient-to-r from-red-700 via-red-600 to-rose-500 transition-all duration-500 flex items-center justify-end pr-1 shadow-[0_0_12px_#DC2626]"
+            className="h-full rounded-sm bg-gradient-to-r from-red-700 via-red-600 to-rose-500 transition-all duration-500 flex items-center justify-end pr-1 shadow-[0_0_12px_#DC2626] relative overflow-hidden"
             style={{
               width: `${Math.max(5, percent)}%`,
               animation: showAnimation ? 'bloodMoonSurge 1.8s ease-in-out infinite' : 'none'
             }}
           >
-            {percent >= 12 && <span className="text-[9px] font-mono font-black text-white">{percent}%</span>}
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#DC2626" roundedClass="rounded-sm" />
+            {percent >= 12 && <span className="relative z-10 text-[9px] font-mono font-black text-white">{percent}%</span>}
           </div>
         </div>
       </div>
@@ -962,6 +1131,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#D97706" borderRadius="0.75rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -981,6 +1151,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             className="h-full rounded bg-gradient-to-r from-[#8C5D23] via-[#B47B36] to-[#E5B869] transition-all duration-700 flex items-center justify-end pr-2 relative overflow-hidden"
             style={{ width: `${Math.max(5, percent)}%` }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#D97706" roundedClass="rounded" />
             {showAnimation && (
               <div
                 className="absolute inset-y-0 w-10 bg-gradient-to-r from-transparent via-amber-100/70 to-transparent pointer-events-none"
@@ -1004,6 +1175,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#E0E7FF" borderRadius="1rem" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -1020,13 +1192,14 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
         </div>
         <div className="w-full h-6 rounded-xl bg-slate-950 border border-white/20 p-0.5 overflow-hidden">
           <div
-            className="h-full rounded-lg bg-gradient-to-r from-sky-300 via-indigo-300 via-pink-300 to-yellow-200 transition-all duration-500 flex items-center justify-end pr-2 shadow-[0_0_15px_rgba(255,255,255,0.7)]"
+            className="h-full rounded-lg bg-gradient-to-r from-sky-300 via-indigo-300 via-pink-300 to-yellow-200 transition-all duration-500 flex items-center justify-end pr-2 shadow-[0_0_15px_rgba(255,255,255,0.7)] relative overflow-hidden"
             style={{
               width: `${Math.max(5, percent)}%`,
               animation: showAnimation ? 'holoDiffractionFlow 3s ease-in-out infinite' : 'none'
             }}
           >
-            {percent >= 12 && <span className="text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#E0E7FF" roundedClass="rounded-lg" />
+            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
           </div>
         </div>
       </div>
@@ -1043,6 +1216,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             : 'bg-transparent border-transparent shadow-none'
         }`}
       >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#FBBF24" borderRadius="0" />
         {animationStyles}
         {bonusPopup}
         <div className="flex items-center justify-between gap-3">
@@ -1058,6 +1232,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
             className="h-full bg-yellow-400 border-r-2 border-black transition-all duration-500 flex items-center justify-end pr-1 text-black font-black text-xs relative overflow-hidden"
             style={{ width: `${Math.max(5, percent)}%` }}
           >
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#FBBF24" roundedClass="rounded-none" />
             <div
               className="absolute inset-0 opacity-20 pointer-events-none"
               style={{
@@ -1082,6 +1257,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
           : 'bg-transparent border-transparent shadow-none'
       }`}
     >
+      <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#84CC16" borderRadius="1rem" />
       {animationStyles}
       {bonusPopup}
       <div className="flex items-center justify-between gap-3">
@@ -1101,6 +1277,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
           className="h-full rounded-lg bg-gradient-to-r from-lime-500 to-emerald-400 transition-all duration-500 flex items-center justify-end pr-2 shadow-[0_0_15px_#84CC16] relative overflow-hidden"
           style={{ width: `${Math.max(5, percent)}%` }}
         >
+          <ProgressBarGradientShader show={showGradientShader} accentColor="#84CC16" roundedClass="rounded-lg" />
           {showAnimation && (
             <div
               className="absolute inset-y-0 w-8 bg-gradient-to-r from-transparent via-lime-200/90 to-transparent pointer-events-none"

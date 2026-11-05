@@ -52,9 +52,10 @@ import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
 import { VoiceClonerModal } from './VoiceClonerModal';
 import { AlertPresetModal } from './AlertPresetModal';
+import { MediaPickerModal } from './MediaPickerModal';
+import { useAuth } from '../../context/AuthContext';
 import { AlertPreset } from '../../data/donationAlertPresets';
-import { MediaItem } from './MediaLibraryManager';
-import { mediaService } from '../../services/mediaService';
+import { MediaItem, isAudioAsset } from './MediaLibraryManager';
 import { normalizeCurrencyAndSymbols, khmerNumberToWords } from '../../utils/ttsHelper';
 import { KHMER_FONTS_2019 } from '../../data/khmerFonts';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
@@ -138,6 +139,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const { playSound } = useAudio();
   const { socket } = useSocket();
   const { showConfirm } = useModal();
+  const { user } = useAuth();
 
   // Active Category Section (Accordion List Item Expanded: null = collapsed)
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'tts' | 'rules' | null>('text');
@@ -282,15 +284,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     if (preset.layoutMode) setLayoutMode(preset.layoutMode);
   };
   
-  // Storage Media Picker & In-Modal Upload State
-  const [storagePickerMode, setStoragePickerMode] = useState<'image' | 'sound' | null>(null);
-  const [storageActiveTab, setStorageActiveTab] = useState<'image' | 'sound' | 'all'>('image');
-  const [storageMedia, setStorageMedia] = useState<MediaItem[]>([]);
-  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [activeAudioPreview, setActiveAudioPreview] = useState<string | null>(null);
-  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
-  const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+  // Media Library Storage Picker State (Supports User Uploads + 500 Stickers + 100 GIFs + Sounds)
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [mediaPickerSection, setMediaPickerSection] = useState<'uploads' | 'stickers' | 'gifs' | 'sounds'>('stickers');
 
   const filteredFonts = useMemo(() => {
     return ALL_FONT_OPTIONS.filter((f) => {
@@ -696,118 +692,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       socket.off('donation:alert', handleLiveAlert);
     };
   }, [socket, soundUrl, soundVolume, ttsEnabled, durationSeconds]);
-
-  useEffect(() => {
-    // 1. Initialize from cache immediately
-    const cached = mediaService.getCachedMedia();
-    if (cached.length > 0) {
-      setStorageMedia(cached);
-    }
-
-    // 2. Subscribe to real-time updates via WebSocket
-    const unsubscribe = mediaService.subscribe((data) => {
-      if (data?.media) {
-        setStorageMedia(data.media);
-      }
-    });
-
-    // 3. Fetch/revalidate in background
-    fetchStorageMedia();
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  const fetchStorageMedia = async () => {
-    try {
-      const data = await mediaService.fetchMedia();
-      if (data?.media) {
-        setStorageMedia(data.media);
-      }
-    } catch (e) {
-      console.error('Failed to fetch storage media:', e);
-    }
-  };
-
-  const openStoragePicker = (mode: 'image' | 'sound') => {
-    setStoragePickerMode(mode);
-    setStorageActiveTab(mode);
-    setUploadError(null);
-    fetchStorageMedia();
-  };
-
-  const closeStoragePicker = () => {
-    if (audioPreviewRef.current) {
-      audioPreviewRef.current.pause();
-      audioPreviewRef.current = null;
-    }
-    setActiveAudioPreview(null);
-    setUploadError(null);
-    setStoragePickerMode(null);
-  };
-
-  const handleToggleSoundPreview = (url: string) => {
-    if (activeAudioPreview === url) {
-      if (audioPreviewRef.current) {
-        audioPreviewRef.current.pause();
-        audioPreviewRef.current = null;
-      }
-      setActiveAudioPreview(null);
-    } else {
-      if (audioPreviewRef.current) {
-        audioPreviewRef.current.pause();
-      }
-      const audio = new Audio(url);
-      audio.volume = soundVolume;
-      audio.onended = () => setActiveAudioPreview(null);
-      audio.onerror = () => setActiveAudioPreview(null);
-      audio.play().catch(() => setActiveAudioPreview(null));
-      audioPreviewRef.current = audio;
-      setActiveAudioPreview(url);
-    }
-  };
-
-  const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingMedia(true);
-    setUploadError(null);
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const result = await mediaService.uploadMedia(file);
-      if (result.media) {
-        setStorageMedia((prev) => [result.media, ...prev.filter((m) => m._id !== result.media._id)]);
-
-        // Automatically assign and apply newly uploaded file
-        const isAudio =
-          result.media.fileType?.startsWith('audio') ||
-          /\.(mp3|wav|ogg|webm|m4a)$/i.test(result.media.url || result.media.filename);
-
-        if (isAudio || storagePickerMode === 'sound') {
-          setSoundUrl(result.media.url);
-          playSound(result.media.url, soundVolume);
-        } else {
-          setMediaUrl(result.media.url);
-        }
-
-        // Close picker after a brief moment
-        setTimeout(() => {
-          closeStoragePicker();
-        }, 400);
-      }
-    } catch (err: any) {
-      console.error('Error uploading file:', err);
-      setUploadError(err.message || 'Network error during upload');
-    } finally {
-      setIsUploadingMedia(false);
-      e.target.value = '';
-    }
-  };
 
   const dedicatedBoxUrl = box?._id
     ? (typeof window !== 'undefined' ? `${window.location.origin}/overlay/alert/${effectiveToken}?boxId=${box._id}` : `https://streambotkh.com/overlay/alert/${effectiveToken}?boxId=${box._id}`)
@@ -1851,23 +1735,15 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => openStoragePicker('image')}
-                                className="text-[11px] font-mono font-bold text-cyan-400 hover:underline flex items-center gap-1"
+                                onClick={() => {
+                                  setMediaPickerSection('stickers');
+                                  setIsMediaPickerOpen(true);
+                                }}
+                                className="px-3.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:border-cyan-400"
                               >
-                                <ImageIcon size={12} />
-                                <span>Pick from Storage</span>
+                                <ImageIcon size={13} />
+                                <span>Choose</span>
                               </button>
-                              <span className="text-slate-700">•</span>
-                              <label className="text-[11px] font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer">
-                                <Upload size={12} />
-                                <span>Upload Image</span>
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/gif,image/webp"
-                                  onChange={handleDirectUpload}
-                                  className="hidden"
-                                />
-                              </label>
                             </div>
                           </div>
 
@@ -1967,23 +1843,15 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => openStoragePicker('sound')}
-                            className="text-[11px] font-mono font-bold text-cyan-400 hover:underline flex items-center gap-1"
+                            onClick={() => {
+                              setMediaPickerSection('sounds');
+                              setIsMediaPickerOpen(true);
+                            }}
+                            className="px-3.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:border-cyan-400"
                           >
-                            <Volume2 size={12} />
-                            <span>Pick from Storage</span>
+                            <Volume2 size={13} />
+                            <span>Choose</span>
                           </button>
-                          <span className="text-slate-700">•</span>
-                          <label className="text-[11px] font-mono font-bold text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer">
-                            <Upload size={12} />
-                            <span>Upload Audio</span>
-                            <input
-                              type="file"
-                              accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/x-m4a"
-                              onChange={handleDirectUpload}
-                              className="hidden"
-                            />
-                          </label>
                         </div>
                       </div>
 
@@ -2590,304 +2458,32 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       </div>
 
       {/* ============================================================== */}
-      {/* UNIVERSAL STORAGE MEDIA MODAL (IMAGES & SOUNDS + DIRECT UPLOAD) */}
+      {/* MEDIA PICKER MODAL (GLOBAL STICKERS, GIFS, SOUNDS & UPLOADS)    */}
       {/* ============================================================== */}
-      {storagePickerMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-2xl bg-[#090D18] border border-cyan-500/30 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[88vh] flex flex-col overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 flex-shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                  {storagePickerMode === 'sound' ? <Volume2 size={16} /> : <ImageIcon size={16} />}
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white font-['Chakra_Petch']">
-                    {storagePickerMode === 'sound' ? 'Select Alert Sound from Storage' : 'Select Reaction Media from Storage'}
-                  </h4>
-                  <p className="text-[10px] text-slate-400 font-mono">
-                    Pick existing assets or manually upload new files directly
-                  </p>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={closeStoragePicker}
-                className="w-8 h-8 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Toolbar: Category Filter Tabs + Direct Manual Upload Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0">
-              {/* Category Filter Tabs */}
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 self-start">
-                <button
-                  type="button"
-                  onClick={() => setStorageActiveTab('image')}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
-                    storageActiveTab === 'image'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_8px_rgba(0,240,255,0.15)]'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <ImageIcon size={12} />
-                  <span>Images & GIFs</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStorageActiveTab('sound')}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
-                    storageActiveTab === 'sound'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_8px_rgba(0,240,255,0.15)]'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Music size={12} />
-                  <span>Sounds & Audio</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStorageActiveTab('all')}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
-                    storageActiveTab === 'all'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <span>All Media</span>
-                </button>
-              </div>
-
-              {/* Manual Upload Button Inside Modal */}
-              <div>
-                <input
-                  type="file"
-                  ref={mediaFileInputRef}
-                  onChange={handleDirectUpload}
-                  accept={
-                    storageActiveTab === 'sound'
-                      ? 'audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/x-m4a'
-                      : storageActiveTab === 'image'
-                      ? 'image/png,image/jpeg,image/gif,image/webp'
-                      : 'image/png,image/jpeg,image/gif,image/webp,audio/mpeg,audio/mp3,audio/wav,audio/ogg'
-                  }
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  onClick={() => mediaFileInputRef.current?.click()}
-                  disabled={isUploadingMedia}
-                  className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold font-mono text-xs shadow-[0_0_12px_rgba(0,240,255,0.25)] flex items-center gap-1.5 w-full sm:w-auto justify-center"
-                >
-                  {isUploadingMedia ? (
-                    <>
-                      <Loader2 size={13} className="animate-spin" />
-                      <span>Uploading Into Cloud...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={13} />
-                      <span>Upload to Storage</span>
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Upload Error Banner */}
-            {uploadError && (
-              <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs font-mono flex items-center justify-between flex-shrink-0">
-                <span className="flex items-center gap-2">
-                  <AlertCircle size={14} className="text-red-400 flex-shrink-0" />
-                  <span>{uploadError}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setUploadError(null)}
-                  className="text-red-400 hover:text-white text-xs ml-2"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            {/* Media Items Grid / List Container (Scrollable) */}
-            <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-[220px]">
-              {(() => {
-                // Filter media by active tab
-                const filteredMedia = storageMedia.filter((m) => {
-                  const isAudio =
-                    m.fileType?.startsWith('audio') ||
-                    /\.(mp3|wav|ogg|webm|m4a)$/i.test(m.url || m.filename);
-                  if (storageActiveTab === 'image') return !isAudio;
-                  if (storageActiveTab === 'sound') return isAudio;
-                  return true;
-                });
-
-                if (filteredMedia.length === 0) {
-                  return (
-                    <div className="p-8 text-center space-y-3 rounded-2xl bg-slate-950 border border-slate-800/80 my-auto">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-900 mx-auto flex items-center justify-center text-slate-500">
-                        {storageActiveTab === 'sound' ? <Volume2 size={24} /> : <ImageIcon size={24} />}
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-mono text-slate-300 font-bold">
-                          {storageActiveTab === 'sound'
-                            ? 'No sound files found in Storage yet'
-                            : storageActiveTab === 'image'
-                            ? 'No images or GIFs found in Storage yet'
-                            : 'Storage library is empty'}
-                        </p>
-                        <p className="text-[11px] text-slate-500 font-mono">
-                          Use the "Upload to Storage" button above to upload files directly without leaving this studio.
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => mediaFileInputRef.current?.click()}
-                        className="text-xs font-mono text-cyan-400 border-cyan-500/30 hover:bg-cyan-950/40"
-                      >
-                        <Upload size={12} />
-                        <span>Choose File from Computer</span>
-                      </Button>
-                    </div>
-                  );
-                }
-
-                // Render Audio List view if looking at sounds
-                if (storageActiveTab === 'sound') {
-                  return (
-                    <div className="space-y-2">
-                      {filteredMedia.map((m) => {
-                        const isSelected = soundUrl === m.url;
-                        const isPlaying = activeAudioPreview === m.url;
-                        return (
-                          <div
-                            key={m._id || m.url}
-                            className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
-                              isSelected
-                                ? 'bg-cyan-500/15 border-cyan-400 shadow-[0_0_12px_rgba(0,240,255,0.15)]'
-                                : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <button
-                                type="button"
-                                onClick={() => handleToggleSoundPreview(m.url)}
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${
-                                  isPlaying
-                                    ? 'bg-cyan-400 text-slate-950 shadow-[0_0_10px_rgba(0,240,255,0.4)]'
-                                    : 'bg-slate-900 border border-slate-800 text-cyan-400 hover:bg-slate-800'
-                                }`}
-                                title={isPlaying ? 'Pause preview' : 'Play preview'}
-                              >
-                                {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-                              </button>
-                              <div className="min-w-0">
-                                <div className="text-xs font-mono font-bold text-white truncate">{m.filename}</div>
-                                <div className="text-[10px] text-slate-500 font-mono">
-                                  {m.fileSize ? `${(m.fileSize / 1024).toFixed(1)} KB` : 'Audio'} • {m.fileType || 'audio/mpeg'}
-                                </div>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSoundUrl(m.url);
-                                playSound(m.url, soundVolume);
-                                closeStoragePicker();
-                              }}
-                              className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition-all flex-shrink-0 ${
-                                isSelected
-                                  ? 'bg-cyan-400 text-slate-950'
-                                  : 'bg-slate-900 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-500/40'
-                              }`}
-                            >
-                              {isSelected ? 'Active Chime' : 'Select Sound'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                }
-
-                // Render Image/Mixed Grid view
-                return (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {filteredMedia.map((m) => {
-                      const isAudio =
-                        m.fileType?.startsWith('audio') ||
-                        /\.(mp3|wav|ogg|webm|m4a)$/i.test(m.url || m.filename);
-                      const isSelected = isAudio ? soundUrl === m.url : mediaUrl === m.url;
-
-                      return (
-                        <div
-                          key={m._id || m.url}
-                          onClick={() => {
-                            if (isAudio) {
-                              setSoundUrl(m.url);
-                              playSound(m.url, soundVolume);
-                            } else {
-                              setMediaUrl(m.url);
-                            }
-                            closeStoragePicker();
-                          }}
-                          className={`p-2.5 rounded-2xl border cursor-pointer transition-all group space-y-2 flex flex-col justify-between ${
-                            isSelected
-                              ? 'bg-cyan-500/15 border-cyan-400 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
-                              : 'bg-slate-950 border-slate-800 hover:border-cyan-400/60'
-                          }`}
-                        >
-                          <div className="w-full aspect-square rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center relative">
-                            {isAudio ? (
-                              <div className="flex flex-col items-center justify-center gap-1 text-cyan-400">
-                                <Volume2 size={32} />
-                                <span className="text-[10px] font-mono text-slate-400">Audio Track</span>
-                              </div>
-                            ) : (
-                              <img
-                                src={m.url}
-                                alt={m.filename}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              />
-                            )}
-
-                            {isSelected && (
-                              <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-cyan-400 text-slate-950 font-mono text-[9px] font-bold">
-                                ACTIVE
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="text-[11px] font-mono text-slate-200 truncate font-semibold">
-                              {m.filename}
-                            </div>
-                            <div className="text-[10px] font-mono text-slate-500">
-                              {m.fileSize ? `${(m.fileSize / 1024).toFixed(0)} KB` : 'Media'}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
+      <MediaPickerModal
+        isOpen={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        onSelect={(selectedUrl) => {
+          if (mediaPickerSection === 'sounds' || isAudioAsset({ url: selectedUrl, filename: '', fileType: '' })) {
+            setSoundUrl(selectedUrl);
+            playSound(selectedUrl, soundVolume);
+          } else {
+            setMediaUrl(selectedUrl);
+          }
+          setIsMediaPickerOpen(false);
+        }}
+        currentUrl={mediaPickerSection === 'sounds' ? soundUrl : mediaUrl}
+        initialSection={mediaPickerSection}
+        title={mediaPickerSection === 'sounds' ? 'Choose Alert Sound' : 'Choose Reaction Media'}
+        subtitle={
+          mediaPickerSection === 'sounds'
+            ? 'Pick a preset sound effect, or select from your uploaded audio files.'
+            : 'Pick from 500+ Facebook stickers, 100 alert GIFs, or your uploaded cloud media.'
+        }
+        currentPlan={user?.plan || 'free'}
+        isAdmin={Boolean(user?.isAdmin || (user as any)?.role === 'admin')}
+        isTrialActive={Boolean(user?.trialActive)}
+      />
 
       {/* ============================================================== */}
       {/* VOICE CLONER MODAL (SPEECH RECORDING >= 10 SECONDS)             */}

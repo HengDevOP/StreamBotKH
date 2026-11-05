@@ -20,6 +20,7 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
   const [showBalance, setShowBalance] = useState(true);
   const [showBackground, setShowBackground] = useState(true);
   const [showAnimation, setShowAnimation] = useState(true);
+  const [showGradientShader, setShowGradientShader] = useState(true);
   const [endDate, setEndDate] = useState<string | null>(null);
   const [recentDonor, setRecentDonor] = useState<string | null>(null);
   const [addedAmount, setAddedAmount] = useState<number | null>(null);
@@ -47,6 +48,7 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
             if (g.showBalance !== undefined) setShowBalance(g.showBalance);
             if (g.showBackground !== undefined) setShowBackground(g.showBackground);
             if (g.showAnimation !== undefined) setShowAnimation(g.showAnimation);
+            if (g.showGradientShader !== undefined) setShowGradientShader(g.showGradientShader);
             setEndDate(g.endDate || null);
           }
         }
@@ -77,6 +79,7 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
       if (payload.showBalance !== undefined) setShowBalance(payload.showBalance);
       if (payload.showBackground !== undefined) setShowBackground(payload.showBackground);
       if (payload.showAnimation !== undefined) setShowAnimation(payload.showAnimation);
+      if (payload.showGradientShader !== undefined) setShowGradientShader(payload.showGradientShader);
       if (payload.endDate !== undefined) setEndDate(payload.endDate);
 
       if (payload.donorName && payload.addedAmount) {
@@ -111,6 +114,7 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
         showBalance={showBalance}
         showBackground={showBackground}
         showAnimation={showAnimation}
+        showGradientShader={showGradientShader}
         endDate={endDate}
         recentDonor={recentDonor}
         addedAmount={addedAmount}

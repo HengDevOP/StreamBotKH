@@ -21,7 +21,8 @@ import {
   Crown,
   Smile,
   Film,
-  Music
+  Music,
+  Filter
 } from 'lucide-react';
 import { MediaItem, isVideoAsset, isAudioAsset, isImageAsset } from './MediaLibraryManager';
 import { mediaService, StorageInfo } from '../../services/mediaService';
@@ -46,6 +47,7 @@ interface MediaPickerModalProps {
   isTrialActive?: boolean;
   isAdmin?: boolean;
   onUpgrade?: () => void;
+  initialSection?: 'uploads' | 'stickers' | 'gifs' | 'sounds';
 }
 
 export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
@@ -58,7 +60,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   currentPlan,
   isTrialActive,
   isAdmin,
-  onUpgrade
+  onUpgrade,
+  initialSection
 }) => {
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => mediaService.getCachedMedia());
   const [selectedUrl, setSelectedUrl] = useState<string>(currentUrl || '');
@@ -82,18 +85,40 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
   // Section Selector: 'uploads' | 'stickers' | 'gifs' | 'sounds'
   const isInitiallyPreset = useMemo<'uploads' | 'stickers' | 'gifs' | 'sounds'>(() => {
-    if (!currentUrl) return 'uploads';
+    if (initialSection) return initialSection;
+    if (!currentUrl) return 'stickers';
     if (currentUrl.includes('/stickers/')) return 'stickers';
     if (currentUrl.includes('/gifs/')) return 'gifs';
     if (currentUrl.includes('/sounds/')) return 'sounds';
     return 'uploads';
-  }, [currentUrl]);
+  }, [currentUrl, initialSection]);
 
   const [activeSection, setActiveSection] = useState<'uploads' | 'stickers' | 'gifs' | 'sounds'>(isInitiallyPreset);
+
+  // Filter inside uploads tab: 'all' | 'images' | 'audio' | 'video'
+  const [uploadsFilter, setUploadsFilter] = useState<'all' | 'images' | 'audio' | 'video'>(
+    initialSection === 'sounds' ? 'audio' : 'all'
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialSection) {
+        setActiveSection(initialSection);
+        if (initialSection === 'sounds') {
+          setUploadsFilter('audio');
+        } else if (initialSection === 'stickers' || initialSection === 'gifs') {
+          setUploadsFilter('images');
+        }
+      } else if (isInitiallyPreset) {
+        setActiveSection(isInitiallyPreset);
+      }
+    }
+  }, [isOpen, initialSection, isInitiallyPreset]);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [stickerGroup, setStickerGroup] = useState<string>('All');
+  const [soundGroup, setSoundGroup] = useState<string>('All');
   const [playingSoundId, setPlayingSoundId] = useState<string | null>(null);
   const [visibleStickersCount, setVisibleStickersCount] = useState(60);
   const [visibleGifsCount, setVisibleGifsCount] = useState(48);
@@ -109,11 +134,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     setVisibleGifsCount(48);
   }, [searchQuery]);
 
-  const handleTogglePlaySound = (sound: PresetMediaItem, e?: React.MouseEvent) => {
+  // Universal Audio Player (Handles both presets and user uploads)
+  const handleTogglePlaySound = (url: string, id: string, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
     }
-    if (playingSoundId === sound.id) {
+    if (playingSoundId === id) {
       if (activeAudioRef.current) {
         activeAudioRef.current.pause();
         activeAudioRef.current = null;
@@ -127,9 +153,9 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       activeAudioRef.current = null;
     }
 
-    const audio = new Audio(sound.url);
+    const audio = new Audio(url);
     activeAudioRef.current = audio;
-    setPlayingSoundId(sound.id);
+    setPlayingSoundId(id);
 
     audio.onended = () => {
       setPlayingSoundId(null);
@@ -184,14 +210,44 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const filteredSounds = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return PRESET_SOUNDS.filter((item) => {
-      if (!q) return true;
-      return (
+      const matchGroup = soundGroup === 'All' || item.group === soundGroup;
+      const matchQuery =
+        !q ||
         item.name.toLowerCase().includes(q) ||
         item.group.toLowerCase().includes(q) ||
-        item.tags.some((t) => t.toLowerCase().includes(q))
-      );
+        item.tags.some((t) => t.toLowerCase().includes(q));
+      return matchGroup && matchQuery;
     });
-  }, [searchQuery]);
+  }, [soundGroup, searchQuery]);
+
+  // Unique Sound Groups
+  const soundGroups = useMemo(() => {
+    const set = new Set<string>();
+    PRESET_SOUNDS.forEach((s) => {
+      if (s.group) set.add(s.group);
+    });
+    return Array.from(set);
+  }, []);
+
+  // Filtered Uploads
+  const filteredUploads = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return mediaList.filter((m) => {
+      const matchQuery = !q || m.filename.toLowerCase().includes(q);
+      if (!matchQuery) return false;
+
+      if (uploadsFilter === 'images') {
+        return isImageAsset(m);
+      }
+      if (uploadsFilter === 'audio') {
+        return isAudioAsset(m);
+      }
+      if (uploadsFilter === 'video') {
+        return isVideoAsset(m);
+      }
+      return true;
+    });
+  }, [mediaList, searchQuery, uploadsFilter]);
 
   const fetchMedia = async (force = false) => {
     try {
@@ -371,29 +427,44 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
         onClick={onClose}
       >
         <div
-          className="w-full max-w-4xl max-h-[90vh] rounded-2xl bg-[#090D18] border border-slate-800 shadow-2xl flex flex-col overflow-hidden"
+          className="w-full max-w-5xl h-full sm:h-auto max-h-[92vh] rounded-2xl sm:rounded-3xl bg-[#090D18] border border-cyan-500/25 shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden text-slate-100"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
-          <div className="px-5 sm:px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-[#0B0F19]">
+          <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between bg-[#0B0F19] flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                <ImageIcon size={20} />
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-sm flex-shrink-0">
+                {activeSection === 'sounds' ? (
+                  <Volume2 size={20} />
+                ) : activeSection === 'stickers' ? (
+                  <Smile size={20} />
+                ) : activeSection === 'gifs' ? (
+                  <Film size={20} />
+                ) : (
+                  <ImageIcon size={20} />
+                )}
               </div>
               <div>
-                <h3 className="text-base font-bold text-white font-['Chakra_Petch']">{title}</h3>
-                <p className="text-xs text-slate-400">{subtitle}</p>
+                <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
+                  <span>{title}</span>
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[10px] font-mono uppercase font-bold tracking-wider">
+                    <Sparkles size={10} />
+                    Global Media Library
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 line-clamp-1">{subtitle}</p>
               </div>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/70 transition-colors cursor-pointer"
+              className="p-2 sm:p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800/80 transition-colors cursor-pointer flex-shrink-0"
+              title="Close"
             >
               <X size={18} />
             </button>
@@ -401,10 +472,10 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
           {/* Plan Pro Notice Banner for Free Users */}
           {!isProOrTrial && (
-            <div className="px-4 sm:px-6 py-2.5 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
+            <div className="px-4 sm:px-6 py-2 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-200 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Crown size={15} className="text-amber-400 fill-amber-400 flex-shrink-0 animate-pulse" />
-                <span>
+                <span className="text-[11px] sm:text-xs">
                   <strong>500 Stickers, 100 GIFs &amp; Sounds</strong> are free on <strong>Pro Plan</strong> or <strong>Trial</strong>. Free users will see the King icon.
                 </span>
               </div>
@@ -414,46 +485,33 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   setProModalFeature('Presets Library (500 Stickers, 100 GIFs & Sounds)');
                   setShowProModal(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors cursor-pointer shadow-sm shadow-amber-500/20 flex-shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors cursor-pointer shadow-sm shadow-amber-500/20 flex-shrink-0 ml-2"
               >
                 <Crown size={12} className="fill-current" />
-                <span>Upgrade to Pro</span>
+                <span>Upgrade</span>
               </button>
             </div>
           )}
 
-          {/* Tab Navigation */}
-          <div className="px-4 sm:px-6 py-2.5 bg-[#070A12] border-b border-slate-800 flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <button
-              type="button"
-              onClick={() => setActiveSection('uploads')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-                activeSection === 'uploads'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Layers size={13} />
-              <span>My Uploads ({mediaList.length})</span>
-            </button>
-
+          {/* Section Selector Tabs Bar */}
+          <div className="px-4 sm:px-6 py-2.5 bg-[#070A12] border-b border-slate-800 flex items-center gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
             <button
               type="button"
               onClick={() => setActiveSection('stickers')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
                 activeSection === 'stickers'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
               }`}
             >
-              <Smile size={13} />
+              <Smile size={14} className={activeSection === 'stickers' ? 'text-cyan-400' : ''} />
               <span>Stickers (500)</span>
+              <span className="px-1.5 py-0.2 rounded bg-pink-500/90 text-white text-[8px] font-bold uppercase tracking-wider">
+                FB STICKERS
+              </span>
               {!isProOrTrial && (
                 <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5" />
               )}
-              <span className="px-1.5 py-0.2 rounded bg-pink-500 text-white text-[8px] font-bold uppercase tracking-wider">
-                FACEBOOK
-              </span>
             </button>
 
             <button
@@ -461,12 +519,15 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               onClick={() => setActiveSection('gifs')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
                 activeSection === 'gifs'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
               }`}
             >
-              <Film size={13} />
+              <Film size={14} className={activeSection === 'gifs' ? 'text-cyan-400' : ''} />
               <span>GIFs (100)</span>
+              <span className="px-1.5 py-0.2 rounded bg-cyan-500/30 text-cyan-300 text-[8px] font-bold uppercase tracking-wider">
+                TRENDING
+              </span>
               {!isProOrTrial && (
                 <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5" />
               )}
@@ -477,223 +538,36 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               onClick={() => setActiveSection('sounds')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
                 activeSection === 'sounds'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
               }`}
             >
-              <Music size={13} />
+              <Music size={14} className={activeSection === 'sounds' ? 'text-cyan-400' : ''} />
               <span>Sounds ({PRESET_SOUNDS.length})</span>
+              <span className="px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 text-[8px] font-bold uppercase tracking-wider">
+                SFX
+              </span>
               {!isProOrTrial && (
                 <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5" />
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSection('uploads')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                activeSection === 'uploads'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+              }`}
+            >
+              <Layers size={14} className={activeSection === 'uploads' ? 'text-cyan-400' : ''} />
+              <span>My Uploads ({mediaList.length})</span>
+            </button>
           </div>
 
           {/* ============================================================== */}
-          {/* TAB 1: MY UPLOADS                                              */}
-          {/* ============================================================== */}
-          {activeSection === 'uploads' && (
-            <>
-              {/* Upload Bar + Storage Quota */}
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setDragActive(true);
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setDragActive(false);
-                }}
-                onDrop={handleDrop}
-                className={`px-6 py-4 border-b border-slate-800/80 transition-colors ${
-                  dragActive ? 'bg-cyan-500/10 border-cyan-400' : 'bg-slate-950/60'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="*/*"
-                      onChange={handleInputChange}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-extrabold text-xs transition-all cursor-pointer disabled:opacity-50 shadow-md shadow-cyan-500/10"
-                    >
-                      {uploading ? (
-                        <>
-                          <Loader2 size={15} className="animate-spin" />
-                          <span>Uploading Into Cloud...</span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud size={15} />
-                          <span>Upload New Media</span>
-                        </>
-                      )}
-                    </button>
-
-                    <span className="text-[11px] font-mono text-slate-400">
-                      MP4, GIF, MP3, WAV, PNG, JPG supported
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 self-end sm:self-auto">
-                    {storageInfo && (
-                      <span className="text-[11px] font-mono text-slate-400 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-                        {(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB / {(storageInfo.limitBytes / (1024 * 1024)).toFixed(0)} MB used ({storageInfo.planLabel})
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => fetchMedia(true)}
-                      disabled={loading}
-                      title="Refresh Library"
-                      className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
-                    >
-                      <RefreshCw size={14} className={loading ? 'animate-spin text-cyan-400' : ''} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Feedback Banners */}
-                {errorMsg && (
-                  <div className="mt-3 p-3 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs font-mono flex items-center justify-between gap-2 shadow-lg shadow-red-950/40 animate-fadeIn">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
-                        <AlertCircle size={12} className="text-red-400" />
-                        Storage Limit Exceeded
-                      </span>
-                      <span className="font-sans text-xs">{errorMsg}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setErrorMsg(null)}
-                      className="text-red-400 hover:text-white text-xs font-bold px-1.5 py-0.5 cursor-pointer ml-auto flex-shrink-0"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-                {successMsg && (
-                  <div className="mt-3 p-3 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2">
-                    <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0" />
-                    <span>{successMsg}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Media Grid */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-[360px]">
-                {loading ? (
-                  <div className="py-20 text-center space-y-2 text-slate-400 font-mono text-xs">
-                    <Loader2 size={24} className="animate-spin text-cyan-400 mx-auto" />
-                    <div>Loading your Media Library...</div>
-                  </div>
-                ) : mediaList.length === 0 ? (
-                  <div className="py-14 text-center space-y-3 border border-dashed border-slate-800 rounded-2xl bg-slate-950/40 p-8">
-                    <ImageIcon size={32} className="text-slate-600 mx-auto" />
-                    <div className="text-sm font-bold text-white">Your Media Library is Empty</div>
-                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                      Click &ldquo;Upload New Media&rdquo; above to upload your own media, or explore the preset Stickers, GIFs and Sounds above!
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      <UploadCloud size={14} />
-                      <span>Upload First File</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {mediaList.map((item) => {
-                      const isSelected = selectedUrl === item.url;
-                      const isVideo = isVideoAsset(item);
-                      const isAudio = isAudioAsset(item);
-                      const isImage = isImageAsset(item);
-                      const extBadge = (item.filename.split('.').pop() || 'FILE').toUpperCase();
-
-                      return (
-                        <div
-                          key={item._id || item.url}
-                          onClick={() => setSelectedUrl(item.url)}
-                          onDoubleClick={() => {
-                            onSelect(item.url, item);
-                            onClose();
-                          }}
-                          className={`group relative rounded-xl overflow-hidden border-2 transition-all cursor-pointer bg-slate-950 flex flex-col ${
-                            isSelected
-                              ? 'border-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.25)]'
-                              : 'border-slate-800 hover:border-slate-600'
-                          }`}
-                        >
-                          <div className="aspect-square w-full bg-slate-900/80 flex items-center justify-center overflow-hidden relative p-2">
-                            {isVideo ? (
-                              <video
-                                src={item.url}
-                                muted
-                                loop
-                                playsInline
-                                className="w-full h-full object-contain rounded-lg"
-                              />
-                            ) : isAudio ? (
-                              <div className="flex flex-col items-center justify-center gap-2 text-purple-400">
-                                <Volume2 size={28} />
-                                <span className="text-[10px] font-mono text-slate-300">{extBadge}</span>
-                              </div>
-                            ) : isImage ? (
-                              <img
-                                src={item.url}
-                                alt={item.filename}
-                                loading="lazy"
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                              />
-                            ) : (
-                              <div className="flex flex-col items-center justify-center gap-2 text-cyan-400">
-                                <FileText size={28} />
-                                <span className="text-[10px] font-mono text-slate-300">{extBadge}</span>
-                              </div>
-                            )}
-
-                            <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-black/75 text-slate-200 flex items-center gap-1">
-                              {isVideo && <Video size={9} className="text-cyan-400" />}
-                              {isAudio && <Volume2 size={9} className="text-purple-400" />}
-                              {extBadge}
-                            </span>
-
-                            {isSelected && (
-                              <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-lg">
-                                <Check size={14} strokeWidth={3} />
-                              </div>
-                            )}
-                          </div>
-                          <div className="p-2.5 bg-[#0B0F19] border-t border-slate-800/80">
-                            <div className="text-[11px] font-semibold text-slate-200 truncate" title={item.filename}>
-                              {item.filename}
-                            </div>
-                            <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-                              {formatFileSize(item.fileSize || 0)}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* ============================================================== */}
-          {/* TAB 2: STICKERS (500)                                          */}
+          {/* TAB 1: STICKERS (500)                                          */}
           {/* ============================================================== */}
           {activeSection === 'stickers' && (
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 min-h-[360px]">
@@ -706,13 +580,13 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search 500+ stickers (e.g. pusheen, cat, pepe, panda, troll, doge)..."
-                    className="w-full pl-10 pr-9 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+                    className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-0.5 cursor-pointer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
                     >
                       ✕
                     </button>
@@ -724,14 +598,14 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setStickerGroup('All')}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                       stickerGroup === 'All'
                         ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
                         : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
                     }`}
                   >
                     <span>All Stickers</span>
-                    <span className="text-[9px] px-1 py-0.2 rounded-full font-mono bg-slate-950/30">
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-mono bg-slate-950/30">
                       {PRESET_STICKERS.length}
                     </span>
                   </button>
@@ -744,7 +618,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                         key={grp}
                         type="button"
                         onClick={() => setStickerGroup(grp)}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                           isSelected
                             ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
                             : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -752,7 +626,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                       >
                         <span>{grp}</span>
                         <span
-                          className={`text-[9px] px-1 py-0.2 rounded-full font-mono ${
+                          className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
                             isSelected ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
                           }`}
                         >
@@ -766,12 +640,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
               {/* Stickers Grid */}
               {filteredStickers.length === 0 ? (
-                <div className="py-14 text-center text-xs text-slate-500 font-mono">
+                <div className="py-16 text-center text-xs text-slate-500 font-mono">
                   No stickers match &ldquo;{searchQuery}&rdquo;
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2.5 sm:gap-3">
                     {filteredStickers.slice(0, visibleStickersCount).map((sticker) => {
                       const isSelected = selectedUrl === sticker.url;
 
@@ -780,13 +654,13 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                           key={sticker.id}
                           onClick={() => handlePresetSelect(sticker)}
                           onDoubleClick={() => handlePresetDoubleClick(sticker)}
-                          className={`group relative rounded-xl overflow-hidden border transition-all cursor-pointer bg-slate-950 flex flex-col justify-between ${
+                          className={`group relative rounded-2xl overflow-hidden border transition-all cursor-pointer bg-slate-950 flex flex-col justify-between ${
                             isSelected
-                              ? 'border-cyan-400 shadow-[0_0_16px_rgba(0,240,255,0.3)] bg-cyan-950/20'
+                              ? 'border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_20px_rgba(0,240,255,0.35)] bg-cyan-950/25'
                               : 'border-slate-800/90 hover:border-slate-600 hover:bg-slate-900/60'
                           }`}
                         >
-                          <div className="aspect-square w-full p-2 flex items-center justify-center relative bg-slate-900/40">
+                          <div className="aspect-square w-full p-2.5 flex items-center justify-center relative bg-slate-900/30">
                             <img
                               src={sticker.url}
                               alt={sticker.name}
@@ -829,11 +703,11 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   </div>
 
                   {visibleStickersCount < filteredStickers.length && (
-                    <div className="pt-2 text-center">
+                    <div className="pt-3 text-center">
                       <button
                         type="button"
                         onClick={() => setVisibleStickersCount((prev) => Math.min(prev + 60, filteredStickers.length))}
-                        className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-cyan-300 hover:text-white transition-colors cursor-pointer"
+                        className="px-6 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono font-bold text-cyan-300 hover:text-white transition-colors cursor-pointer"
                       >
                         Load More Stickers ({visibleStickersCount} of {filteredStickers.length})
                       </button>
@@ -845,7 +719,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           )}
 
           {/* ============================================================== */}
-          {/* TAB 3: GIFS (100)                                              */}
+          {/* TAB 2: GIFS (100)                                              */}
           {/* ============================================================== */}
           {activeSection === 'gifs' && (
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 min-h-[360px]">
@@ -857,13 +731,13 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search 100 popular alert GIFs..."
-                  className="w-full pl-10 pr-9 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+                  className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-0.5 cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
                   >
                     ✕
                   </button>
@@ -872,12 +746,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
               {/* GIFs Grid */}
               {filteredGifs.length === 0 ? (
-                <div className="py-14 text-center text-xs text-slate-500 font-mono">
+                <div className="py-16 text-center text-xs text-slate-500 font-mono">
                   No GIFs match &ldquo;{searchQuery}&rdquo;
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
                     {filteredGifs.slice(0, visibleGifsCount).map((gif) => {
                       const isSelected = selectedUrl === gif.url;
 
@@ -886,9 +760,9 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                           key={gif.id}
                           onClick={() => handlePresetSelect(gif)}
                           onDoubleClick={() => handlePresetDoubleClick(gif)}
-                          className={`group relative rounded-xl overflow-hidden border transition-all cursor-pointer bg-slate-950 flex flex-col justify-between ${
+                          className={`group relative rounded-2xl overflow-hidden border transition-all cursor-pointer bg-slate-950 flex flex-col justify-between ${
                             isSelected
-                              ? 'border-cyan-400 shadow-[0_0_18px_rgba(0,240,255,0.3)] bg-cyan-950/20'
+                              ? 'border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_20px_rgba(0,240,255,0.35)] bg-cyan-950/25'
                               : 'border-slate-800/90 hover:border-slate-600 hover:bg-slate-900/60'
                           }`}
                         >
@@ -936,11 +810,11 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   </div>
 
                   {visibleGifsCount < filteredGifs.length && (
-                    <div className="pt-2 text-center">
+                    <div className="pt-3 text-center">
                       <button
                         type="button"
                         onClick={() => setVisibleGifsCount((prev) => Math.min(prev + 48, filteredGifs.length))}
-                        className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-cyan-300 hover:text-white transition-colors cursor-pointer"
+                        className="px-6 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono font-bold text-cyan-300 hover:text-white transition-colors cursor-pointer"
                       >
                         Load More GIFs ({visibleGifsCount} of {filteredGifs.length})
                       </button>
@@ -952,34 +826,80 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           )}
 
           {/* ============================================================== */}
-          {/* TAB 4: SOUNDS (18)                                             */}
+          {/* TAB 3: SOUNDS (18)                                             */}
           {/* ============================================================== */}
           {activeSection === 'sounds' && (
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 min-h-[360px]">
-              {/* Search */}
-              <div className="relative">
-                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search preset sounds (e.g. kaching, victory, coin, meme, oof)..."
-                  className="w-full pl-10 pr-9 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
-                />
-                {searchQuery && (
+              {/* Search & Sound Groups */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search preset sounds (e.g. kaching, victory, coin, meme, oof)..."
+                    className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Sound Group Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-0.5 cursor-pointer"
+                    onClick={() => setSoundGroup('All')}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+                      soundGroup === 'All'
+                        ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
                   >
-                    ✕
+                    <span>All Sounds</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-mono bg-slate-950/30">
+                      {PRESET_SOUNDS.length}
+                    </span>
                   </button>
-                )}
+
+                  {soundGroups.map((grp) => {
+                    const count = PRESET_SOUNDS.filter((s) => s.group === grp).length;
+                    const isSelected = soundGroup === grp;
+                    return (
+                      <button
+                        key={grp}
+                        type="button"
+                        onClick={() => setSoundGroup(grp)}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+                          isSelected
+                            ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                            : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                        }`}
+                      >
+                        <span>{grp}</span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
+                            isSelected ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Sound Cards */}
+              {/* Sound Cards Grid */}
               {filteredSounds.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-500 font-mono">
+                <div className="py-16 text-center text-xs text-slate-500 font-mono">
                   No sounds match &ldquo;{searchQuery}&rdquo;
                 </div>
               ) : (
@@ -993,22 +913,22 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                         key={sound.id}
                         onClick={() => handlePresetSelect(sound)}
                         onDoubleClick={() => handlePresetDoubleClick(sound)}
-                        className={`group p-3.5 rounded-xl border transition-all cursor-pointer bg-slate-950/90 flex flex-col justify-between gap-3 relative ${
+                        className={`group p-3.5 rounded-2xl border transition-all cursor-pointer bg-slate-950/90 flex flex-col justify-between gap-3 relative ${
                           isSelected
-                            ? 'border-cyan-400 shadow-[0_0_16px_rgba(0,240,255,0.2)] bg-cyan-950/15'
+                            ? 'border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_18px_rgba(0,240,255,0.25)] bg-cyan-950/20'
                             : 'border-slate-800/90 hover:border-slate-700 hover:bg-slate-900/50'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 flex-shrink-0">
-                              <Volume2 size={16} />
+                            <div className="w-10 h-10 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 flex-shrink-0">
+                              <Volume2 size={18} />
                             </div>
                             <div className="min-w-0">
                               <div className="text-xs font-bold text-white truncate" title={sound.name}>
                                 {sound.name}
                               </div>
-                              <div className="text-[10px] font-mono text-slate-400">
+                              <div className="text-[10px] font-mono text-slate-400 mt-0.5">
                                 {sound.group} • {sound.duration || 1.5}s
                               </div>
                             </div>
@@ -1033,25 +953,36 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                           </div>
                         </div>
 
+                        {/* Audio Waveform Equalizer when playing */}
+                        {isPlaying && (
+                          <div className="flex items-center gap-1 h-3 px-1">
+                            <span className="w-1 bg-cyan-400 h-2 rounded-full animate-bounce" />
+                            <span className="w-1 bg-cyan-300 h-3 rounded-full animate-bounce [animation-delay:0.15s]" />
+                            <span className="w-1 bg-cyan-400 h-1.5 rounded-full animate-bounce [animation-delay:0.3s]" />
+                            <span className="w-1 bg-cyan-300 h-3 rounded-full animate-bounce [animation-delay:0.45s]" />
+                            <span className="w-1 bg-cyan-400 h-2 rounded-full animate-bounce [animation-delay:0.2s]" />
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
                           <button
                             type="button"
-                            onClick={(e) => handleTogglePlaySound(sound, e)}
-                            className={`px-3 py-1 rounded-lg text-[10px] font-bold font-mono flex items-center gap-1.5 transition-colors cursor-pointer ${
+                            onClick={(e) => handleTogglePlaySound(sound.url, sound.id, e)}
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold font-mono flex items-center gap-1.5 transition-colors cursor-pointer ${
                               isPlaying
-                                ? 'bg-cyan-400 text-slate-950 animate-pulse'
+                                ? 'bg-cyan-400 text-slate-950 font-black shadow-md shadow-cyan-400/30'
                                 : 'bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30'
                             }`}
                           >
                             {isPlaying ? (
                               <>
-                                <Pause size={10} className="fill-current" />
-                                <span>Stop</span>
+                                <Pause size={11} className="fill-current" />
+                                <span>Stop Preview</span>
                               </>
                             ) : (
                               <>
-                                <Play size={10} className="fill-current" />
-                                <span>Preview</span>
+                                <Play size={11} className="fill-current" />
+                                <span>Preview Audio</span>
                               </>
                             )}
                           </button>
@@ -1068,21 +999,256 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             </div>
           )}
 
+          {/* ============================================================== */}
+          {/* TAB 4: MY UPLOADS                                              */}
+          {/* ============================================================== */}
+          {activeSection === 'uploads' && (
+            <div className="flex-1 overflow-y-auto flex flex-col min-h-[360px]">
+              {/* Upload Dropzone & Storage Quota */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragActive(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragActive(false);
+                }}
+                onDrop={handleDrop}
+                className={`px-4 sm:px-6 py-4 border-b border-slate-800/80 transition-colors flex-shrink-0 ${
+                  dragActive ? 'bg-cyan-500/15 border-cyan-400' : 'bg-slate-950/60'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="*/*"
+                      onChange={handleInputChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 font-black text-xs transition-all cursor-pointer disabled:opacity-50 shadow-md shadow-cyan-500/20"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          <span>Uploading Into Cloud...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud size={15} />
+                          <span>Upload File</span>
+                        </>
+                      )}
+                    </button>
+
+                    <span className="text-[11px] font-mono text-slate-400 hidden sm:inline">
+                      MP4, GIF, MP3, WAV, PNG, JPG supported
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 self-end sm:self-auto">
+                    {storageInfo && (
+                      <span className="text-[11px] font-mono text-slate-400 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
+                        {(storageInfo.usedBytes / (1024 * 1024)).toFixed(1)} MB / {(storageInfo.limitBytes / (1024 * 1024)).toFixed(0)} MB ({storageInfo.planLabel})
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => fetchMedia(true)}
+                      disabled={loading}
+                      title="Refresh Library"
+                      className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <RefreshCw size={14} className={loading ? 'animate-spin text-cyan-400' : ''} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Upload Feedback */}
+                {errorMsg && (
+                  <div className="mt-3 p-3 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs font-mono flex items-center justify-between gap-2 shadow-lg animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle size={15} className="flex-shrink-0 text-red-400" />
+                      <span>{errorMsg}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setErrorMsg(null)}
+                      className="text-red-400 hover:text-white text-xs font-bold px-2 py-0.5 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {successMsg && (
+                  <div className="mt-3 p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs font-mono flex items-center gap-2 shadow-lg animate-fadeIn">
+                    <CheckCircle2 size={15} className="flex-shrink-0 text-emerald-400" />
+                    <span>{successMsg}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Uploads Filter Bar */}
+              <div className="px-4 sm:px-6 py-2.5 bg-slate-900/50 border-b border-slate-800/80 flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <Filter size={12} className="text-slate-400" />
+                  <span className="text-[11px] font-mono text-slate-400 mr-1">Filter:</span>
+                  {(['all', 'images', 'audio', 'video'] as const).map((filterKey) => (
+                    <button
+                      key={filterKey}
+                      type="button"
+                      onClick={() => setUploadsFilter(filterKey)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer ${
+                        uploadsFilter === filterKey
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      {filterKey}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="text-[11px] font-mono text-slate-500">
+                  Showing {filteredUploads.length} files
+                </div>
+              </div>
+
+              {/* Uploads Grid */}
+              <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
+                {loading && mediaList.length === 0 ? (
+                  <div className="py-16 text-center text-xs text-slate-500 font-mono flex items-center justify-center gap-2">
+                    <Loader2 size={15} className="animate-spin text-cyan-400" />
+                    <span>Loading your cloud assets...</span>
+                  </div>
+                ) : filteredUploads.length === 0 ? (
+                  <div className="p-10 rounded-2xl bg-slate-900/30 border border-slate-800 text-center space-y-2 max-w-md mx-auto my-6">
+                    <ImageIcon size={32} className="mx-auto text-slate-600" />
+                    <div className="text-xs font-bold text-slate-300">No matching files in storage</div>
+                    <p className="text-[11px] text-slate-500">
+                      Upload files via the button above, or browse 500+ stickers, GIFs, and sounds in the other tabs!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+                    {filteredUploads.map((item) => {
+                      const isSelected = selectedUrl === item.url;
+                      const isVideo = isVideoAsset(item);
+                      const isAudio = isAudioAsset(item);
+                      const isImage = isImageAsset(item);
+                      const isPlaying = playingSoundId === item._id;
+                      const extBadge = (item.filename.split('.').pop() || 'FILE').toUpperCase();
+
+                      return (
+                        <div
+                          key={item._id || item.url}
+                          onClick={() => setSelectedUrl(item.url)}
+                          onDoubleClick={() => {
+                            onSelect(item.url, item);
+                            onClose();
+                          }}
+                          className={`group relative rounded-2xl overflow-hidden border-2 transition-all cursor-pointer bg-slate-950 flex flex-col justify-between ${
+                            isSelected
+                              ? 'border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_20px_rgba(0,240,255,0.3)] bg-cyan-950/20'
+                              : 'border-slate-800 hover:border-slate-600 hover:bg-slate-900/40'
+                          }`}
+                        >
+                          <div className="aspect-square w-full bg-slate-900/80 flex items-center justify-center overflow-hidden relative p-2">
+                            {isVideo ? (
+                              <video
+                                src={item.url}
+                                muted
+                                loop
+                                playsInline
+                                className="w-full h-full object-contain rounded-lg"
+                              />
+                            ) : isAudio ? (
+                              <div className="flex flex-col items-center justify-center gap-2 text-purple-400 text-center">
+                                <Volume2 size={32} />
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleTogglePlaySound(item.url, item._id, e)}
+                                  className={`px-2.5 py-1 rounded-lg text-[9px] font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                                    isPlaying
+                                      ? 'bg-cyan-400 text-slate-950 animate-pulse'
+                                      : 'bg-slate-800 text-cyan-300 hover:bg-slate-700'
+                                  }`}
+                                >
+                                  {isPlaying ? <Pause size={9} fill="currentColor" /> : <Play size={9} fill="currentColor" />}
+                                  <span>{isPlaying ? 'Stop' : 'Play'}</span>
+                                </button>
+                              </div>
+                            ) : isImage ? (
+                              <img
+                                src={item.url}
+                                alt={item.filename}
+                                loading="lazy"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 rounded-lg"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center gap-2 text-cyan-400">
+                                <FileText size={28} />
+                                <span className="text-[10px] font-mono text-slate-300">{extBadge}</span>
+                              </div>
+                            )}
+
+                            <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-black/75 text-slate-200 flex items-center gap-1">
+                              {isVideo && <Video size={9} className="text-cyan-400" />}
+                              {isAudio && <Volume2 size={9} className="text-purple-400" />}
+                              {extBadge}
+                            </span>
+
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-lg">
+                                <Check size={14} strokeWidth={3} />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="p-2.5 bg-[#0B0F19] border-t border-slate-800/80">
+                            <div className="text-[11px] font-semibold text-slate-200 truncate" title={item.filename}>
+                              {item.filename}
+                            </div>
+                            <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+                              {formatFileSize(item.fileSize || 0)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Modal Footer */}
-          <div className="px-5 sm:px-6 py-4 border-t border-slate-800 bg-[#0B0F19] flex items-center justify-between gap-4">
-            <div className="text-xs text-slate-400 truncate">
+          <div className="px-4 sm:px-6 py-3.5 border-t border-slate-800 bg-[#0B0F19] flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+            <div className="text-xs text-slate-400 truncate w-full sm:w-auto text-center sm:text-left">
               {selectedUrl ? (
-                <span className="font-mono text-cyan-400">Selected: {selectedUrl.split('/').pop()}</span>
+                <span className="font-mono text-cyan-400 flex items-center gap-1.5 justify-center sm:justify-start truncate">
+                  <CheckCircle2 size={13} className="text-cyan-400 flex-shrink-0" />
+                  <span className="truncate">Selected: {selectedUrl.split('/').pop()}</span>
+                </span>
               ) : (
-                <span>Click any item above to select it</span>
+                <span className="text-slate-500">Click any media card to select, or double-click to apply instantly.</span>
               )}
             </div>
 
-            <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-shrink-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
+                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1090,7 +1256,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                 type="button"
                 onClick={handleConfirmSelection}
                 disabled={!selectedUrl}
-                className="px-5 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 text-slate-950 font-extrabold text-xs transition-all cursor-pointer"
+                className="flex-1 sm:flex-none px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 disabled:opacity-40 text-slate-950 font-black text-xs transition-all cursor-pointer shadow-md shadow-cyan-500/20"
               >
                 Apply Selected Media
               </button>

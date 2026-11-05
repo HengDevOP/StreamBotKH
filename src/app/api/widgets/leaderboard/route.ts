@@ -215,7 +215,8 @@ export async function POST(req: NextRequest) {
       showAnimation = true,
       showRankBadges = true,
       fontFamily = 'Chakra Petch',
-      testTip = false
+      testTip = false,
+      testOvertake = false
     } = body;
 
     // Verify streamer has Pro plan active before saving or broadcasting to overlay
@@ -229,6 +230,24 @@ export async function POST(req: NextRequest) {
         },
         { status: 403 }
       );
+    }
+
+    // Simulation test for leaderboard overtake / rank up
+    if (testOvertake) {
+      const io = getIO();
+      if (io) {
+        const overtakePayload = {
+          donorName: body.donorName || 'Vannak KH',
+          oldRank: Number(body.oldRank) || 2,
+          newRank: Number(body.newRank) || 1,
+          amount: parseFloat(body.amount) || 95.0
+        };
+        io.to(`overlay:${token}`).emit('leaderboard:overtake', overtakePayload);
+        if (token !== 'demo-token') {
+          io.to('overlay:demo-token').emit('leaderboard:overtake', overtakePayload);
+        }
+      }
+      return NextResponse.json({ success: true, message: 'Overtake animation triggered on OBS overlay' });
     }
 
     // Simulation test for leaderboard tip

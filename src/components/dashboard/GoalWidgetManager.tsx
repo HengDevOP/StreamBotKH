@@ -47,6 +47,7 @@ export interface StreamGoal {
   showBalance?: boolean;
   showBackground?: boolean;
   showAnimation?: boolean;
+  showGradientShader?: boolean;
   endDate?: string | null;
   isActive: boolean;
   createdAt?: string;
@@ -89,6 +90,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   const [formShowBalance, setFormShowBalance] = useState<boolean>(true);
   const [formShowBackground, setFormShowBackground] = useState<boolean>(true);
   const [formShowAnimation, setFormShowAnimation] = useState<boolean>(true);
+  const [formShowGradientShader, setFormShowGradientShader] = useState<boolean>(true);
   const [formEndDate, setFormEndDate] = useState<string>('');
   const [formIsActive, setFormIsActive] = useState<boolean>(true);
   const [formError, setFormError] = useState<string | null>(null);
@@ -149,6 +151,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
               showBalance: payload.showBalance !== undefined ? payload.showBalance : g.showBalance,
               showBackground: payload.showBackground !== undefined ? payload.showBackground : g.showBackground,
               showAnimation: payload.showAnimation !== undefined ? payload.showAnimation : g.showAnimation,
+              showGradientShader: payload.showGradientShader !== undefined ? payload.showGradientShader : g.showGradientShader,
               endDate: payload.endDate !== undefined ? payload.endDate : g.endDate,
               isActive: payload.isActive !== undefined ? payload.isActive : g.isActive
             };
@@ -199,6 +202,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     setFormShowBalance(true);
     setFormShowBackground(true);
     setFormShowAnimation(true);
+    setFormShowGradientShader(true);
     const defaultEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     defaultEnd.setHours(23, 59, 0, 0);
     setFormEndDate(toLocalDateTimeValue(defaultEnd));
@@ -219,6 +223,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     setFormShowBalance(goal.showBalance !== false);
     setFormShowBackground(goal.showBackground !== false);
     setFormShowAnimation(goal.showAnimation !== false);
+    setFormShowGradientShader(goal.showGradientShader !== false);
     setFormEndDate(goal.endDate || '');
     setFormIsActive(goal.isActive);
     setIsModalOpen(true);
@@ -253,6 +258,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
             showBalance: formShowBalance,
             showBackground: formShowBackground,
             showAnimation: formShowAnimation,
+            showGradientShader: formShowGradientShader,
             endDate: formEndDate || null,
             isActive: formIsActive
           })
@@ -289,6 +295,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
             showBalance: formShowBalance,
             showBackground: formShowBackground,
             showAnimation: formShowAnimation,
+            showGradientShader: formShowGradientShader,
             endDate: formEndDate || null,
             isActive: formIsActive
           })
@@ -393,6 +400,32 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
       }
     } catch (err) {
       console.error('[GoalWidgetManager] Error toggling animation:', err);
+    }
+  };
+
+  // Quick Toggle Gradient Animation Shader for Active Goal
+  const handleToggleShowGradientShader = async () => {
+    if (!activeGoal) return;
+    const newShowGradientShader = !(activeGoal.showGradientShader !== false);
+    try {
+      const res = await fetch('/api/widgets/goals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: activeGoal.id,
+          token: streamerToken || 'demo-token',
+          showGradientShader: newShowGradientShader
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.goal) {
+        setGoals((prev) =>
+          prev.map((g) => (g.id === activeGoal.id ? { ...g, showGradientShader: newShowGradientShader } : g))
+        );
+        setActiveGoal((prev) => (prev ? { ...prev, showGradientShader: newShowGradientShader } : null));
+      }
+    } catch (err) {
+      console.error('[GoalWidgetManager] Error toggling gradient shader:', err);
     }
   };
 
@@ -621,6 +654,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                 showBalance={activeGoal.showBalance !== false}
                 showBackground={activeGoal.showBackground !== false}
                 showAnimation={activeGoal.showAnimation !== false}
+                showGradientShader={activeGoal.showGradientShader !== false}
                 endDate={activeGoal.endDate}
                 recentDonor={isTestingGoal ? 'Test Supporter' : null}
                 addedAmount={isTestingGoal ? 10 : null}
@@ -628,39 +662,149 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
             </div>
           </div>
 
-          {/* Template Info & Modal Trigger Bar (Clean modal preview instead of raw buttons) */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center gap-3 min-w-0">
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg border border-white/10"
-                style={{ backgroundColor: `${currentTemplate.previewColor}25`, color: currentTemplate.previewColor }}
+          {/* Quick Settings & Template Trigger Bar */}
+          <div className="flex flex-col gap-3 pt-3 border-t border-slate-800/80">
+            {/* Quick Display & Shader Toggles */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* Gradient Animation Shader Quick Toggle */}
+                <button
+                  type="button"
+                  onClick={handleToggleShowGradientShader}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
+                    activeGoal.showGradientShader !== false
+                      ? 'bg-fuchsia-500/20 border-fuchsia-500/50 text-fuchsia-300 shadow-[0_0_12px_rgba(217,70,239,0.25)]'
+                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                  title="Toggle Gradient Animation Shader"
+                >
+                  <Sparkles
+                    size={13}
+                    className={activeGoal.showGradientShader !== false ? 'text-fuchsia-400 animate-pulse' : 'text-slate-500'}
+                  />
+                  <span>Gradient Shader</span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      activeGoal.showGradientShader !== false ? 'bg-fuchsia-400 shadow-[0_0_6px_#E879F9]' : 'bg-slate-600'
+                    }`}
+                  />
+                </button>
+
+                {/* Bar Animation Quick Toggle */}
+                <button
+                  type="button"
+                  onClick={handleToggleShowAnimation}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
+                    activeGoal.showAnimation !== false
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                  title="Toggle Bar Animation"
+                >
+                  <Sliders
+                    size={12}
+                    className={activeGoal.showAnimation !== false ? 'text-emerald-400' : 'text-slate-500'}
+                  />
+                  <span>Animation</span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      activeGoal.showAnimation !== false ? 'bg-emerald-400 shadow-[0_0_6px_#34D399]' : 'bg-slate-600'
+                    }`}
+                  />
+                </button>
+
+                {/* Show Balance Quick Toggle */}
+                <button
+                  type="button"
+                  onClick={handleToggleShowBalance}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
+                    activeGoal.showBalance !== false
+                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                  title="Toggle Show Balance"
+                >
+                  <DollarSign
+                    size={12}
+                    className={activeGoal.showBalance !== false ? 'text-cyan-400' : 'text-slate-500'}
+                  />
+                  <span>Balance</span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      activeGoal.showBalance !== false ? 'bg-cyan-400' : 'bg-slate-600'
+                    }`}
+                  />
+                </button>
+
+                {/* Show Background Quick Toggle */}
+                <button
+                  type="button"
+                  onClick={handleToggleShowBackground}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
+                    activeGoal.showBackground !== false
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                  title="Toggle Container Background"
+                >
+                  <Layers
+                    size={12}
+                    className={activeGoal.showBackground !== false ? 'text-amber-400' : 'text-slate-500'}
+                  />
+                  <span>Background</span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      activeGoal.showBackground !== false ? 'bg-amber-400' : 'bg-slate-600'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Edit Active Goal Button */}
+              <button
+                type="button"
+                onClick={() => openEditModal(activeGoal)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer"
               >
-                <Palette size={16} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-white font-['Chakra_Petch'] truncate">
-                    Current Style: {currentTemplate.name}
-                  </span>
-                  <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 font-bold">
-                    {currentTemplate.category}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 line-clamp-1">{currentTemplate.description}</p>
-              </div>
+                <Edit2 size={12} className="text-slate-400" />
+                <span>Edit Goal</span>
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setTemplateModalTarget('active');
-                setIsTemplateModalOpen(true);
-              }}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 hover:text-white font-mono text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] flex-shrink-0"
-            >
-              <Palette size={14} className="text-cyan-400" />
-              <span>Browse 20 Templates (Previews Modal)</span>
-            </button>
+            {/* Template Info & Modal Trigger */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-800/40">
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg border border-white/10"
+                  style={{ backgroundColor: `${currentTemplate.previewColor}25`, color: currentTemplate.previewColor }}
+                >
+                  <Palette size={16} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white font-['Chakra_Petch'] truncate">
+                      Current Style: {currentTemplate.name}
+                    </span>
+                    <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 font-bold">
+                      {currentTemplate.category}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 line-clamp-1">{currentTemplate.description}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTemplateModalTarget('active');
+                  setIsTemplateModalOpen(true);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 hover:text-white font-mono text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] flex-shrink-0 cursor-pointer"
+              >
+                <Palette size={14} className="text-cyan-400" />
+                <span>Browse Templates (Previews Modal)</span>
+              </button>
+            </div>
           </div>
         </Card>
       )}
@@ -942,6 +1086,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                         showBalance={formShowBalance}
                         showBackground={formShowBackground}
                         showAnimation={formShowAnimation}
+                        showGradientShader={formShowGradientShader}
                         endDate={formEndDate || null}
                       />
                     </div>
@@ -1119,8 +1264,32 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                     </div>
                   </div>
 
-                  {/* Row 5: Responsive 2x2 Display & OBS Settings Grid */}
+                  {/* Row 5: Responsive Display, Shader & OBS Settings Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                    {/* Gradient Animation Shader Setting */}
+                    <button
+                      type="button"
+                      onClick={() => setFormShowGradientShader((v) => !v)}
+                      className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-xs font-mono text-slate-200 font-bold flex items-center gap-1.5 truncate">
+                          <Sparkles size={12} className="text-fuchsia-400 flex-shrink-0" />
+                          <span className="truncate">Gradient Shader</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Liquid chromatic shader & light caustics
+                        </span>
+                      </div>
+                      <span
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors flex items-center flex-shrink-0 ${
+                          formShowGradientShader ? 'bg-fuchsia-500 justify-end' : 'bg-slate-800 justify-start'
+                        }`}
+                      >
+                        <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
+                      </span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => setFormShowBalance((v) => !v)}
@@ -1172,7 +1341,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                     >
                       <div className="min-w-0">
                         <span className="text-xs font-mono text-slate-200 font-bold flex items-center gap-1.5 truncate">
-                          <Sparkles size={12} className="text-amber-400 flex-shrink-0" />
+                          <Sliders size={12} className="text-emerald-400 flex-shrink-0" />
                           <span className="truncate">Bar Animation</span>
                         </span>
                         <span className="text-[10px] text-slate-400 block truncate">
@@ -1257,7 +1426,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                       <Palette size={18} />
                     </div>
                     <h3 className="text-base sm:text-xl font-bold text-white font-['Chakra_Petch'] truncate">
-                      Goal Styling Templates (20 Designs)
+                      Goal Styling Templates ({GOAL_TEMPLATES.length} Designs)
                     </h3>
                   </div>
                   <p className="text-[11px] sm:text-xs text-slate-400 line-clamp-2">
@@ -1368,6 +1537,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                               showBalance={true}
                               showBackground={true}
                               showAnimation={true}
+                              showGradientShader={true}
                             />
                           </div>
                         </div>

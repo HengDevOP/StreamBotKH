@@ -34,6 +34,10 @@ import {
   Target,
   Layers
 } from 'lucide-react';
+import {
+  EXTENDED_LEADERBOARD_TEMPLATES,
+  renderExtendedLeaderboardTemplate
+} from './leaderboardExtendedTemplates';
 
 export interface LeaderboardTemplateMeta {
   id: string;
@@ -64,6 +68,7 @@ export interface LeaderboardTemplateRendererProps {
   maxRows?: number; // 1 to 10, default 3
   fontFamily?: string;
   className?: string;
+  overtakingDonorName?: string | null;
 }
 
 export const LEADERBOARD_TEMPLATES: LeaderboardTemplateMeta[] = [
@@ -369,7 +374,8 @@ export const LEADERBOARD_TEMPLATES: LeaderboardTemplateMeta[] = [
     category: 'Special',
     previewColor: '#E0E7FF',
     description: 'Faceted crystal diamond glass with rainbow prism refraction and sparkling stars.'
-  }
+  },
+  ...EXTENDED_LEADERBOARD_TEMPLATES
 ];
 
 export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererProps> = ({
@@ -383,7 +389,8 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
   showRankBadges = true,
   maxRows = 3,
   fontFamily = 'Chakra Petch',
-  className = ''
+  className = '',
+  overtakingDonorName = null
 }) => {
   // Ensure we display between 1 to 10 rows (default 3)
   const displayLimit = Math.min(10, Math.max(1, maxRows || 3));
@@ -406,7 +413,14 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
   const resolvedFontFamily = fontFamily ? `"${fontFamily}", sans-serif` : undefined;
 
   // Helper for rank icon/badge
-  const renderRankBadge = (rank: number, styleColor: string) => {
+  const renderRankBadge = (rank: number, styleColor: string, isOvertaker = false) => {
+    if (isOvertaker) {
+      return (
+        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950 font-black text-[9px] animate-bounce shadow-md shadow-amber-400/50">
+          ▲ #{rank}
+        </span>
+      );
+    }
     if (!showRankBadges) {
       return <span className="font-mono font-bold text-xs opacity-75">#{rank}</span>;
     }
@@ -421,6 +435,26 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
     }
     return <span className="font-mono font-bold text-xs opacity-70">#{rank}</span>;
   };
+
+  // Check if requested template belongs to the 40 new extended styles
+  if (EXTENDED_LEADERBOARD_TEMPLATES.some((t) => t.id === templateStyle)) {
+    const extendedNode = renderExtendedLeaderboardTemplate({
+      templateStyle,
+      title,
+      periodLabel,
+      displayLimit,
+      donorsToRender,
+      accentColor,
+      showBackground,
+      showAnimation,
+      showRankBadges,
+      resolvedFontFamily,
+      className,
+      overtakingDonorName,
+      renderRankBadge
+    });
+    if (extendedNode) return extendedNode;
+  }
 
   // Helper style block for animations
   const animationStyles = (
@@ -451,6 +485,35 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           0% { transform: translateX(-150%); }
           100% { transform: translateX(150%); }
         }
+        @keyframes lb-flame-flow {
+          0% { border-color: #EF4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.7), inset 0 0 10px rgba(249, 115, 22, 0.4); }
+          25% { border-color: #F97316; box-shadow: 0 0 25px rgba(249, 115, 22, 0.85), inset 0 0 14px rgba(234, 179, 8, 0.5); }
+          50% { border-color: #EAB308; box-shadow: 0 0 30px rgba(234, 179, 8, 0.95), inset 0 0 18px rgba(239, 68, 68, 0.55); }
+          75% { border-color: #F43F5E; box-shadow: 0 0 22px rgba(244, 63, 94, 0.8), inset 0 0 12px rgba(249, 115, 22, 0.4); }
+          100% { border-color: #EF4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.7), inset 0 0 10px rgba(249, 115, 22, 0.4); }
+        }
+        @keyframes lb-frost-flow {
+          0% { border-color: #38BDF8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.7), inset 0 0 10px rgba(186, 230, 253, 0.35); }
+          50% { border-color: #E0F2FE; box-shadow: 0 0 26px rgba(224, 242, 254, 0.95), inset 0 0 18px rgba(56, 189, 248, 0.5); }
+          100% { border-color: #38BDF8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.7), inset 0 0 10px rgba(186, 230, 253, 0.35); }
+        }
+        @keyframes lb-electric-crackle {
+          0%, 100% { border-color: #A855F7; box-shadow: 0 0 14px rgba(168, 85, 247, 0.7); }
+          25% { border-color: #06B6D4; box-shadow: 0 0 25px rgba(6, 182, 212, 0.9); }
+          50% { border-color: #3B82F6; box-shadow: 0 0 18px rgba(59, 130, 246, 0.75); }
+          75% { border-color: #EC4899; box-shadow: 0 0 24px rgba(236, 72, 153, 0.85); }
+        }
+        @keyframes lb-overtake-pop {
+          0% { transform: scale(0.9) translateY(10px); opacity: 0.5; filter: brightness(2.5) contrast(1.5); }
+          35% { transform: scale(1.08) translateY(-5px); filter: brightness(1.7); }
+          60% { transform: scale(1.02) translateY(-2px); }
+          80% { transform: scale(1.05); }
+          100% { transform: scale(1) translateY(0); filter: brightness(1); }
+        }
+        .lb-anim-overtake { animation: lb-overtake-pop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; position: relative; z-index: 10; }
+        .lb-flame-card { animation: lb-flame-flow 2.4s ease-in-out infinite; }
+        .lb-frost-card { animation: lb-frost-flow 3s ease-in-out infinite; }
+        .lb-anim-electric { animation: lb-electric-crackle 1.8s ease-in-out infinite; }
         .lb-anim-rgb { animation: lb-rgb-flow 8s linear infinite; }
         .lb-anim-scanline { animation: lb-scanline 6s linear infinite; }
         .lb-anim-gear { animation: lb-gear-spin 12s linear infinite; }

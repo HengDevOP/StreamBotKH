@@ -919,6 +919,7 @@ export const HomeFeatureShowcase: React.FC = () => {
                 showBalance={true}
                 showBackground={true}
                 showAnimation={true}
+                showGradientShader={true}
                 endDate={null}
               />
             </div>

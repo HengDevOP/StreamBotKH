@@ -95,6 +95,7 @@ export async function GET(req: NextRequest) {
       showBalance: g.showBalance !== false && g.show_balance !== 0,
       showBackground: g.showBackground !== false && g.show_background !== 0,
       showAnimation: g.showAnimation !== false && g.show_animation !== 0,
+      showGradientShader: g.showGradientShader !== false && g.show_gradient_shader !== 0,
       endDate: g.endDate || g.end_date || null,
       isActive: Boolean(g.isActive || g.is_active === 1),
       createdAt: g.createdAt || g.created_at,
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
     const showBalance = body.showBalance !== undefined ? Boolean(body.showBalance) : true;
     const showBackground = body.showBackground !== undefined ? Boolean(body.showBackground) : true;
     const showAnimation = body.showAnimation !== undefined ? Boolean(body.showAnimation) : true;
+    const showGradientShader = body.showGradientShader !== undefined ? Boolean(body.showGradientShader) : true;
     const endDate = body.endDate || null;
     const isActive = body.isActive !== undefined ? Boolean(body.isActive) : true;
 
@@ -181,6 +183,7 @@ export async function POST(req: NextRequest) {
       showBalance,
       showBackground,
       showAnimation,
+      showGradientShader,
       endDate,
       isActive,
       createdAt: now,
@@ -201,6 +204,7 @@ export async function POST(req: NextRequest) {
       showBalance,
       showBackground,
       showAnimation,
+      showGradientShader,
       endDate,
       isActive
     };
@@ -276,6 +280,7 @@ export async function PUT(req: NextRequest) {
           showBalance: existing.showBalance !== false,
           showBackground: existing.showBackground !== false,
           showAnimation: existing.showAnimation !== false,
+          showGradientShader: existing.showGradientShader !== false,
           endDate: existing.endDate || null,
           isActive: Boolean(existing.isActive),
           donorName: 'Test Supporter',
@@ -325,6 +330,7 @@ export async function PUT(req: NextRequest) {
     const showBalance = body.showBalance !== undefined ? Boolean(body.showBalance) : (existing.showBalance !== undefined ? Boolean(existing.showBalance) : true);
     const showBackground = body.showBackground !== undefined ? Boolean(body.showBackground) : (existing.showBackground !== undefined ? Boolean(existing.showBackground) : true);
     const showAnimation = body.showAnimation !== undefined ? Boolean(body.showAnimation) : (existing.showAnimation !== undefined ? Boolean(existing.showAnimation) : true);
+    const showGradientShader = body.showGradientShader !== undefined ? Boolean(body.showGradientShader) : (existing.showGradientShader !== undefined ? Boolean(existing.showGradientShader) : true);
     const endDate = body.endDate !== undefined ? body.endDate : existing.endDate;
 
     await goalsCol.updateOne(
@@ -339,6 +345,7 @@ export async function PUT(req: NextRequest) {
           showBalance,
           showBackground,
           showAnimation,
+          showGradientShader,
           endDate,
           isActive: willBeActive,
           updatedAt: new Date()
@@ -357,6 +364,7 @@ export async function PUT(req: NextRequest) {
       showBalance,
       showBackground,
       showAnimation,
+      showGradientShader,
       endDate,
       isActive: willBeActive
     };
@@ -436,6 +444,7 @@ export async function DELETE(req: NextRequest) {
             showBalance: promoted.showBalance !== false,
             showBackground: promoted.showBackground !== false,
             showAnimation: promoted.showAnimation !== false,
+            showGradientShader: promoted.showGradientShader !== false,
             endDate: promoted.endDate || null,
             isActive: true
           });

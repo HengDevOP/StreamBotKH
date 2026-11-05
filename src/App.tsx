@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate, useLocation, useSearchParams, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -403,6 +403,17 @@ function AppRoutes() {
 }
 
 export function App() {
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('streambot_theme_mode');
+      if (savedTheme === 'light') {
+        document.documentElement.classList.add('light-mode');
+      } else {
+        document.documentElement.classList.remove('light-mode');
+      }
+    } catch (e) {}
+  }, []);
+
   return (
     <AuthProvider>
       <SocketProvider>
