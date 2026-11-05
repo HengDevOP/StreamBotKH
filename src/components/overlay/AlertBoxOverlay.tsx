@@ -14,7 +14,7 @@ interface AlertBoxOverlayProps {
 
 export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, mode = 'all', boxId }) => {
   const { socket, connected, joinOverlayRoom } = useSocket();
-  const { currentAlert, pushAlert, dismissCurrentAlert, pauseQueue, resumeQueue, queueLength } = useAlertQueue();
+  const { currentAlert, pushAlert, dismissCurrentAlert, waitForAlertSound, pauseQueue, resumeQueue, queueLength } = useAlertQueue();
   const [ready, setReady] = useState(false);
   const [overlayConfig, setOverlayConfig] = useState<any>(null);
   const [alertBoxes, setAlertBoxes] = useState<any[]>([]);
@@ -116,14 +116,15 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     msg: string | undefined,
     type: string,
     clonedUrl?: string,
+    clonedVoiceName?: string,
     volume?: number,
     onTtsFinished?: () => void
   ) => {
     let finishedFired = false;
     let safetyTimer: NodeJS.Timeout | null = setTimeout(() => {
-      console.warn('⏱️ [Overlay TTS] TTS speech safety timeout elapsed (12s).');
+      console.warn('⏱️ [Overlay TTS] TTS speech safety timeout elapsed (15s).');
       notifyFinished();
-    }, 12000);
+    }, 15000);
 
     const notifyFinished = () => {
       if (safetyTimer) {
@@ -227,7 +228,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
             : '';
 
         audioUrl = `/api/tts?type=cloned&clonedVoiceName=${encodeURIComponent(
-          alert.clonedVoiceName || ''
+          clonedVoiceName || ''
         )}&clonedVoiceSampleUrl=${encodeURIComponent(
           safeSamplePath
         )}&text=${encodeURIComponent(speechText.slice(0, 250))}`;
@@ -248,27 +249,25 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
           currentTtsAudioRef.current = null;
         }
 
-        // Delay 700ms so alert chime sound plays first
-        setTimeout(() => {
-          const audio = new Audio(audioUrl);
-          currentTtsAudioRef.current = audio;
-          audio.volume = Math.min(1, Math.max(0, volume ?? 0.85));
+        // Play TTS immediately (caller already awaited alert sound completion)
+        const audio = new Audio(audioUrl);
+        currentTtsAudioRef.current = audio;
+        audio.volume = Math.min(1, Math.max(0, volume ?? 0.85));
 
-          audio.onended = () => {
-            console.log('🗣️ [Overlay TTS] Audio playback finished completely!');
-            notifyFinished();
-          };
+        audio.onended = () => {
+          console.log('🗣️ [Overlay TTS] Audio playback finished completely!');
+          notifyFinished();
+        };
 
-          audio.onerror = (e) => {
-            console.warn('[Overlay TTS] Audio error or format failure:', e);
-            notifyFinished();
-          };
+        audio.onerror = (e) => {
+          console.warn('[Overlay TTS] Audio error or format failure:', e);
+          notifyFinished();
+        };
 
-          audio.play().catch((err) => {
-            console.warn('[Overlay TTS] Play error (autoplay blocked or network):', err);
-            notifyFinished();
-          });
-        }, 700);
+        audio.play().catch((err) => {
+          console.warn('[Overlay TTS] Play error (autoplay blocked or network):', err);
+          notifyFinished();
+        });
       } else {
         notifyFinished();
       }
@@ -327,10 +326,10 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
     }
 
     // Standard donation alert card:
-    // Requires BOTH minimum display duration AND complete TTS speech before dismissing!
+    // Requires BOTH minimum display duration AND complete alert sound + TTS speech before dismissing!
     const alertDurationSec = Math.max(5, Number(currentAlert.durationSeconds) || 8);
     minDurationElapsedRef.current = false;
-    isTtsSpeakingRef.current = Boolean(currentAlert.ttsEnabled);
+    isTtsSpeakingRef.current = true;
 
     if (minDurationTimerRef.current) {
       clearTimeout(minDurationTimerRef.current);
@@ -341,27 +340,38 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       checkAndDismissAlert();
     }, alertDurationSec * 1000);
 
-    if (currentAlert.ttsEnabled) {
-      console.log(`🗣️ [AlertBox] Starting TTS speech for "${alertId}". Video and next alerts will wait until TTS finishes.`);
-      speakAlertTTS(
-        currentAlert.textTemplate,
-        currentAlert.donorName || 'Supporter',
-        Number(currentAlert.amount) || 0,
-        currentAlert.currency || 'USD',
-        currentAlert.donorMessage,
-        currentAlert.ttsType || 'google',
-        (currentAlert as any).clonedVoiceSampleUrl,
-        currentAlert.soundVolume,
-        () => {
-          console.log(`🗣️ [AlertBox] TTS speech completed 100% for "${alertId}".`);
-          isTtsSpeakingRef.current = false;
-          checkAndDismissAlert();
-        }
-      );
-    } else {
-      isTtsSpeakingRef.current = false;
-    }
-  }, [currentAlert, checkAndDismissAlert]);
+    // Wait until the alert audio finishes playing completely before starting TTS
+    (async () => {
+      console.log(`🔊 [AlertBox] Awaiting alert sound playback completion for "${alertId}"...`);
+      await waitForAlertSound();
+
+      // If this alert was already dismissed/replaced while sound was playing, abort
+      if (activeAlertIdRef.current !== alertId) return;
+
+      if (currentAlert.ttsEnabled) {
+        console.log(`🗣️ [AlertBox] Alert sound finished! Now starting TTS speech for "${alertId}".`);
+        speakAlertTTS(
+          currentAlert.textTemplate,
+          currentAlert.donorName || 'Supporter',
+          Number(currentAlert.amount) || 0,
+          currentAlert.currency || 'USD',
+          currentAlert.donorMessage,
+          currentAlert.ttsType || 'google',
+          (currentAlert as any).clonedVoiceSampleUrl,
+          (currentAlert as any).clonedVoiceName,
+          currentAlert.soundVolume,
+          () => {
+            console.log(`🗣️ [AlertBox] TTS speech completed 100% for "${alertId}".`);
+            isTtsSpeakingRef.current = false;
+            checkAndDismissAlert();
+          }
+        );
+      } else {
+        isTtsSpeakingRef.current = false;
+        checkAndDismissAlert();
+      }
+    })();
+  }, [currentAlert, checkAndDismissAlert, waitForAlertSound]);
 
   // Cross-overlay synchronization: broadcast finished signals and coordinate queue waiting
   const prevAlertRef = useRef<any>(null);

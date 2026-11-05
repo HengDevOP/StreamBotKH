@@ -79,6 +79,63 @@ export function extractYouTubeId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+export type DonorLanguage = 'en' | 'kh';
+
+export const DONOR_TRANSLATIONS = {
+  en: {
+    oneTimeTip: 'One-Time Tip',
+    subscribe: 'Subscribe',
+    vipBadge: 'VIP BADGE',
+    selectTier: 'Select Membership Tier',
+    activeBadge: '30-day active badge',
+    vipNotice: 'Your VIP badge will display next to your username in stream chat and alerts!',
+    username: 'Username *',
+    youtubeName: 'YouTube Account Name (for Chat Badge) *',
+    matchLiveChat: 'MATCH LIVE CHAT',
+    usernamePlaceholder: 'Tra Gamer',
+    youtubePlaceholder: 'e.g. SokhaGamer or @sokhagamer',
+    youtubeHelp: 'Enter your exact YouTube channel name or @handle so your VIP badge displays automatically in live stream chat.',
+    payerName: 'Payer Name (Bank Account) *',
+    payerPlaceholder: 'SOKPHEAK TRA',
+    message: 'Text (Message)',
+    messagePlaceholder: 'Drop a cheer or message to be broadcasted on stream...',
+    shareMedia: 'Share Media',
+    requiredTip: '[Required $1.00]',
+    tryDemo: 'Try Demo Video',
+    videoPlaceholder: 'Paste YouTube link (e.g. https://www.youtube.com/watch?v=...)',
+    clear: 'Clear',
+    sendTip: 'Send Tip',
+    subscribeWithKhqr: (price: string) => `Subscribe with Bakong KHQR ${price ? `(${price})` : ''}`,
+    loading: 'Generating KHQR...'
+  },
+  kh: {
+    oneTimeTip: 'ឧបត្ថម្ភ (Tip)',
+    subscribe: 'ជាវសមាជិក (Subscribe)',
+    vipBadge: 'ផ្លាក VIP',
+    selectTier: 'ជ្រើសរើសកម្រិតសមាជិក',
+    activeBadge: 'ផ្លាកមានសុពលភាព 30 ថ្ងៃ',
+    vipNotice: 'ផ្លាកសញ្ញា VIP របស់អ្នកនឹងបង្ហាញជាប់ឈ្មោះក្នុង live chat និងលើផ្ទាំងផ្សាយផ្ទាល់!',
+    username: 'ឈ្មោះអ្នកឧបត្ថម្ភ *',
+    youtubeName: 'ឈ្មោះគណនី YouTube (សម្រាប់ផ្លាក Chat) *',
+    matchLiveChat: 'ដូចឈ្មោះ LIVE CHAT',
+    usernamePlaceholder: 'ឧ. ត្រា ហ្គេមមឺ',
+    youtubePlaceholder: 'ឧ. SokhaGamer ឬ @sokhagamer',
+    youtubeHelp: 'សូមបញ្ចូលឈ្មោះគណនី YouTube ឬ @handle របស់អ្នកឱ្យដូចគ្នាបេះបិទ ដើម្បីឱ្យផ្លាកសញ្ញា VIP បង្ហាញក្នុង live chat ដោយស្វ័យប្រវត្តិ។',
+    payerName: 'ឈ្មោះម្ចាស់គណនីធនាគារ *',
+    payerPlaceholder: 'SOKPHEAK TRA (អក្សរឡាតាំង)',
+    message: 'សារជូនពរ (Message)',
+    messagePlaceholder: 'សរសេរសារជូនពរ ឬលើកទឹកចិត្តដែលនឹងបង្ហាញលើផ្ទាំងផ្សាយផ្ទាល់...',
+    shareMedia: 'ចែករំលែកវីដេអូ',
+    requiredTip: '[ទាមទារ $1.00]',
+    tryDemo: 'សាកល្បងវីដេអូគំរូ',
+    videoPlaceholder: 'បិទភ្ជាប់តំណ YouTube (ឧ. https://www.youtube.com/watch?v=...)',
+    clear: 'សម្អាត',
+    sendTip: 'ផ្ញើជំនួយឧបត្ថម្ភ (Send Tip)',
+    subscribeWithKhqr: (price: string) => `ជាវសមាជិកជាមួយ Bakong KHQR ${price ? `(${price})` : ''}`,
+    loading: 'កំពុងបង្កើត KHQR...'
+  }
+};
+
 function formatTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds || 0));
   const mins = Math.floor(s / 60);
@@ -90,6 +147,34 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   const storageKey = `streambotkh_draft_${streamer.username || 'neonstreamer'}`;
   const isLoadedRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Language Switcher State: 'en' | 'kh'
+  const [lang, setLang] = useState<DonorLanguage>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('stream_lang');
+      if (saved === 'kh' || saved === 'en') return saved;
+    }
+    return 'en';
+  });
+
+  const handleSwitchLang = (newLang: DonorLanguage) => {
+    setLang(newLang);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stream_lang', newLang);
+      window.dispatchEvent(new CustomEvent('stream_lang_change', { detail: newLang }));
+    }
+  };
+
+  useEffect(() => {
+    const onLangChange = (e: any) => {
+      const l = e.detail || localStorage.getItem('stream_lang');
+      if (l === 'kh' || l === 'en') {
+        setLang(l);
+      }
+    };
+    window.addEventListener('stream_lang_change', onLangChange);
+    return () => window.removeEventListener('stream_lang_change', onLangChange);
+  }, []);
 
   // Form states: Username, Bank Name, Text/Message, Video URL + Amount & Currency
   const [currency, setCurrency] = useState<'USD' | 'KHR'>('USD');
@@ -412,10 +497,10 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   // Video alert configuration constraints from streamer settings (unlocked only if streamer is Pro/Admin and enabled)
   const isStreamerPlanUnlocked = (streamer.plan ? streamer.plan.toLowerCase() !== 'free' : false) || Boolean((streamer as any).isAdmin);
   const isVideoAlertsEnabled = isStreamerPlanUnlocked && Boolean(streamer.videoAlertEnabled) && streamer.hasVideoOverlay !== false;
-  const videoMinTip = Number(streamer.videoMinTipAmount ?? 0.25);
+  const videoMinTip = Number(streamer.videoMinTipAmount ?? 1.00);
   const videoMaxDuration = Number(streamer.videoMaxDurationSeconds ?? 300); // up to 5 minutes
   const currentAmountInUsd = currency === 'KHR' ? (amount || 0) / 4000 : (amount || 0);
-  const meetsMinTip = currentAmountInUsd >= videoMinTip;
+  const meetsMinTip = true;
 
   const handleSetClipDuration = (durationSec: number) => {
     setVideoEndTime(videoStartTime + durationSec);
@@ -519,6 +604,36 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             )}
           </div>
         </div>
+
+        {/* Top Right: Language Switcher EN / KH */}
+        <div className="flex items-center shrink-0 ml-2 self-start">
+          <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-sm">
+            <button
+              type="button"
+              onClick={() => handleSwitchLang('en')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                lang === 'en'
+                  ? 'bg-white text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Switch to English"
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSwitchLang('kh')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                lang === 'kh'
+                  ? 'bg-white text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="ប្តូរទៅភាសាខ្មែរ (Khmer)"
+            >
+              KH
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Donation Type Switch: One-Time Tip vs Subscribe / Membership */}
@@ -534,7 +649,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             }`}
           >
             <Heart size={14} className={donationType === 'tip' ? 'text-pink-400 fill-pink-400/40' : ''} />
-            <span>One-Time Tip</span>
+            <span>{DONOR_TRANSLATIONS[lang].oneTimeTip}</span>
           </button>
           <button
             type="button"
@@ -546,9 +661,9 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             }`}
           >
             <Crown size={14} className={donationType === 'subscribe' ? 'text-amber-400' : ''} />
-            <span>Subscribe</span>
+            <span>{DONOR_TRANSLATIONS[lang].subscribe}</span>
             <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
-              VIP BADGE
+              {DONOR_TRANSLATIONS[lang].vipBadge}
             </span>
           </button>
         </div>
@@ -561,9 +676,9 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold uppercase tracking-wider text-amber-400 font-['Chakra_Petch'] flex items-center gap-1.5">
                 <Crown size={14} className="text-amber-400" />
-                <span>Select Membership Tier</span>
+                <span>{DONOR_TRANSLATIONS[lang].selectTier}</span>
               </label>
-              <span className="text-[10px] font-mono text-slate-400">30-day active badge</span>
+              <span className="text-[10px] font-mono text-slate-400">{DONOR_TRANSLATIONS[lang].activeBadge}</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -644,280 +759,170 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
             <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2 text-[11px] text-amber-300 font-mono">
               <Crown size={14} className="text-amber-400 shrink-0" />
-              <span>Your VIP badge will display next to your username in stream chat and alerts!</span>
+              <span>{DONOR_TRANSLATIONS[lang].vipNotice}</span>
             </div>
           </div>
         )}
 
-        {/* TIP AMOUNT PRESETS (Rendered in Tip Mode) */}
-        {donationType === 'tip' && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex items-center gap-1.5">
-                <DollarSign size={13} className="text-cyan-400" />
-                <span>Tip Amount</span>
-              </label>
-              <div className="inline-flex rounded-lg p-0.5 bg-slate-950 border border-slate-800 text-[10px] font-mono">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrency('USD');
-                    setAmount(5);
-                  }}
-                  className={`px-2 py-0.5 rounded font-bold transition-colors ${currency === 'USD' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
-                >
-                  USD ($)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrency('KHR');
-                    setAmount(20000);
-                  }}
-                  className={`px-2 py-0.5 rounded font-bold transition-colors ${currency === 'KHR' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
-                >
-                  KHR (៛)
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-5 gap-1.5">
-              {(currency === 'USD' ? [1, 2, 5, 10, 20] : [4000, 10000, 20000, 40000, 100000]).map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => setAmount(preset)}
-                  className={`py-1.5 text-xs font-mono font-bold border transition-colors ${
-                    amount === preset
-                      ? 'border-cyan-400 bg-cyan-500/10 text-cyan-300'
-                      : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
-                >
-                  {currency === 'USD' ? `$${preset}` : `${preset.toLocaleString()}៛`}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Row with Username & Bank Name */}
+        {/* Row with Username & Bank Name (All input field icons removed, pure white styling) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* FIELD 1: Username / YouTube Account Name */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <User size={13} className={donationType === 'subscribe' ? 'text-amber-400' : 'text-cyan-400'} />
-                <span>
-                  {donationType === 'subscribe' ? 'YouTube Account Name (for Chat Badge) *' : 'Username *'}
-                </span>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between">
+              <span>
+                {donationType === 'subscribe' ? DONOR_TRANSLATIONS[lang].youtubeName : DONOR_TRANSLATIONS[lang].username}
               </span>
               <div className="flex items-center gap-2">
                 {donationType === 'subscribe' && (
                   <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-                    MATCH LIVE CHAT
+                    {DONOR_TRANSLATIONS[lang].matchLiveChat}
                   </span>
                 )}
-                <span className="text-[10px] font-mono text-slate-500">{donorName.length}/25</span>
+                <span className="text-[10px] font-mono text-slate-400">{donorName.length}/25</span>
               </div>
             </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <User size={14} />
-              </div>
-              <input
-                type="text"
-                required
-                maxLength={25}
-                placeholder={donationType === 'subscribe' ? 'e.g. SokhaGamer or @sokhagamer' : 'Tra Gamer'}
-                value={donorName}
-                onChange={(e) => setDonorName(e.target.value.slice(0, 25))}
-                className={`w-full pl-9 pr-3 py-2 rounded-none bg-slate-950 border text-white text-xs sm:text-sm font-medium focus:outline-none transition-colors placeholder:text-slate-500 ${
-                  donationType === 'subscribe'
-                    ? 'border-amber-500/40 focus:border-amber-400'
-                    : 'border-slate-800 focus:border-cyan-400'
-                }`}
-              />
-            </div>
+            <input
+              type="text"
+              required
+              maxLength={25}
+              placeholder={donationType === 'subscribe' ? DONOR_TRANSLATIONS[lang].youtubePlaceholder : DONOR_TRANSLATIONS[lang].usernamePlaceholder}
+              value={donorName}
+              onChange={(e) => setDonorName(e.target.value.slice(0, 25))}
+              className={`w-full px-3.5 py-2.5 rounded-none bg-slate-950 border text-white text-xs sm:text-sm font-medium focus:outline-none transition-colors placeholder:text-slate-400 ${
+                donationType === 'subscribe'
+                  ? 'border-amber-500/50 focus:border-white'
+                  : 'border-slate-700 focus:border-white'
+              }`}
+            />
             {donationType === 'subscribe' && (
               <p className="text-[10px] text-amber-300/90 font-mono mt-1 flex items-start gap-1 leading-tight">
-                <span className="text-amber-400">⚡</span>
-                <span>Enter your exact YouTube channel name or @handle so your VIP badge displays automatically in live stream chat.</span>
+                <span>⚡</span>
+                <span>{DONOR_TRANSLATIONS[lang].youtubeHelp}</span>
               </p>
             )}
           </div>
 
           {/* FIELD 2: Payer Name (Bank Account) */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Landmark size={13} className="text-cyan-400" />
-                <span>Payer Name (Bank Account) *</span>
-              </span>
-              <span className="text-[10px] font-mono text-slate-500">{bankingName.length}/30</span>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between">
+              <span>{DONOR_TRANSLATIONS[lang].payerName}</span>
+              <span className="text-[10px] font-mono text-slate-400">{bankingName.length}/30</span>
             </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Landmark size={14} />
-              </div>
-              <input
-                type="text"
-                required
-                maxLength={30}
-                placeholder="SOKPHEAK TRA"
-                value={bankingName}
-                onChange={(e) => setBankingName(e.target.value.slice(0, 30))}
-                className="w-full pl-9 pr-3 py-2 rounded-none bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-cyan-400 transition-colors placeholder:text-slate-500 uppercase"
-              />
-            </div>
+            <input
+              type="text"
+              required
+              maxLength={30}
+              placeholder={DONOR_TRANSLATIONS[lang].payerPlaceholder}
+              value={bankingName}
+              onChange={(e) => setBankingName(e.target.value.slice(0, 30))}
+              className="w-full px-3.5 py-2.5 rounded-none bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-white transition-colors placeholder:text-slate-400 uppercase"
+            />
           </div>
         </div>
 
         {/* FIELD 3: Text (Message) */}
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex items-center gap-1.5">
-              <MessageSquare size={13} className="text-cyan-400" />
-              <span>Text (Message)</span>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch']">
+              <span>{DONOR_TRANSLATIONS[lang].message}</span>
             </label>
-            <span className="text-[10px] font-mono text-slate-500">{donorMessage.length}/200</span>
+            <span className="text-[10px] font-mono text-slate-400">{donorMessage.length}/200</span>
           </div>
 
           <textarea
             rows={2}
             maxLength={200}
-            placeholder="Drop a cheer or message to be broadcasted on stream..."
+            placeholder={DONOR_TRANSLATIONS[lang].messagePlaceholder}
             value={donorMessage}
             onChange={(e) => setDonorMessage(e.target.value.slice(0, 200))}
-            className="w-full p-2.5 rounded-none bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-cyan-400 transition-colors resize-none placeholder:text-slate-500 leading-relaxed"
+            className="w-full p-3 rounded-none bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-white transition-colors resize-none placeholder:text-slate-400 leading-relaxed"
           />
         </div>
 
-        {/* FIELD 4: Video URL (Media Share) - Only rendered in Tip mode if enabled by streamer */}
+        {/* FIELD 4: Video URL (Media Share) - Direct unlocked input with [Required $1.00] */}
         {isVideoAlertsEnabled && donationType === 'tip' && (
           <div className="space-y-2">
             <div className="flex items-start sm:items-center justify-between gap-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
-                <span className="inline-flex items-center gap-1.5 shrink-0">
-                  <Youtube size={14} className="text-red-500" />
-                  <span>Share Media</span>
-                </span>
-                <span className="text-red-500 font-mono font-bold text-[10px] sm:text-[11px] normal-case tracking-normal">
-                  [Required ${videoMinTip.toFixed(2)} To Show On Stream]
+              <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
+                <span>{DONOR_TRANSLATIONS[lang].shareMedia}</span>
+                <span className="text-red-400 font-mono font-bold text-[10px] sm:text-[11px] normal-case tracking-normal">
+                  {DONOR_TRANSLATIONS[lang].requiredTip}
                 </span>
               </label>
-              {meetsMinTip && (
+              <button
+                type="button"
+                onClick={handleLoadDemoVideo}
+                className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline shrink-0 whitespace-nowrap cursor-pointer"
+              >
+                {DONOR_TRANSLATIONS[lang].tryDemo}
+              </button>
+            </div>
+
+            <div className="relative">
+              <input
+                type="url"
+                placeholder={DONOR_TRANSLATIONS[lang].videoPlaceholder}
+                value={videoUrl}
+                onChange={handleVideoUrlChange}
+                className="w-full px-3.5 py-2.5 pr-14 rounded-none bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-white transition-colors placeholder:text-slate-400"
+              />
+              {videoUrl && (
                 <button
                   type="button"
-                  onClick={handleLoadDemoVideo}
-                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline shrink-0 whitespace-nowrap"
+                  onClick={handleClearVideo}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
                 >
-                  Try Demo Video
+                  {DONOR_TRANSLATIONS[lang].clear}
                 </button>
               )}
             </div>
 
-            {/* If tip amount is under streamer's minimum tip threshold ($0.25 to $50) */}
-            {!meetsMinTip ? (
-              <div className="p-3 bg-slate-950 border border-amber-500/30 rounded-none flex items-center justify-between gap-3 text-xs font-mono">
-                <div className="space-y-0.5">
-                  <span className="text-amber-300 font-bold flex items-center gap-1.5 text-[11px]">
-                    <Lock size={12} className="text-amber-400" />
-                    <span>Media Share unlocks at ${videoMinTip.toFixed(2)}+</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 block">
-                    Current tip: ${currentAmountInUsd.toFixed(2)} USD
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (currency === 'KHR') {
-                      setAmount(Math.round(videoMinTip * 4000));
-                    } else {
-                      setAmount(videoMinTip);
-                    }
-                  }}
-                  className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] uppercase font-mono rounded-none transition-colors whitespace-nowrap"
-                >
-                  Set to ${videoMinTip.toFixed(2)}
-                </button>
+            {videoError && (
+              <p className="text-[10px] text-red-400 font-mono">{videoError}</p>
+            )}
+
+            {videoTitle && (
+              <div className="flex items-center gap-2 p-1.5 bg-slate-950/80 border border-slate-800 text-[11px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                <span className="text-slate-300 truncate font-medium">{videoTitle}</span>
               </div>
-            ) : (
-              <>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-red-500">
-                    {fetchingVideo ? (
-                      <Loader2 size={14} className="animate-spin text-cyan-400" />
-                    ) : (
-                      <Youtube size={14} />
-                    )}
-                  </div>
-                  <input
-                    type="url"
-                    placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=...)"
-                    value={videoUrl}
-                    onChange={handleVideoUrlChange}
-                    className="w-full pl-9 pr-14 py-2 rounded-none bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-red-500/70 transition-colors placeholder:text-slate-500"
-                  />
-                  {videoUrl && (
-                    <button
-                      type="button"
-                      onClick={handleClearVideo}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-red-400 text-xs transition-colors"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
+            )}
 
-                {videoError && (
-                  <p className="text-[10px] text-red-400 font-mono">{videoError}</p>
-                )}
+            {/* Video Preview Player & Scrubber Timeline */}
+            {activeVideoId && (
+              <div className="space-y-2.5 pt-1 animate-fadeIn">
+                {/* Live Preview Player with Custom Progress Duration Bar at Bottom */}
+                <VideoPlayerWithProgressBar
+                  key={previewKey}
+                  videoId={activeVideoId}
+                  startTime={videoStartTime}
+                  endTime={videoEndTime}
+                  autoplay={isPlayingPreview && !loading && !isModalOpen}
+                  isPaused={Boolean(loading || isModalOpen)}
+                  muted={false}
+                  videoTitle={videoTitle}
+                  donorName={donorName || 'Viewer'}
+                  amount={amount}
+                  currency={currency}
+                  isPreview={true}
+                  donorMessage={donorMessage}
+                  onPlayStateChange={setIsPlayingPreview}
+                />
 
-                {videoTitle && (
-                  <div className="flex items-center gap-2 p-1.5 bg-slate-950/80 border border-slate-800 text-[11px]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                    <span className="text-slate-300 truncate font-medium">{videoTitle}</span>
-                  </div>
-                )}
-
-                {/* Video Preview Player & Scrubber Timeline */}
-                {activeVideoId && (
-                  <div className="space-y-2.5 pt-1 animate-fadeIn">
-                    {/* Live Preview Player with Custom Progress Duration Bar at Bottom */}
-                    <VideoPlayerWithProgressBar
-                      key={previewKey}
-                      videoId={activeVideoId}
-                      startTime={videoStartTime}
-                      endTime={videoEndTime}
-                      autoplay={isPlayingPreview && !loading && !isModalOpen}
-                      isPaused={Boolean(loading || isModalOpen)}
-                      muted={false}
-                      videoTitle={videoTitle}
-                      donorName={donorName || 'Viewer'}
-                      amount={amount}
-                      currency={currency}
-                      isPreview={true}
-                      donorMessage={donorMessage}
-                      onPlayStateChange={setIsPlayingPreview}
-                    />
-
-                    {/* Custom Clip Duration Line for easy drag & move segment up to 5 mins */}
-                    <VideoClipScrubberLine
-                      startTime={videoStartTime}
-                      endTime={videoEndTime}
-                      videoDuration={videoDuration}
-                      maxAllowedDuration={videoMaxDuration}
-                      onChange={(newStart, newEnd) => {
-                        setVideoStartTime(newStart);
-                        setVideoEndTime(newEnd);
-                        setIsPlayingPreview(true);
-                        setPreviewKey((k) => k + 1);
-                      }}
-                    />
-                  </div>
-                )}
-              </>
+                {/* Custom Clip Duration Line for easy drag & move segment up to 5 mins */}
+                <VideoClipScrubberLine
+                  startTime={videoStartTime}
+                  endTime={videoEndTime}
+                  videoDuration={videoDuration}
+                  maxAllowedDuration={videoMaxDuration}
+                  onChange={(newStart, newEnd) => {
+                    setVideoStartTime(newStart);
+                    setVideoEndTime(newEnd);
+                    setIsPlayingPreview(true);
+                    setPreviewKey((k) => k + 1);
+                  }}
+                />
+              </div>
             )}
           </div>
         )}
@@ -954,10 +959,10 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                 {donationType === 'subscribe' ? (
                   <>
                     <Crown size={18} className="fill-slate-950/20" />
-                    <span>Subscribe with Bakong KHQR {subPriceLabel ? `(${subPriceLabel})` : ''}</span>
+                    <span>{DONOR_TRANSLATIONS[lang].subscribeWithKhqr(subPriceLabel)}</span>
                   </>
                 ) : (
-                  <span>Send Tip ({currency === 'KHR' ? `${(amount || 0).toLocaleString()} ៛` : `$${Number(amount || 0).toFixed(2)}`})</span>
+                  <span>{DONOR_TRANSLATIONS[lang].sendTip}</span>
                 )}
               </Button>
             );

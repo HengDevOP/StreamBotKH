@@ -156,7 +156,7 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
               : '/sounds/cash-register-kaching.mp3'),
         soundVolume: matchingBox?.soundVolume ?? alertSettings?.soundVolume ?? 0.85,
         durationSeconds: matchingBox?.durationSeconds || alertSettings?.durationSeconds || 8,
-        ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (alertSettings?.ttsEnabled === true && donation.amount >= ((alertSettings as any)?.ttsMinAmount || alertSettings?.minAmountAlert || 0)),
+        ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : Boolean(alertSettings?.ttsEnabled),
         ttsType: matchingBox?.ttsType || alertSettings?.ttsVoice || 'google',
         clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.clonedVoiceSampleUrl
       };

@@ -1340,7 +1340,7 @@ export const MultiStreamPage: React.FC = () => {
     setIsPlayingPreview(false);
     setSubmittingTip(true);
 
-    const amountNum = parseFloat(customAmount || tipAmount) || (currency === 'KHR' ? 5000 : 1);
+    const amountNum = parseFloat(customAmount || tipAmount) || (currency === 'KHR' ? 4000 : 1);
     const donor = tipDonorName.trim() || user?.displayName || user?.username || 'Anonymous Supporter';
     const bank = bankingName.trim() || donor || 'Bakong KHQR';
     const msg = tipDonorMessage.trim() || `Cheering for ${target.name}! 🔥`;
@@ -1392,7 +1392,7 @@ export const MultiStreamPage: React.FC = () => {
 
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const amountNum = paidDetails?.amount || parseFloat(customAmount || tipAmount) || (currency === 'KHR' ? 5000 : 5);
+    const amountNum = paidDetails?.amount || parseFloat(customAmount || tipAmount) || (currency === 'KHR' ? 20000 : 5);
     const formattedAmount = currency === 'KHR' ? `${Number(amountNum).toLocaleString()} ៛` : `$${Number(amountNum).toFixed(2)}`;
     const donor = paidDetails?.donor_name || tipDonorName.trim() || user?.displayName || 'Anonymous Supporter';
     const msg = paidDetails?.donor_message || tipDonorMessage.trim() || `Bakong KHQR Tip Sent to ${selectedStreamer.name}! ⚡️`;
@@ -2661,7 +2661,7 @@ export const MultiStreamPage: React.FC = () => {
                         <span>Share Media</span>
                       </span>
                       <span className="text-red-500 font-mono font-bold text-[10px] sm:text-[11px] normal-case tracking-normal">
-                        [Required ${Number(selectedStreamer.videoMinTipAmount ?? 2.0).toFixed(2)} To Show On Stream]
+                        [Required $1.00]
                       </span>
                     </label>
                     <button

@@ -379,7 +379,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (activeGoal) {
-          const addedUsd = effectiveCurrency === 'KHR' ? (effectiveAmount / 4100) : effectiveAmount;
+          const addedUsd = effectiveCurrency === 'KHR' ? (effectiveAmount / 4000) : effectiveAmount;
           const newGoalAmount = (activeGoal.currentAmount || 0) + addedUsd;
           await goalsCol.updateOne(
             { _id: activeGoal._id },

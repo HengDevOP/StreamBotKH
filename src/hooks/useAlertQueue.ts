@@ -12,8 +12,11 @@ export function useAlertQueue() {
   const isPausedRef = useRef<boolean>(false);
   const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const soundPromiseRef = useRef<Promise<void>>(Promise.resolve());
 
-  const { playSound } = useAudio();
+  const { playSound, stopSound } = useAudio();
+
+  const waitForAlertSound = useCallback(() => soundPromiseRef.current, []);
 
   // Always keep queueRef in sync with latest state
   useEffect(() => {
@@ -34,22 +37,24 @@ export function useAlertQueue() {
     setQueue((prev) => prev.slice(1));
     setCurrentAlert(nextAlert);
 
-    // 1. Play alert sound chime (only for standard alerts, not video clips)
+    // 1. Play alert sound chime (only for standard alerts, not video clips) and track its completion Promise
     if (!nextAlert.isSecondStageVideo && !nextAlert.videoUrl && nextAlert.soundUrl && nextAlert.soundUrl !== 'none') {
-      playSound(nextAlert.soundUrl, nextAlert.soundVolume ?? 0.85);
+      soundPromiseRef.current = playSound(nextAlert.soundUrl, nextAlert.soundVolume ?? 0.85);
+    } else {
+      soundPromiseRef.current = Promise.resolve();
     }
 
-    // 2. Set auto-dismiss timer matching alert duration
+    // 2. Set auto-dismiss safety timer matching alert duration (actual dismissal waits for sound + TTS in AlertBoxOverlay)
     const isVideo = Boolean(nextAlert.isSecondStageVideo || nextAlert.videoUrl);
     const hasTts = Boolean(nextAlert.ttsEnabled);
 
-    // If alert has TTS or is a video clip, dismissal is driven by TTS completion / video onEnded.
+    // If alert has TTS or is a video clip, dismissal is driven by sound + TTS completion / video onEnded.
     // We provide a generous safety fallback timer so it never hangs indefinitely if network fails.
     const durationMs = isVideo
       ? Math.max(15, (Number(nextAlert.durationSeconds) || 30) + 15) * 1000
       : (hasTts
-          ? Math.max(16, (Number(nextAlert.durationSeconds) || 8) + 8) * 1000
-          : Math.max(3, Number(nextAlert.durationSeconds) || 8) * 1000);
+          ? Math.max(45, (Number(nextAlert.durationSeconds) || 8) + 35) * 1000
+          : Math.max(30, (Number(nextAlert.durationSeconds) || 8) + 20) * 1000);
 
     if (dismissTimerRef.current) {
       clearTimeout(dismissTimerRef.current);
@@ -64,6 +69,7 @@ export function useAlertQueue() {
       clearTimeout(dismissTimerRef.current);
       dismissTimerRef.current = null;
     }
+    stopSound();
 
     // Dismiss active card
     setCurrentAlert(null);
@@ -78,7 +84,7 @@ export function useAlertQueue() {
         playNext();
       }
     }, 500);
-  }, [playNext]);
+  }, [playNext, stopSound]);
 
   const pushAlert = useCallback((alert: LiveAlertPayload) => {
     setQueue((prev) => {
@@ -122,6 +128,7 @@ export function useAlertQueue() {
     currentAlert,
     pushAlert,
     dismissCurrentAlert,
+    waitForAlertSound,
     pauseQueue,
     resumeQueue,
     queueLength: queue.length

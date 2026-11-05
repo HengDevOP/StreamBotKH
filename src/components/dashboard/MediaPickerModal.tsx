@@ -31,6 +31,10 @@ import {
   PRESET_STICKERS,
   PRESET_SOUNDS,
   PRESET_STICKER_GROUPS,
+  PRESET_TEMPLATES,
+  PRESET_TEMPLATE_GROUPS,
+  PRESET_MLBB,
+  PRESET_MLBB_GROUPS,
   ALL_PRESETS,
   PresetMediaItem
 } from '../../data/presetsData';
@@ -47,7 +51,8 @@ interface MediaPickerModalProps {
   isTrialActive?: boolean;
   isAdmin?: boolean;
   onUpgrade?: () => void;
-  initialSection?: 'uploads' | 'stickers' | 'gifs' | 'sounds';
+  initialSection?: 'uploads' | 'template' | 'mlbb' | 'stickers' | 'gifs' | 'sounds';
+  filterMode?: 'all' | 'audio' | 'image';
 }
 
 export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
@@ -61,9 +66,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   isTrialActive,
   isAdmin,
   onUpgrade,
-  initialSection
+  initialSection,
+  filterMode = 'all'
 }) => {
+  const isAudioOnly = filterMode === 'audio' || initialSection === 'sounds';
   const [mediaList, setMediaList] = useState<MediaItem[]>(() => mediaService.getCachedMedia());
+  const audioUploadsCount = useMemo(() => mediaList.filter((m) => isAudioAsset(m)).length, [mediaList]);
   const [selectedUrl, setSelectedUrl] = useState<string>(currentUrl || '');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -83,49 +91,69 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     Boolean(isAdmin) ||
     storageInfo?.plan === 'pro';
 
-  // Section Selector: 'uploads' | 'stickers' | 'gifs' | 'sounds'
-  const isInitiallyPreset = useMemo<'uploads' | 'stickers' | 'gifs' | 'sounds'>(() => {
+  // Section Selector: 'uploads' | 'template' | 'mlbb' | 'stickers' | 'gifs' | 'sounds'
+  const isInitiallyPreset = useMemo<'uploads' | 'template' | 'mlbb' | 'stickers' | 'gifs' | 'sounds'>(() => {
+    if (isAudioOnly) {
+      if (currentUrl && !currentUrl.includes('/sounds/') && !currentUrl.includes('/uploads/presets/')) {
+        return 'uploads';
+      }
+      return 'sounds';
+    }
     if (initialSection) return initialSection;
-    if (!currentUrl) return 'stickers';
+    if (!currentUrl) return 'template';
+    if (currentUrl.includes('/mlbb/')) return 'mlbb';
+    if (currentUrl.includes('/sbkh/')) return 'template';
     if (currentUrl.includes('/stickers/')) return 'stickers';
     if (currentUrl.includes('/gifs/')) return 'gifs';
     if (currentUrl.includes('/sounds/')) return 'sounds';
     return 'uploads';
-  }, [currentUrl, initialSection]);
+  }, [currentUrl, initialSection, isAudioOnly]);
 
-  const [activeSection, setActiveSection] = useState<'uploads' | 'stickers' | 'gifs' | 'sounds'>(isInitiallyPreset);
+  const [activeSection, setActiveSection] = useState<'uploads' | 'template' | 'mlbb' | 'stickers' | 'gifs' | 'sounds'>(isInitiallyPreset);
 
   // Filter inside uploads tab: 'all' | 'images' | 'audio' | 'video'
   const [uploadsFilter, setUploadsFilter] = useState<'all' | 'images' | 'audio' | 'video'>(
-    initialSection === 'sounds' ? 'audio' : 'all'
+    isAudioOnly ? 'audio' : filterMode === 'image' ? 'images' : 'all'
   );
 
   useEffect(() => {
     if (isOpen) {
-      if (initialSection) {
+      if (isAudioOnly) {
+        setUploadsFilter('audio');
+        if (currentUrl && mediaList.some((m) => m.url === currentUrl && isAudioAsset(m))) {
+          setActiveSection('uploads');
+        } else {
+          setActiveSection('sounds');
+        }
+      } else if (initialSection) {
         setActiveSection(initialSection);
-        if (initialSection === 'sounds') {
-          setUploadsFilter('audio');
-        } else if (initialSection === 'stickers' || initialSection === 'gifs') {
+        if (initialSection === 'template' || initialSection === 'mlbb' || initialSection === 'stickers' || initialSection === 'gifs' || filterMode === 'image') {
           setUploadsFilter('images');
         }
       } else if (isInitiallyPreset) {
         setActiveSection(isInitiallyPreset);
       }
     }
-  }, [isOpen, initialSection, isInitiallyPreset]);
+  }, [isOpen, initialSection, isInitiallyPreset, isAudioOnly, filterMode]);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
+  const [templateGroup, setTemplateGroup] = useState<string>('All');
+  const [mlbbFilter, setMlbbFilter] = useState<'All' | 'Animated GIF' | 'HD Sticker (PNG)'>('All');
   const [stickerGroup, setStickerGroup] = useState<string>('All');
   const [soundGroup, setSoundGroup] = useState<string>('All');
   const [playingSoundId, setPlayingSoundId] = useState<string | null>(null);
+  const [visibleMlbbCount, setVisibleMlbbCount] = useState(48);
   const [visibleStickersCount, setVisibleStickersCount] = useState(60);
   const [visibleGifsCount, setVisibleGifsCount] = useState(48);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset pagination on filter change
+  useEffect(() => {
+    setVisibleMlbbCount(48);
+  }, [mlbbFilter, searchQuery]);
+
   useEffect(() => {
     setVisibleStickersCount(60);
   }, [stickerGroup, searchQuery]);
@@ -180,6 +208,39 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       }
     };
   }, []);
+
+  // Filtered Templates (SBKH HD PNG & Animated GIF)
+  const filteredTemplates = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return PRESET_TEMPLATES.filter((item) => {
+      const matchGroup = templateGroup === 'All' || item.group === templateGroup;
+      const matchQuery =
+        !q ||
+        item.name.toLowerCase().includes(q) ||
+        item.tags.some((t) => t.toLowerCase().includes(q));
+      return matchGroup && matchQuery;
+    });
+  }, [templateGroup, searchQuery]);
+
+  // Filtered MLBB Emotes (Layla)
+  const filteredMlbb = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return PRESET_MLBB.filter((item) => {
+      const matchType =
+        mlbbFilter === 'All'
+          ? true
+          : mlbbFilter === 'Animated GIF'
+          ? item.isAnimated
+          : !item.isAnimated;
+      const matchQuery =
+        !q ||
+        item.name.toLowerCase().includes(q) ||
+        item.group.toLowerCase().includes(q) ||
+        (item.type && item.type.toLowerCase().includes(q)) ||
+        item.tags.some((t) => t.toLowerCase().includes(q));
+      return matchType && matchQuery;
+    });
+  }, [mlbbFilter, searchQuery]);
 
   // Filtered Stickers
   const filteredStickers = useMemo(() => {
@@ -236,6 +297,9 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       const matchQuery = !q || m.filename.toLowerCase().includes(q);
       if (!matchQuery) return false;
 
+      if (isAudioOnly) {
+        return isAudioAsset(m);
+      }
       if (uploadsFilter === 'images') {
         return isImageAsset(m);
       }
@@ -247,7 +311,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       }
       return true;
     });
-  }, [mediaList, searchQuery, uploadsFilter]);
+  }, [mediaList, searchQuery, uploadsFilter, isAudioOnly]);
 
   const fetchMedia = async (force = false) => {
     try {
@@ -306,6 +370,11 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
+    if (isAudioOnly && !isAudioAsset({ fileType: file.type, url: file.name, filename: file.name })) {
+      setErrorMsg('Only audio files (MP3, WAV, OGG, M4A, AAC, FLAC) are allowed for sound alerts.');
+      return;
+    }
+
     const incomingSize = Number(file.size) || 0;
     if (storageInfo && (storageInfo.usedBytes + incomingSize > storageInfo.limitBytes || incomingSize > storageInfo.remainingBytes)) {
       const totalMb = ((storageInfo.usedBytes + incomingSize) / (1024 * 1024)).toFixed(1);
@@ -359,7 +428,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   };
 
   const handlePresetSelect = (item: PresetMediaItem) => {
-    if (!isProOrTrial) {
+    if (!isProOrTrial && item.category !== 'Template' && item.category !== 'MLBB Emote') {
       setProModalFeature(
         item.category === 'Stickers'
           ? '500+ Sticker Presets'
@@ -374,7 +443,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   };
 
   const handlePresetDoubleClick = (item: PresetMediaItem) => {
-    if (!isProOrTrial) {
+    if (!isProOrTrial && item.category !== 'Template' && item.category !== 'MLBB Emote') {
       setProModalFeature(
         item.category === 'Stickers'
           ? '500+ Sticker Presets'
@@ -391,7 +460,14 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       filename: item.name,
       storedFilename: item.url.split('/').pop() || '',
       url: item.url,
-      fileType: item.category === 'Sounds' ? 'audio/mp3' : item.format === 'gif' ? 'image/gif' : 'image/webp',
+      fileType:
+        item.category === 'Sounds'
+          ? 'audio/mp3'
+          : item.format === 'gif'
+          ? 'image/gif'
+          : item.format === 'png'
+          ? 'image/png'
+          : 'image/webp',
       fileSize: 45000,
       createdAt: new Date().toISOString()
     });
@@ -416,7 +492,14 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       filename: presetFound.name,
       storedFilename: presetFound.url.split('/').pop() || '',
       url: presetFound.url,
-      fileType: presetFound.category === 'Sounds' ? 'audio/mp3' : presetFound.format === 'gif' ? 'image/gif' : 'image/webp',
+      fileType:
+        presetFound.category === 'Sounds'
+          ? 'audio/mp3'
+          : presetFound.format === 'gif'
+          ? 'image/gif'
+          : presetFound.format === 'png'
+          ? 'image/png'
+          : 'image/webp',
       fileSize: 45000,
       createdAt: new Date().toISOString()
     } : undefined);
@@ -444,6 +527,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   <Smile size={20} />
                 ) : activeSection === 'gifs' ? (
                   <Film size={20} />
+                ) : activeSection === 'mlbb' ? (
+                  <Sparkles size={20} className="text-amber-400" />
                 ) : (
                   <ImageIcon size={20} />
                 )}
@@ -494,77 +579,425 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           )}
 
           {/* Section Selector Tabs Bar */}
-          <div className="px-4 sm:px-6 py-2.5 bg-[#070A12] border-b border-slate-800 flex items-center gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setActiveSection('stickers')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-                activeSection === 'stickers'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
-              }`}
-            >
-              <Smile size={14} className={activeSection === 'stickers' ? 'text-cyan-400' : ''} />
-              <span>Stickers (500)</span>
-              <span className="px-1.5 py-0.2 rounded bg-pink-500/90 text-white text-[8px] font-bold uppercase tracking-wider">
-                FB STICKERS
-              </span>
-              {!isProOrTrial && (
-                <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5" />
-              )}
-            </button>
+          <div className="px-3 sm:px-6 py-2.5 bg-[#070A12] border-b border-slate-800 flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
+            {!isAudioOnly && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('template')}
+                  className={`flex-1 sm:flex-initial justify-center px-2.5 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold font-mono transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                    activeSection === 'template'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+                  }`}
+                >
+                  <Sparkles size={14} className={`flex-shrink-0 ${activeSection === 'template' ? 'text-cyan-400' : ''}`} />
+                  <span>Template ({PRESET_TEMPLATES.length})</span>
+                  <span className="px-1.5 py-0.2 rounded bg-purple-500/90 text-white text-[8px] font-bold uppercase tracking-wider flex-shrink-0">
+                    HD + GIF
+                  </span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSection('gifs')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-                activeSection === 'gifs'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
-              }`}
-            >
-              <Film size={14} className={activeSection === 'gifs' ? 'text-cyan-400' : ''} />
-              <span>GIFs (100)</span>
-              <span className="px-1.5 py-0.2 rounded bg-cyan-500/30 text-cyan-300 text-[8px] font-bold uppercase tracking-wider">
-                TRENDING
-              </span>
-              {!isProOrTrial && (
-                <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5" />
-              )}
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('mlbb')}
+                  className={`flex-1 sm:flex-initial justify-center px-2.5 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold font-mono transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                    activeSection === 'mlbb'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+                  }`}
+                >
+                  <Sparkles size={14} className={`flex-shrink-0 ${activeSection === 'mlbb' ? 'text-amber-400' : ''}`} />
+                  <span>MLBB Emote ({PRESET_MLBB.length})</span>
+                  <span className="px-1.5 py-0.2 rounded bg-amber-500/90 text-slate-950 text-[8px] font-black uppercase tracking-wider flex-shrink-0">
+                    LAYLA
+                  </span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSection('sounds')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-                activeSection === 'sounds'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
-              }`}
-            >
-              <Music size={14} className={activeSection === 'sounds' ? 'text-cyan-400' : ''} />
-              <span>Sounds ({PRESET_SOUNDS.length})</span>
-              <span className="px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 text-[8px] font-bold uppercase tracking-wider">
-                SFX
-              </span>
-              {!isProOrTrial && (
-                <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5" />
-              )}
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('stickers')}
+                  className={`flex-1 sm:flex-initial justify-center px-2.5 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold font-mono transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                    activeSection === 'stickers'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+                  }`}
+                >
+                  <Smile size={14} className={`flex-shrink-0 ${activeSection === 'stickers' ? 'text-cyan-400' : ''}`} />
+                  <span>Stickers (500)</span>
+                  <span className="px-1.5 py-0.2 rounded bg-pink-500/90 text-white text-[8px] font-bold uppercase tracking-wider flex-shrink-0">
+                    FB
+                  </span>
+                  {!isProOrTrial && (
+                    <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5 flex-shrink-0" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('gifs')}
+                  className={`flex-1 sm:flex-initial justify-center px-2.5 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold font-mono transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                    activeSection === 'gifs'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+                  }`}
+                >
+                  <Film size={14} className={`flex-shrink-0 ${activeSection === 'gifs' ? 'text-cyan-400' : ''}`} />
+                  <span>GIFs (100)</span>
+                  <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-cyan-500/30 text-cyan-300 text-[8px] font-bold uppercase tracking-wider">
+                    TRENDING
+                  </span>
+                  {!isProOrTrial && (
+                    <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5 flex-shrink-0" />
+                  )}
+                </button>
+              </>
+            )}
+
+            {filterMode !== 'image' && (
+              <button
+                type="button"
+                onClick={() => setActiveSection('sounds')}
+                className={`flex-1 sm:flex-initial justify-center px-2.5 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold font-mono transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
+                  activeSection === 'sounds'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+                }`}
+              >
+                <Music size={14} className={`flex-shrink-0 ${activeSection === 'sounds' ? 'text-cyan-400' : ''}`} />
+                <span>Sounds ({PRESET_SOUNDS.length})</span>
+                <span className="px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 text-[8px] font-bold uppercase tracking-wider flex-shrink-0">
+                  SFX
+                </span>
+                {!isProOrTrial && (
+                  <Crown size={12} className="text-amber-400 fill-amber-400 ml-0.5 flex-shrink-0" />
+                )}
+              </button>
+            )}
 
             <button
               type="button"
               onClick={() => setActiveSection('uploads')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+              className={`flex-1 sm:flex-initial justify-center px-2.5 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold font-mono transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer whitespace-nowrap ${
                 activeSection === 'uploads'
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
               }`}
             >
-              <Layers size={14} className={activeSection === 'uploads' ? 'text-cyan-400' : ''} />
-              <span>My Uploads ({mediaList.length})</span>
+              {isAudioOnly ? (
+                <Volume2 size={14} className={`flex-shrink-0 ${activeSection === 'uploads' ? 'text-cyan-400' : ''}`} />
+              ) : (
+                <Layers size={14} className={`flex-shrink-0 ${activeSection === 'uploads' ? 'text-cyan-400' : ''}`} />
+              )}
+              <span>
+                {isAudioOnly ? `My Uploads (${audioUploadsCount})` : `My Uploads (${mediaList.length})`}
+              </span>
+              {isAudioOnly && (
+                <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[8px] font-bold uppercase tracking-wider flex-shrink-0">
+                  MP3 • WAV
+                </span>
+              )}
             </button>
           </div>
+
+          {/* ============================================================== */}
+          {/* TAB 0: TEMPLATE (SBKH HD PNG & ANIMATED GIF)                   */}
+          {/* ============================================================== */}
+          {activeSection === 'template' && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 min-h-[360px]">
+              {/* Filter & Search Bar */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search SBKH mascot templates (e.g. hi, thank you, love, gg, live, gaming, subscribe)..."
+                    className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Group Filter Chips */}
+                <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => setTemplateGroup('All')}
+                    className={`flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                      templateGroup === 'All'
+                        ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    <span>All Templates</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-mono bg-slate-950/30">
+                      {PRESET_TEMPLATES.length}
+                    </span>
+                  </button>
+
+                  {PRESET_TEMPLATE_GROUPS.map((grp) => {
+                    const count = PRESET_TEMPLATES.filter((t) => t.group === grp).length;
+                    const isSelected = templateGroup === grp;
+                    return (
+                      <button
+                        key={grp}
+                        type="button"
+                        onClick={() => setTemplateGroup(grp)}
+                        className={`flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                            : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                        }`}
+                      >
+                        <span>{grp}</span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
+                            isSelected ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Templates Grid */}
+              {filteredTemplates.length === 0 ? (
+                <div className="py-16 text-center text-xs text-slate-500 font-mono">
+                  No templates match &ldquo;{searchQuery}&rdquo;
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2.5 sm:gap-3">
+                  {filteredTemplates.map((tpl) => {
+                    const isSelected = selectedUrl === tpl.url;
+
+                    return (
+                      <div
+                        key={tpl.id}
+                        onClick={() => handlePresetSelect(tpl)}
+                        onDoubleClick={() => handlePresetDoubleClick(tpl)}
+                        className={`group relative rounded-2xl overflow-hidden border transition-all cursor-pointer bg-slate-950 flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_20px_rgba(0,240,255,0.35)] bg-cyan-950/25'
+                            : 'border-slate-800/90 hover:border-slate-600 hover:bg-slate-900/60'
+                        }`}
+                      >
+                        <div className="aspect-square w-full p-2.5 flex items-center justify-center relative bg-slate-900/30">
+                          <img
+                            src={tpl.url}
+                            alt={tpl.name}
+                            loading="lazy"
+                            className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-200"
+                          />
+
+                          {isSelected && (
+                            <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow-lg">
+                              <Check size={12} strokeWidth={3} />
+                            </div>
+                          )}
+
+                          <span
+                            className={`absolute bottom-1.5 left-1.5 px-1 py-0.2 rounded text-[8px] font-mono font-bold uppercase ${
+                              tpl.isAnimated
+                                ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40'
+                                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                            }`}
+                          >
+                            {tpl.isAnimated ? 'GIF' : 'HD'}
+                          </span>
+                        </div>
+
+                        <div className="p-1.5 bg-[#0B0F19] border-t border-slate-800/60">
+                          <div className="text-[10px] font-medium text-slate-300 truncate" title={tpl.name}>
+                            {tpl.name}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* TAB 0.5: MLBB EMOTE (LAYLA ANIMATED GIF & HD STICKER)          */}
+          {/* ============================================================== */}
+          {activeSection === 'mlbb' && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 min-h-[360px]">
+              {/* Filter & Search Bar */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search MLBB Layla emotes (e.g. hi, laugh, rage, cry, heart, sleepy, boba, drink, cool, victory)..."
+                    className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Subcategory & Filter Chips */}
+                <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                  <div className="flex items-center gap-1.5 mr-1">
+                    <span className="text-[10px] font-mono uppercase font-bold text-slate-500">Category:</span>
+                    <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold uppercase">
+                      MLBB Emote
+                    </span>
+                    <span className="text-[10px] font-mono uppercase font-bold text-slate-500 ml-1">Type:</span>
+                    <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold uppercase">
+                      Layla
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setMlbbFilter('All')}
+                    className={`flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                      mlbbFilter === 'All'
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    <span>All Layla Emotes</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-mono bg-slate-950/30">
+                      {PRESET_MLBB.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMlbbFilter('Animated GIF')}
+                    className={`flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                      mlbbFilter === 'Animated GIF'
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    <span>Layla Animated (GIF)</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
+                        mlbbFilter === 'Animated GIF' ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {PRESET_MLBB.filter((m) => m.isAnimated).length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMlbbFilter('HD Sticker (PNG)')}
+                    className={`flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                      mlbbFilter === 'HD Sticker (PNG)'
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    <span>Layla HD Stickers (PNG)</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
+                        mlbbFilter === 'HD Sticker (PNG)' ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {PRESET_MLBB.filter((m) => !m.isAnimated).length}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Emotes Grid */}
+              {filteredMlbb.length === 0 ? (
+                <div className="py-16 text-center text-xs text-slate-500 font-mono">
+                  No Layla emotes match &ldquo;{searchQuery}&rdquo;
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2.5 sm:gap-3">
+                    {filteredMlbb.slice(0, visibleMlbbCount).map((item) => {
+                      const isSelected = selectedUrl === item.url;
+
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => handlePresetSelect(item)}
+                          onDoubleClick={() => handlePresetDoubleClick(item)}
+                          className={`group relative rounded-2xl overflow-hidden border transition-all cursor-pointer bg-slate-950 flex flex-col justify-between ${
+                            isSelected
+                              ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-[0_0_20px_rgba(245,158,11,0.35)] bg-amber-950/25'
+                              : 'border-slate-800/90 hover:border-amber-500/40 hover:bg-slate-900/60'
+                          }`}
+                        >
+                          <div className="aspect-square w-full p-2.5 flex items-center justify-center relative bg-slate-900/30">
+                            <img
+                              src={item.url}
+                              alt={item.name}
+                              loading="lazy"
+                              className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-200"
+                            />
+
+                            {isSelected && (
+                              <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg">
+                                <Check size={12} strokeWidth={3} />
+                              </div>
+                            )}
+
+                            <span
+                              className={`absolute bottom-1.5 left-1.5 px-1 py-0.2 rounded text-[8px] font-mono font-bold uppercase ${
+                                item.isAnimated
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                  : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                              }`}
+                            >
+                              {item.isAnimated ? 'GIF' : 'HD'}
+                            </span>
+                          </div>
+
+                          <div className="p-1.5 bg-[#0B0F19] border-t border-slate-800/60">
+                            <div className="text-[10px] font-medium text-slate-300 truncate" title={item.name}>
+                              {item.name}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {visibleMlbbCount < filteredMlbb.length && (
+                    <div className="pt-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleMlbbCount((prev) => Math.min(prev + 48, filteredMlbb.length))}
+                        className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-amber-300 hover:text-white transition-colors cursor-pointer"
+                      >
+                        Load More Layla Emotes ({visibleMlbbCount} of {filteredMlbb.length})
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* ============================================================== */}
           {/* TAB 1: STICKERS (500)                                          */}
@@ -1026,7 +1459,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="*/*"
+                      accept={isAudioOnly ? '.mp3,.wav,.ogg,.m4a,.aac,.flac,audio/*' : '*/*'}
                       onChange={handleInputChange}
                       className="hidden"
                     />
@@ -1044,13 +1477,15 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                       ) : (
                         <>
                           <UploadCloud size={15} />
-                          <span>Upload File</span>
+                          <span>{isAudioOnly ? 'Upload Audio' : 'Upload File'}</span>
                         </>
                       )}
                     </button>
 
                     <span className="text-[11px] font-mono text-slate-400 hidden sm:inline">
-                      MP4, GIF, MP3, WAV, PNG, JPG supported
+                      {isAudioOnly
+                        ? 'MP3, WAV, OGG, M4A, AAC, FLAC audio files supported'
+                        : 'MP4, GIF, MP3, WAV, PNG, JPG supported'}
                     </span>
                   </div>
 
@@ -1102,24 +1537,31 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                 <div className="flex items-center gap-1.5">
                   <Filter size={12} className="text-slate-400" />
                   <span className="text-[11px] font-mono text-slate-400 mr-1">Filter:</span>
-                  {(['all', 'images', 'audio', 'video'] as const).map((filterKey) => (
-                    <button
-                      key={filterKey}
-                      type="button"
-                      onClick={() => setUploadsFilter(filterKey)}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer ${
-                        uploadsFilter === filterKey
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                      }`}
-                    >
-                      {filterKey}
-                    </button>
-                  ))}
+                  {isAudioOnly ? (
+                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1.5">
+                      <Volume2 size={11} />
+                      <span>Audio Only (MP3, WAV, OGG, M4A, AAC, FLAC)</span>
+                    </span>
+                  ) : (
+                    (['all', 'images', 'audio', 'video'] as const).map((filterKey) => (
+                      <button
+                        key={filterKey}
+                        type="button"
+                        onClick={() => setUploadsFilter(filterKey)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer ${
+                          uploadsFilter === filterKey
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                        }`}
+                      >
+                        {filterKey}
+                      </button>
+                    ))
+                  )}
                 </div>
 
                 <div className="text-[11px] font-mono text-slate-500">
-                  Showing {filteredUploads.length} files
+                  Showing {filteredUploads.length} {isAudioOnly ? 'audio ' : ''}files
                 </div>
               </div>
 

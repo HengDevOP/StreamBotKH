@@ -36,6 +36,34 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
   const isPaidRef = useRef<boolean>(false);
   const { socket } = useSocket();
 
+  // Language state synchronized with stream_lang
+  const [lang, setLang] = useState<'en' | 'kh'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('stream_lang');
+      if (saved === 'kh' || saved === 'en') return saved;
+    }
+    return 'en';
+  });
+
+  const handleSwitchLang = (newLang: 'en' | 'kh') => {
+    setLang(newLang);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stream_lang', newLang);
+      window.dispatchEvent(new CustomEvent('stream_lang_change', { detail: newLang }));
+    }
+  };
+
+  useEffect(() => {
+    const onLangChange = (e: any) => {
+      const l = e.detail || localStorage.getItem('stream_lang');
+      if (l === 'kh' || l === 'en') {
+        setLang(l);
+      }
+    };
+    window.addEventListener('stream_lang_change', onLangChange);
+    return () => window.removeEventListener('stream_lang_change', onLangChange);
+  }, []);
+
   // Unified payment completion handler: runs celebration and closes KHQR modal
   const handleSuccess = (details?: any) => {
     if (isPaidRef.current) return;
@@ -183,7 +211,41 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
   const formattedTime = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Scan To Pay" maxWidth="sm" showDot={false}>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={lang === 'kh' ? 'ស្កេនដើម្បីទូទាត់' : 'Scan To Pay'}
+      maxWidth="sm"
+      showDot={false}
+      headerRight={
+        <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-sm">
+          <button
+            type="button"
+            onClick={() => handleSwitchLang('en')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+              lang === 'en'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title="Switch to English"
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSwitchLang('kh')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+              lang === 'kh'
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title="ប្តូរទៅភាសាខ្មែរ (Khmer)"
+          >
+            KH
+          </button>
+        </div>
+      }
+    >
       <div className="flex flex-col items-center text-center space-y-3.5 py-1">
         {/* Official Bakong KHQR Canvas (Show only the pure QR code, fluidly responsive for small devices) */}
         <div className="p-2 sm:p-3 bg-white border-2 border-slate-700 shadow-2xl rounded-xl max-w-full">
@@ -233,17 +295,23 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
                 </svg>
               </div>
               <span className="text-base font-extrabold text-white font-['Chakra_Petch'] tracking-wide">
-                PAYMENT CONFIRMED!
+                {lang === 'kh' ? 'ការទូទាត់បានជោគជ័យ!' : 'PAYMENT CONFIRMED!'}
               </span>
               <span className="text-xs text-emerald-400 font-mono">
-                Broadcasting alert on stream...
+                {lang === 'kh' ? 'កំពុងបង្ហាញលើការផ្សាយផ្ទាល់...' : 'Broadcasting alert on stream...'}
               </span>
             </div>
           ) : (!donationData.qrImage && !masterKhqrImage) ? (
             <div className="w-52 h-52 xs:w-60 xs:h-60 sm:w-64 sm:h-64 flex flex-col items-center justify-center p-4 text-center bg-[#090D18] rounded-xl border border-amber-500/30 text-amber-400">
               <AlertCircle size={28} className="mb-2 text-amber-400" />
-              <span className="text-xs font-mono font-bold">No KHQR Image Found</span>
-              <span className="text-[10px] text-slate-400 mt-1">This streamer has not uploaded their Bakong Master KHQR code yet.</span>
+              <span className="text-xs font-mono font-bold">
+                {lang === 'kh' ? 'រកមិនឃើញរូបភាព KHQR ទេ' : 'No KHQR Image Found'}
+              </span>
+              <span className="text-[10px] text-slate-400 mt-1">
+                {lang === 'kh'
+                  ? 'Streamer នេះមិនទាន់បានបង្ហោះកូដ Bakong Master KHQR នៅឡើយទេ។'
+                  : 'This streamer has not uploaded their Bakong Master KHQR code yet.'}
+              </span>
             </div>
           ) : (
             <img
@@ -264,7 +332,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
         {/* Temporary Duration Countdown for the Alerts */}
         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs font-mono">
           <Clock size={13} className="text-amber-400" />
-          <span className="text-slate-400">Session Expires:</span>
+          <span className="text-slate-400">{lang === 'kh' ? 'រយៈពេលនៅសល់:' : 'Session Expires:'}</span>
           <span className="font-bold text-white font-mono">{formattedTime}</span>
         </div>
       </div>

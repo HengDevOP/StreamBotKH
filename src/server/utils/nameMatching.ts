@@ -186,13 +186,13 @@ export function amountsMatch(
     return true;
   }
 
-  // 3. USD vs KHR conversion tolerance (~4,100 KHR per USD)
+  // 3. USD vs KHR conversion tolerance (4,000 KHR per USD)
   if (cCurr === 'USD' && kCurr === 'KHR') {
-    const converted = candAmount * 4100;
+    const converted = candAmount * 4000;
     return Math.abs(converted - critAmount) < 200;
   }
   if (cCurr === 'KHR' && kCurr === 'USD') {
-    const converted = candAmount / 4100;
+    const converted = candAmount / 4000;
     return Math.abs(converted - critAmount) < 0.05;
   }
 

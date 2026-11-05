@@ -329,7 +329,7 @@ export async function upsertGoogleStreamer(profile: {
         allowKhr: true,
         usdMinAmount: 0.5,
         khrMinAmount: 2000,
-        exchangeRate: 4100,
+        exchangeRate: 4000,
         updatedAt: new Date()
       });
     }

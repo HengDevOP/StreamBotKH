@@ -36,6 +36,11 @@ tsconfig.tsbuildinfo
 *.log
 npm-debug.log*
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
 # OS
 Thumbs.db
 

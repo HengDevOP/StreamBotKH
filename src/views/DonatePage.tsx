@@ -98,6 +98,26 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
   // Selected supporter video for instant playback preview modal
   const [previewingVideoUrl, setPreviewingVideoUrl] = useState<string | null>(null);
 
+  // Synchronized language state
+  const [lang, setLang] = useState<'en' | 'kh'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('stream_lang');
+      if (saved === 'kh' || saved === 'en') return saved;
+    }
+    return 'en';
+  });
+
+  useEffect(() => {
+    const onLangChange = (e: any) => {
+      const l = e.detail || localStorage.getItem('stream_lang');
+      if (l === 'kh' || l === 'en') {
+        setLang(l);
+      }
+    };
+    window.addEventListener('stream_lang_change', onLangChange);
+    return () => window.removeEventListener('stream_lang_change', onLangChange);
+  }, []);
+
   useEffect(() => {
     const fetchStreamerAndSupporters = async () => {
       try {
@@ -357,11 +377,11 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
                 <div className="flex items-center gap-2">
                   <Heart size={15} className="text-pink-400 fill-pink-400" />
                   <h3 className="text-sm font-bold uppercase tracking-wider text-white font-['Chakra_Petch']">
-                    Latest Support
+                    {lang === 'kh' ? 'ការគាំទ្រចុងក្រោយ' : 'Latest Support'}
                   </h3>
                 </div>
                 <span className="text-xs font-mono text-slate-500">
-                  {recentSupporters.length} recent
+                  {recentSupporters.length} {lang === 'kh' ? 'ថ្មីៗ' : 'recent'}
                 </span>
               </div>
 
@@ -369,15 +389,19 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
               <div className="flex-1 min-h-[320px] overflow-y-auto divide-y divide-slate-800/60 pr-1">
                 {recentSupporters.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center py-12 text-slate-500">
-                    <p className="text-xs text-slate-400">No supporters yet.</p>
-                    <p className="text-[11px] text-slate-600 mt-1">Be the first to send a cheer!</p>
+                    <p className="text-xs text-slate-400">
+                      {lang === 'kh' ? 'មិនទាន់មានអ្នកឧបត្ថម្ភទេ' : 'No supporters yet.'}
+                    </p>
+                    <p className="text-[11px] text-slate-600 mt-1">
+                      {lang === 'kh' ? 'ក្លាយជាអ្នកដំបូងដែលផ្ញើការលើកទឹកចិត្ត!' : 'Be the first to send a cheer!'}
+                    </p>
                   </div>
                 ) : (
                   recentSupporters.map((s, idx) => (
                     <div key={s.id || idx} className="py-2.5 first:pt-1.5 last:pb-1 flex items-center justify-between gap-3">
                       {/* Name & Amount */}
                       <span className="text-xs font-semibold text-white truncate">
-                        {s.donor_name || 'Generous Supporter'}
+                        {s.donor_name || (lang === 'kh' ? 'អ្នកគាំទ្រដ៏សប្បុរស' : 'Generous Supporter')}
                       </span>
                       <span className="text-xs font-mono font-bold text-cyan-400 flex-shrink-0">
                         {s.currency === 'KHR'

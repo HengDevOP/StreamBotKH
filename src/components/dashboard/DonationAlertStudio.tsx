@@ -110,13 +110,6 @@ const GLOW_COLOR_PRESETS = [
   { label: 'Pure White', hex: '#FFFFFF' }
 ];
 
-const SOUND_PRESETS = [
-  { label: 'Cash Register Ka-Ching', url: '/sounds/cash-register-kaching.mp3' },
-  { label: 'Mario Coin Bell', url: '/sounds/mario-coin.mp3' },
-  { label: 'Cyber Pulse Alert', url: '/sounds/cyber-alert.mp3' },
-  { label: 'Victory Synth Fanfare', url: '/sounds/victory-chime.mp3' }
-];
-
 const GIF_PRESETS = [
   { label: 'Neon Cyber Cat', url: 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif' },
   { label: 'Dancing Hype Alien', url: 'https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif' },
@@ -142,7 +135,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const { user } = useAuth();
 
   // Active Category Section (Accordion List Item Expanded: null = collapsed)
-  const [activeTab, setActiveTab] = useState<'text' | 'image' | 'tts' | 'rules' | null>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'image' | 'tts' | 'rules' | null>(null);
 
   const initialConditions = useMemo<AlertConditionTier[]>(() => {
     if (box?.conditions && Array.isArray(box.conditions) && box.conditions.length > 0) {
@@ -216,6 +209,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   // Form State (Box-level: name; Tier-level: active condition settings)
   const [name, setName] = useState((box?.name || 'Standard Box').slice(0, 16));
   const [minAmountCondition, setMinAmountCondition] = useState<number>(firstTier.minAmountCondition);
+  const [conditionAmountInput, setConditionAmountInput] = useState<string>(
+    Number(firstTier.minAmountCondition || 0.01).toFixed(2)
+  );
   const [templateStyle, setTemplateStyle] = useState<'neon-box' | 'glass-hologram' | 'cyber-glitch' | 'arcade' | 'minimal'>(
     firstTier.templateStyle || 'neon-box'
   );
@@ -255,6 +251,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   // TTS State
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(firstTier.ttsEnabled !== false);
   const [ttsMinAmount, setTtsMinAmount] = useState<number>(firstTier.ttsMinAmount ?? 0.01);
+  const [ttsMinAmountInput, setTtsMinAmountInput] = useState<string>(
+    Number(firstTier.ttsMinAmount ?? 0.01).toFixed(2)
+  );
   const [ttsType, setTtsType] = useState<'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned'>(
     firstTier.ttsType || 'google'
   );
@@ -284,9 +283,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     if (preset.layoutMode) setLayoutMode(preset.layoutMode);
   };
   
-  // Media Library Storage Picker State (Supports User Uploads + 500 Stickers + 100 GIFs + Sounds)
+  // Media Library Storage Picker State (Supports User Uploads + Templates + 500 Stickers + 100 GIFs + Sounds)
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
-  const [mediaPickerSection, setMediaPickerSection] = useState<'uploads' | 'stickers' | 'gifs' | 'sounds'>('stickers');
+  const [mediaPickerSection, setMediaPickerSection] = useState<'uploads' | 'template' | 'stickers' | 'gifs' | 'sounds'>('template');
 
   const filteredFonts = useMemo(() => {
     return ALL_FONT_OPTIONS.filter((f) => {
@@ -323,6 +322,8 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isSimulating, setIsSimulating] = useState(false);
   const [isTtsPlaying, setIsTtsPlaying] = useState(false);
+  const simulationRunIdRef = useRef<number>(0);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Mobile responsive categories drawer / tab toggle
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
@@ -352,15 +353,12 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
 
   const formatConditionChip = (val: number): string => {
     const num = Number(val) > 0 ? Number(val) : 0.01;
-    if (Math.round(num * 100) !== num * 100) {
-      return `${num.toFixed(3).replace(/0+$/, '')}$`;
-    }
     return `${num.toFixed(2)}$`;
   };
 
   const snapshotCurrentTier = (targetId: string): AlertConditionTier => ({
     id: targetId,
-    minAmountCondition: Number(minAmountCondition) > 0 ? Number(minAmountCondition) : 0.01,
+    minAmountCondition: Number(minAmountCondition) > 0 ? Number(Number(minAmountCondition).toFixed(2)) : 0.01,
     isEnabled: true,
     templateStyle,
     showImage,
@@ -378,15 +376,16 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     textTemplate,
     animationStyle,
     ttsEnabled,
-    ttsMinAmount: Number(ttsMinAmount) >= 0 ? Number(ttsMinAmount) : 0.01,
+    ttsMinAmount: Number(ttsMinAmount) > 0 ? Number(Number(ttsMinAmount).toFixed(2)) : 0.01,
     ttsType,
     clonedVoiceName,
     clonedVoiceSampleUrl
   });
 
   const applyTierToForm = (tier: AlertConditionTier) => {
-    const nextAmt = Number(tier.minAmountCondition) > 0 ? Number(tier.minAmountCondition) : 0.01;
+    const nextAmt = Number((Number(tier.minAmountCondition) > 0 ? Number(tier.minAmountCondition) : 0.01).toFixed(2));
     setMinAmountCondition(nextAmt);
+    setConditionAmountInput(nextAmt.toFixed(2));
     setTemplateStyle(tier.templateStyle || 'neon-box');
     setShowImage(tier.showImage !== false);
     setMediaUrl(tier.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif');
@@ -407,7 +406,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     setTextTemplate(tier.textTemplate || '{donator} donated {amount} through superchat!');
     setAnimationStyle(tier.animationStyle === 'bounce' ? 'fade' : (tier.animationStyle as any) || 'fade');
     setTtsEnabled(tier.ttsEnabled !== false);
-    setTtsMinAmount(tier.ttsMinAmount ?? 0.01);
+    const nextTtsAmt = Number((Number(tier.ttsMinAmount ?? 0.01) > 0 ? Number(tier.ttsMinAmount ?? 0.01) : 0.01).toFixed(2));
+    setTtsMinAmount(nextTtsAmt);
+    setTtsMinAmountInput(nextTtsAmt.toFixed(2));
     setTtsType(tier.ttsType || 'google');
     setClonedVoiceName(tier.clonedVoiceName || '');
     setClonedVoiceSampleUrl(tier.clonedVoiceSampleUrl || '');
@@ -667,24 +668,42 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       if (data?.isTest) return;
 
       if (data) {
-        if (data.donorName) setDemoDonorName(data.donorName);
-        if (data.amount) setDemoAmount(Number(data.amount));
-        const incomingMsg = data.donorMessage ?? data.donor_message ?? data.message;
-        if (incomingMsg !== undefined) {
-          setDemoMessage(typeof incomingMsg === 'string' ? incomingMsg.trim() : '');
-        } else {
-          setDemoMessage('');
-        }
+        const incomingDonor = data.donorName || demoDonorName;
+        const incomingAmount = data.amount !== undefined ? Number(data.amount) : demoAmount;
+        const rawIncomingMsg = data.donorMessage ?? data.donor_message ?? data.message;
+        const incomingMsg =
+          rawIncomingMsg !== undefined
+            ? typeof rawIncomingMsg === 'string'
+              ? rawIncomingMsg.trim()
+              : ''
+            : '';
+
+        if (data.donorName) setDemoDonorName(incomingDonor);
+        if (data.amount !== undefined) setDemoAmount(incomingAmount);
+        setDemoMessage(incomingMsg);
+
+        const runId = ++simulationRunIdRef.current;
         setIsSimulating(true);
-        playSound(soundUrl, soundVolume);
-        if (ttsEnabled) {
-          setTimeout(() => {
-            handleTestTtsAudio();
-          }, 700);
-        }
-        setTimeout(() => {
-          setIsSimulating(false);
-        }, (durationSeconds || 8) * 1000);
+        const minDurationPromise = new Promise<void>((resolve) =>
+          setTimeout(resolve, (durationSeconds || 8) * 1000)
+        );
+
+        (async () => {
+          // 1. Play alert audio and await until it finishes completely
+          await playSound(soundUrl, soundVolume);
+          if (simulationRunIdRef.current !== runId) return;
+
+          // 2. Only after alert audio finishes, start TTS speech
+          if (ttsEnabled) {
+            await handleTestTtsAudio(incomingDonor, incomingAmount, incomingMsg);
+          }
+
+          // 3. Ensure minimum card duration has also elapsed before hiding preview
+          await minDurationPromise;
+          if (simulationRunIdRef.current === runId) {
+            setIsSimulating(false);
+          }
+        })();
       }
     };
     socket.on('donation:alert', handleLiveAlert);
@@ -705,15 +724,11 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
 
   // Trigger live simulation in preview canvas AND broadcast to OBS Studio Browser Source URL
   const handleSimulateAlert = () => {
+    const runId = ++simulationRunIdRef.current;
     setIsSimulating(true);
-    playSound(soundUrl, soundVolume);
-
-    // If TTS is enabled and meets min amount, speak both headline announcement text and donor message
-    if (ttsEnabled && demoAmount >= ttsMinAmount) {
-      setTimeout(() => {
-        handleTestTtsAudio();
-      }, 700);
-    }
+    const minDurationPromise = new Promise<void>((resolve) =>
+      setTimeout(resolve, (durationSeconds || 8) * 1000)
+    );
 
     // Build payload with all active studio configurations
     const alertPayload = {
@@ -742,6 +757,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       durationSeconds,
       ttsEnabled,
       ttsType,
+      clonedVoiceName,
       clonedVoiceSampleUrl,
       overlayToken: effectiveToken,
       isVideoTest: false,
@@ -760,101 +776,144 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
       }).catch((e) => console.error('Error broadcasting test alert to overlay API:', e));
     }
 
-    setTimeout(() => {
-      setIsSimulating(false);
-    }, (durationSeconds || 8) * 1000);
+    (async () => {
+      // 1. Play alert sound and await until the audio track finishes completely
+      await playSound(soundUrl, soundVolume);
+      if (simulationRunIdRef.current !== runId) return;
+
+      // 2. Only after alert sound finishes, start TTS if enabled
+      if (ttsEnabled) {
+        await handleTestTtsAudio();
+      }
+
+      // 3. Ensure minimum card display duration has elapsed before hiding preview card
+      await minDurationPromise;
+      if (simulationRunIdRef.current === runId) {
+        setIsSimulating(false);
+      }
+    })();
   };
 
   // Test TTS Audio: Reads BOTH headline announcement text and donor message with $ and ៛ normalization
-  const handleTestTtsAudio = () => {
-    setIsTtsPlaying(true);
-    try {
-      const template = textTemplate || '{donator} donated {amount} through superchat!';
-      const isKhmer =
-        /[\u1780-\u17FF]/.test(demoDonorName + ' ' + (demoMessage || '') + ' ' + (textTemplate || '')) ||
-        ttsType.startsWith('kiritts') ||
-        ttsType.includes('piseth') ||
-        ttsType.includes('sreymom');
+  // Returns a Promise<void> that resolves once TTS playback completes.
+  const handleTestTtsAudio = (
+    overrideDonor?: string,
+    overrideAmount?: number,
+    overrideMsg?: string
+  ): Promise<void> => {
+    const activeDonor = typeof overrideDonor === 'string' ? overrideDonor : demoDonorName;
+    const activeAmount = typeof overrideAmount === 'number' ? overrideAmount : demoAmount;
+    const activeMsg = typeof overrideMsg === 'string' ? overrideMsg : demoMessage;
 
-      const hasCurrencyTag = template.toLowerCase().includes('{currency}');
-      const numAmount = Number(demoAmount) || 0;
-      let formattedAmount = '';
-      let currencyWord = '';
-
-      if (Math.abs(numAmount - 0.01) < 0.0001) {
-        formattedAmount = isKhmer ? '1 សេន' : '1 cent';
-        currencyWord = isKhmer ? 'សេន' : 'cent';
-      } else if (numAmount > 0 && numAmount < 1) {
-        const cents = Math.round(numAmount * 100);
-        formattedAmount = isKhmer
-          ? `${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន`
-          : `${cents} cents`;
-        currencyWord = isKhmer ? 'សេន' : 'cents';
-      } else {
-        const dollars = Math.floor(numAmount);
-        const cents = Math.round((numAmount - dollars) * 100);
-        if (cents > 0) {
-          formattedAmount = isKhmer
-            ? `${khmerNumberToWords(dollars)} ដុល្លារ ${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន`
-            : `${dollars === 1 ? '1 dollar' : `${dollars} dollars`} and ${cents === 1 ? '1 cent' : `${cents} cents`}`;
-          currencyWord = isKhmer ? 'ដុល្លារ' : 'dollars';
-        } else {
-          formattedAmount = isKhmer
-            ? (hasCurrencyTag ? khmerNumberToWords(dollars) : `${khmerNumberToWords(dollars)} ដុល្លារ`)
-            : `${dollars} ${dollars === 1 ? 'dollar' : 'dollars'}`;
-          currencyWord = isKhmer ? 'ដុល្លារ' : (dollars === 1 ? 'dollar' : 'dollars');
-        }
-      }
-
-      let headline = template
-        .replace(/\{donator\}/gi, demoDonorName)
-        .replace(/\{name\}/gi, demoDonorName)
-        .replace(/\{amount\}/gi, formattedAmount)
-        .replace(/\{currency\}/gi, currencyWord)
-        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
-        .trim();
-
-      const cleanMsg = (demoMessage || '')
-        .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
-        .trim();
-
-      headline = normalizeCurrencyAndSymbols(headline, isKhmer);
-      const normalizedMsg = cleanMsg ? normalizeCurrencyAndSymbols(cleanMsg, isKhmer) : '';
-
-      // Read BOTH headline announcement text AND donor message!
-      const fullSpeech = normalizedMsg ? `${headline}. ${normalizedMsg}` : headline;
-
-      let ttsAudioUrl = '';
-      if (ttsType === 'cloned') {
-        // High quality Neural KiriTTS Voice Clone matching streamer's exact voice
-        const safeSamplePath =
-          clonedVoiceSampleUrl &&
-          !clonedVoiceSampleUrl.startsWith('data:') &&
-          clonedVoiceSampleUrl.length < 250
-            ? clonedVoiceSampleUrl
-            : '';
-
-        ttsAudioUrl = `/api/tts?type=cloned&clonedVoiceName=${encodeURIComponent(
-          clonedVoiceName || ''
-        )}&clonedVoiceSampleUrl=${encodeURIComponent(
-          safeSamplePath
-        )}&text=${encodeURIComponent(fullSpeech.slice(0, 250))}`;
-      } else {
-        // High quality Neural TTS synthesizing Piseth, Sreymom, Jenny, Christopher voices
-        ttsAudioUrl = `/api/tts?type=${encodeURIComponent(ttsType)}&text=${encodeURIComponent(
-          fullSpeech.slice(0, 250)
-        )}`;
-      }
-
-      const audio = new Audio(ttsAudioUrl);
-      audio.volume = Math.min(1, soundVolume + 0.15);
-      audio.onended = () => setIsTtsPlaying(false);
-      audio.onerror = () => setIsTtsPlaying(false);
-      audio.play().catch(() => setIsTtsPlaying(false));
-    } catch (e) {
-      console.error('Error testing TTS audio:', e);
-      setIsTtsPlaying(false);
+    if (ttsAudioRef.current) {
+      try {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current.currentTime = 0;
+      } catch {}
+      ttsAudioRef.current = null;
     }
+
+    setIsTtsPlaying(true);
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(safetyTimer);
+        setIsTtsPlaying(false);
+        resolve();
+      };
+      const safetyTimer = setTimeout(done, 15000);
+
+      try {
+        const template = textTemplate || '{donator} donated {amount} through superchat!';
+        const isKhmer =
+          /[\u1780-\u17FF]/.test(activeDonor + ' ' + (activeMsg || '') + ' ' + (textTemplate || '')) ||
+          ttsType.startsWith('kiritts') ||
+          ttsType.includes('piseth') ||
+          ttsType.includes('sreymom');
+
+        const hasCurrencyTag = template.toLowerCase().includes('{currency}');
+        const numAmount = Number(activeAmount) || 0;
+        let formattedAmount = '';
+        let currencyWord = '';
+
+        if (Math.abs(numAmount - 0.01) < 0.0001) {
+          formattedAmount = isKhmer ? '1 សេន' : '1 cent';
+          currencyWord = isKhmer ? 'សេន' : 'cent';
+        } else if (numAmount > 0 && numAmount < 1) {
+          const cents = Math.round(numAmount * 100);
+          formattedAmount = isKhmer
+            ? `${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន`
+            : `${cents} cents`;
+          currencyWord = isKhmer ? 'សេន' : 'cents';
+        } else {
+          const dollars = Math.floor(numAmount);
+          const cents = Math.round((numAmount - dollars) * 100);
+          if (cents > 0) {
+            formattedAmount = isKhmer
+              ? `${khmerNumberToWords(dollars)} ដុល្លារ ${cents === 1 ? '1' : khmerNumberToWords(cents)} សេន`
+              : `${dollars === 1 ? '1 dollar' : `${dollars} dollars`} and ${cents === 1 ? '1 cent' : `${cents} cents`}`;
+            currencyWord = isKhmer ? 'ដុល្លារ' : 'dollars';
+          } else {
+            formattedAmount = isKhmer
+              ? (hasCurrencyTag ? khmerNumberToWords(dollars) : `${khmerNumberToWords(dollars)} ដុល្លារ`)
+              : `${dollars} ${dollars === 1 ? 'dollar' : 'dollars'}`;
+            currencyWord = isKhmer ? 'ដុល្លារ' : (dollars === 1 ? 'dollar' : 'dollars');
+          }
+        }
+
+        let headline = template
+          .replace(/\{donator\}/gi, activeDonor)
+          .replace(/\{name\}/gi, activeDonor)
+          .replace(/\{amount\}/gi, formattedAmount)
+          .replace(/\{currency\}/gi, currencyWord)
+          .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
+          .trim();
+
+        const cleanMsg = (activeMsg || '')
+          .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '')
+          .trim();
+
+        headline = normalizeCurrencyAndSymbols(headline, isKhmer);
+        const normalizedMsg = cleanMsg ? normalizeCurrencyAndSymbols(cleanMsg, isKhmer) : '';
+
+        // Read BOTH headline announcement text AND donor message!
+        const fullSpeech = normalizedMsg ? `${headline}. ${normalizedMsg}` : headline;
+
+        let ttsAudioUrl = '';
+        if (ttsType === 'cloned') {
+          // High quality Neural KiriTTS Voice Clone matching streamer's exact voice
+          const safeSamplePath =
+            clonedVoiceSampleUrl &&
+            !clonedVoiceSampleUrl.startsWith('data:') &&
+            clonedVoiceSampleUrl.length < 250
+              ? clonedVoiceSampleUrl
+              : '';
+
+          ttsAudioUrl = `/api/tts?type=cloned&clonedVoiceName=${encodeURIComponent(
+            clonedVoiceName || ''
+          )}&clonedVoiceSampleUrl=${encodeURIComponent(
+            safeSamplePath
+          )}&text=${encodeURIComponent(fullSpeech.slice(0, 250))}`;
+        } else {
+          // High quality Neural TTS synthesizing Piseth, Sreymom, Jenny, Christopher voices
+          ttsAudioUrl = `/api/tts?type=${encodeURIComponent(ttsType)}&text=${encodeURIComponent(
+            fullSpeech.slice(0, 250)
+          )}`;
+        }
+
+        const audio = new Audio(ttsAudioUrl);
+        ttsAudioRef.current = audio;
+        audio.volume = Math.min(1, soundVolume + 0.15);
+        audio.onended = () => done();
+        audio.onerror = () => done();
+        audio.play().catch(() => done());
+      } catch (e) {
+        console.error('Error testing TTS audio:', e);
+        done();
+      }
+    });
   };
 
   // Save or Create Alert Box
@@ -1736,7 +1795,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setMediaPickerSection('stickers');
+                                  setMediaPickerSection('template');
                                   setIsMediaPickerOpen(true);
                                 }}
                                 className="px-3.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:border-cyan-400"
@@ -1879,44 +1938,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                       </p>
                     </div>
 
-                    {/* Sound Preset Picker */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-mono font-bold text-slate-300 block">
-                        Sound Presets
-                      </label>
-                      <div className="space-y-1.5">
-                        {SOUND_PRESETS.map((snd) => {
-                          const isSelected = soundUrl === snd.url;
-                          return (
-                            <div
-                              key={snd.url}
-                              onClick={() => {
-                                setSoundUrl(snd.url);
-                                playSound(snd.url, soundVolume);
-                              }}
-                              className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                                isSelected
-                                  ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                              }`}
-                            >
-                              <span className="font-mono text-xs font-bold">{snd.label}</span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  playSound(snd.url, soundVolume);
-                                }}
-                                className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-400"
-                              >
-                                <Play size={12} fill="currentColor" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
                     {/* Sound Volume Slider */}
                     <div className="space-y-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80">
                       <div className="flex items-center justify-between text-xs">
@@ -2003,26 +2024,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
 
                   {ttsEnabled && (
                     <>
-                      {/* Minimum Donation for TTS */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-mono font-bold text-slate-300">
-                            Minimum Tip for TTS ($ USD)
-                          </label>
-                          <span className="text-[10px] text-cyan-400 font-mono">
-                            ~{((ttsMinAmount || 1) * 4100).toLocaleString()} ៛ KHR
-                          </span>
-                        </div>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0.5"
-                          value={ttsMinAmount}
-                          onChange={(e) => setTtsMinAmount(parseFloat(e.target.value) || 1.0)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
-                        />
-                      </div>
-
                       {/* Voice Model Selection */}
                       <div className="space-y-2">
                         <label className="text-xs font-mono font-bold text-slate-300 block">
@@ -2158,7 +2159,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handleTestTtsAudio}
+                        onClick={() => handleTestTtsAudio()}
                         disabled={isTtsPlaying}
                         className="w-full border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-xs font-mono font-bold"
                       >
@@ -2232,60 +2233,48 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
 
                   {/* Condition Amount Threshold */}
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <label className="text-xs font-mono font-bold text-slate-300">
                         Condition Amount (≥ Threshold)
                       </label>
                       <span className="text-[10px] text-cyan-400 font-mono">
-                        ~{(minAmountCondition * 4100).toLocaleString()} ៛ KHR
+                        ~{Math.round(minAmountCondition * 4000).toLocaleString()} ៛ KHR
                       </span>
                     </div>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono font-bold">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.001"
-                        value={minAmountCondition}
-                        onChange={(e) => setMinAmountCondition(parseFloat(e.target.value) || 0)}
-                        className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500 font-mono">
-                      Tips equal to or greater than this amount (≥ ${minAmountCondition.toFixed(2)}) will trigger this alert box.
-                    </p>
-                  </div>
 
-                  {/* Dedicated OBS Browser Source Action Icons (No Raw URL Displayed) */}
-                  <div className="p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-cyan-300">
-                        <Monitor size={14} className="text-cyan-400" />
-                        Dedicated OBS Overlay
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={copyObsUrl}
-                          title={copiedUrl ? 'Copied OBS Overlay URL!' : 'Copy OBS Overlay URL'}
-                          className="p-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 transition-colors cursor-pointer"
-                        >
-                          {copiedUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                        </button>
-                        <a
-                          href={dedicatedBoxUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Open Target Overlay"
-                          className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 border border-slate-800 transition-colors"
-                        >
-                          <ExternalLink size={14} />
-                        </a>
-                      </div>
+                    <div className="flex items-center rounded-xl bg-slate-950 border border-slate-800 focus-within:border-cyan-400 transition-colors overflow-hidden">
+                      <span className="pl-3 pr-2 py-2 text-cyan-400 font-mono font-bold text-xs select-none border-r border-slate-800/80 bg-slate-900/60">
+                        ≥ $
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={conditionAmountInput}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9.]/g, '');
+                          if (!/^\d*(?:\.\d{0,2})?$/.test(raw)) return;
+                          setConditionAmountInput(raw);
+                          const parsed = parseFloat(raw);
+                          if (!isNaN(parsed) && parsed > 0) {
+                            const rounded = Number(parsed.toFixed(2));
+                            setMinAmountCondition(rounded);
+                            setDemoAmount(rounded);
+                          }
+                        }}
+                        onBlur={() => {
+                          const parsed = parseFloat(conditionAmountInput);
+                          const safeVal = !isNaN(parsed) && parsed > 0 ? Number(parsed.toFixed(2)) : 0.01;
+                          setMinAmountCondition(safeVal);
+                          setConditionAmountInput(safeVal.toFixed(2));
+                          setDemoAmount(safeVal);
+                        }}
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 bg-transparent text-white font-mono font-bold text-xs focus:outline-none"
+                      />
+                      <span className="pr-3 pl-2 text-[10px] font-mono text-slate-500 select-none">
+                        USD
+                      </span>
                     </div>
-                    <p className="text-[10px] text-slate-400 font-mono leading-relaxed">
-                      Copy or open this box&apos;s dedicated Browser Source overlay for OBS Studio (1920x1080).
-                    </p>
                   </div>
                 </div>
               )}
@@ -2474,11 +2463,12 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         }}
         currentUrl={mediaPickerSection === 'sounds' ? soundUrl : mediaUrl}
         initialSection={mediaPickerSection}
+        filterMode={mediaPickerSection === 'sounds' ? 'audio' : 'image'}
         title={mediaPickerSection === 'sounds' ? 'Choose Alert Sound' : 'Choose Reaction Media'}
         subtitle={
           mediaPickerSection === 'sounds'
-            ? 'Pick a preset sound effect, or select from your uploaded audio files.'
-            : 'Pick from 500+ Facebook stickers, 100 alert GIFs, or your uploaded cloud media.'
+            ? 'Pick a preset sound effect, or select from your uploaded audio files (MP3, WAV, OGG, M4A).'
+            : 'Pick from SBKH Templates, 500+ Facebook stickers, 100 alert GIFs, or your uploaded cloud media.'
         }
         currentPlan={user?.plan || 'free'}
         isAdmin={Boolean(user?.isAdmin || (user as any)?.role === 'admin')}

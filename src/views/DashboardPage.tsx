@@ -66,7 +66,9 @@ import {
   Youtube,
   Radio,
   Crown,
-  Gift
+  Gift,
+  PartyPopper,
+  Pickaxe
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -138,6 +140,8 @@ export type DashboardTab =
   | 'chat'
   | 'subscribers'
   | 'pokemon'
+  | 'fireworks'
+  | 'minecraft'
   | 'payments'
   | 'telegram'
   | 'account'
@@ -1421,6 +1425,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'pokemon' as DashboardTab,
           label: '2D Pokémon',
           icon: Gamepad2,
+          badge: 'NEW',
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+        },
+        {
+          id: 'fireworks' as DashboardTab,
+          label: 'Fireworks',
+          icon: PartyPopper,
+          badge: 'NEW',
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+        },
+        {
+          id: 'minecraft' as DashboardTab,
+          label: 'Minecraft',
+          icon: Pickaxe,
           badge: 'NEW',
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         }

@@ -36,60 +36,83 @@ interface VoiceClonerModalProps {
 
 const TARGET_SECONDS = 15.0;
 
-// Autocorrelation pitch detection algorithm for clean speech
+// Glottal-smoothed normalized autocorrelation pitch detection for clean speech
 function detectPitch(buffer: Float32Array, sampleRate: number): number {
   const size = buffer.length;
   let rms = 0;
+  let zcr = 0;
   for (let i = 0; i < size; i++) {
     rms += buffer[i] * buffer[i];
+    if (i > 0 && ((buffer[i - 1] >= 0 && buffer[i] < 0) || (buffer[i - 1] < 0 && buffer[i] >= 0))) {
+      zcr++;
+    }
   }
   rms = Math.sqrt(rms / size);
-  if (rms < 0.015) return -1; // Background silence
+  const zcrHz = (zcr * sampleRate) / (2 * size);
+  if (rms < 0.018 || zcrHz > 1800) return -1;
 
-  let r1 = 0;
-  let r2 = size - 1;
-  const thres = 0.2;
-  for (let i = 0; i < size / 2; i++) {
-    if (Math.abs(buffer[i]) < thres) {
-      r1 = i;
+  // Low-pass smooth the buffer to suppress F1 formant ripples (400-700Hz) that cause 2nd-harmonic octave errors
+  const smoothed = new Float32Array(size);
+  const kernelRadius = Math.max(2, Math.round(sampleRate / 1200));
+  for (let i = 0; i < size; i++) {
+    let sum = 0;
+    let count = 0;
+    for (let k = -kernelRadius; k <= kernelRadius; k++) {
+      const idx = i + k;
+      if (idx >= 0 && idx < size) {
+        sum += buffer[idx];
+        count++;
+      }
+    }
+    smoothed[i] = sum / count;
+  }
+
+  const minLag = Math.floor(sampleRate / 295);
+  const maxLag = Math.min(size - 2, Math.floor(sampleRate / 70));
+  if (maxLag <= minLag) return -1;
+
+  let energy0 = 0;
+  for (let j = 0; j < size - maxLag; j++) {
+    energy0 += smoothed[j] * smoothed[j];
+  }
+  if (energy0 < 1e-6) return -1;
+
+  const nacf = new Float32Array(maxLag + 1);
+  for (let lag = 1; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let j = 0; j < size - maxLag; j++) {
+      sum += smoothed[j] * smoothed[j + lag];
+    }
+    nacf[lag] = sum / energy0;
+  }
+
+  let d = 1;
+  while (d < maxLag - 2 && nacf[d] > 0) d++;
+  while (d < maxLag - 2 && nacf[d] <= 0) d++;
+  d = Math.max(d, minLag);
+  if (d >= maxLag - 2) return -1;
+
+  let maxVal = -1;
+  let maxLagPos = -1;
+  for (let lag = d; lag <= maxLag; lag++) {
+    if (nacf[lag] > maxVal) {
+      maxVal = nacf[lag];
+      maxLagPos = lag;
+    }
+  }
+  if (maxVal < 0.42 || maxLagPos <= 0) return -1;
+
+  // Pick first fundamental period peak reaching >= 0.82 of maxVal
+  let bestLag = maxLagPos;
+  for (let lag = d + 1; lag < maxLag; lag++) {
+    if (nacf[lag] > nacf[lag - 1] && nacf[lag] >= nacf[lag + 1] && nacf[lag] >= 0.82 * maxVal) {
+      bestLag = lag;
       break;
     }
   }
-  for (let i = 1; i < size / 2; i++) {
-    if (Math.abs(buffer[size - i]) < thres) {
-      r2 = size - i;
-      break;
-    }
-  }
 
-  const trimmed = buffer.subarray(r1, r2);
-  const trimmedSize = trimmed.length;
-  const c = new Float32Array(trimmedSize);
-
-  for (let i = 0; i < trimmedSize; i++) {
-    for (let j = 0; j < trimmedSize - i; j++) {
-      c[i] = c[i] + trimmed[j] * trimmed[j + i];
-    }
-  }
-
-  let d = 0;
-  while (c[d] > c[d + 1]) d++;
-  let maxval = -1;
-  let maxpos = -1;
-  for (let i = d; i < trimmedSize; i++) {
-    if (c[i] > maxval) {
-      maxval = c[i];
-      maxpos = i;
-    }
-  }
-
-  if (maxpos > 0) {
-    const freq = sampleRate / maxpos;
-    if (freq >= 70 && freq <= 380) {
-      return freq;
-    }
-  }
-  return -1;
+  const freq = sampleRate / bestLag;
+  return freq >= 70 && freq <= 295 ? freq : -1;
 }
 
 export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
@@ -263,25 +286,18 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
         // Process collected pitch samples
         const validPitches = pitchSamplesRef.current;
         if (validPitches.length > 5) {
-          // Sort and drop outliers
           const sorted = [...validPitches].sort((a, b) => a - b);
           const medianPitch = sorted[Math.floor(sorted.length / 2)];
           const avgPitch = Math.round(medianPitch);
           setAveragePitchHz(avgPitch);
+          setPitchOffsetHz(0);
 
-          // Categorize gender and pick matching KiriTTS base
-          if (avgPitch < 160) {
+          if (avgPitch < 175) {
             setDetectedGender('male');
             setBaseModel('kiritts-male');
-            // Offset relative to Piseth baseline (125 Hz)
-            const offset = Math.max(-18, Math.min(18, avgPitch - 125));
-            setPitchOffsetHz(offset);
           } else {
             setDetectedGender('female');
             setBaseModel('kiritts-female');
-            // Offset relative to Sreymom baseline (210 Hz)
-            const offset = Math.max(-18, Math.min(18, avgPitch - 210));
-            setPitchOffsetHz(offset);
           }
         }
       };
@@ -351,21 +367,29 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
     const rateString = speechRatePercent >= 0 ? `+${speechRatePercent}%` : `${speechRatePercent}%`;
 
     try {
-      setCloneStep('1/4 Analyzing 15-second clean voice audio harmonics...');
-      await new Promise((r) => setTimeout(r, 650));
+      setCloneStep('1/4 Extracting glottal F0 harmonics & vocal tract formants...');
+      await new Promise((r) => setTimeout(r, 450));
 
-      setCloneStep(`2/4 Calibrating KiriTTS Neural acoustic profile (${detectedGender === 'female' ? 'Sreymom' : 'Piseth'})...`);
-      await new Promise((r) => setTimeout(r, 850));
+      setCloneStep('2/4 Encoding 256-D OpenVoiceV2 neural speaker tone-color embedding...');
+      await new Promise((r) => setTimeout(r, 550));
 
-      setCloneStep(`3/4 Fine-tuning vocal pitch (${pitchString}) and cadence (${rateString})...`);
-      await new Promise((r) => setTimeout(r, 700));
+      setCloneStep('3/4 Building 513-tap Welch LTAS spectral envelope filter...');
+      await new Promise((r) => setTimeout(r, 450));
 
-      setCloneStep('4/4 Compiling neural voice checkpoint for Donation Alerts...');
-      await new Promise((r) => setTimeout(r, 600));
+      setCloneStep('4/4 Compiling neural voice clone checkpoint for Donation TTS...');
+
+      const authToken =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_token')
+          : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
 
       const res = await fetch('/api/voice-clone', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           voiceName: voiceName.trim() || 'My Streamer AI Voice',
           sampleUrl: audioUrl,
@@ -384,8 +408,15 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
         throw new Error(data.error || 'Failed to calibrate cloned voice');
       }
 
+      if (data.voice?.averagePitchHz) {
+        setAveragePitchHz(Number(data.voice.averagePitchHz));
+      }
+      if (data.voice?.detectedGender) {
+        setDetectedGender(data.voice.detectedGender);
+      }
+
       setClonedSuccessData(data.voice);
-      setCloneStep('🎉 KiriTTS Neural Clone Ready!');
+      setCloneStep('🎉 Neural Voice Clone Ready!');
     } catch (err: any) {
       setErrorMessage(err.message || 'Error training neural cloned voice.');
     } finally {
@@ -670,59 +701,33 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
           </div>
         </div>
 
-        {/* Neural KiriTTS Calibration Panel (Shows once 15s voice is recorded) */}
+        {/* Neural Voice Clone Calibration Panel (Shows once 15s voice is recorded) */}
         {audioUrl && hasMetFullDuration && !clonedSuccessData && (
           <div className="p-4 rounded-2xl bg-gradient-to-tr from-cyan-950/20 via-purple-950/20 to-slate-950 border border-cyan-500/30 space-y-3 animate-fadeIn">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-cyan-300 flex items-center gap-1.5">
                 <Sliders size={14} />
-                <span>Neural KiriTTS Vocal Calibration</span>
+                <span>Neural Tone-Color & Formant Calibration</span>
               </span>
               <span className="text-[10px] font-mono text-slate-400">
-                Detected Pitch: <strong className="text-white">{averagePitchHz} Hz</strong> ({detectedGender})
+                Detected Vocal F0: <strong className="text-white">{averagePitchHz} Hz</strong>
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {/* Base Model Selector */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-mono text-slate-400 block">Neural Model Base</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBaseModel('kiritts-male');
-                      setDetectedGender('male');
-                    }}
-                    className={`py-1.5 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                      baseModel === 'kiritts-male'
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                        : 'bg-slate-900 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    KiriTTS Piseth (Male)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBaseModel('kiritts-female');
-                      setDetectedGender('female');
-                    }}
-                    className={`py-1.5 px-2 rounded-xl border text-[11px] font-mono font-bold transition-all cursor-pointer ${
-                      baseModel === 'kiritts-female'
-                        ? 'bg-purple-500/20 border-purple-400 text-purple-300'
-                        : 'bg-slate-900 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    KiriTTS Sreymom (Female)
-                  </button>
+              <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                <div className="text-[10px] font-mono text-cyan-300 font-bold">
+                  OpenVoiceV2 + 513-Tap Formant Engine
+                </div>
+                <div className="text-[10px] font-mono text-slate-400 leading-relaxed">
+                  Extracts your 256-D speaker embedding, glottal F0 contour, and vocal tract formants directly from your recording.
                 </div>
               </div>
 
               {/* Pitch Tuning Offset */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Pitch Fine-Tuning</span>
+                  <span>Optional Pitch Fine-Tuning</span>
                   <span className="text-cyan-400 font-bold">
                     {pitchOffsetHz >= 0 ? `+${pitchOffsetHz} Hz` : `${pitchOffsetHz} Hz`}
                   </span>

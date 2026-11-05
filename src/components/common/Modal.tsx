@@ -8,6 +8,7 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   showDot?: boolean;
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
 }
@@ -17,6 +18,7 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   showDot = false,
+  headerRight,
   children,
   maxWidth = 'md'
 }) => {
@@ -61,9 +63,14 @@ export const Modal: React.FC<ModalProps> = ({
               <span className="truncate">{title}</span>
             </h3>
           )}
+          {headerRight && (
+            <div className="ml-auto mr-2 flex items-center shrink-0">
+              {headerRight}
+            </div>
+          )}
           <button
             onClick={onClose}
-            className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-auto flex-shrink-0"
+            className={`p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0 ${!headerRight ? 'ml-auto' : ''}`}
           >
             <X size={18} />
           </button>
