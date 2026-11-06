@@ -123,20 +123,25 @@ class YouTubeChatService {
     this.stopListener(token);
 
     const seenMessageIds = new Set<string>();
+    let isPolling = false;
 
     const poll = async () => {
+      if (isPolling) return;
+      isPolling = true;
       try {
         await this.pollYouTubeLiveChat(token, videoId, seenMessageIds);
       } catch (err: any) {
         // Silent recovery
+      } finally {
+        isPolling = false;
       }
     };
 
     // Run first poll immediately
     poll();
 
-    // Poll every 5 seconds for new live chat messages
-    const interval = setInterval(poll, 5000);
+    // Responsive poll every 1.5 seconds for instant real-time message pickup without delay
+    const interval = setInterval(poll, 1500);
 
     this.activeStreams.set(token, {
       videoId,
@@ -145,7 +150,7 @@ class YouTubeChatService {
       lastPollTime: Date.now()
     });
 
-    console.log(`⚡ [YouTube Live Chat] Started listener for token [${token}] on video [${videoId}]`);
+    console.log(`⚡ [YouTube Live Chat] Started responsive listener for token [${token}] on video [${videoId}]`);
   }
 
   /**
@@ -201,6 +206,8 @@ class YouTubeChatService {
         data?.continuationContents?.liveChatContinuation?.actions ||
         [];
 
+      const extractedComments: any[] = [];
+
       for (const action of actions) {
         const item = action?.addChatItemAction?.item;
         const textMessage = item?.liveChatTextMessageRenderer;
@@ -229,13 +236,28 @@ class YouTubeChatService {
               message,
               timestamp: Date.now()
             };
-
-            // 1. Send to Pokémon stream overlay
-            this.emitPokemonComment(token, commentPayload);
-
-            // 2. Send to Live Chat overlay with subscriber badge if matched
-            this.emitLiveChatMessage(token, commentPayload);
+            extractedComments.push(commentPayload);
           }
+        }
+      }
+
+      // If new messages found, deliver the first instantly, and stagger any burst smoothly
+      if (extractedComments.length > 0) {
+        // First message is emitted with ZERO delay for instant response
+        const firstComment = extractedComments[0];
+        this.emitPokemonComment(token, firstComment);
+        this.emitLiveChatMessage(token, firstComment);
+
+        // Stagger subsequent messages in the burst so overlay animates each one smoothly
+        for (let i = 1; i < extractedComments.length; i++) {
+          const comment = extractedComments[i];
+          const staggerDelayMs = Math.min(i * 180, 1200);
+          setTimeout(() => {
+            if (this.isListening(token)) {
+              this.emitPokemonComment(token, comment);
+              this.emitLiveChatMessage(token, comment);
+            }
+          }, staggerDelayMs);
         }
       }
     } catch (err: any) {

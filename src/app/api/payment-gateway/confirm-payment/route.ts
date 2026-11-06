@@ -12,7 +12,10 @@ import {
   resolveMatchingAlertBox,
   getAlertSettingsCollection,
   getVideoAlertSettingsCollection,
-  getStreamGoalsCollection
+  getStreamGoalsCollection,
+  getSubscribersCollection,
+  getSubscriberSettingsCollection,
+  buildSubscriberUsernameQuery
 } from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
@@ -62,6 +65,37 @@ export async function POST(req: NextRequest) {
       streamer = await usersCol.findOne({
         $or: [{ userId: streamerId }, { id: streamerId as any }]
       });
+    }
+
+    if (!streamer && body.donationId) {
+      try {
+        const donationsCol = await getDonationsCollection();
+        const existingDoc = await donationsCol.findOne({ id: body.donationId });
+        if (existingDoc?.streamerId) {
+          streamer = await usersCol.findOne({
+            $or: [
+              { userId: existingDoc.streamerId },
+              { id: existingDoc.streamerId as any },
+              { username: existingDoc.streamerId }
+            ]
+          });
+        }
+        if (!streamer) {
+          const tempCol = await getTemporaryDonationsCollection();
+          const existingTemp = await tempCol.findOne({
+            $or: [{ id: body.donationId }, { donationId: body.donationId }]
+          });
+          if (existingTemp?.streamerId) {
+            streamer = await usersCol.findOne({
+              $or: [
+                { userId: existingTemp.streamerId },
+                { id: existingTemp.streamerId as any },
+                { username: existingTemp.streamerId }
+              ]
+            });
+          }
+        }
+      } catch (err) {}
     }
 
     if (!streamer) {
@@ -130,7 +164,17 @@ export async function POST(req: NextRequest) {
             video_title: doc.videoTitle,
             video_start_time: doc.videoStartTime,
             video_end_time: doc.videoEndTime,
-            created_at: doc.createdAt
+            created_at: doc.createdAt,
+            is_subscription: Boolean(doc.isSubscription || (doc as any).is_subscription),
+            tier_id: doc.tierId || (doc as any).tier_id,
+            tier_name: doc.tierName || (doc as any).tier_name,
+            badge_text: doc.badgeText || (doc as any).badge_text,
+            badge_color: doc.badgeColor || (doc as any).badge_color,
+            badge_bg: doc.badgeBg || (doc as any).badge_bg,
+            badge_border: doc.badgeBorder || (doc as any).badge_border,
+            badge_icon: doc.badgeIcon || (doc as any).badge_icon,
+            badge_gif_url: doc.badgeGifUrl || (doc as any).badge_gif_url,
+            badge_image: doc.badgeImage || (doc as any).badge_image
           });
         }
       }
@@ -166,21 +210,37 @@ export async function POST(req: NextRequest) {
               video_title: doc.videoTitle,
               video_start_time: doc.videoStartTime,
               video_end_time: doc.videoEndTime,
-              created_at: doc.createdAt
+              created_at: doc.createdAt,
+              is_subscription: Boolean(doc.isSubscription || (doc as any).is_subscription),
+              tier_id: doc.tierId || (doc as any).tier_id,
+              tier_name: doc.tierName || (doc as any).tier_name,
+              badge_text: doc.badgeText || (doc as any).badge_text,
+              badge_color: doc.badgeColor || (doc as any).badge_color,
+              badge_bg: doc.badgeBg || (doc as any).badge_bg,
+              badge_border: doc.badgeBorder || (doc as any).badge_border,
+              badge_icon: doc.badgeIcon || (doc as any).badge_icon,
+              badge_gif_url: doc.badgeGifUrl || (doc as any).badge_gif_url,
+              badge_image: doc.badgeImage || (doc as any).badge_image
             });
           }
         }
       } catch (sqlErr) {}
 
-      matchedTemp = findMatchingTemporaryDonation(candidates, {
-        donorName: donorName.trim(),
-        payerName: (bankingName || donorName).trim(),
-        bankingName,
-        rawText: `${bankingName} ${donorName}`,
-        senderName: donorName.trim(),
-        amount: numericAmount,
-        currency
-      });
+      if (body.donationId) {
+        matchedTemp = candidates.find((c) => c.id === body.donationId) || null;
+      }
+
+      if (!matchedTemp) {
+        matchedTemp = findMatchingTemporaryDonation(candidates, {
+          donorName: donorName.trim(),
+          payerName: (bankingName || donorName).trim(),
+          bankingName,
+          rawText: `${bankingName} ${donorName}`,
+          senderName: donorName.trim(),
+          amount: numericAmount,
+          currency
+        });
+      }
 
       if (matchedTemp) {
         console.log(`🎯 [Gateway Matched] Found active temporary donation session ${matchedTemp.id} in MongoDB (Bank Name: "${matchedTemp.banking_name}", Donor: "${matchedTemp.donor_name}").`);
@@ -223,6 +283,20 @@ export async function POST(req: NextRequest) {
 
     const now = new Date();
 
+    const isSubscription = Boolean(
+      matchedTemp?.is_subscription ||
+      matchedTemp?.isSubscription
+    );
+    const tierId = matchedTemp?.tier_id || matchedTemp?.tierId || undefined;
+    let tierName = matchedTemp?.tier_name || matchedTemp?.tierName || undefined;
+    let badgeText = matchedTemp?.badge_text || matchedTemp?.badgeText || undefined;
+    let badgeColor = matchedTemp?.badge_color || matchedTemp?.badgeColor || undefined;
+    let badgeBg = matchedTemp?.badge_bg || matchedTemp?.badgeBg || undefined;
+    let badgeBorder = matchedTemp?.badge_border || matchedTemp?.badgeBorder || undefined;
+    let badgeIcon = matchedTemp?.badge_icon || matchedTemp?.badgeIcon || undefined;
+    let badgeGifUrl = matchedTemp?.badge_gif_url || matchedTemp?.badgeGifUrl || undefined;
+    let badgeImage = matchedTemp?.badge_image || matchedTemp?.badgeImage || undefined;
+
     // 2. Update or insert into MongoDB donations table with status PAID
     try {
       await donationsCol.updateOne(
@@ -242,6 +316,16 @@ export async function POST(req: NextRequest) {
             videoStartTime: effectiveVideoStartTime,
             videoEndTime: effectiveVideoEndTime,
             status: 'PAID',
+            isSubscription: isSubscription || undefined,
+            tierId,
+            tierName,
+            badgeText,
+            badgeColor,
+            badgeBg,
+            badgeBorder,
+            badgeIcon,
+            badgeGifUrl,
+            badgeImage,
             isAlerted: 1,
             paidAt: now,
             updatedAt: now
@@ -252,6 +336,64 @@ export async function POST(req: NextRequest) {
       );
     } catch (dbErr) {
       console.error('[DB] Error updating/inserting confirm-payment donation in MongoDB:', dbErr);
+    }
+
+    // If subscription payment, activate 30-day membership in subscribers collection
+    let subscriberRecord: any = null;
+    if (isSubscription) {
+      try {
+        const subCol = await getSubscribersCollection();
+        const subCleanName = effectiveDonorName;
+        const youtubeHandle = subCleanName.replace(/^@+/, '').trim();
+        const subscribedAt = now;
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+        subscriberRecord = {
+          id: 'sub_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+          streamerToken: resolvedOverlayToken || 'demo-token',
+          streamerUsername: streamer?.username || resolvedStreamerId,
+          subscriberName: subCleanName,
+          youtubeHandle,
+          tierId: tierId || 'tier_sub',
+          tierName: tierName || 'Subscriber',
+          price: effectiveAmount,
+          currency: effectiveCurrency,
+          badgeText: badgeText || 'SUB',
+          badgeColor: badgeColor || '#00F0FF',
+          badgeBg: badgeBg || 'rgba(0, 240, 255, 0.2)',
+          badgeBorder: badgeBorder || 'rgba(0, 240, 255, 0.4)',
+          badgeIcon: badgeIcon || 'Crown',
+          badgeGifUrl: badgeGifUrl || badgeImage,
+          badgeImage: badgeImage || badgeGifUrl,
+          paymentMethod: bankingName || 'Bakong KHQR',
+          status: 'active',
+          subscribedAt,
+          expiresAt,
+          donorMessage: effectiveDonorMessage,
+          transactionId: activeDonationId
+        };
+
+        await subCol.updateOne(
+          {
+            streamerToken: resolvedOverlayToken || 'demo-token',
+            ...buildSubscriberUsernameQuery(subCleanName)
+          },
+          { $set: subscriberRecord },
+          { upsert: true }
+        );
+
+        const io = getIO();
+        if (io) {
+          if (resolvedOverlayToken) io.to(`overlay:${resolvedOverlayToken}`).emit('subscriber:new', subscriberRecord);
+          io.to(`dashboard:${resolvedStreamerId}`).emit('subscriber:new', subscriberRecord);
+          if (resolvedOverlayToken && resolvedOverlayToken !== 'demo-token') {
+            io.to(`dashboard:${resolvedOverlayToken}`).emit('subscriber:new', subscriberRecord);
+            io.to('overlay:demo-token').emit('subscriber:new', subscriberRecord);
+          }
+        }
+      } catch (subErr) {
+        console.error('[Subscriber] Error creating subscriber record in confirm-payment:', subErr);
+      }
     }
 
     // 3. Get streamer alert settings from MongoDB alert_boxes
@@ -298,6 +440,43 @@ export async function POST(req: NextRequest) {
       });
     } catch (e) {}
 
+    // If subscription, fetch subscriber tier alertSettings from MongoDB
+    let tierAlertSettings: any = null;
+    if (isSubscription) {
+      try {
+        const subSettingsCol = await getSubscriberSettingsCollection();
+        const subSettingsDoc = await subSettingsCol.findOne({
+          $or: [
+            ...(resolvedOverlayToken ? [{ streamerToken: resolvedOverlayToken }] : []),
+            ...(streamer.username ? [{ streamerUsername: streamer.username }] : []),
+            { streamerToken: resolvedStreamerId }
+          ]
+        });
+        if (subSettingsDoc && Array.isArray(subSettingsDoc.tiers)) {
+          const foundTier = subSettingsDoc.tiers.find(
+            (t) => (tierId && t.id === tierId) || (tierName && t.name.toLowerCase() === tierName.toLowerCase())
+          ) || subSettingsDoc.tiers[0];
+          if (foundTier?.alertSettings) {
+            tierAlertSettings = foundTier.alertSettings;
+          }
+          if (foundTier) {
+            if (!tierName) tierName = foundTier.name;
+            if (!badgeText && foundTier.badgeText) badgeText = foundTier.badgeText;
+            if (!badgeColor && foundTier.badgeColor) badgeColor = foundTier.badgeColor;
+            if (!badgeBg && foundTier.badgeBg) badgeBg = foundTier.badgeBg;
+            if (!badgeBorder && foundTier.badgeBorder) badgeBorder = foundTier.badgeBorder;
+            if (!badgeIcon && foundTier.badgeIcon) badgeIcon = foundTier.badgeIcon;
+            if (!badgeGifUrl && (foundTier.badgeGifUrl || foundTier.badgeImage)) {
+              badgeGifUrl = foundTier.badgeGifUrl || foundTier.badgeImage;
+              badgeImage = badgeGifUrl;
+            }
+          }
+        }
+      } catch (subErr) {
+        console.warn('[ConfirmPayment] Could not fetch subscriber tier alertSettings:', subErr);
+      }
+    }
+
     // 4. Trigger Real-Time OBS Studio Overlay Alert with current saved settings
     broadcastAlertToOverlay(resolvedOverlayToken, {
       streamerId: resolvedStreamerId,
@@ -311,6 +490,11 @@ export async function POST(req: NextRequest) {
       amount: effectiveAmount,
       currency: effectiveCurrency,
       bankingName: effectiveBankingName,
+      isSubscription: isSubscription || undefined,
+      tierId: tierId || undefined,
+      tierName: tierName || undefined,
+      badgeText: badgeText || undefined,
+      badgeColor: badgeColor || undefined,
       videoUrl: effectiveVideoUrl,
       videoTitle: effectiveVideoTitle,
       videoStartTime: effectiveVideoStartTime,
@@ -318,37 +502,51 @@ export async function POST(req: NextRequest) {
       videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
       videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
       videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
-      templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
-      textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
-      textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
-      donorColor: matchingBox?.donorColor || undefined,
-      amountColor: matchingBox?.amountColor || undefined,
-      customGifUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-      mediaUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-      showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0),
-      fontFamily: matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
-      fontSize: matchingBox?.fontSize || alertSettings?.font_size || 28,
-      layoutMode: matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
-      animationStyle: matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
-      glowColor: matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF',
-      soundUrl: (matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
-        ? matchingBox.soundUrl
-        : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
-            ? alertSettings.sound_url
-            : '/sounds/cash-register-kaching.mp3'),
-      soundVolume: matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85,
-      durationSeconds: effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
-        ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
-        : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8),
-      ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1),
-      ttsType: matchingBox?.ttsType || (
-        (alertSettings?.tts_voice || '').toLowerCase() === 'google-male' || (alertSettings?.tts_voice || '').toLowerCase().includes('christopher') ? 'google-male'
-        : (alertSettings?.tts_voice || '').toLowerCase().includes('female') || (alertSettings?.tts_voice || '').toLowerCase().includes('sreymom') ? 'kiritts-female'
-        : (alertSettings?.tts_voice || '').toLowerCase().includes('male') || (alertSettings?.tts_voice || '').toLowerCase().includes('piseth') ? 'kiritts-male'
-        : alertSettings?.tts_voice === 'cloned' ? 'cloned'
-        : (alertSettings?.tts_type || 'google')
-      ),
-      clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url
+      templateStyle: (isSubscription && tierAlertSettings?.templateStyle) || matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
+      textTemplate: isSubscription
+        ? (tierAlertSettings?.textTemplate || '{name} joined as a {tier} subscriber!')
+        : (matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!'),
+      textColor: (isSubscription && tierAlertSettings?.textColor) || matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+      donorColor: (isSubscription && (tierAlertSettings?.subscriberColor || tierAlertSettings?.donorColor)) || matchingBox?.donorColor || undefined,
+      amountColor: (isSubscription && (tierAlertSettings?.tierColor || tierAlertSettings?.amountColor)) || matchingBox?.amountColor || undefined,
+      customGifUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+      mediaUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+      showImage: (isSubscription && tierAlertSettings?.showImage !== undefined) ? tierAlertSettings.showImage : (matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0)),
+      fontFamily: (isSubscription && tierAlertSettings?.fontFamily) || matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
+      fontSize: (isSubscription && tierAlertSettings?.fontSize) || matchingBox?.fontSize || alertSettings?.font_size || 28,
+      layoutMode: (isSubscription && tierAlertSettings?.layoutMode) || matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
+      animationStyle: (isSubscription && tierAlertSettings?.animationStyle) || matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
+      glowColor: (isSubscription && (tierAlertSettings?.glowColor || badgeColor)) || (matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF'),
+      soundUrl: (isSubscription && tierAlertSettings?.soundUrl)
+        ? tierAlertSettings.soundUrl
+        : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+            ? matchingBox.soundUrl
+            : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
+                ? alertSettings.sound_url
+                : '/sounds/cash-register-kaching.mp3')),
+      soundVolume: (isSubscription && tierAlertSettings?.soundVolume !== undefined)
+        ? tierAlertSettings.soundVolume
+        : (matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85),
+      durationSeconds: (isSubscription && tierAlertSettings?.durationSeconds)
+        ? tierAlertSettings.durationSeconds
+        : (effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
+            ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
+            : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8)),
+      ttsEnabled: (isSubscription && tierAlertSettings?.ttsEnabled !== undefined)
+        ? tierAlertSettings.ttsEnabled
+        : (matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1)),
+      ttsType: (isSubscription && tierAlertSettings?.ttsType)
+        ? tierAlertSettings.ttsType
+        : (matchingBox?.ttsType || (
+            (alertSettings?.tts_voice || '').toLowerCase() === 'google-male' || (alertSettings?.tts_voice || '').toLowerCase().includes('christopher') ? 'google-male'
+            : (alertSettings?.tts_voice || '').toLowerCase().includes('female') || (alertSettings?.tts_voice || '').toLowerCase().includes('sreymom') ? 'kiritts-female'
+            : (alertSettings?.tts_voice || '').toLowerCase().includes('male') || (alertSettings?.tts_voice || '').toLowerCase().includes('piseth') ? 'kiritts-male'
+            : alertSettings?.tts_voice === 'cloned' ? 'cloned'
+            : (alertSettings?.tts_type || 'google')
+          )),
+      clonedVoiceSampleUrl: (isSubscription && tierAlertSettings?.clonedVoiceSampleUrl)
+        ? tierAlertSettings.clonedVoiceSampleUrl
+        : (matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url)
     });
 
     // 5. Broadcast to Streamer Live Dashboard (Updates revenue & recent list immediately)
@@ -361,6 +559,8 @@ export async function POST(req: NextRequest) {
       banking_name: effectiveBankingName,
       payment_method: bankingName,
       status: 'PAID',
+      is_subscription: isSubscription,
+      subscriber: subscriberRecord,
       created_at: now.toISOString(),
       paid_at: now.toISOString()
     });

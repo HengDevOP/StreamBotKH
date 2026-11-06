@@ -123,4 +123,10 @@ export interface LiveAlertPayload {
   isVideoTest?: boolean;
   directVideo?: boolean;
   isTest?: boolean;
+  isSubscription?: boolean;
+  tierId?: string;
+  tierName?: string;
+  badgeText?: string;
+  badgeColor?: string;
+  clonedVoiceSampleUrl?: string;
 }

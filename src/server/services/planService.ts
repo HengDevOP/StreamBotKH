@@ -1,4 +1,5 @@
 import { getUsersCollection, getOverlayTokenHistoryCollection } from '@/server/database/mongo';
+import { isAdminEmail } from '@/server/database/db';
 
 export interface ProVerificationResult {
   isPro: boolean;
@@ -73,7 +74,7 @@ export async function verifyProStreamerByToken(token: string): Promise<ProVerifi
 
     const streamerId = streamer.userId || streamer.id || String(streamer._id);
     const plan = String(streamer.plan || 'free').toLowerCase();
-    const isAdmin = Boolean(streamer.isAdmin);
+    const isAdmin = Boolean(streamer.isAdmin) || isAdminEmail(streamer.email) || streamer.role === 'admin';
 
     // Check active 7-Day Free Trial
     let isTrialActive = false;

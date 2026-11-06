@@ -88,9 +88,12 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
     cleanDonorMessage.toLowerCase() !== 'undefined'
   );
 
+  const tierNameFromAlert = (alert as any).tierName || (alert as any).tier || 'VIP Member';
+
   let formattedHeadline = headlineTemplate
     .replace(/\{donator\}/gi, donorName)
     .replace(/\{name\}/gi, donorName)
+    .replace(/\{tier\}/gi, tierNameFromAlert)
     .replace(/\{amount\}/gi, formattedAmount)
     .replace(/\{currency\}/gi, currency || 'USD')
     .replace(/\{message\}/gi, hasMeaningfulMessage ? `"${cleanDonorMessage}"` : '')
@@ -115,9 +118,10 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
   const renderHeadlineElements = () => {
     const activeDonorColor = donorColor || '#FFE600';
     const activeAmountColor = amountColor || '#00F0FF';
+    const activeTierColor = (alert as any).tierColor || activeAmountColor || '#F59E0B';
     const activeTextColor = textColor || '#FFFFFF';
 
-    const tokenRegex = /(\{(?:donator|name|amount|currency|message|donor_message|context)\})/gi;
+    const tokenRegex = /(\{(?:donator|name|tier|amount|currency|message|donor_message|context)\})/gi;
     const tokens = headlineTemplate.split(tokenRegex);
 
     return tokens.map((part, idx) => {
@@ -130,6 +134,17 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
             style={getGradientOrColorStyle(activeDonorColor)}
           >
             {donorName}
+          </span>
+        );
+      }
+      if (lower === '{tier}') {
+        return (
+          <span
+            key={idx}
+            className="font-extrabold"
+            style={getGradientOrColorStyle(activeTierColor)}
+          >
+            {tierNameFromAlert}
           </span>
         );
       }

@@ -1,3 +1,26 @@
+export interface SubscriberAlertSettings {
+  isEnabled?: boolean;
+  templateStyle?: 'neon-box' | 'glass-hologram' | 'cyber-glitch' | 'arcade' | 'minimal';
+  showImage?: boolean;
+  mediaUrl?: string;
+  soundUrl?: string;
+  soundVolume?: number;
+  durationSeconds?: number;
+  glowColor?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  textTemplate?: string;
+  textColor?: string;
+  subscriberColor?: string;
+  tierColor?: string;
+  layoutMode?: 'top' | 'left' | 'right' | 'banner';
+  animationStyle?: string;
+  ttsEnabled?: boolean;
+  ttsType?: 'google' | 'google-male' | 'kiritts-male' | 'kiritts-female' | 'cloned';
+  clonedVoiceName?: string;
+  clonedVoiceSampleUrl?: string;
+}
+
 export interface SubscriberTier {
   id: string;
   name: string;
@@ -14,6 +37,7 @@ export interface SubscriberTier {
   description?: string;
   enabled?: boolean;
   order?: number;
+  alertSettings?: SubscriberAlertSettings;
 }
 
 export interface SubscriberItem {
@@ -36,6 +60,20 @@ export interface SubscriberItem {
   expiresAt: string;
   paymentMethod?: string;
   donorMessage?: string;
+}
+
+export interface TelegramOutletGroup {
+  chatId: string;
+  title: string;
+  username?: string;
+}
+
+export interface SubscriberSettings {
+  streamerToken?: string;
+  streamerUsername?: string;
+  enabled?: boolean;
+  tiers: SubscriberTier[];
+  telegramOutletGroup?: TelegramOutletGroup | null;
 }
 
 export const DEFAULT_SUBSCRIBER_TIERS: SubscriberTier[] = [];

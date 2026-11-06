@@ -5,7 +5,7 @@ import { NewMessage } from 'telegram/events';
 import { sleep, returnBigInt, getRandomInt } from 'telegram/Helpers';
 import { UpdateConnectionState } from 'telegram/network';
 import { v4 as uuidv4 } from 'uuid';
-import { broadcastAlertToOverlay, broadcastDonationToDashboard } from '../../../src/server/services/socketService';
+import { broadcastAlertToOverlay, broadcastDonationToDashboard, getIO } from '../../../src/server/services/socketService';
 import { PhraseCatcher } from './phraseCatcher';
 import { findMatchingTemporaryDonation, matchBankNames, isGenericBankKeyword } from '../../../src/server/utils/nameMatching';
 import {
@@ -18,6 +18,9 @@ import {
   getDonationsCollection,
   getAlertSettingsCollection,
   getVideoAlertSettingsCollection,
+  getSubscribersCollection,
+  getSubscriberSettingsCollection,
+  buildSubscriberUsernameQuery,
   cleanupExpiredPendingDonationsMongo
 } from '../../../src/server/database/mongo';
 import { ObjectId } from 'mongodb';
@@ -1142,8 +1145,8 @@ class TelegramUserClientManager {
         return;
       }
 
-      // STRICT TARGET GROUP ENFORCEMENT: GramJS will ONLY listen from configured target groups (MongoDB & SQLite)!
-      let targetGroups: Array<{ id: string; streamer_id: string; chat_id: string; title: string; username?: string }> = [];
+      // STRICT TARGET GROUP ENFORCEMENT: GramJS will ONLY listen from configured target groups & subscriber outlet groups!
+      let targetGroups: Array<{ id: string; streamer_id: string; chat_id: string; title: string; username?: string; isSubscriberOutlet?: boolean }> = [];
       const seenGroupIds = new Set<string>();
 
       try {
@@ -1163,6 +1166,36 @@ class TelegramUserClientManager {
                 username: g.username
               });
             }
+          }
+        }
+      } catch (e) {}
+
+      // Check if streamer has a dedicated Subscriber Telegram Outlet Group configured
+      let isSubscriberOutletMatch = false;
+      let subscriberOutletChatId: string | null = null;
+      try {
+        const subSettingsCol = await getSubscriberSettingsCollection();
+        const subSettings = await subSettingsCol.findOne({
+          $or: [
+            { streamerToken: streamerId },
+            { streamerUsername: streamerId },
+            { streamerId: streamerId }
+          ]
+        });
+        if (subSettings?.telegramOutletGroup?.chatId) {
+          const rawOutletCid = String(subSettings.telegramOutletGroup.chatId).trim();
+          subscriberOutletChatId = rawOutletCid;
+          const normOutlet = rawOutletCid.replace(/^-100/, '').replace(/^-/, '');
+          if (normOutlet && !seenGroupIds.has(normOutlet)) {
+            seenGroupIds.add(normOutlet);
+            targetGroups.push({
+              id: 'sub_outlet_' + normOutlet,
+              streamer_id: streamerId,
+              chat_id: rawOutletCid,
+              title: subSettings.telegramOutletGroup.title || 'Subscriber Telegram Outlet Group',
+              username: subSettings.telegramOutletGroup.username,
+              isSubscriberOutlet: true
+            });
           }
         }
       } catch (e) {}
@@ -1347,6 +1380,7 @@ class TelegramUserClientManager {
         // 1. Clean expired sessions (>5m) and gather active candidates within 15 minutes
         let matchedTemp: any = null;
         let dbDonation: any = null;
+        let candidates: any[] = [];
         const donationsCol = await getDonationsCollection();
 
         try {
@@ -1354,7 +1388,7 @@ class TelegramUserClientManager {
 
           // Collect active candidates within 15 minutes window (MongoDB temporary queue + pending donations)
           const seenIds = new Set<string>();
-          const candidates: any[] = [];
+          candidates = [];
 
           // A. MongoDB temporary_donations collection
           try {
@@ -1390,7 +1424,17 @@ class TelegramUserClientManager {
                   video_title: doc.videoTitle,
                   video_start_time: doc.videoStartTime,
                   video_end_time: doc.videoEndTime,
-                  created_at: doc.createdAt
+                  created_at: doc.createdAt,
+                  is_subscription: Boolean(doc.isSubscription || (doc as any).is_subscription),
+                  tier_id: doc.tierId || (doc as any).tier_id,
+                  tier_name: doc.tierName || (doc as any).tier_name,
+                  badge_text: doc.badgeText || (doc as any).badge_text,
+                  badge_color: doc.badgeColor || (doc as any).badge_color,
+                  badge_bg: doc.badgeBg || (doc as any).badge_bg,
+                  badge_border: doc.badgeBorder || (doc as any).badge_border,
+                  badge_icon: doc.badgeIcon || (doc as any).badge_icon,
+                  badge_gif_url: doc.badgeGifUrl || (doc as any).badge_gif_url,
+                  badge_image: doc.badgeImage || (doc as any).badge_image
                 });
               }
             }
@@ -1428,7 +1472,17 @@ class TelegramUserClientManager {
                   video_title: c.videoTitle,
                   video_start_time: c.videoStartTime,
                   video_end_time: c.videoEndTime,
-                  created_at: c.createdAt
+                  created_at: c.createdAt,
+                  is_subscription: Boolean(c.isSubscription || (c as any).is_subscription),
+                  tier_id: c.tierId || (c as any).tier_id,
+                  tier_name: c.tierName || (c as any).tier_name,
+                  badge_text: c.badgeText || (c as any).badge_text,
+                  badge_color: c.badgeColor || (c as any).badge_color,
+                  badge_bg: c.badgeBg || (c as any).badge_bg,
+                  badge_border: c.badgeBorder || (c as any).badge_border,
+                  badge_icon: c.badgeIcon || (c as any).badge_icon,
+                  badge_gif_url: c.badgeGifUrl || (c as any).badge_gif_url,
+                  badge_image: c.badgeImage || (c as any).badge_image
                 });
               }
             }
@@ -1439,15 +1493,33 @@ class TelegramUserClientManager {
             console.log(`      - Candidate [${c.id}]: Donor="${c.donor_name}", PayerBankName="${c.banking_name || 'N/A'}", Amount=${c.amount} ${c.currency}`);
           }
 
-          matchedTemp = findMatchingTemporaryDonation(candidates, {
-            donorName: parsed.donorName,
-            payerName: parsed.payerName || parsed.donorName,
-            bankingName: parsed.bankingName,
-            rawText: text,
-            senderName,
-            amount: parsed.amount,
-            currency: parsed.currency
-          });
+          if (isSubscriberOutletMatch) {
+            console.log(`   💎 [Subscriber Outlet Match] Message received from Subscriber Telegram Outlet Group! Prioritizing subscription candidate matching.`);
+            const subCandidates = candidates.filter((c) => c.is_subscription);
+            if (subCandidates.length > 0) {
+              matchedTemp = findMatchingTemporaryDonation(subCandidates, {
+                donorName: parsed.donorName,
+                payerName: parsed.payerName || parsed.donorName,
+                bankingName: parsed.bankingName,
+                rawText: text,
+                senderName,
+                amount: parsed.amount,
+                currency: parsed.currency
+              });
+            }
+          }
+
+          if (!matchedTemp) {
+            matchedTemp = findMatchingTemporaryDonation(candidates, {
+              donorName: parsed.donorName,
+              payerName: parsed.payerName || parsed.donorName,
+              bankingName: parsed.bankingName,
+              rawText: text,
+              senderName,
+              amount: parsed.amount,
+              currency: parsed.currency
+            });
+          }
 
           if (matchedTemp) {
             console.log(`   🎯 [MATCH SUCCESS] Bound incoming bank transfer to pending session [${matchedTemp.id}]!`);
@@ -1488,8 +1560,16 @@ class TelegramUserClientManager {
               return;
             }
 
-            // Check if there is an active candidate with exact amount match:
-            const soleAmountMatch = candidates.find((c) => Math.abs(c.amount - parsed.amount) < 0.01);
+            // Check if there is an active candidate with exact amount match (prioritizing subscription candidates if from outlet group):
+            let soleAmountMatch: any = null;
+            if (isSubscriberOutletMatch) {
+              const subMatches = candidates.filter((c) => c.is_subscription && Math.abs(c.amount - parsed.amount) < 0.01);
+              if (subMatches.length === 1) soleAmountMatch = subMatches[0];
+            }
+            if (!soleAmountMatch) {
+              soleAmountMatch = candidates.find((c) => Math.abs(c.amount - parsed.amount) < 0.01);
+            }
+
             if (soleAmountMatch) {
               console.log(`   🎯 [SOLE MATCH RECOVERY] Bound to sole active candidate [${soleAmountMatch.id}] (${soleAmountMatch.donor_name}, $${soleAmountMatch.amount})! Suppressing default alert.`);
               matchedTemp = soleAmountMatch;
@@ -1568,6 +1648,23 @@ class TelegramUserClientManager {
           const effectiveVideoStartTime = Number(matchedTemp?.video_start_time ?? dbDonation?.video_start_time ?? 0);
           const effectiveVideoEndTime = Number(matchedTemp?.video_end_time ?? dbDonation?.video_end_time ?? 0);
 
+          const isSubscription = Boolean(
+            matchedTemp?.is_subscription ||
+            matchedTemp?.isSubscription ||
+            dbDonation?.isSubscription ||
+            (isSubscriberOutletMatch && (matchedTemp?.tier_id || candidates.some((c) => c.is_subscription)))
+          );
+
+          const tierId = matchedTemp?.tier_id || matchedTemp?.tierId || dbDonation?.tierId || undefined;
+          let tierName = matchedTemp?.tier_name || matchedTemp?.tierName || dbDonation?.tierName || undefined;
+          let badgeText = matchedTemp?.badge_text || matchedTemp?.badgeText || dbDonation?.badgeText || undefined;
+          let badgeColor = matchedTemp?.badge_color || matchedTemp?.badgeColor || dbDonation?.badgeColor || undefined;
+          let badgeBg = matchedTemp?.badge_bg || matchedTemp?.badgeBg || dbDonation?.badgeBg || undefined;
+          let badgeBorder = matchedTemp?.badge_border || matchedTemp?.badgeBorder || dbDonation?.badgeBorder || undefined;
+          let badgeIcon = matchedTemp?.badge_icon || matchedTemp?.badgeIcon || dbDonation?.badgeIcon || undefined;
+          let badgeGifUrl = matchedTemp?.badge_gif_url || matchedTemp?.badgeGifUrl || dbDonation?.badgeGifUrl || undefined;
+          let badgeImage = matchedTemp?.badge_image || matchedTemp?.badgeImage || dbDonation?.badgeImage || undefined;
+
           // Update or insert into MongoDB donations collection (100% MongoDB Atlas)
           try {
             await donationsCol.updateOne(
@@ -1589,6 +1686,16 @@ class TelegramUserClientManager {
                   videoStartTime: effectiveVideoStartTime,
                   videoEndTime: effectiveVideoEndTime,
                   status: 'PAID',
+                  isSubscription: isSubscription || undefined,
+                  tierId,
+                  tierName,
+                  badgeText,
+                  badgeColor,
+                  badgeBg,
+                  badgeBorder,
+                  badgeIcon,
+                  badgeGifUrl,
+                  badgeImage,
                   isAlerted: true,
                   paidAt: new Date(),
                   updatedAt: new Date()
@@ -1599,6 +1706,118 @@ class TelegramUserClientManager {
             );
           } catch (dbErr) {
             console.error('[MongoDB] Error updating/inserting telegram donation:', dbErr);
+          }
+
+          // If this was a subscription, automatically activate the 30-day subscriber in MongoDB
+          let subscriberRecord: any = null;
+          if (isSubscription) {
+            try {
+              const subCol = await getSubscribersCollection();
+              const subCleanName = effectiveDonorName;
+              const youtubeHandle = subCleanName.replace(/^@+/, '').trim();
+              const subscribedAt = new Date();
+              const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30-day membership
+
+              subscriberRecord = {
+                id: 'sub_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                streamerToken: targetOverlayToken,
+                streamerUsername: targetStreamer.username || targetStreamerId,
+                subscriberName: subCleanName,
+                youtubeHandle,
+                tierId: tierId || 'tier_sub',
+                tierName: tierName || 'Subscriber',
+                price: effectiveAmount,
+                currency: effectiveCurrency,
+                badgeText: badgeText || 'SUB',
+                badgeColor: badgeColor || '#00F0FF',
+                badgeBg: badgeBg || 'rgba(0, 240, 255, 0.2)',
+                badgeBorder: badgeBorder || 'rgba(0, 240, 255, 0.4)',
+                badgeIcon: badgeIcon || 'Crown',
+                badgeGifUrl: badgeGifUrl || badgeImage,
+                badgeImage: badgeImage || badgeGifUrl,
+                paymentMethod: parsed.bankingName || 'Bakong KHQR',
+                status: 'active',
+                subscribedAt,
+                expiresAt,
+                donorMessage: effectiveDonorMessage,
+                transactionId: parsed.transactionRef || activeDonationId
+              };
+
+              await subCol.updateOne(
+                {
+                  streamerToken: targetOverlayToken,
+                  ...buildSubscriberUsernameQuery(subCleanName)
+                },
+                { $set: subscriberRecord },
+                { upsert: true }
+              );
+
+              console.log(`👑 [Subscriber Verified via Telegram] Activated 30-day membership for "${subCleanName}" (${tierName})!`);
+
+              const io = getIO();
+              if (io) {
+                io.to(`overlay:${targetOverlayToken}`).emit('subscriber:new', subscriberRecord);
+                io.to(`dashboard:${targetStreamerId}`).emit('subscriber:new', subscriberRecord);
+                if (targetOverlayToken !== 'demo-token') {
+                  io.to(`dashboard:${targetOverlayToken}`).emit('subscriber:new', subscriberRecord);
+                  io.to('overlay:demo-token').emit('subscriber:new', subscriberRecord);
+                }
+              }
+
+              // Also add a mailbox notification for the streamer
+              try {
+                const { addMongoMailboxMessage } = await import('../../../src/server/database/mongo');
+                await addMongoMailboxMessage({
+                  streamerId: targetStreamerId,
+                  title: `New Subscriber: ${subCleanName} (${tierName || 'Member'})! 👑`,
+                  senderName: 'Subscriber Verification Bot',
+                  category: 'donation',
+                  content: `${subCleanName} purchased a 30-day membership to "${tierName || 'Membership'}" for ${effectiveCurrency === 'KHR' ? `${effectiveAmount.toLocaleString()} ៛` : `$${effectiveAmount.toFixed(2)}`}.\nPayment verified via Telegram Outlet Group (${parsed.bankingName}). Their badge is active in stream chat and alerts!`,
+                  actionUrl: '/dashboard?tab=subscribers',
+                  actionLabel: 'Subscribers Manager',
+                  priority: 'high'
+                });
+              } catch (_) {}
+            } catch (subErr) {
+              console.error('[Subscriber] Error creating subscriber record:', subErr);
+            }
+          }
+
+          // If subscription, fetch subscriber tier alertSettings from MongoDB
+          let tierAlertSettings: any = null;
+          if (isSubscription) {
+            try {
+              const subSettingsCol = await getSubscriberSettingsCollection();
+              const subSettingsDoc = await subSettingsCol.findOne({
+                $or: [
+                  ...(targetOverlayToken ? [{ streamerToken: targetOverlayToken }] : []),
+                  ...(targetStreamer.username ? [{ streamerUsername: targetStreamer.username }] : []),
+                  { streamerToken: targetStreamerId }
+                ]
+              });
+              if (subSettingsDoc && Array.isArray(subSettingsDoc.tiers)) {
+                const foundTier = subSettingsDoc.tiers.find(
+                  (t) => (tierId && t.id === tierId) || (tierName && t.name.toLowerCase() === tierName.toLowerCase())
+                ) || subSettingsDoc.tiers[0];
+                if (foundTier?.alertSettings) {
+                  tierAlertSettings = foundTier.alertSettings;
+                }
+                if (foundTier) {
+                  if (!tierName) tierName = foundTier.name;
+                  if (!badgeText && foundTier.badgeText) badgeText = foundTier.badgeText;
+                  if (!badgeColor && foundTier.badgeColor) badgeColor = foundTier.badgeColor;
+                  if (!badgeBg && foundTier.badgeBg) badgeBg = foundTier.badgeBg;
+                  if (!badgeBorder && foundTier.badgeBorder) badgeBorder = foundTier.badgeBorder;
+                  if (!badgeIcon && foundTier.badgeIcon) badgeIcon = foundTier.badgeIcon;
+                  if (!badgeGifUrl && (foundTier.badgeGifUrl || foundTier.badgeImage)) {
+                    badgeGifUrl = foundTier.badgeGifUrl || foundTier.badgeImage;
+                    badgeImage = badgeGifUrl;
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('[TelegramJS] Could not fetch subscriber tier alertSettings:', err);
+            }
           }
 
           // Fetch current saved condition alert box from MongoDB for this streamer & amount
@@ -1637,6 +1856,11 @@ class TelegramUserClientManager {
             amount: effectiveAmount,
             currency: effectiveCurrency,
             bankingName: effectiveBankingName,
+            isSubscription: isSubscription || undefined,
+            tierId: tierId || undefined,
+            tierName: tierName || undefined,
+            badgeText: badgeText || undefined,
+            badgeColor: badgeColor || undefined,
             videoUrl: effectiveVideoUrl,
             videoTitle: effectiveVideoTitle,
             videoStartTime: effectiveVideoStartTime,
@@ -1644,31 +1868,45 @@ class TelegramUserClientManager {
             videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
             videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
             videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
-            templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
-            textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
-            textColor: matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
-            donorColor: matchingBox?.donorColor || undefined,
-            amountColor: matchingBox?.amountColor || undefined,
-            customGifUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-            mediaUrl: matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-            showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0),
-            fontFamily: matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
-            fontSize: matchingBox?.fontSize || alertSettings?.font_size || 28,
-            layoutMode: matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
-            animationStyle: matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
-            glowColor: matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF',
-            soundUrl: (matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
-              ? matchingBox.soundUrl
-              : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
-                  ? alertSettings.sound_url
-                  : '/sounds/cash-register-kaching.mp3'),
-            soundVolume: matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85,
-            durationSeconds: effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
-              ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
-              : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8),
-            ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1),
-            ttsType: matchingBox?.ttsType || alertSettings?.tts_type || 'google',
-            clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url
+            templateStyle: (isSubscription && tierAlertSettings?.templateStyle) || matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
+            textTemplate: isSubscription
+              ? (tierAlertSettings?.textTemplate || '{name} joined as a {tier} subscriber!')
+              : (matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!'),
+            textColor: (isSubscription && tierAlertSettings?.textColor) || matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+            donorColor: (isSubscription && (tierAlertSettings?.subscriberColor || tierAlertSettings?.donorColor)) || matchingBox?.donorColor || undefined,
+            amountColor: (isSubscription && (tierAlertSettings?.tierColor || tierAlertSettings?.amountColor)) || matchingBox?.amountColor || undefined,
+            customGifUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+            mediaUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+            showImage: (isSubscription && tierAlertSettings?.showImage !== undefined) ? tierAlertSettings.showImage : (matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0)),
+            fontFamily: (isSubscription && tierAlertSettings?.fontFamily) || matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
+            fontSize: (isSubscription && tierAlertSettings?.fontSize) || matchingBox?.fontSize || alertSettings?.font_size || 28,
+            layoutMode: (isSubscription && tierAlertSettings?.layoutMode) || matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
+            animationStyle: (isSubscription && tierAlertSettings?.animationStyle) || matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
+            glowColor: (isSubscription && (tierAlertSettings?.glowColor || badgeColor)) || (matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF'),
+            soundUrl: (isSubscription && tierAlertSettings?.soundUrl)
+              ? tierAlertSettings.soundUrl
+              : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+                  ? matchingBox.soundUrl
+                  : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
+                      ? alertSettings.sound_url
+                      : '/sounds/cash-register-kaching.mp3')),
+            soundVolume: (isSubscription && tierAlertSettings?.soundVolume !== undefined)
+              ? tierAlertSettings.soundVolume
+              : (matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85),
+            durationSeconds: (isSubscription && tierAlertSettings?.durationSeconds)
+              ? tierAlertSettings.durationSeconds
+              : (effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
+                  ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
+                  : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8)),
+            ttsEnabled: (isSubscription && tierAlertSettings?.ttsEnabled !== undefined)
+              ? tierAlertSettings.ttsEnabled
+              : (matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1)),
+            ttsType: (isSubscription && tierAlertSettings?.ttsType)
+              ? tierAlertSettings.ttsType
+              : (matchingBox?.ttsType || alertSettings?.tts_type || 'google'),
+            clonedVoiceSampleUrl: (isSubscription && tierAlertSettings?.clonedVoiceSampleUrl)
+              ? tierAlertSettings.clonedVoiceSampleUrl
+              : (matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url)
           });
 
           // Broadcast to Streamer Dashboard (Updates revenue live)
@@ -1681,6 +1919,8 @@ class TelegramUserClientManager {
             banking_name: effectiveBankingName,
             payment_method: parsed.bankingName,
             status: 'PAID',
+            is_subscription: isSubscription,
+            subscriber: subscriberRecord,
             created_at: new Date().toISOString(),
             paid_at: new Date().toISOString()
           });
@@ -1723,6 +1963,25 @@ class TelegramUserClientManager {
               seenChatIds.add(norm);
               chatStrings.push(`${s.title || 'Group'} (${cid})`);
             }
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const subSettingsCol = await getSubscriberSettingsCollection();
+        const subSettings = await subSettingsCol.findOne({
+          $or: [
+            { streamerToken: streamerId },
+            { streamerUsername: streamerId },
+            { streamerId: streamerId }
+          ]
+        });
+        if (subSettings?.telegramOutletGroup?.chatId) {
+          const cid = String(subSettings.telegramOutletGroup.chatId).trim();
+          const norm = cid.replace(/^-100/, '').replace(/^-/, '');
+          if (norm && !seenChatIds.has(norm)) {
+            seenChatIds.add(norm);
+            chatStrings.push(`${subSettings.telegramOutletGroup.title || 'Subscriber Outlet'} (${cid})`);
           }
         }
       } catch (e) {}

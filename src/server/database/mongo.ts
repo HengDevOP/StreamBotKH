@@ -70,6 +70,16 @@ export interface DonationDoc {
   paidAt?: Date | string | null;
   createdAt: Date;
   updatedAt?: Date;
+  isSubscription?: boolean;
+  tierId?: string;
+  tierName?: string;
+  badgeText?: string;
+  badgeColor?: string;
+  badgeBg?: string;
+  badgeBorder?: string;
+  badgeIcon?: string;
+  badgeGifUrl?: string;
+  badgeImage?: string;
 }
 
 export interface AlertSettingsDoc {
@@ -221,6 +231,9 @@ export interface StreamChatSettingsDoc {
   textShadowStyle?: 'none' | 'soft' | 'strong' | 'glow' | 'custom';
   textShadowColor?: string;
   textShadowBlur?: number;
+  soundEnabled?: boolean;
+  soundUrl?: string;
+  soundVolume?: number;
   youtubeUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -240,6 +253,9 @@ export interface SubscriberTierDoc {
   badgeImage?: string;
   perks: string[];
   description?: string;
+  enabled?: boolean;
+  order?: number;
+  alertSettings?: any;
 }
 
 export interface SubscriberSettingsDoc {
@@ -248,6 +264,11 @@ export interface SubscriberSettingsDoc {
   streamerUsername?: string;
   enabled: boolean;
   tiers: SubscriberTierDoc[];
+  telegramOutletGroup?: {
+    chatId: string;
+    title: string;
+    username?: string;
+  } | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -577,6 +598,16 @@ export interface TemporaryDonationDoc {
   videoStartTime?: number;
   videoEndTime?: number;
   createdAt: Date;
+  isSubscription?: boolean;
+  tierId?: string;
+  tierName?: string;
+  badgeText?: string;
+  badgeColor?: string;
+  badgeBg?: string;
+  badgeBorder?: string;
+  badgeIcon?: string;
+  badgeGifUrl?: string;
+  badgeImage?: string;
 }
 
 export interface TelegramSessionDoc {

@@ -164,6 +164,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Desktop App Layout State
   const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab || 'overview');
   const [selectedDonationId, setSelectedDonationId] = useState<string | null>(initialSelectedId || null);
+  const [selectedSubscriberTierId, setSelectedSubscriberTierId] = useState<string | null>(
+    activeTab === 'subscribers' ? (initialSelectedId || null) : null
+  );
   const [activePromo, setActivePromo] = useState<PromotionConfig | null>(null);
 
   // Payment Gateway health status (displays red exclamation mark if any prerequisite is missing)
@@ -281,7 +284,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
   useEffect(() => {
     if (initialSelectedId) {
-      setSelectedDonationId(initialSelectedId);
+      if (activeTab === 'subscribers') {
+        setSelectedSubscriberTierId(initialSelectedId);
+      } else {
+        setSelectedDonationId(initialSelectedId);
+      }
       return;
     }
     if (typeof window !== 'undefined') {
@@ -291,12 +298,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         id = search.split('?id=')[1]?.split('&')[0];
       } else if (search.includes('&id=')) {
         id = search.split('&id=')[1]?.split('&')[0];
+      } else if (search.includes('?tierId=')) {
+        id = search.split('?tierId=')[1]?.split('&')[0];
+      } else if (search.includes('&tierId=')) {
+        id = search.split('&tierId=')[1]?.split('&')[0];
       }
       if (id) {
-        setSelectedDonationId(id);
+        if (search.includes('tab=subscribers')) {
+          setSelectedSubscriberTierId(id);
+        } else {
+          setSelectedDonationId(id);
+        }
       }
     }
-  }, [initialSelectedId]);
+  }, [initialSelectedId, activeTab]);
 
   const activeTabRef = useRef<DashboardTab>(activeTab);
   activeTabRef.current = activeTab;
@@ -311,8 +326,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         id = search.split('?id=')[1]?.split('&')[0];
       } else if (search.includes('&id=')) {
         id = search.split('&id=')[1]?.split('&')[0];
+      } else if (search.includes('?tierId=')) {
+        id = search.split('?tierId=')[1]?.split('&')[0];
+      } else if (search.includes('&tierId=')) {
+        id = search.split('&tierId=')[1]?.split('&')[0];
       }
-      setSelectedDonationId(id || null);
+
+      if (search.includes('tab=subscribers')) {
+        setSelectedSubscriberTierId(id || null);
+        setSelectedDonationId(null);
+      } else {
+        setSelectedDonationId(id || null);
+        setSelectedSubscriberTierId(null);
+      }
 
       if (search.includes('tab=')) {
         let rawTab = search.split('tab=')[1]?.split('&')[0]?.split('?')[0];
@@ -1625,6 +1651,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     );
   }
 
+  // When a target subscriber tier is selected, render the dedicated Target Subscriber Studio as a new dashboard
+  // (The main sidebar is completely hidden and replaced by our dedicated top bar and studio, matching donation alerts)
+  if (selectedSubscriberTierId && activeTab === 'subscribers') {
+    return (
+      <div className="flex-1 min-h-0 h-full w-full overflow-hidden overscroll-none bg-[#070A12] text-slate-100 flex flex-col antialiased">
+        <SubscribersManager
+          streamerToken={user?.overlayToken}
+          streamerUsername={user?.username}
+          isLocked={false}
+          onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
+          initialSelectedTierId={selectedSubscriberTierId}
+          onSelectTierId={(tierId) => setSelectedSubscriberTierId(tierId)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full flex flex-row overflow-hidden bg-[#060911] text-slate-100 antialiased relative">
       {/* ============================================================== */}
@@ -2296,6 +2339,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               streamerUsername={user?.username}
               isLocked={false}
               onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
+              initialSelectedTierId={selectedSubscriberTierId || undefined}
+              onSelectTierId={(tierId) => setSelectedSubscriberTierId(tierId)}
             />
           )}
 

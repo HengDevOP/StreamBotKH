@@ -43,6 +43,9 @@ export interface StreamChatSettings {
   textShadowStyle: 'none' | 'soft' | 'strong' | 'glow' | 'custom';
   textShadowColor: string;
   textShadowBlur: number;
+  soundEnabled?: boolean;
+  soundUrl?: string;
+  soundVolume?: number;
   youtubeUrl?: string;
 }
 
@@ -67,6 +70,9 @@ const DEFAULT_SETTINGS: StreamChatSettings = {
   textShadowStyle: 'none',
   textShadowColor: 'rgba(0, 0, 0, 0.95)',
   textShadowBlur: 0,
+  soundEnabled: true,
+  soundUrl: '/sounds/cash-register-kaching.mp3',
+  soundVolume: 0.85,
   youtubeUrl: ''
 };
 
@@ -79,9 +85,107 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
   const { socket, joinOverlayRoom } = useSocket();
 
   const [settings, setSettings] = useState<StreamChatSettings>(DEFAULT_SETTINGS);
+  const settingsRef = useRef<StreamChatSettings>(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Smooth & Instant Animated Message Queue
+  const messageQueueRef = useRef<ChatMessage[]>([]);
+  const isDrainingRef = useRef<boolean>(false);
+  const lastSoundTimeRef = useRef<number>(0);
+  const drainTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up any pending stagger timers on unmount
+  useEffect(() => {
+    return () => {
+      if (drainTimerRef.current) {
+        clearTimeout(drainTimerRef.current);
+      }
+    };
+  }, []);
+
+  const playNotificationSound = () => {
+    const curSettings = settingsRef.current;
+    if (curSettings.soundEnabled === false || typeof window === 'undefined' || typeof Audio === 'undefined') {
+      return;
+    }
+    const now = Date.now();
+    // Throttle audio by 180ms to avoid audio distortion during high-volume bursts
+    if (now - lastSoundTimeRef.current < 180) {
+      return;
+    }
+    lastSoundTimeRef.current = now;
+    try {
+      const soundSrc = curSettings.soundUrl || '/sounds/cash-register-kaching.mp3';
+      const audio = new Audio(soundSrc);
+      const volume = curSettings.soundVolume !== undefined ? curSettings.soundVolume : 0.85;
+      audio.volume = Math.min(1, Math.max(0, volume));
+      audio.play().catch((err) => {
+        console.warn('[StreamChatOverlay] Audio play blocked:', err);
+      });
+    } catch (err) {
+      console.warn('[StreamChatOverlay] Audio playback error:', err);
+    }
+  };
+
+  const drainQueue = () => {
+    if (messageQueueRef.current.length === 0) {
+      isDrainingRef.current = false;
+      return;
+    }
+
+    isDrainingRef.current = true;
+    const nextMsg = messageQueueRef.current.shift();
+    if (!nextMsg) {
+      isDrainingRef.current = false;
+      return;
+    }
+
+    // Deliver next message into visible stream overlay
+    setMessages((prev) => {
+      if (nextMsg.id && prev.some((m) => m.id === nextMsg.id)) {
+        return prev;
+      }
+      const curMax = settingsRef.current.maxMessages || 10;
+      const next = [...prev, { ...nextMsg, timestamp: Date.now() }];
+      if (next.length > curMax) {
+        return next.slice(next.length - curMax);
+      }
+      return next;
+    });
+
+    playNotificationSound();
+
+    // If more messages exist in queue from a rapid burst, stagger them smoothly
+    if (messageQueueRef.current.length > 0) {
+      const remaining = messageQueueRef.current.length;
+      // Stagger: 260ms for 1-2 queued items (clean slide animation), 160ms for 3-5 items, 100ms for large raids
+      const staggerDelay = remaining > 5 ? 100 : remaining > 2 ? 160 : 260;
+      drainTimerRef.current = setTimeout(() => {
+        drainQueue();
+      }, staggerDelay);
+    } else {
+      isDrainingRef.current = false;
+    }
+  };
+
+  const enqueueMessage = (msg: ChatMessage) => {
+    if (msg.id && messageQueueRef.current.some((m) => m.id === msg.id)) {
+      return;
+    }
+
+    messageQueueRef.current.push(msg);
+
+    // If queue is idle, display the first message immediately with 0ms latency!
+    if (!isDrainingRef.current) {
+      drainQueue();
+    }
+  };
 
   // 1. Initial settings fetch & Pro plan verification
   useEffect(() => {
@@ -112,26 +216,14 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
     if (!socket) return;
 
     const handleChatMessage = (msg: ChatMessage) => {
-      if (isLocked) return;
+      if (isLocked || !msg) return;
       const isTestMsg = msg.id?.startsWith('test_') || Boolean((msg as any).isTest);
-      const delayMs = isTestMsg ? 0 : Math.max(0, (settings.messageDelay || 0) * 1000);
-      const pushMessage = () => {
-        setMessages((prev) => {
-          if (msg.id && prev.some((m) => m.id === msg.id)) {
-            return prev;
-          }
-          const next = [...prev, { ...msg, timestamp: Date.now() }];
-          if (next.length > (settings.maxMessages || 10)) {
-            return next.slice(next.length - (settings.maxMessages || 10));
-          }
-          return next;
-        });
-      };
+      const delayMs = isTestMsg ? 0 : Math.max(0, (settingsRef.current.messageDelay || 0) * 1000);
 
       if (delayMs > 0) {
-        setTimeout(pushMessage, delayMs);
+        setTimeout(() => enqueueMessage(msg), delayMs);
       } else {
-        pushMessage();
+        enqueueMessage(msg);
       }
     };
 
@@ -146,7 +238,7 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
       socket.off('chat:message', handleChatMessage);
       socket.off('chat:settings_updated', handleSettingsUpdated);
     };
-  }, [socket, isLocked, settings.maxMessages, settings.messageDelay]);
+  }, [socket, isLocked]);
 
   // 4. Auto fade-out messages after fadeDuration seconds
   useEffect(() => {
@@ -203,7 +295,7 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
   };
 
   const getTextStrokeCSS = () => {
-    const width = settings.textBorderWidth ?? 0;
+    const width = Number(settings.textBorderWidth) || 0;
     if (width <= 0) return undefined;
     return `${width}px ${settings.textBorderColor || '#000000'}`;
   };
@@ -293,9 +385,10 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
                 <span
                   className="font-bold tracking-wide"
                   style={{
-                    color: settings.authorColor || '#00F0FF',
+                    color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
                     fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
                     WebkitTextStroke: getTextStrokeCSS(),
+                    paintOrder: 'stroke fill',
                     textShadow: getTextShadowCSS()
                   }}
                 >
@@ -329,11 +422,12 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
                 <span className="font-bold text-slate-300">:</span>
               </div>
               <div
-                className="flex-1 min-w-0 text-left"
+                className="flex-1 min-w-0 text-left font-medium text-white"
                 style={{
-                  color: settings.messageColor || '#FFFFFF',
+                  color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
                   fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
                   WebkitTextStroke: getTextStrokeCSS(),
+                  paintOrder: 'stroke fill',
                   textShadow: getTextShadowCSS(),
                   wordBreak: 'break-word',
                   overflowWrap: 'anywhere'

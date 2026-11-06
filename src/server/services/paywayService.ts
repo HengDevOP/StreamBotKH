@@ -7,9 +7,12 @@ import {
   getVideoAlertSettingsCollection,
   getAlertBoxesCollection,
   resolveMatchingAlertBox,
-  getPaymentSettingsCollection
+  getPaymentSettingsCollection,
+  getSubscribersCollection,
+  getSubscriberSettingsCollection,
+  buildSubscriberUsernameQuery
 } from '../database/mongo';
-import { broadcastAlertToOverlay, broadcastDonationToDashboard } from './socketService';
+import { broadcastAlertToOverlay, broadcastDonationToDashboard, getIO } from './socketService';
 import { sendTelegramDonationAlert } from './telegramService';
 
 export interface PayWayCheckoutParams {
@@ -114,6 +117,43 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
       console.warn('[PaywayService] Could not fetch mongo alert boxes:', e);
     }
 
+    // If subscription, fetch subscriber tier alertSettings from MongoDB
+    let tierAlertSettings: any = null;
+    let tierName = donation.tierName;
+    let badgeText = donation.badgeText;
+    let badgeColor = donation.badgeColor;
+    let badgeGifUrl = donation.badgeGifUrl || (donation as any).badgeImage;
+    if (donation.isSubscription) {
+      try {
+        const subSettingsCol = await getSubscriberSettingsCollection();
+        const subSettingsDoc = await subSettingsCol.findOne({
+          $or: [
+            ...(streamer.overlayToken ? [{ streamerToken: streamer.overlayToken }] : []),
+            ...(streamer.username ? [{ streamerUsername: streamer.username }] : []),
+            { streamerToken: streamerKey }
+          ]
+        });
+        if (subSettingsDoc && Array.isArray(subSettingsDoc.tiers)) {
+          const foundTier = subSettingsDoc.tiers.find(
+            (t) => (donation.tierId && t.id === donation.tierId) || (tierName && t.name.toLowerCase() === tierName.toLowerCase())
+          ) || subSettingsDoc.tiers[0];
+          if (foundTier?.alertSettings) {
+            tierAlertSettings = foundTier.alertSettings;
+          }
+          if (foundTier) {
+            if (!tierName) tierName = foundTier.name;
+            if (!badgeText && foundTier.badgeText) badgeText = foundTier.badgeText;
+            if (!badgeColor && foundTier.badgeColor) badgeColor = foundTier.badgeColor;
+            if (!badgeGifUrl && (foundTier.badgeGifUrl || foundTier.badgeImage)) {
+              badgeGifUrl = foundTier.badgeGifUrl || foundTier.badgeImage;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[PaywayService] Could not fetch subscriber tier alertSettings:', e);
+      }
+    }
+
     // Only alert if amount is >= min_amount_alert
     const minAlert = matchingBox ? (Number(matchingBox.minAmountCondition) || 0) : (alertSettings?.minAmountAlert || 0);
     const donationUsd = donation.currency === 'KHR' ? donation.amount / 4000 : donation.amount;
@@ -129,6 +169,11 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
         amount: donation.amount,
         currency: donation.currency,
         bankingName: donation.bankingName || 'Bakong KHQR',
+        isSubscription: donation.isSubscription || undefined,
+        tierId: donation.tierId || undefined,
+        tierName: tierName || undefined,
+        badgeText: badgeText || undefined,
+        badgeColor: badgeColor || undefined,
         videoUrl: donation.videoUrl || undefined,
         videoTitle: donation.videoTitle || undefined,
         videoStartTime: Number(donation.videoStartTime) || 0,
@@ -136,29 +181,43 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
         videoAlertEnabled: Boolean(videoSettings?.isEnabled ?? true),
         videoMinTipAmount: Number(videoSettings?.minTipAmount ?? 0.25),
         videoMaxDurationSeconds: Number(videoSettings?.maxDurationSeconds ?? 300),
-        templateStyle: matchingBox?.templateStyle || alertSettings?.templateStyle || 'neon-box',
-        textTemplate: matchingBox?.textTemplate || alertSettings?.textTemplate || '{donator} donated {amount} through superchat!',
-        textColor: matchingBox?.textColor || alertSettings?.textColor || '#FFFFFF',
-        donorColor: matchingBox?.donorColor || undefined,
-        amountColor: matchingBox?.amountColor || undefined,
-        customGifUrl: matchingBox?.mediaUrl || alertSettings?.customGifUrl,
-        mediaUrl: matchingBox?.mediaUrl || alertSettings?.customGifUrl,
-        showImage: matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.showImage !== false),
-        fontFamily: matchingBox?.fontFamily || alertSettings?.fontFamily || 'Chakra Petch',
-        fontSize: matchingBox?.fontSize || alertSettings?.fontSize || 28,
-        layoutMode: matchingBox?.layoutMode || alertSettings?.layoutMode || 'top',
-        animationStyle: matchingBox?.animationStyle || alertSettings?.animationStyle || 'fade',
-        glowColor: matchingBox?.glowColor || alertSettings?.glowColor || '#00F0FF',
-        soundUrl: (matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
-          ? matchingBox.soundUrl
-          : (alertSettings?.soundUrl && !alertSettings.soundUrl.includes('neon-chime')
-              ? alertSettings.soundUrl
-              : '/sounds/cash-register-kaching.mp3'),
-        soundVolume: matchingBox?.soundVolume ?? alertSettings?.soundVolume ?? 0.85,
-        durationSeconds: matchingBox?.durationSeconds || alertSettings?.durationSeconds || 8,
-        ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : Boolean(alertSettings?.ttsEnabled),
-        ttsType: matchingBox?.ttsType || alertSettings?.ttsVoice || 'google',
-        clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.clonedVoiceSampleUrl
+        templateStyle: (donation.isSubscription && tierAlertSettings?.templateStyle) || matchingBox?.templateStyle || alertSettings?.templateStyle || 'neon-box',
+        textTemplate: donation.isSubscription
+          ? (tierAlertSettings?.textTemplate || '{name} joined as a {tier} subscriber!')
+          : (matchingBox?.textTemplate || alertSettings?.textTemplate || '{donator} donated {amount} through superchat!'),
+        textColor: (donation.isSubscription && tierAlertSettings?.textColor) || matchingBox?.textColor || alertSettings?.textColor || '#FFFFFF',
+        donorColor: (donation.isSubscription && (tierAlertSettings?.subscriberColor || tierAlertSettings?.donorColor)) || matchingBox?.donorColor || undefined,
+        amountColor: (donation.isSubscription && (tierAlertSettings?.tierColor || tierAlertSettings?.amountColor)) || matchingBox?.amountColor || undefined,
+        customGifUrl: (donation.isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || matchingBox?.mediaUrl || alertSettings?.customGifUrl,
+        mediaUrl: (donation.isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || matchingBox?.mediaUrl || alertSettings?.customGifUrl,
+        showImage: (donation.isSubscription && tierAlertSettings?.showImage !== undefined) ? tierAlertSettings.showImage : (matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.showImage !== false)),
+        fontFamily: (donation.isSubscription && tierAlertSettings?.fontFamily) || matchingBox?.fontFamily || alertSettings?.fontFamily || 'Chakra Petch',
+        fontSize: (donation.isSubscription && tierAlertSettings?.fontSize) || matchingBox?.fontSize || alertSettings?.fontSize || 28,
+        layoutMode: (donation.isSubscription && tierAlertSettings?.layoutMode) || matchingBox?.layoutMode || alertSettings?.layoutMode || 'top',
+        animationStyle: (donation.isSubscription && tierAlertSettings?.animationStyle) || matchingBox?.animationStyle || alertSettings?.animationStyle || 'fade',
+        glowColor: (donation.isSubscription && (tierAlertSettings?.glowColor || badgeColor)) || (matchingBox?.glowColor || alertSettings?.glowColor || '#00F0FF'),
+        soundUrl: (donation.isSubscription && tierAlertSettings?.soundUrl)
+          ? tierAlertSettings.soundUrl
+          : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+              ? matchingBox.soundUrl
+              : (alertSettings?.soundUrl && !alertSettings.soundUrl.includes('neon-chime')
+                  ? alertSettings.soundUrl
+                  : '/sounds/cash-register-kaching.mp3')),
+        soundVolume: (donation.isSubscription && tierAlertSettings?.soundVolume !== undefined)
+          ? tierAlertSettings.soundVolume
+          : (matchingBox?.soundVolume ?? alertSettings?.soundVolume ?? 0.85),
+        durationSeconds: (donation.isSubscription && tierAlertSettings?.durationSeconds)
+          ? tierAlertSettings.durationSeconds
+          : (matchingBox?.durationSeconds || alertSettings?.durationSeconds || 8),
+        ttsEnabled: (donation.isSubscription && tierAlertSettings?.ttsEnabled !== undefined)
+          ? tierAlertSettings.ttsEnabled
+          : (matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : Boolean(alertSettings?.ttsEnabled)),
+        ttsType: (donation.isSubscription && tierAlertSettings?.ttsType)
+          ? tierAlertSettings.ttsType
+          : (matchingBox?.ttsType || alertSettings?.ttsVoice || 'google'),
+        clonedVoiceSampleUrl: (donation.isSubscription && tierAlertSettings?.clonedVoiceSampleUrl)
+          ? tierAlertSettings.clonedVoiceSampleUrl
+          : (matchingBox?.clonedVoiceSampleUrl || alertSettings?.clonedVoiceSampleUrl)
       };
 
       // Real-time broadcast to OBS overlay room
@@ -168,10 +227,73 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
       }
     }
 
+    // If donation was a subscription, activate the subscriber in MongoDB subscribers collection
+    let subscriberRecord: any = null;
+    if (donation.isSubscription) {
+      try {
+        const subCol = await getSubscribersCollection();
+        const subCleanName = (donation.donorName || 'Subscriber').trim();
+        const youtubeHandle = subCleanName.replace(/^@+/, '').trim();
+        const subscribedAt = now;
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const overlayToken = streamer?.overlayToken || (streamer as any)?.overlay_token || 'demo-token';
+
+        subscriberRecord = {
+          id: 'sub_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+          streamerToken: overlayToken,
+          streamerUsername: streamer?.username || streamerKey,
+          subscriberName: subCleanName,
+          youtubeHandle,
+          tierId: donation.tierId || 'tier_sub',
+          tierName: donation.tierName || 'Subscriber',
+          price: donation.amount,
+          currency: donation.currency || 'USD',
+          badgeText: donation.badgeText || 'SUB',
+          badgeColor: donation.badgeColor || '#00F0FF',
+          badgeBg: donation.badgeBg || 'rgba(0, 240, 255, 0.2)',
+          badgeBorder: donation.badgeBorder || 'rgba(0, 240, 255, 0.4)',
+          badgeIcon: donation.badgeIcon || 'Crown',
+          badgeGifUrl: donation.badgeGifUrl || donation.badgeImage,
+          badgeImage: donation.badgeImage || donation.badgeGifUrl,
+          paymentMethod: donation.bankingName || 'Bakong KHQR',
+          status: 'active',
+          subscribedAt,
+          expiresAt,
+          donorMessage: donation.donorMessage,
+          transactionId: resolvedPaywayTranId
+        };
+
+        await subCol.updateOne(
+          {
+            streamerToken: overlayToken,
+            ...buildSubscriberUsernameQuery(subCleanName)
+          },
+          { $set: subscriberRecord },
+          { upsert: true }
+        );
+
+        console.log(`👑 [PayWay/Simulator] Activated 30-day subscriber membership for "${subCleanName}" (${donation.tierName})!`);
+
+        const io = getIO();
+        if (io) {
+          if (overlayToken) io.to(`overlay:${overlayToken}`).emit('subscriber:new', subscriberRecord);
+          io.to(`dashboard:${streamerKey}`).emit('subscriber:new', subscriberRecord);
+          if (overlayToken !== 'demo-token') {
+            io.to(`dashboard:${overlayToken}`).emit('subscriber:new', subscriberRecord);
+            io.to('overlay:demo-token').emit('subscriber:new', subscriberRecord);
+          }
+        }
+      } catch (subErr) {
+        console.error('[Subscriber] Error creating subscriber record in handleSuccessfulPayment:', subErr);
+      }
+    }
+
     // Broadcast updated transaction to streamer dashboard
     broadcastDonationToDashboard(streamerKey, {
       ...donation,
       status: 'PAID',
+      is_subscription: donation.isSubscription,
+      subscriber: subscriberRecord,
       paidAt: now.toISOString(),
       paid_at: now.toISOString()
     });

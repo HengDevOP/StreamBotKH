@@ -15,6 +15,12 @@ export interface Donation {
   video_end_time?: number;
   status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED';
   is_alerted: number;
+  is_subscription?: boolean;
+  tier_id?: string;
+  tier_name?: string;
+  badge_text?: string;
+  badge_color?: string;
+  badge_icon?: string;
   created_at: string;
   paid_at?: string;
 }
@@ -30,6 +36,16 @@ export interface CreateDonationRequest {
   videoTitle?: string;
   videoStartTime?: number;
   videoEndTime?: number;
+  isSubscription?: boolean;
+  tierId?: string;
+  tierName?: string;
+  badgeText?: string;
+  badgeColor?: string;
+  badgeBg?: string;
+  badgeBorder?: string;
+  badgeIcon?: string;
+  badgeGifUrl?: string;
+  badgeImage?: string;
 }
 
 export interface CreateDonationResponse {
@@ -42,4 +58,10 @@ export interface CreateDonationResponse {
   abaDeepLink: string;
   bakongDeepLink: string;
   expiresInSeconds: number;
+  isSubscription?: boolean;
+  tierId?: string;
+  tierName?: string;
+  badgeText?: string;
+  badgeColor?: string;
+  badgeIcon?: string;
 }

@@ -28,13 +28,21 @@ import {
   Heart,
   Zap,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  Volume2,
+  VolumeX,
+  Volume1,
+  Play,
+  Square,
+  Music,
+  FolderOpen
 } from 'lucide-react';
 import { getBadgeIconComponent } from '../../data/badgeIcons';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { ANIMATION_STYLES, CHAT_ANIMATIONS_CSS, CHAT_FONTS } from '../../utils/chatAnimations';
 import { useSocket } from '../../context/SocketContext';
+import { MediaPickerModal } from './MediaPickerModal';
 
 export interface LiveChatWidgetManagerProps {
   streamerToken?: string;
@@ -66,8 +74,78 @@ interface ChatSettings {
   textShadowStyle: 'none' | 'soft' | 'strong' | 'glow' | 'custom';
   textShadowColor: string;
   textShadowBlur: number;
+  soundEnabled: boolean;
+  soundUrl: string;
+  soundVolume: number;
   youtubeUrl: string;
 }
+
+export const CHAT_SOUND_PRESETS = [
+  {
+    id: 'cash-register',
+    name: 'Cash Register',
+    badge: 'DEFAULT',
+    desc: 'Classic tip & ka-ching sound',
+    url: '/sounds/cash-register-kaching.mp3',
+    icon: '💰'
+  },
+  {
+    id: 'mario-coin',
+    name: 'Super Mario Coin',
+    badge: 'RETRO',
+    desc: 'Retro 8-bit coin pickup sound',
+    url: '/sounds/mario-coin.mp3',
+    icon: '⭐'
+  },
+  {
+    id: 'discord-ping',
+    name: 'Discord Ping',
+    badge: 'POPULAR',
+    desc: 'Familiar message ping chime',
+    url: '/sounds/memes/meme-discord-ping.mp3',
+    icon: '🔔'
+  },
+  {
+    id: 'neon-chime',
+    name: 'Neon Cyber Synth',
+    badge: 'CLEAN',
+    desc: 'Futuristic synth chime',
+    url: '/sounds/neon-chime.mp3',
+    icon: '⚡'
+  },
+  {
+    id: 'hitmarker',
+    name: 'Gaming Hitmarker',
+    badge: 'TACTICAL',
+    desc: 'Tactical hit sound effect',
+    url: '/sounds/memes/meme-hitmarker.mp3',
+    icon: '🎯'
+  },
+  {
+    id: 'windows-startup',
+    name: 'Windows Startup',
+    badge: 'CLASSIC',
+    desc: 'Iconic startup audio chime',
+    url: '/sounds/memes/meme-windows-startup.mp3',
+    icon: '💻'
+  },
+  {
+    id: 'baby-triple',
+    name: 'Baby A Triple!',
+    badge: 'HYPE',
+    desc: 'Epic gaming celebration',
+    url: '/sounds/memes/oh-baby-a-triple.mp3',
+    icon: '🔥'
+  },
+  {
+    id: 'roblox-oof',
+    name: 'Roblox OOF',
+    badge: 'MEME',
+    desc: 'Iconic comedy reaction sound',
+    url: '/sounds/memes/oh-roblox-oof.mp3',
+    icon: '😅'
+  }
+];
 
 const DEFAULT_SETTINGS: ChatSettings = {
   fontFamily: 'Chakra Petch',
@@ -90,6 +168,9 @@ const DEFAULT_SETTINGS: ChatSettings = {
   textShadowStyle: 'none',
   textShadowColor: 'rgba(0, 0, 0, 0.95)',
   textShadowBlur: 0,
+  soundEnabled: true,
+  soundUrl: '/sounds/cash-register-kaching.mp3',
+  soundVolume: 0.85,
   youtubeUrl: ''
 };
 
@@ -207,6 +288,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
   const [sendingTest, setSendingTest] = useState<boolean>(false);
   const [testSent, setTestSent] = useState<boolean>(false);
@@ -237,6 +319,120 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const settingsSectionRef = useRef<HTMLElement>(null);
 
+  // Sound Notification & Media Picker State
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState<boolean>(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const settingsRef = useRef<ChatSettings>(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  const playPreviewSound = (urlToPlay?: string, volToUse?: number) => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current.currentTime = 0;
+      }
+      const targetUrl = urlToPlay || settingsRef.current.soundUrl || '/sounds/cash-register-kaching.mp3';
+      const audio = new Audio(targetUrl);
+      previewAudioRef.current = audio;
+      const vol = volToUse !== undefined ? volToUse : (settingsRef.current.soundVolume ?? 0.85);
+      audio.volume = Math.min(1, Math.max(0, vol));
+      setIsPlayingAudio(true);
+      audio.onended = () => setIsPlayingAudio(false);
+      audio.onerror = () => setIsPlayingAudio(false);
+      audio.play().catch((err) => {
+        console.warn('Audio preview play blocked:', err);
+        setIsPlayingAudio(false);
+      });
+    } catch (e) {
+      console.warn('Error playing preview audio:', e);
+      setIsPlayingAudio(false);
+    }
+  };
+
+  const stopPreviewSound = () => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+      setIsPlayingAudio(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
+    };
+  }, []);
+
+  // Smooth & Instant Preview Delivery Queue
+  const previewQueueRef = useRef<LocalChatMessage[]>([]);
+  const isDrainingPreviewRef = useRef<boolean>(false);
+  const previewDrainTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewDrainTimerRef.current) {
+        clearTimeout(previewDrainTimerRef.current);
+      }
+    };
+  }, []);
+
+  const drainPreviewQueue = () => {
+    if (previewQueueRef.current.length === 0) {
+      isDrainingPreviewRef.current = false;
+      return;
+    }
+
+    isDrainingPreviewRef.current = true;
+    const nextMsg = previewQueueRef.current.shift();
+    if (!nextMsg) {
+      isDrainingPreviewRef.current = false;
+      return;
+    }
+
+    setMessages((prev) => {
+      if (nextMsg.id && prev.some((m) => m.id === nextMsg.id)) {
+        return prev;
+      }
+      const curMax = settingsRef.current.maxMessages || 15;
+      const next = [...prev, nextMsg];
+      if (next.length > curMax) {
+        return next.slice(next.length - curMax);
+      }
+      return next;
+    });
+
+    if (previewQueueRef.current.length > 0) {
+      const remaining = previewQueueRef.current.length;
+      const staggerDelay = remaining > 5 ? 100 : remaining > 2 ? 160 : 260;
+      previewDrainTimerRef.current = setTimeout(() => {
+        drainPreviewQueue();
+      }, staggerDelay);
+    } else {
+      isDrainingPreviewRef.current = false;
+    }
+  };
+
+  const enqueuePreviewMessage = (newMsg: LocalChatMessage, playSound = false) => {
+    if (newMsg.id && previewQueueRef.current.some((m) => m.id === newMsg.id)) {
+      return;
+    }
+    if (playSound && settingsRef.current.soundEnabled && typeof window !== 'undefined') {
+      playPreviewSound(settingsRef.current.soundUrl, settingsRef.current.soundVolume);
+    }
+    previewQueueRef.current.push(newMsg);
+    if (!isDrainingPreviewRef.current) {
+      drainPreviewQueue();
+    }
+  };
+
   const token = streamerToken || 'demo-token';
   const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/widget/chat/${token}`;
 
@@ -253,35 +449,28 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
     if (!socket) return;
     const handleIncomingChatMessage = (msg: any) => {
       if (!msg) return;
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const newMsg: LocalChatMessage = {
-          id: msg.id || 'msg_' + Date.now(),
-          author: msg.author || 'Viewer',
-          message: msg.message || '',
-          badge: msg.badge,
-          badgeColor: msg.badgeColor,
-          badgeBg: msg.badgeBg,
-          badgeBorder: msg.badgeBorder,
-          badgeIcon: msg.badgeIcon,
-          badgeGifUrl: msg.badgeGifUrl || msg.badgeImage,
-          badgeImage: msg.badgeImage || msg.badgeGifUrl,
-          platform: msg.platform || 'youtube',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        const next = [...prev, newMsg];
-        if (next.length > (settings.maxMessages || 15)) {
-          return next.slice(next.length - (settings.maxMessages || 15));
-        }
-        return next;
-      });
+      const newMsg: LocalChatMessage = {
+        id: msg.id || 'msg_' + Date.now(),
+        author: msg.author || 'Viewer',
+        message: msg.message || '',
+        badge: msg.badge,
+        badgeColor: msg.badgeColor,
+        badgeBg: msg.badgeBg,
+        badgeBorder: msg.badgeBorder,
+        badgeIcon: msg.badgeIcon,
+        badgeGifUrl: msg.badgeGifUrl || msg.badgeImage,
+        badgeImage: msg.badgeImage || msg.badgeGifUrl,
+        platform: msg.platform || 'youtube',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      enqueuePreviewMessage(newMsg, true);
     };
 
     socket.on('chat:message', handleIncomingChatMessage);
     return () => {
       socket.off('chat:message', handleIncomingChatMessage);
     };
-  }, [socket, settings.maxMessages]);
+  }, [socket]);
 
   // Unsaved changes tracking
   const hasUnsavedChanges = useMemo(() => {
@@ -378,14 +567,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
-      setMessages((prev) => {
-        const next = [...prev, newSampleMsg];
-        const maxLimit = settings.maxMessages || 15;
-        if (next.length > maxLimit) {
-          return next.slice(next.length - maxLimit);
-        }
-        return next;
-      });
+      enqueuePreviewMessage(newSampleMsg, false);
     }, 2500);
 
     return () => clearInterval(simInterval);
@@ -405,6 +587,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
   const handleSaveSettings = async () => {
     setSaving(true);
     setSaveSuccess(false);
+    setSaveError(null);
     try {
       const res = await fetch('/api/widgets/chat', {
         method: 'POST',
@@ -416,7 +599,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setIsEarthquake(false);
         if (data.settings) {
           setSettings((prev) => ({ ...prev, ...data.settings }));
@@ -426,9 +609,15 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         }
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        const errorMsg = data.error || 'Failed to save settings to database.';
+        setSaveError(errorMsg);
+        setTimeout(() => setSaveError(null), 5000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving chat settings:', err);
+      setSaveError(err.message || 'Network error saving chat settings.');
+      setTimeout(() => setSaveError(null), 5000);
     } finally {
       setSaving(false);
     }
@@ -437,6 +626,11 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
   const handleSendTestMessage = async (customMsg?: string) => {
     setSendingTest(true);
     setTestSent(false);
+
+    // Play notification sound on dashboard preview if sound is enabled
+    if (settingsRef.current.soundEnabled && typeof window !== 'undefined') {
+      playPreviewSound(settingsRef.current.soundUrl, settingsRef.current.soundVolume);
+    }
 
     const sampleAuthors = ['CyberFan', 'SokhaAce', 'KompongChamp', 'GamerKhmer', 'ChakriyaX'];
     const sampleTexts = [
@@ -542,7 +736,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
   };
 
   const getTextStrokeCSS = () => {
-    const width = settings.textBorderWidth ?? 0;
+    const width = Number(settings.textBorderWidth) || 0;
     if (width <= 0) return undefined;
     return `${width}px ${settings.textBorderColor || '#000000'}`;
   };
@@ -738,9 +932,10 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                       <span
                         className="font-bold tracking-wide"
                         style={{
-                          color: settings.authorColor || '#00F0FF',
+                          color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
                           fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
                           WebkitTextStroke: getTextStrokeCSS(),
+                          paintOrder: 'stroke fill',
                           textShadow: getTextShadowCSS()
                         }}
                       >
@@ -774,11 +969,12 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                       <span className="font-bold text-slate-300">:</span>
                     </div>
                     <div
-                      className="flex-1 min-w-0 text-left"
+                      className="flex-1 min-w-0 text-left font-medium text-white"
                       style={{
-                        color: settings.messageColor || '#FFFFFF',
+                        color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
                         fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
                         WebkitTextStroke: getTextStrokeCSS(),
+                        paintOrder: 'stroke fill',
                         textShadow: getTextShadowCSS(),
                         wordBreak: 'break-word',
                         overflowWrap: 'anywhere'
@@ -887,12 +1083,34 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               {hasUnsavedChanges && (
-                <span className="text-[10px] font-mono text-amber-400 font-semibold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 animate-pulse">
+                <span className="hidden sm:inline text-[10px] font-mono text-amber-400 font-semibold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 animate-pulse">
                   Unsaved
                 </span>
               )}
+              {saveSuccess && (
+                <span className="text-[10px] font-mono text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1 animate-in fade-in">
+                  <Check size={11} className="text-emerald-400" />
+                  <span>Saved</span>
+                </span>
+              )}
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleSaveSettings}
+                loading={saving}
+                disabled={!hasUnsavedChanges && !saveSuccess}
+                className={`font-bold font-mono text-xs px-3 shadow-md transition-all ${
+                  hasUnsavedChanges
+                    ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_12px_rgba(0,240,255,0.35)]'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700/80 cursor-default opacity-80'
+                }`}
+              >
+                <Save size={12} className={hasUnsavedChanges ? 'text-slate-950' : 'text-slate-400'} />
+                <span>Save</span>
+              </Button>
               {/* Mobile Close Button */}
               <button
                 type="button"
@@ -904,6 +1122,21 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Error Alert Banner if Save failed */}
+          {saveError && (
+            <div className="px-4 py-2.5 bg-red-950/80 border-b border-red-500/40 text-red-200 text-xs flex items-center gap-2 animate-in fade-in">
+              <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
+              <span className="flex-1 text-[11px] font-medium leading-tight">{saveError}</span>
+              <button
+                type="button"
+                onClick={() => setSaveError(null)}
+                className="text-red-400 hover:text-white p-0.5"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
 
         {/* Scrollable Settings Content Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 no-scrollbar">
@@ -1000,7 +1233,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               {/* Stroke Width Buttons: 0px, 1px, 2px, 3px, 4px */}
               <div className="grid grid-cols-5 gap-1.5">
                 {[0, 1, 2, 3, 4].map((w) => {
-                  const isSelected = (settings.textBorderWidth ?? 1) === w;
+                  const isSelected = (settings.textBorderWidth ?? 0) === w;
                   return (
                     <button
                       key={w}
@@ -1019,7 +1252,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               </div>
 
               {/* Stroke Color Picker & Presets */}
-              {(settings.textBorderWidth ?? 1) > 0 && (
+              {(settings.textBorderWidth ?? 0) > 0 && (
                 <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 flex-1">
                     <input
@@ -1280,34 +1513,275 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
 
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1 truncate">Author Color</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] text-slate-400 truncate">Author Color</label>
+                  <span className="text-[9px] text-cyan-400 font-mono">{settings.authorColor || '#00F0FF'}</span>
+                </div>
                 <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl p-1.5">
                   <input
                     type="color"
-                    value={settings.authorColor}
+                    value={settings.authorColor?.startsWith('#') && settings.authorColor.length === 7 ? settings.authorColor : '#00F0FF'}
                     onChange={(e) => setSettings({ ...settings, authorColor: e.target.value })}
                     className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
                   />
-                  <span className="text-[10px] text-slate-300 font-mono truncate">{settings.authorColor}</span>
+                  <input
+                    type="text"
+                    value={settings.authorColor || '#00F0FF'}
+                    onChange={(e) => setSettings({ ...settings, authorColor: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] font-mono text-white uppercase focus:outline-none focus:border-cyan-400"
+                    maxLength={7}
+                  />
+                </div>
+                {/* Author Color Swatches */}
+                <div className="flex items-center gap-1 mt-1.5">
+                  {[
+                    { color: '#00F0FF', name: 'Cyber Cyan' },
+                    { color: '#F59E0B', name: 'Amber Gold' },
+                    { color: '#10B981', name: 'Emerald' },
+                    { color: '#A855F7', name: 'Purple' },
+                    { color: '#EC4899', name: 'Neon Pink' },
+                    { color: '#FFFFFF', name: 'Pure White' }
+                  ].map((swatch) => (
+                    <button
+                      key={swatch.color}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, authorColor: swatch.color })}
+                      className={`w-4 h-4 rounded-md border transition-all cursor-pointer ${
+                        settings.authorColor?.toLowerCase() === swatch.color.toLowerCase()
+                          ? 'ring-2 ring-cyan-400 scale-110'
+                          : 'border-slate-800 hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: swatch.color }}
+                      title={swatch.name}
+                    />
+                  ))}
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1 truncate">Message Color</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] text-slate-400 truncate">Message Color</label>
+                  <span className="text-[9px] text-cyan-400 font-mono">{settings.messageColor || '#FFFFFF'}</span>
+                </div>
                 <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl p-1.5">
                   <input
                     type="color"
-                    value={settings.messageColor}
+                    value={settings.messageColor?.startsWith('#') && settings.messageColor.length === 7 && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF'}
                     onChange={(e) => setSettings({ ...settings, messageColor: e.target.value })}
                     className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
                   />
-                  <span className="text-[10px] text-slate-300 font-mono truncate">{settings.messageColor}</span>
+                  <input
+                    type="text"
+                    value={settings.messageColor || '#FFFFFF'}
+                    onChange={(e) => setSettings({ ...settings, messageColor: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] font-mono text-white uppercase focus:outline-none focus:border-cyan-400"
+                    maxLength={7}
+                  />
+                </div>
+                {/* Message Color Swatches */}
+                <div className="flex items-center gap-1 mt-1.5">
+                  {[
+                    { color: '#FFFFFF', name: 'Pure White' },
+                    { color: '#F1F5F9', name: 'Slate White' },
+                    { color: '#E2E8F0', name: 'Soft Light Gray' },
+                    { color: '#E0F2FE', name: 'Sky Frost' },
+                    { color: '#FEF08A', name: 'Light Cream' },
+                    { color: '#DCFCE7', name: 'Soft Mint' }
+                  ].map((swatch) => (
+                    <button
+                      key={swatch.color}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, messageColor: swatch.color })}
+                      className={`w-4 h-4 rounded-md border transition-all cursor-pointer ${
+                        settings.messageColor?.toLowerCase() === swatch.color.toLowerCase()
+                          ? 'ring-2 ring-cyan-400 scale-110'
+                          : 'border-slate-800 hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: swatch.color }}
+                      title={swatch.name}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* SECTION 5: TIMING & VISIBILITY TOGGLES */}
+          {/* SECTION 5: LIVE CHAT NOTIFICATION SOUND */}
+          <div className="space-y-3 pt-3 border-t border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white font-bold text-xs">
+                <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Notification Sound</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                  settings.soundEnabled
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}>
+                  {settings.soundEnabled ? 'ON' : 'MUTED'}
+                </span>
+                {/* Sound Toggle Switch */}
+                <button
+                  type="button"
+                  onClick={() => setSettings((prev) => ({ ...prev, soundEnabled: !prev.soundEnabled }))}
+                  className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors cursor-pointer ${
+                    settings.soundEnabled ? 'bg-cyan-500' : 'bg-slate-700'
+                  }`}
+                  title={settings.soundEnabled ? 'Mute chat sound' : 'Enable chat sound'}
+                >
+                  <div
+                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                      settings.soundEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-400 leading-normal">
+              Plays an audio chime on your stream overlay and dashboard whenever someone sends a live chat message.
+            </p>
+
+            {settings.soundEnabled && (
+              <div className="space-y-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                {/* Sound Presets */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
+                    <span>Sound Preset</span>
+                    <span className="text-[10px] text-cyan-400 font-mono truncate max-w-[150px]">
+                      {CHAT_SOUND_PRESETS.find((p) => p.url === settings.soundUrl)?.name || 'Custom Audio'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5 no-scrollbar">
+                    {CHAT_SOUND_PRESETS.map((preset) => {
+                      const isSelected = settings.soundUrl === preset.url;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            setSettings((prev) => ({ ...prev, soundUrl: preset.url }));
+                            playPreviewSound(preset.url, settings.soundVolume);
+                          }}
+                          className={`p-2 rounded-lg border text-left transition-all cursor-pointer flex items-center gap-2 ${
+                            isSelected
+                              ? 'border-cyan-400 bg-cyan-500/15 text-white shadow-[0_0_8px_rgba(0,240,255,0.2)]'
+                              : 'border-slate-800 bg-slate-900/90 text-slate-300 hover:border-slate-700 hover:text-white'
+                          }`}
+                        >
+                          <span className="text-base flex-shrink-0">{preset.icon}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[11px] font-bold truncate flex items-center justify-between gap-1">
+                              <span className="truncate">{preset.name}</span>
+                              {preset.badge && (
+                                <span className={`text-[8px] font-mono px-1 py-0.2 rounded ${
+                                  isSelected
+                                    ? 'bg-cyan-400 text-slate-950 font-black'
+                                    : 'bg-slate-800 text-slate-400'
+                                }`}>
+                                  {preset.badge}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[9px] text-slate-400 truncate font-mono">
+                              {preset.desc}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Preview and Media Library Bar */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isPlayingAudio) {
+                          stopPreviewSound();
+                        } else {
+                          playPreviewSound(settings.soundUrl, settings.soundVolume);
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isPlayingAudio
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.3)] animate-pulse'
+                          : 'bg-cyan-500/20 border-cyan-400/80 text-cyan-300 hover:bg-cyan-500/30'
+                      }`}
+                      title={isPlayingAudio ? 'Stop Preview' : 'Play Sound Preview'}
+                    >
+                      {isPlayingAudio ? (
+                        <>
+                          <Square className="w-3.5 h-3.5 fill-amber-300" />
+                          <span>Stop</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 fill-cyan-300" />
+                          <span>Preview</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsMediaPickerOpen(true)}
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Media Library</span>
+                    </button>
+                  </div>
+
+                  {/* Volume Slider */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5">
+                        {settings.soundVolume === 0 ? (
+                          <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+                        ) : settings.soundVolume < 0.5 ? (
+                          <Volume1 className="w-3.5 h-3.5 text-cyan-400" />
+                        ) : (
+                          <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                        )}
+                        <span>Sound Volume</span>
+                      </span>
+                      <span className="text-cyan-400 font-mono font-bold text-xs">
+                        {Math.round((settings.soundVolume ?? 0.85) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={settings.soundVolume ?? 0.85}
+                      onChange={(e) => setSettings({ ...settings, soundVolume: parseFloat(e.target.value) })}
+                      className="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                    />
+                  </div>
+
+                  {/* Direct Audio URL */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1 font-mono">Audio URL or File Path</label>
+                    <input
+                      type="text"
+                      value={settings.soundUrl || ''}
+                      onChange={(e) => setSettings({ ...settings, soundUrl: e.target.value })}
+                      placeholder="/sounds/cash-register-kaching.mp3"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-200 focus:outline-none focus:border-cyan-400 truncate"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 6: TIMING & VISIBILITY TOGGLES */}
           <div className="space-y-3 pt-3 border-t border-slate-800/80">
             <div className="flex items-center gap-2 text-white font-bold text-xs">
               <Clock className="w-3.5 h-3.5 text-cyan-400" />
@@ -1415,8 +1889,8 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
           </div>
         </div>
 
-        {/* Mobile Sticky Footer Action Bar (Modal Web Application Experience) */}
-        <div className="lg:hidden p-3.5 bg-[#060911] border-t border-slate-800 flex items-center justify-between gap-2.5 flex-shrink-0">
+        {/* Sticky Footer Action Bar (Desktop and Mobile) */}
+        <div className="p-3.5 bg-[#060911] border-t border-slate-800 flex items-center justify-between gap-2.5 flex-shrink-0">
           <button
             type="button"
             onClick={handleResetChanges}
@@ -1429,7 +1903,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
             <button
               type="button"
               onClick={closeRightbar}
-              className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 transition-colors cursor-pointer"
+              className="lg:hidden px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 transition-colors cursor-pointer"
             >
               Close
             </button>
@@ -1439,9 +1913,14 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               size="sm"
               onClick={handleSaveSettings}
               loading={saving}
-              className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold font-mono text-xs px-4 shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+              disabled={!hasUnsavedChanges && !saveSuccess}
+              className={`font-bold font-mono text-xs px-4 shadow-[0_0_15px_rgba(0,240,255,0.3)] ${
+                hasUnsavedChanges
+                  ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700/80 cursor-default opacity-80'
+              }`}
             >
-              <Save size={13} className="text-slate-950" />
+              <Save size={13} className={hasUnsavedChanges ? 'text-slate-950' : 'text-slate-400'} />
               <span>Save</span>
             </Button>
           </div>
@@ -1535,6 +2014,26 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
             <span>Changes saved successfully!</span>
           </div>
         </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 6. MEDIA PICKER MODAL (GLOBAL AUDIO & UPLOAD ASSETS)           */}
+      {/* ============================================================== */}
+      {isMediaPickerOpen && (
+        <MediaPickerModal
+          isOpen={isMediaPickerOpen}
+          onClose={() => setIsMediaPickerOpen(false)}
+          filterMode="audio"
+          initialSection="sounds"
+          currentUrl={settings.soundUrl}
+          title="Choose Live Chat Notification Sound"
+          subtitle="Pick a preset notification chime or select from your uploaded audio files."
+          onSelect={(selectedUrl: string) => {
+            setSettings((prev) => ({ ...prev, soundUrl: selectedUrl }));
+            setIsMediaPickerOpen(false);
+            playPreviewSound(selectedUrl, settings.soundVolume);
+          }}
+        />
       )}
     </div>
   );

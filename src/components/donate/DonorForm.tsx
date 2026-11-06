@@ -24,10 +24,14 @@ import {
   Flame,
   Zap,
   Heart,
-  Check
+  Check,
+  CreditCard,
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
+import { Modal } from '../common/Modal';
 import { PublicStreamerInfo } from '../../services/donationService';
 import { VideoPlayerWithProgressBar } from '../common/VideoPlayerWithProgressBar';
 import { VideoClipScrubberLine } from './VideoClipScrubberLine';
@@ -83,7 +87,7 @@ export type DonorLanguage = 'en' | 'kh';
 
 export const DONOR_TRANSLATIONS = {
   en: {
-    oneTimeTip: 'One-Time Tip',
+    oneTimeTip: 'Tip',
     subscribe: 'Subscribe',
     vipBadge: 'VIP BADGE',
     selectTier: 'Select Membership Tier',
@@ -182,6 +186,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   const [donorName, setDonorName] = useState<string>('');
   const [bankingName, setBankingName] = useState<string>('');
   const [donorMessage, setDonorMessage] = useState<string>('');
+  const [showPayerInfoModal, setShowPayerInfoModal] = useState<boolean>(false);
 
   // YouTube Video Overlay states
   const [videoUrl, setVideoUrl] = useState<string>('');
@@ -237,7 +242,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     setCurrency(tier.currency || 'USD');
   };
 
-  // 1. Restore draft from localStorage on mount safely
+  // 1. Restore draft from localStorage on mount safely (only username and payer name)
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -245,17 +250,6 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         const parsed = JSON.parse(saved);
         if (parsed.donorName) setDonorName(parsed.donorName);
         if (parsed.bankingName) setBankingName(parsed.bankingName);
-        if (parsed.amount) setAmount(Number(parsed.amount) || 5);
-        if (parsed.currency) setCurrency(parsed.currency === 'KHR' ? 'KHR' : 'USD');
-        if (parsed.donorMessage) setDonorMessage(parsed.donorMessage);
-        if (parsed.videoUrl) {
-          setVideoUrl(parsed.videoUrl);
-          if (parsed.videoTitle) setVideoTitle(parsed.videoTitle);
-          if (parsed.videoAuthor) setVideoAuthor(parsed.videoAuthor);
-          if (parsed.videoThumbnail) setVideoThumbnail(parsed.videoThumbnail);
-          if (parsed.videoStartTime !== undefined) setVideoStartTime(Number(parsed.videoStartTime) || 0);
-          if (parsed.videoEndTime !== undefined) setVideoEndTime(Number(parsed.videoEndTime) || 30);
-        }
       }
     } catch (e) {
       console.warn('Could not read draft from localStorage', e);
@@ -264,41 +258,19 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     }
   }, [storageKey]);
 
-  // 2. Persist draft to localStorage on changes ONLY after initial load
+  // 2. Persist draft to localStorage on changes ONLY after initial load (only username and payer name)
   useEffect(() => {
     if (!isLoadedRef.current) return;
     try {
       const draft = {
         donorName,
-        bankingName,
-        amount,
-        currency,
-        donorMessage,
-        videoUrl,
-        videoTitle,
-        videoAuthor,
-        videoThumbnail,
-        videoStartTime,
-        videoEndTime
+        bankingName
       };
       localStorage.setItem(storageKey, JSON.stringify(draft));
     } catch (e) {
       console.warn('Could not persist draft to localStorage', e);
     }
-  }, [
-    storageKey,
-    donorName,
-    bankingName,
-    amount,
-    currency,
-    donorMessage,
-    videoUrl,
-    videoTitle,
-    videoAuthor,
-    videoThumbnail,
-    videoStartTime,
-    videoEndTime
-  ]);
+  }, [storageKey, donorName, bankingName]);
 
   // Handle YouTube URL lookup with proper debouncing
   const lastFetchedUrl = useRef<string>('');
@@ -348,11 +320,11 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       setVideoDuration(vDur);
 
       // If video duration is less than the preset (30s), default to full duration!
-      if (vDur && vDur < 30) {
+      if (vDur && vDur > 0 && vDur < 30) {
         setVideoStartTime(0);
         setVideoEndTime(vDur);
       } else {
-        const defaultDur = data.defaultDuration || 30;
+        const defaultDur = Math.min(videoMaxDuration, data.defaultDuration || 30);
         setVideoStartTime(0);
         setVideoEndTime(defaultDur);
       }
@@ -407,6 +379,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     setVideoUrl(DEMO_YOUTUBE_URL);
     setVideoStartTime(0);
     setVideoEndTime(30);
+    lastFetchedUrl.current = '';
     setIsPlayingPreview(true);
     setPreviewKey((k) => k + 1);
     void fetchYoutubeDetails(DEMO_YOUTUBE_URL);
@@ -423,12 +396,12 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     } catch (e) {}
   };
 
-  // Auto pause preview playback when viewer clicks Tip to show Bakong KHQR modal
+  // Auto pause preview playback when viewer clicks Tip to show Bakong KHQR modal or info modal
   useEffect(() => {
-    if (loading || isModalOpen) {
+    if (loading || isModalOpen || showPayerInfoModal) {
       setIsPlayingPreview(false);
     }
-  }, [loading, isModalOpen]);
+  }, [loading, isModalOpen, showPayerInfoModal]);
 
   // Ensure clip duration boundaries strictly match video duration 100% without glitches
   useEffect(() => {
@@ -516,7 +489,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   };
 
   return (
-    <Card className="p-4 xs:p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl space-y-4 sm:space-y-5 w-full h-full flex flex-col justify-between">
+    <>
+      <Card className="p-4 xs:p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl space-y-4 sm:space-y-5 w-full h-full flex flex-col justify-between">
       {/* 1. Streamer Profile & Bio Header */}
       <div className="flex items-start justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-800/80">
         <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
@@ -636,13 +610,13 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         </div>
       </div>
 
-      {/* Donation Type Switch: One-Time Tip vs Subscribe / Membership */}
+      {/* Donation Type Switch: Tip vs Subscribe / Membership */}
       {subscriberSettings?.enabled && subscriberSettings.tiers.length > 0 && (
         <div className="grid grid-cols-2 p-1 bg-slate-950/80 border border-slate-800 rounded-xl gap-1">
           <button
             type="button"
             onClick={() => handleModeChange('tip')}
-            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all ${
+            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all cursor-pointer ${
               donationType === 'tip'
                 ? 'bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-pink-300 border border-pink-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
@@ -654,7 +628,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           <button
             type="button"
             onClick={() => handleModeChange('subscribe')}
-            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all relative ${
+            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all cursor-pointer ${
               donationType === 'subscribe'
                 ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
@@ -662,9 +636,6 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           >
             <Crown size={14} className={donationType === 'subscribe' ? 'text-amber-400' : ''} />
             <span>{DONOR_TRANSLATIONS[lang].subscribe}</span>
-            <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
-              {DONOR_TRANSLATIONS[lang].vipBadge}
-            </span>
           </button>
         </div>
       )}
@@ -674,170 +645,295 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         {donationType === 'subscribe' && subscriberSettings?.tiers && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-amber-400 font-['Chakra_Petch'] flex items-center gap-1.5">
-                <Crown size={14} className="text-amber-400" />
+              <label className="text-xs font-bold uppercase tracking-wider text-amber-400 font-['Chakra_Petch'] flex items-center gap-1.5">
+                <Crown size={15} className="text-amber-400" />
                 <span>{DONOR_TRANSLATIONS[lang].selectTier}</span>
               </label>
-              <span className="text-[10px] font-mono text-slate-400">{DONOR_TRANSLATIONS[lang].activeBadge}</span>
+              <span className="text-[10px] font-mono font-semibold text-amber-300/80 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                {DONOR_TRANSLATIONS[lang].activeBadge}
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {subscriberSettings.tiers.map((tier) => {
-                const isSelected = (selectedTierId || subscriberSettings.tiers[0].id) === tier.id;
-                const IconComp = getBadgeIconComponent(tier.badgeIcon);
-                const formattedPrice = tier.currency === 'KHR'
-                  ? `${tier.price.toLocaleString()} ៛`
-                  : `$${tier.price.toFixed(2)}`;
+            {subscriberSettings.tiers.length === 0 ? (
+              <div className="p-6 rounded-2xl bg-slate-950/70 border border-dashed border-slate-800 text-center space-y-2">
+                <Crown className="w-8 h-8 text-amber-400 mx-auto opacity-50" />
+                <p className="text-xs text-slate-300 font-semibold">No membership tiers available at the moment.</p>
+                <p className="text-[11px] text-slate-500">The streamer has not configured active membership tiers yet.</p>
+              </div>
+            ) : (
+              <div
+                className={`grid gap-3 ${
+                  subscriberSettings.tiers.length === 1
+                    ? 'grid-cols-1'
+                    : subscriberSettings.tiers.length === 2
+                    ? 'grid-cols-1 sm:grid-cols-2'
+                    : 'grid-cols-1 sm:grid-cols-3'
+                }`}
+              >
+                {subscriberSettings.tiers.map((tier) => {
+                  const isSelected = (selectedTierId || subscriberSettings.tiers[0].id) === tier.id;
+                  const IconComp = getBadgeIconComponent(tier.badgeIcon);
+                  const formattedPrice = tier.currency === 'KHR'
+                    ? `${tier.price.toLocaleString()} ៛`
+                    : `$${tier.price.toFixed(2)}`;
 
-                return (
-                  <div
-                    key={tier.id}
-                    onClick={() => handleSelectTier(tier)}
-                    className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between text-left relative ${
-                      isSelected
-                        ? 'bg-gradient-to-b from-amber-500/10 to-amber-950/20 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
-                        : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-white font-['Chakra_Petch'] truncate">
-                          {tier.name}
-                        </span>
-                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                          isSelected ? 'border-amber-400 bg-amber-400 text-slate-950' : 'border-slate-600'
-                        }`}>
-                          {isSelected && <Check size={10} className="stroke-[3]" />}
-                        </div>
-                      </div>
-
-                      <div className="text-sm font-extrabold text-amber-400 font-mono">
-                        {formattedPrice} <span className="text-[10px] text-slate-400 font-normal">/mo</span>
-                      </div>
-
-                      {/* Live Vector Badge */}
-                      <div>
-                        <div
-                          className="inline-flex items-center gap-1.5 text-xs font-bold font-mono tracking-wider"
-                          style={{
-                            color: tier.badgeColor || '#00F0FF'
-                          }}
-                        >
-                          {tier.badgeImage || tier.badgeGifUrl ? (
-                            <img
-                              src={tier.badgeImage || tier.badgeGifUrl}
-                              alt="Badge"
-                              className="w-3.5 h-3.5 object-contain flex-shrink-0"
-                            />
-                          ) : (
-                            <IconComp
-                              className="w-3.5 h-3.5 flex-shrink-0"
-                              style={{ color: tier.badgeColor || '#00F0FF' }}
-                            />
-                          )}
-                          {tier.badgeText ? (
-                            <span className="truncate max-w-[90px]">{tier.badgeText}</span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {/* Perks */}
-                      {tier.perks && tier.perks.length > 0 && (
-                        <ul className="text-[10px] text-slate-400 space-y-1 pt-1.5 border-t border-slate-800/80">
-                          {tier.perks.slice(0, 3).map((perk, idx) => (
-                            <li key={idx} className="flex items-center gap-1 truncate">
-                              <span className="text-amber-400">✓</span> {perk}
-                            </li>
-                          ))}
-                        </ul>
+                  return (
+                    <div
+                      key={tier.id}
+                      onClick={() => handleSelectTier(tier)}
+                      className={`p-3.5 sm:p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between text-left relative overflow-hidden group ${
+                        isSelected
+                          ? 'bg-gradient-to-b from-amber-500/20 via-[#151122] to-[#0A0E18] border-amber-400 ring-2 ring-amber-400/40 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
+                          : 'bg-slate-950/70 border-slate-800/90 hover:border-slate-700 hover:bg-slate-900/40'
+                      }`}
+                    >
+                      {/* Active Corner Glow */}
+                      {isSelected && (
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-400/10 blur-2xl pointer-events-none rounded-full" />
                       )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
 
-            <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2 text-[11px] text-amber-300 font-mono">
-              <Crown size={14} className="text-amber-400 shrink-0" />
-              <span>{DONOR_TRANSLATIONS[lang].vipNotice}</span>
+                      <div className="space-y-2.5">
+                        {/* Top: Tier Name & Checkmark */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
+                            {tier.name}
+                          </span>
+                          <div
+                            className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
+                              isSelected
+                                ? 'border-amber-400 bg-amber-400 text-slate-950 shadow-sm shadow-amber-400/50'
+                                : 'border-slate-700 group-hover:border-slate-600'
+                            }`}
+                          >
+                            {isSelected && <Check size={11} className="stroke-[3]" />}
+                          </div>
+                        </div>
+
+                        {/* Price Display */}
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-lg sm:text-xl font-black text-amber-400 font-mono tracking-tight">
+                            {formattedPrice}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-normal">/mo</span>
+                        </div>
+
+                        {/* Badge Display Capsule */}
+                        <div className="pt-0.5">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 shadow-inner">
+                            <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
+                              Badge:
+                            </span>
+                            <span
+                              className="inline-flex items-center gap-1 text-xs font-bold font-mono tracking-wider truncate max-w-[120px]"
+                              style={{ color: tier.badgeColor || '#00F0FF' }}
+                            >
+                              {tier.badgeImage || tier.badgeGifUrl ? (
+                                <img
+                                  src={tier.badgeImage || tier.badgeGifUrl}
+                                  alt="Badge"
+                                  className="w-3.5 h-3.5 object-contain flex-shrink-0 inline-block"
+                                />
+                              ) : (
+                                <IconComp
+                                  className="w-3.5 h-3.5 flex-shrink-0 inline-block"
+                                  style={{ color: tier.badgeColor || '#00F0FF' }}
+                                />
+                              )}
+                              {tier.badgeText ? <span>{tier.badgeText}</span> : null}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Perks */}
+                        {tier.perks && tier.perks.length > 0 && (
+                          <ul className="text-[11px] text-slate-300 space-y-1 pt-2 border-t border-slate-800/80">
+                            {tier.perks.slice(0, 3).map((perk, idx) => (
+                              <li key={idx} className="flex items-center gap-1.5 truncate">
+                                <span className="text-amber-400 font-bold">✓</span>
+                                <span className="truncate">{perk}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="p-3 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 rounded-xl flex items-center gap-2.5 text-xs text-amber-300 font-mono">
+              <Crown size={16} className="text-amber-400 shrink-0" />
+              <span className="leading-snug">{DONOR_TRANSLATIONS[lang].vipNotice}</span>
             </div>
           </div>
         )}
 
-        {/* Row with Username & Bank Name (All input field icons removed, pure white styling) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* FIELD 1: Username / YouTube Account Name */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between">
-              <span>
-                {donationType === 'subscribe' ? DONOR_TRANSLATIONS[lang].youtubeName : DONOR_TRANSLATIONS[lang].username}
-              </span>
-              <div className="flex items-center gap-2">
-                {donationType === 'subscribe' && (
-                  <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-                    {DONOR_TRANSLATIONS[lang].matchLiveChat}
+        {/* INPUT FORM FIELDS (Responsive: Side-by-side on ONE LINE in both modes) */}
+        {donationType === 'subscribe' ? (
+          /* ============================================================== */
+          /* SUBSCRIBE MODE: RESPONSIVE 2-COLUMN ROW ON ONE LINE            */
+          /* ============================================================== */
+          <div className="space-y-3">
+            {/* 2-COLUMN ROW ON ONE LINE: YouTube Name & Payer Name (Bank Account) */}
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              {/* FIELD 1: YouTube Account Name (for Chat Badge) */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between gap-1 whitespace-nowrap min-w-0">
+                  <span className="truncate flex items-center gap-1">
+                    <span>{lang === 'kh' ? 'ឈ្មោះ YouTube' : 'YouTube Name'}</span>
+                    <span className="text-amber-400">*</span>
                   </span>
-                )}
-                <span className="text-[10px] font-mono text-slate-400">{donorName.length}/25</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[8px] sm:text-[9px] font-mono font-bold text-amber-400 bg-amber-500/15 px-1 sm:px-1.5 py-0.2 rounded uppercase">
+                      CHAT
+                    </span>
+                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-400">{donorName.length}/25</span>
+                  </div>
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={25}
+                  placeholder={DONOR_TRANSLATIONS[lang].youtubePlaceholder}
+                  value={donorName}
+                  onChange={(e) => setDonorName(e.target.value.slice(0, 25))}
+                  className="w-full px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-amber-500/40 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all placeholder:text-slate-500"
+                />
               </div>
-            </label>
-            <input
-              type="text"
-              required
-              maxLength={25}
-              placeholder={donationType === 'subscribe' ? DONOR_TRANSLATIONS[lang].youtubePlaceholder : DONOR_TRANSLATIONS[lang].usernamePlaceholder}
-              value={donorName}
-              onChange={(e) => setDonorName(e.target.value.slice(0, 25))}
-              className={`w-full px-3.5 py-2.5 rounded-none bg-slate-950 border text-white text-xs sm:text-sm font-medium focus:outline-none transition-colors placeholder:text-slate-400 ${
-                donationType === 'subscribe'
-                  ? 'border-amber-500/50 focus:border-white'
-                  : 'border-slate-700 focus:border-white'
-              }`}
-            />
-            {donationType === 'subscribe' && (
-              <p className="text-[10px] text-amber-300/90 font-mono mt-1 flex items-start gap-1 leading-tight">
-                <span>⚡</span>
-                <span>{DONOR_TRANSLATIONS[lang].youtubeHelp}</span>
-              </p>
-            )}
-          </div>
 
-          {/* FIELD 2: Payer Name (Bank Account) */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between">
-              <span>{DONOR_TRANSLATIONS[lang].payerName}</span>
-              <span className="text-[10px] font-mono text-slate-400">{bankingName.length}/30</span>
-            </label>
-            <input
-              type="text"
-              required
-              maxLength={30}
-              placeholder={DONOR_TRANSLATIONS[lang].payerPlaceholder}
-              value={bankingName}
-              onChange={(e) => setBankingName(e.target.value.slice(0, 30))}
-              className="w-full px-3.5 py-2.5 rounded-none bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-white transition-colors placeholder:text-slate-400 uppercase"
-            />
-          </div>
-        </div>
+              {/* FIELD 2: Payer Name (Bank Account) */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between gap-1 whitespace-nowrap min-w-0">
+                  <span className="truncate flex items-center gap-1.5 min-w-0" title={DONOR_TRANSLATIONS[lang].payerName}>
+                    <span className="truncate">{lang === 'kh' ? 'ឈ្មោះធនាគារ' : 'Payer Name'}</span>{' '}
+                    <span className="text-slate-400 font-normal text-[9px] sm:text-[10px] font-sans shrink-0">
+                      ({lang === 'kh' ? 'គណនី' : 'Bank'})
+                    </span>{' '}
+                    <span className="text-amber-400 shrink-0">*</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPayerInfoModal(true)}
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-rose-500 text-rose-500 hover:text-rose-400 hover:border-rose-400 bg-transparent font-black text-[9px] sm:text-[10px] leading-none inline-flex items-center justify-center shrink-0 cursor-pointer transition-all hover:scale-115 active:scale-95"
+                      title={lang === 'kh' ? 'ចុចដើម្បីអានការណែនាំអំពីឈ្មោះម្ចាស់គណនីធនាគារ' : 'Click to learn why Payer Name is required and how it works'}
+                    >
+                      !
+                    </button>
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 shrink-0">{bankingName.length}/30</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={30}
+                  placeholder={DONOR_TRANSLATIONS[lang].payerPlaceholder}
+                  value={bankingName}
+                  onChange={(e) => setBankingName(e.target.value.slice(0, 30))}
+                  className="w-full px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-semibold focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all placeholder:text-slate-500 uppercase"
+                />
+              </div>
+            </div>
 
-        {/* FIELD 3: Text (Message) */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch']">
-              <span>{DONOR_TRANSLATIONS[lang].message}</span>
-            </label>
-            <span className="text-[10px] font-mono text-slate-400">{donorMessage.length}/200</span>
-          </div>
+            <p className="text-[10px] text-amber-300/90 font-mono mt-0.5 flex items-start gap-1 leading-relaxed">
+              <span>⚡</span>
+              <span>{DONOR_TRANSLATIONS[lang].youtubeHelp}</span>
+            </p>
 
-          <textarea
-            rows={2}
-            maxLength={200}
-            placeholder={DONOR_TRANSLATIONS[lang].messagePlaceholder}
-            value={donorMessage}
-            onChange={(e) => setDonorMessage(e.target.value.slice(0, 200))}
-            className="w-full p-3 rounded-none bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-white transition-colors resize-none placeholder:text-slate-400 leading-relaxed"
-          />
-        </div>
+            {/* FIELD 3: Text (Message) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch']">
+                  <span>{DONOR_TRANSLATIONS[lang].message}</span>
+                </label>
+                <span className="text-[10px] font-mono text-slate-400">{donorMessage.length}/200</span>
+              </div>
+              <textarea
+                rows={2}
+                maxLength={200}
+                placeholder={DONOR_TRANSLATIONS[lang].messagePlaceholder}
+                value={donorMessage}
+                onChange={(e) => setDonorMessage(e.target.value.slice(0, 200))}
+                className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all resize-none placeholder:text-slate-500 leading-relaxed"
+              />
+            </div>
+          </div>
+        ) : (
+          /* ============================================================== */
+          /* TIP MODE: FAST 2-COLUMN COMPACT LAYOUT (ONE LINE)              */
+          /* ============================================================== */
+          <>
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              {/* FIELD 1: Username */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between gap-1 whitespace-nowrap min-w-0">
+                  <span className="truncate">
+                    <span>{DONOR_TRANSLATIONS[lang].username}</span>
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 shrink-0">{donorName.length}/25</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={25}
+                  placeholder={DONOR_TRANSLATIONS[lang].usernamePlaceholder}
+                  value={donorName}
+                  onChange={(e) => setDonorName(e.target.value.slice(0, 25))}
+                  className="w-full px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 text-white text-xs sm:text-sm font-medium focus:outline-none transition-colors placeholder:text-slate-500"
+                />
+              </div>
+
+              {/* FIELD 2: Payer Name (Bank Account) */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between gap-1 whitespace-nowrap min-w-0">
+                  <span className="truncate flex items-center gap-1.5 min-w-0" title={DONOR_TRANSLATIONS[lang].payerName}>
+                    <span className="truncate">{lang === 'kh' ? 'ឈ្មោះធនាគារ' : 'Payer Name'}</span>{' '}
+                    <span className="text-slate-400 font-normal text-[9px] sm:text-[10px] font-sans shrink-0">
+                      ({lang === 'kh' ? 'គណនី' : 'Bank'})
+                    </span>{' '}
+                    <span className="text-cyan-400 shrink-0">*</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPayerInfoModal(true)}
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-rose-500 text-rose-500 hover:text-rose-400 hover:border-rose-400 bg-transparent font-black text-[9px] sm:text-[10px] leading-none inline-flex items-center justify-center shrink-0 cursor-pointer transition-all hover:scale-115 active:scale-95"
+                      title={lang === 'kh' ? 'ចុចដើម្បីអានការណែនាំអំពីឈ្មោះម្ចាស់គណនីធនាគារ' : 'Click to learn why Payer Name is required and how it works'}
+                    >
+                      !
+                    </button>
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 shrink-0">{bankingName.length}/30</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={30}
+                  placeholder={DONOR_TRANSLATIONS[lang].payerPlaceholder}
+                  value={bankingName}
+                  onChange={(e) => setBankingName(e.target.value.slice(0, 30))}
+                  className="w-full px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-cyan-400 transition-colors placeholder:text-slate-500 uppercase"
+                />
+              </div>
+            </div>
+
+            {/* FIELD 3: Text (Message) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch']">
+                  <span>{DONOR_TRANSLATIONS[lang].message}</span>
+                </label>
+                <span className="text-[10px] font-mono text-slate-400">{donorMessage.length}/200</span>
+              </div>
+
+              <textarea
+                rows={2}
+                maxLength={200}
+                placeholder={DONOR_TRANSLATIONS[lang].messagePlaceholder}
+                value={donorMessage}
+                onChange={(e) => setDonorMessage(e.target.value.slice(0, 200))}
+                className="w-full p-3 rounded-none bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-white transition-colors resize-none placeholder:text-slate-400 leading-relaxed"
+              />
+            </div>
+          </>
+        )}
 
         {/* FIELD 4: Video URL (Media Share) - Direct unlocked input with [Required $1.00] */}
         {isVideoAlertsEnabled && donationType === 'tip' && (
@@ -970,5 +1066,91 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         </div>
       </form>
     </Card>
+
+    {/* PAYER NAME INFORMATION & VERIFICATION GUIDE MODAL */}
+    {showPayerInfoModal && (
+      <Modal
+        isOpen={showPayerInfoModal}
+        onClose={() => setShowPayerInfoModal(false)}
+        title={lang === 'kh' ? 'ការណែនាំអំពីឈ្មោះម្ចាស់គណនីធនាគារ (Payer Name)' : 'Payer Name (Bank Account) Guide'}
+        maxWidth="lg"
+      >
+        <div className="space-y-4 text-white">
+          {/* Section 1: What is Payer Name? */}
+          <div className="space-y-1.5">
+            <h1 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider font-['Chakra_Petch'] flex items-center gap-2">
+              <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full border border-rose-500 text-rose-500 bg-transparent font-mono font-black text-xs inline-flex items-center justify-center shrink-0">!</span>
+              <span>{lang === 'kh' ? 'តើអ្វីទៅជាឈ្មោះម្ចាស់គណនី (What is Payer Name)?' : 'What is Payer Name?'}</span>
+            </h1>
+            <p className="text-justify text-xs sm:text-sm text-white leading-relaxed font-sans">
+              {lang === 'kh'
+                ? 'ឈ្មោះម្ចាស់គណនីធនាគារ (Payer Name) គឺជាឈ្មោះផ្លូវការជាអក្សរឡាតាំងដែលបានចុះឈ្មោះក្នុងកម្មវិធីធនាគារទូរស័ព្ទ ឬកាបូបបាគងរបស់អ្នក (ដូចជា ABA Mobile, ACLEDA, Wing, Canadia, Sathapana ជាដើម)។ ឈ្មោះនេះត្រូវតែជាឈ្មោះពិតប្រាកដដែលបង្ហាញលើគណនីធនាគាររបស់អ្នក មិនមែនជាឈ្មោះហៅក្រៅ ឬឈ្មោះក្នុងហ្គេមឡើយ។'
+                : 'Payer Name is your official English / Latin account holder name registered on your Mobile Banking app or Bakong wallet (such as ABA Mobile, ACLEDA, Wing, Canadia, Sathapana, etc.).'}
+            </p>
+          </div>
+
+          {/* Section 2: How to Provide */}
+          <div className="space-y-1.5">
+            <h1 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider font-['Chakra_Petch']">
+              {lang === 'kh' ? 'របៀបស្វែងរក និងបំពេញ (How to Provide)' : 'How to Provide'}
+            </h1>
+            <p className="text-justify text-xs sm:text-sm text-white leading-relaxed font-sans">
+              {lang === 'kh'
+                ? 'ដើម្បីបំពេញបានត្រឹមត្រូវ សូមបើកកម្មវិធីធនាគារទូរស័ព្ទរបស់អ្នកដូចជា ABA Mobile ឬ ACLEDA រួចពិនិត្យមើលឈ្មោះ Profile គណនី ឬកាតនិម្មិតរបស់អ្នកដើម្បីមើលឈ្មោះជាអក្សរឡាតាំង ហើយវាយបញ្ចូលឈ្មោះជាអក្សរឡាតាំងនោះឱ្យដូចគ្នាបេះបិទទៅក្នុងប្រអប់ "ឈ្មោះម្ចាស់គណនីធនាគារ" នៅលើទំព័រឧបត្ថម្ភនេះ។'
+                : 'Open your Mobile Banking app (such as ABA Mobile, ACLEDA, or Wing), check your Account Profile or Virtual Card to find your exact Latin account name, and enter that exact spelling into the "Payer Name" field.'}
+            </p>
+          </div>
+
+          {/* Section 3: How It Works (Instant) */}
+          <div className="space-y-1.5">
+            <h1 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider font-['Chakra_Petch']">
+              {lang === 'kh' ? 'ដំណើរការផ្ទៀងផ្ទាត់ស្វ័យប្រវត្តិ (How It Works)' : 'How It Works (Instant)'}
+            </h1>
+            <p className="text-justify text-xs sm:text-sm text-white leading-relaxed font-sans">
+              {lang === 'kh'
+                ? 'នៅពេលអ្នកធ្វើការផ្ទេរប្រាក់តាមរយៈ Bakong KHQR ធនាគាររបស់អ្នកនឹងបញ្ជូនរបាយការណ៍ប្រតិបត្តិការផ្លូវការដែលមានឈ្មោះអ្នកផ្ញើមកកាន់ប្រព័ន្ធ។ ប្រព័ន្ធស្វ័យប្រវត្តិនឹងយកឈ្មោះនោះមកផ្គូផ្គងជាមួយឈ្មោះដែលអ្នកបានបញ្ចូលនៅទីនេះភ្លាមៗ ដើម្បីបញ្ជាក់ការទូទាត់ និងបង្ហាញ Alert ឬផ្ដល់ផ្លាកសមាជិក VIP ក្នុងរយៈពេលត្រឹមតែ 2 វិនាទីប៉ុណ្ណោះ។'
+                : 'When you transfer via Bakong KHQR, your bank sends a secure confirmation record containing the sender’s account name. Our automated system matches that name with the Payer Name you entered here to instantly verify your tip or active VIP subscriber badge in under 2 seconds!'}
+            </p>
+          </div>
+
+          {/* Section 4: Examples: Correct vs Incorrect */}
+          <div className="space-y-1.5">
+            <h1 className="text-base sm:text-lg font-bold text-white uppercase tracking-wider font-['Chakra_Petch']">
+              {lang === 'kh' ? 'ឧទាហរណ៍ជាក់ស្តែង (Examples: Correct vs Incorrect)' : 'Examples: Correct vs Incorrect'}
+            </h1>
+            <p className="text-justify text-xs sm:text-sm text-white leading-relaxed font-sans">
+              {lang === 'kh'
+                ? 'ឈ្មោះត្រឹមត្រូវ (ឈ្មោះម្ចាស់គណនីធនាគារពិតប្រាកដ) រួមមាន SOKPHEAK TRA, CHAN SOPHEA ឬ HENG HOK។ ឈ្មោះមិនត្រឹមត្រូវដែលមិនអាចផ្ទៀងផ្ទាត់បានរួមមាន GamerPro99, Sokha <3 ឬ Anonymous។ សូមកុំប្រើប្រាស់ឈ្មោះហៅក្រៅ ឬឈ្មោះគណនីហ្គេម ព្រោះប្រព័ន្ធនឹងមិនអាចផ្ទៀងផ្ទាត់ការទូទាត់បានឡើយ។'
+                : 'Correct bank account name examples include SOKPHEAK TRA, CHAN SOPHEA, or HENG HOK. Incorrect examples include GamerPro99, Sokha <3, or Anonymous. Non-bank nicknames will cause automated matching to fail.'}
+            </p>
+          </div>
+
+          {/* Section 5: Important Note */}
+          <div className="space-y-1.5">
+            <h1 className="text-base sm:text-lg font-bold text-rose-500 uppercase tracking-wider font-['Chakra_Petch'] flex items-center gap-1.5 border-l-2 border-rose-500 pl-2">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+              <span>{lang === 'kh' ? 'ចំណាំសំខាន់ (Important)' : 'Important'}</span>
+            </h1>
+            <p className="text-justify text-xs sm:text-sm text-white leading-relaxed font-sans">
+              {lang === 'kh'
+                ? 'ប្រសិនបើឈ្មោះដែលអ្នកបានបំពេញមិនត្រូវគ្នាជាមួយឈ្មោះម្ចាស់គណនីធនាគារដែលបានផ្ទេរប្រាក់ជាក់ស្តែងទេនោះ ប្រព័ន្ធនឹងមិនអាចផ្ទៀងផ្ទាត់ និងដំណើរការដោយស្វ័យប្រវត្តិបានឡើយ ហើយទាមទារការត្រួតពិនិត្យដោយផ្ទាល់ដៃ។'
+                : 'Important: If the entered name does not match the bank transaction sender name, automatic verification cannot proceed and may require manual streamer review.'}
+            </p>
+          </div>
+
+          {/* Got it button */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setShowPayerInfoModal(false)}
+              className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm font-mono border border-slate-700 hover:border-slate-600 transition-all cursor-pointer active:scale-98 text-center"
+            >
+              {lang === 'kh' ? 'យល់ហើយ បន្តទៅមុខទៀត' : 'Got it, Continue'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    )}
+  </>
   );
 };

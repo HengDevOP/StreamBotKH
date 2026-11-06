@@ -171,7 +171,17 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         videoUrl: formData.videoUrl,
         videoTitle: formData.videoTitle,
         videoStartTime: formData.videoStartTime,
-        videoEndTime: formData.videoEndTime
+        videoEndTime: formData.videoEndTime,
+        isSubscription: formData.isSubscription,
+        tierId: formData.tierId,
+        tierName: formData.tierName,
+        badgeText: formData.badgeText,
+        badgeColor: formData.badgeColor,
+        badgeBg: formData.badgeBg,
+        badgeBorder: formData.badgeBorder,
+        badgeIcon: formData.badgeIcon,
+        badgeGifUrl: formData.badgeGifUrl,
+        badgeImage: formData.badgeImage
       });
 
       setCurrentDonorName(formData.donorName);
@@ -296,10 +306,10 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             <div className="flex-1 min-w-0 pr-1">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className="text-[9px] sm:text-[10px] uppercase font-mono tracking-wider font-semibold text-red-400 bg-red-950/70 px-1.5 py-0.5 rounded border border-red-800/50">
-                  Cancelled
+                  {lang === 'kh' ? 'បានបោះបង់' : 'Cancelled'}
                 </span>
                 <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">
-                  Payment Voided
+                  {lang === 'kh' ? 'ការទូទាត់ត្រូវបានមោឃៈ' : 'Payment Voided'}
                 </span>
               </div>
               <p className="mt-1 text-xs sm:text-sm font-semibold text-slate-100 font-['Chakra_Petch'] leading-tight">
@@ -310,7 +320,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             <button
               onClick={() => setCancelMessage(null)}
               className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors"
-              title="Dismiss"
+              title={lang === 'kh' ? 'បិទ' : 'Dismiss'}
             >
               <X size={15} />
             </button>
@@ -452,13 +462,18 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         <BakongKHQRModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onCancel={(msg) => setCancelMessage(msg || 'You have cancelled the donation')}
+          onCancel={(msg) =>
+            setCancelMessage(
+              msg || (lang === 'kh' ? 'អ្នកបានបោះបង់ការឧបត្ថម្ភ' : 'You have cancelled the donation')
+            )
+          }
           donationData={activeDonation}
           donorName={currentDonorName}
           bankingName={currentBankingName}
           streamerId={streamer.id}
           streamerUsername={streamer.username}
           onPaymentSuccess={handlePaymentSuccess}
+          lang={lang}
         />
 
         {/* Website Branding Logo on Bottom Right (Only visible when streamer is on Free Plan) */}

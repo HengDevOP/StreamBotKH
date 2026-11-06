@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const ownToken = authUser.overlayToken || (authUser as any).overlay_token;
+      const ownToken = (authUser as any).overlayToken || (authUser as any).overlay_token;
       if (ownToken && ownToken !== overlayToken && authUser.email !== 'hchenheng@gmail.com') {
         return NextResponse.json(
           { error: 'Forbidden: You cannot trigger test alerts on another streamer\'s overlay.' },
@@ -73,7 +73,12 @@ export async function POST(req: NextRequest) {
       isVideoTest: Boolean(body.isVideoTest && (body.videoUrl || body.isVideoTest === true)),
       directVideo: Boolean(body.directVideo && body.videoUrl),
       overlayToken,
-      isTest: true
+      isTest: true,
+      isSubscription: body.isSubscription,
+      tierId: body.tierId,
+      tierName: body.tierName,
+      badgeText: body.badgeText,
+      badgeColor: body.badgeColor
     };
 
     // Broadcast once through socketService to the target overlay room

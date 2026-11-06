@@ -257,6 +257,11 @@ export interface AlertPayload {
   isVideoTest?: boolean;
   directVideo?: boolean;
   isTest?: boolean;
+  isSubscription?: boolean;
+  tierId?: string;
+  tierName?: string;
+  badgeText?: string;
+  badgeColor?: string;
 }
 
 export function initSocketServer(server: HttpServer): SocketIOServer {

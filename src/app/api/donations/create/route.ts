@@ -22,7 +22,17 @@ export async function POST(req: NextRequest) {
       videoUrl,
       videoTitle,
       videoStartTime,
-      videoEndTime
+      videoEndTime,
+      isSubscription,
+      tierId,
+      tierName,
+      badgeText,
+      badgeColor,
+      badgeBg,
+      badgeBorder,
+      badgeIcon,
+      badgeGifUrl,
+      badgeImage
     } = body;
 
     if (!streamerId || !donorName) {
@@ -165,6 +175,16 @@ export async function POST(req: NextRequest) {
         videoStartTime: cleanVideoStartTime,
         videoEndTime: cleanVideoEndTime,
         status: 'PENDING',
+        isSubscription: Boolean(isSubscription),
+        tierId: tierId || undefined,
+        tierName: tierName || undefined,
+        badgeText: badgeText || undefined,
+        badgeColor: badgeColor || undefined,
+        badgeBg: badgeBg || undefined,
+        badgeBorder: badgeBorder || undefined,
+        badgeIcon: badgeIcon || undefined,
+        badgeGifUrl: badgeGifUrl || undefined,
+        badgeImage: badgeImage || undefined,
         createdAt: now,
         updatedAt: now
       });
@@ -188,6 +208,16 @@ export async function POST(req: NextRequest) {
         videoTitle: cleanVideoTitle || undefined,
         videoStartTime: cleanVideoStartTime,
         videoEndTime: cleanVideoEndTime,
+        isSubscription: Boolean(isSubscription),
+        tierId: tierId || undefined,
+        tierName: tierName || undefined,
+        badgeText: badgeText || undefined,
+        badgeColor: badgeColor || undefined,
+        badgeBg: badgeBg || undefined,
+        badgeBorder: badgeBorder || undefined,
+        badgeIcon: badgeIcon || undefined,
+        badgeGifUrl: badgeGifUrl || undefined,
+        badgeImage: badgeImage || undefined,
         createdAt: now
       });
     } catch (mongoErr) {
@@ -203,7 +233,13 @@ export async function POST(req: NextRequest) {
       qrImage: khqrImage,
       abaDeepLink: '',
       bakongDeepLink: '',
-      expiresInSeconds: 300 // 5 minutes
+      expiresInSeconds: 300, // 5 minutes
+      isSubscription: Boolean(isSubscription),
+      tierId: tierId || undefined,
+      tierName: tierName || undefined,
+      badgeText: badgeText || undefined,
+      badgeColor: badgeColor || undefined,
+      badgeIcon: badgeIcon || undefined
     });
   } catch (err: any) {
     console.error('[Donation] Create donation error:', err);

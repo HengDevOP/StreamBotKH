@@ -146,7 +146,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
             <div className="w-8 h-8 rounded-full bg-slate-800/60 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400">
               <Radio size={14} className="animate-pulse text-emerald-400" />
             </div>
-            <p>Waiting for incoming live tips from ABA Bank or Bakong KHQR...</p>
+            <p>No Data</p>
           </div>
         ) : (
           paidDonations.map((d) => {
@@ -259,7 +259,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
                 <td colSpan={6} className="py-12 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Radio size={18} className="animate-pulse text-emerald-400" />
-                    <p className="font-mono text-xs">Waiting for incoming live tips from ABA Bank or Bakong KHQR...</p>
+                    <p className="font-mono text-xs">No Data</p>
                   </div>
                 </td>
               </tr>

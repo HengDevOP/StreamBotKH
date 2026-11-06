@@ -17,6 +17,7 @@ interface BakongKHQRModalProps {
   streamerId?: string;
   streamerUsername?: string;
   onPaymentSuccess: (paidDetails?: any) => void;
+  lang?: 'en' | 'kh';
 }
 
 export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
@@ -28,7 +29,8 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
   bankingName,
   streamerId,
   streamerUsername,
-  onPaymentSuccess
+  onPaymentSuccess,
+  lang: propLang
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(300);
   const [paid, setPaid] = useState<boolean>(false);
@@ -36,8 +38,9 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
   const isPaidRef = useRef<boolean>(false);
   const { socket } = useSocket();
 
-  // Language state synchronized with stream_lang
-  const [lang, setLang] = useState<'en' | 'kh'>(() => {
+  // Synchronized language state (inherits from donation page and stream_lang)
+  const [internalLang, setInternalLang] = useState<'en' | 'kh'>(() => {
+    if (propLang === 'kh' || propLang === 'en') return propLang;
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('stream_lang');
       if (saved === 'kh' || saved === 'en') return saved;
@@ -45,24 +48,24 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
     return 'en';
   });
 
-  const handleSwitchLang = (newLang: 'en' | 'kh') => {
-    setLang(newLang);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('stream_lang', newLang);
-      window.dispatchEvent(new CustomEvent('stream_lang_change', { detail: newLang }));
+  useEffect(() => {
+    if (propLang && (propLang === 'kh' || propLang === 'en')) {
+      setInternalLang(propLang);
     }
-  };
+  }, [propLang]);
 
   useEffect(() => {
     const onLangChange = (e: any) => {
-      const l = e.detail || localStorage.getItem('stream_lang');
+      const l = e.detail || (typeof window !== 'undefined' ? localStorage.getItem('stream_lang') : null);
       if (l === 'kh' || l === 'en') {
-        setLang(l);
+        setInternalLang(l);
       }
     };
     window.addEventListener('stream_lang_change', onLangChange);
     return () => window.removeEventListener('stream_lang_change', onLangChange);
   }, []);
+
+  const lang = (propLang === 'kh' || propLang === 'en') ? propLang : internalLang;
 
   // Unified payment completion handler: runs celebration and closes KHQR modal
   const handleSuccess = (details?: any) => {
@@ -131,9 +134,9 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
         body: JSON.stringify({ donationId })
       });
       const data = await res.json().catch(() => ({}));
-      return data?.message || 'You have cancelled the donation';
+      return data?.message || (lang === 'kh' ? 'អ្នកបានបោះបង់ការឧបត្ថម្ភ' : 'You have cancelled the donation');
     } catch (e) {
-      return 'You have cancelled the donation';
+      return lang === 'kh' ? 'អ្នកបានបោះបង់ការឧបត្ថម្ភ' : 'You have cancelled the donation';
     }
   };
 
@@ -151,7 +154,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
           if (!isPaidRef.current) {
             cleanupTemporaryDonation(donationData.donationId);
             if (onCancel) {
-              onCancel('Donation session expired');
+              onCancel(lang === 'kh' ? 'ការបរិច្ឆេទនៃវគ្គឧបត្ថម្ភបានផុតកំណត់' : 'Donation session expired');
             }
             onClose();
           }
@@ -162,7 +165,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isOpen, donationData, onClose, onCancel]);
+  }, [isOpen, donationData, onClose, onCancel, lang]);
 
   // Live status poller (every 1s)
   useEffect(() => {
@@ -179,7 +182,13 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
           handleSuccess(res);
         } else if ((res.status === 'EXPIRED' || res.status === 'CANCELLED') && isSubscribed) {
           if (pollInterval) clearInterval(pollInterval);
-          if (onCancel) onCancel(res.status === 'EXPIRED' ? 'Donation session expired' : 'Donation cancelled');
+          if (onCancel) {
+            onCancel(
+              res.status === 'EXPIRED'
+                ? (lang === 'kh' ? 'ការបរិច្ឆេទនៃវគ្គឧបត្ថម្ភបានផុតកំណត់' : 'Donation session expired')
+                : (lang === 'kh' ? 'ការឧបត្ថម្ភត្រូវបានបោះបង់' : 'Donation cancelled')
+            );
+          }
           onClose();
         }
       } catch (e) {}
@@ -192,13 +201,13 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
       isSubscribed = false;
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [isOpen, donationData, paid]);
+  }, [isOpen, donationData, paid, onCancel, onClose, lang]);
 
   const handleClose = () => {
     if (!isPaidRef.current && donationData?.donationId) {
       cleanupTemporaryDonation(donationData.donationId);
       if (onCancel) {
-        onCancel('You have cancelled the donation');
+        onCancel(lang === 'kh' ? 'អ្នកបានបោះបង់ការឧបត្ថម្ភ' : 'You have cancelled the donation');
       }
     }
     onClose();
@@ -217,34 +226,6 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
       title={lang === 'kh' ? 'ស្កេនដើម្បីទូទាត់' : 'Scan To Pay'}
       maxWidth="sm"
       showDot={false}
-      headerRight={
-        <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-sm">
-          <button
-            type="button"
-            onClick={() => handleSwitchLang('en')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
-              lang === 'en'
-                ? 'bg-white text-slate-950 shadow-sm'
-                : 'text-slate-400 hover:text-white'
-            }`}
-            title="Switch to English"
-          >
-            EN
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchLang('kh')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
-              lang === 'kh'
-                ? 'bg-white text-slate-950 shadow-sm'
-                : 'text-slate-400 hover:text-white'
-            }`}
-            title="ប្តូរទៅភាសាខ្មែរ (Khmer)"
-          >
-            KH
-          </button>
-        </div>
-      }
     >
       <div className="flex flex-col items-center text-center space-y-3.5 py-1">
         {/* Official Bakong KHQR Canvas (Show only the pure QR code, fluidly responsive for small devices) */}

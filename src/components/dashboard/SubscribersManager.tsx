@@ -34,21 +34,29 @@ import {
   X,
   Loader2,
   AlertTriangle,
-  Save
+  Save,
+  Send,
+  Radio,
+  Link2,
+  Unlink,
+  Bell
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { SubscriberTier, SubscriberItem } from '../../types/subscriber';
+import { SubscriberTier, SubscriberItem, TelegramOutletGroup } from '../../types/subscriber';
 import { MediaPickerModal } from './MediaPickerModal';
 import { BadgeIconPickerModal } from './BadgeIconPickerModal';
 import { BADGE_ICON_LIST, getBadgeIconComponent } from '../../data/badgeIcons';
 import { useSocket } from '../../context/SocketContext';
+import { SubscriberAlertStudio } from './SubscriberAlertStudio';
 
 interface SubscribersManagerProps {
   streamerToken?: string;
   streamerUsername?: string;
   isLocked?: boolean;
   onUpgrade?: () => void;
+  initialSelectedTierId?: string;
+  onSelectTierId?: (tierId: string | null) => void;
 }
 
 const PRESET_BADGE_GIFS = [
@@ -121,7 +129,9 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   streamerToken,
   streamerUsername,
   isLocked = false,
-  onUpgrade
+  onUpgrade,
+  initialSelectedTierId,
+  onSelectTierId
 }) => {
   const token = streamerToken || 'demo-token';
   const username = streamerUsername || 'streamer';
@@ -151,9 +161,23 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   const [testingComment, setTestingComment] = useState(false);
   const [testSuccessToast, setTestSuccessToast] = useState<string | null>(null);
 
+  // Telegram Outlet Group (for subscriber payment verification)
+  const [telegramOutletGroup, setTelegramOutletGroup] = useState<TelegramOutletGroup | null>(null);
+  const [loadingOutlet, setLoadingOutlet] = useState(false);
+  const [fetchingDialogs, setFetchingDialogs] = useState(false);
+  const [availableDialogs, setAvailableDialogs] = useState<Array<{ id: string; title: string; username?: string }>>([]);
+  const [isOutletModalOpen, setIsOutletModalOpen] = useState(false);
+  const [outletSearchQuery, setOutletSearchQuery] = useState('');
+  const [customOutletChatId, setCustomOutletChatId] = useState('');
+  const [customOutletTitle, setCustomOutletTitle] = useState('');
+  const [outletToast, setOutletToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
   // Modals
   const [isTierModalOpen, setIsTierModalOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<SubscriberTier | null>(null);
+
+  // Active Tier selected for Alert Studio (null = list view)
+  const [selectedTierForAlert, setSelectedTierForAlert] = useState<SubscriberTier | null>(null);
 
   // Manual Add Subscriber Modal
   const [isManualSubModalOpen, setIsManualSubModalOpen] = useState(false);
@@ -220,6 +244,89 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     };
   }, [hasUnsavedChanges]);
 
+  // Sync with initialSelectedTierId or URL search params (?id= or ?tierId=)
+  useEffect(() => {
+    if (tiers.length === 0) return;
+
+    let targetTierId = initialSelectedTierId;
+    if (!targetTierId && typeof window !== 'undefined') {
+      const search = window.location.search;
+      if (search.includes('tab=subscribers') || !search.includes('tab=')) {
+        if (search.includes('?id=')) {
+          targetTierId = search.split('?id=')[1]?.split('&')[0];
+        } else if (search.includes('&id=')) {
+          targetTierId = search.split('&id=')[1]?.split('&')[0];
+        } else if (search.includes('?tierId=')) {
+          targetTierId = search.split('?tierId=')[1]?.split('&')[0];
+        } else if (search.includes('&tierId=')) {
+          targetTierId = search.split('&tierId=')[1]?.split('&')[0];
+        }
+      }
+    }
+
+    if (targetTierId) {
+      const match = tiers.find((t) => t.id === targetTierId);
+      if (match) {
+        setSelectedTierForAlert(match);
+      }
+    } else if (!initialSelectedTierId) {
+      setSelectedTierForAlert(null);
+    }
+  }, [initialSelectedTierId, tiers]);
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        const search = window.location.search;
+        let targetTierId: string | null = null;
+        if (search.includes('tab=subscribers') || !search.includes('tab=')) {
+          if (search.includes('?id=')) {
+            targetTierId = search.split('?id=')[1]?.split('&')[0] || null;
+          } else if (search.includes('&id=')) {
+            targetTierId = search.split('&id=')[1]?.split('&')[0] || null;
+          } else if (search.includes('?tierId=')) {
+            targetTierId = search.split('?tierId=')[1]?.split('&')[0] || null;
+          } else if (search.includes('&tierId=')) {
+            targetTierId = search.split('&tierId=')[1]?.split('&')[0] || null;
+          }
+        }
+        if (targetTierId) {
+          const match = tiers.find((t) => t.id === targetTierId);
+          setSelectedTierForAlert(match || null);
+          onSelectTierId?.(match ? match.id : null);
+        } else {
+          setSelectedTierForAlert(null);
+          onSelectTierId?.(null);
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [tiers, onSelectTierId]);
+
+  const handleOpenTierAlert = (tierToOpen: SubscriberTier) => {
+    setSelectedTierForAlert(tierToOpen);
+    onSelectTierId?.(tierToOpen.id);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', `/dashboard?tab=subscribers&id=${tierToOpen.id}`);
+    }
+  };
+
+  const handleBackFromAlertStudio = () => {
+    setSelectedTierForAlert(null);
+    onSelectTierId?.(null);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', '/dashboard?tab=subscribers');
+    }
+  };
+
+  const handleTierAlertSaved = (updatedTier: SubscriberTier) => {
+    setTiers((prev) => prev.map((t) => (t.id === updatedTier.id ? updatedTier : t)));
+    setSavedTiers((prev) => prev.map((t) => (t.id === updatedTier.id ? updatedTier : t)));
+    setSelectedTierForAlert(updatedTier);
+  };
+
   // Load Settings & Subscribers
   const fetchData = async () => {
     setLoading(true);
@@ -235,6 +342,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
           setTiers([]);
           setSavedTiers([]);
         }
+        setTelegramOutletGroup(settingsData.settings.telegramOutletGroup || null);
       }
 
       // 2. Subscribers Roster
@@ -255,6 +363,15 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     fetchData();
   }, [token, username]);
 
+  const authFetch = (url: string, init: RequestInit = {}) => {
+    const authToken = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
+    const headers = new Headers(init.headers || {});
+    if (authToken && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${authToken}`);
+    }
+    return fetch(url, { ...init, headers });
+  };
+
   const handleSaveSettings = async () => {
     setSaving(true);
     setSaveSuccess(false);
@@ -266,7 +383,8 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
           token,
           username,
           enabled: true,
-          tiers
+          tiers,
+          telegramOutletGroup
         })
       });
       const data = await res.json();
@@ -282,6 +400,112 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
       setSaving(false);
     }
   };
+
+  const handleOpenOutletModal = async () => {
+    setIsOutletModalOpen(true);
+    setOutletSearchQuery('');
+    setCustomOutletChatId('');
+    setCustomOutletTitle('');
+    setFetchingDialogs(true);
+    try {
+      const res = await authFetch('/api/telegram/groups');
+      if (res.ok) {
+        const data = await res.json();
+        const dialogs = data.availableDialogs || [];
+        const groups = data.groups || [];
+        const combinedMap = new Map<string, { id: string; title: string; username?: string }>();
+        dialogs.forEach((d: any) => {
+          if (d.id) combinedMap.set(String(d.id), { id: String(d.id), title: d.title || 'Untitled Group', username: d.username });
+        });
+        groups.forEach((g: any) => {
+          const cid = String(g.chat_id || g.chatId || g.id);
+          if (cid && !combinedMap.has(cid)) {
+            combinedMap.set(cid, { id: cid, title: g.title || 'Telegram Group', username: g.username });
+          }
+        });
+        setAvailableDialogs(Array.from(combinedMap.values()));
+      }
+    } catch (err) {
+      console.error('Failed to load available telegram dialogs:', err);
+    } finally {
+      setFetchingDialogs(false);
+    }
+  };
+
+  const handleConnectOutletGroup = async (group: TelegramOutletGroup) => {
+    setLoadingOutlet(true);
+    try {
+      const res = await authFetch('/api/widgets/subscribers/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          username,
+          telegramOutletGroup: group,
+          tiers
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTelegramOutletGroup(group);
+        setIsOutletModalOpen(false);
+        setOutletToast({ type: 'success', message: `Connected "${group.title}" as Subscriber Telegram Outlet!` });
+        setTimeout(() => setOutletToast(null), 3500);
+      } else {
+        setOutletToast({ type: 'error', message: data.error || 'Failed to connect Telegram outlet group.' });
+        setTimeout(() => setOutletToast(null), 3500);
+      }
+    } catch (err: any) {
+      setOutletToast({ type: 'error', message: err.message || 'Network error connecting outlet group.' });
+      setTimeout(() => setOutletToast(null), 3500);
+    } finally {
+      setLoadingOutlet(false);
+    }
+  };
+
+  const handleDisconnectOutletGroup = async () => {
+    if (!window.confirm('Disconnect this Telegram outlet group? GramJS will stop listening for subscriber transactions from this group.')) {
+      return;
+    }
+    setLoadingOutlet(true);
+    try {
+      const res = await authFetch('/api/widgets/subscribers/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          username,
+          telegramOutletGroup: null,
+          tiers
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTelegramOutletGroup(null);
+        setOutletToast({ type: 'success', message: 'Subscriber Telegram Outlet Group disconnected.' });
+        setTimeout(() => setOutletToast(null), 3500);
+      } else {
+        setOutletToast({ type: 'error', message: data.error || 'Failed to disconnect outlet group.' });
+        setTimeout(() => setOutletToast(null), 3500);
+      }
+    } catch (err: any) {
+      setOutletToast({ type: 'error', message: err.message || 'Network error disconnecting outlet group.' });
+      setTimeout(() => setOutletToast(null), 3500);
+    } finally {
+      setLoadingOutlet(false);
+    }
+  };
+
+  const filteredDialogs = useMemo(() => {
+    if (!outletSearchQuery.trim()) return availableDialogs;
+    const q = outletSearchQuery.toLowerCase();
+    return availableDialogs.filter(
+      (d) =>
+        (d.title && d.title.toLowerCase().includes(q)) ||
+        (d.id && d.id.toLowerCase().includes(q)) ||
+        (d.username && d.username.toLowerCase().includes(q))
+    );
+  }, [availableDialogs, outletSearchQuery]);
 
   const handleUploadGifFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -546,6 +770,20 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     );
   }
 
+  // VIEW: TARGET SUBSCRIBER TIER ALERT STUDIO (WHEN A TIER IS SELECTED)
+  if (selectedTierForAlert) {
+    return (
+      <SubscriberAlertStudio
+        tier={selectedTierForAlert}
+        streamerToken={token}
+        streamerUsername={username}
+        allTiers={tiers}
+        onBack={handleBackFromAlertStudio}
+        onSaveSuccess={handleTierAlertSaved}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* 1. STATS OVERVIEW CARDS */}
@@ -584,6 +822,125 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
             <Layers className="w-5 h-5" />
           </div>
         </div>
+      </div>
+
+      {/* 2. DEDICATED TELEGRAM OUTLET GROUP FOR SUBSCRIBERS */}
+      <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0c1425] via-[#090e1a] to-[#070b14] border border-cyan-500/20 shadow-xl relative overflow-hidden">
+        {/* Ambient glow */}
+        <div className="absolute -top-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="w-8 h-8 rounded-xl bg-[#24A1DE]/20 border border-[#24A1DE]/40 flex items-center justify-center text-[#24A1DE] shadow-md shadow-[#24A1DE]/20">
+                <Send className="w-4 h-4 transform -rotate-45 translate-x-0.5 -translate-y-0.5" />
+              </div>
+              <h2 className="text-base font-bold text-white font-['Chakra_Petch'] tracking-wide flex items-center gap-2">
+                <span>Subscriber Telegram Outlet Group</span>
+              </h2>
+
+              {telegramOutletGroup ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-sm shadow-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  ACTIVE LISTENER
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  NOT CONNECTED
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Connect a dedicated Telegram group to listen for incoming bank &amp; Bakong KHQR transaction receipts for subscriber memberships. Verified receipts automatically activate the viewer&apos;s 30-day VIP badge and broadcast overlay alerts.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {telegramOutletGroup ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleOpenOutletModal}
+                  disabled={loadingOutlet}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 text-cyan-300 hover:text-white text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingOutlet ? 'animate-spin' : ''}`} />
+                  <span>Change Group</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDisconnectOutletGroup}
+                  disabled={loadingOutlet}
+                  className="px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 hover:border-red-500/60 text-red-300 hover:text-white text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Unlink className="w-3.5 h-3.5" />
+                  <span>Disconnect</span>
+                </button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleOpenOutletModal}
+                disabled={loadingOutlet}
+                className="bg-gradient-to-r from-[#24A1DE] to-cyan-500 hover:from-[#1b8bc2] hover:to-cyan-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
+              >
+                <Send className="w-3.5 h-3.5 transform -rotate-45" />
+                <span>Connect Outlet Group</span>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* If connected: Show live info banner */}
+        {telegramOutletGroup && (
+          <div className="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
+                <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block">Target Telegram Group</span>
+                <span className="text-xs font-bold text-white truncate block font-['Chakra_Petch']">
+                  {telegramOutletGroup.title}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 flex-shrink-0">
+                <Link2 className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block">Chat ID / Handle</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-semibold text-cyan-300 truncate">
+                    {telegramOutletGroup.chatId}
+                  </span>
+                  {telegramOutletGroup.username && (
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      (@{telegramOutletGroup.username})
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-emerald-400 font-mono uppercase font-bold block">Status</span>
+                <span className="text-xs text-slate-200 block truncate">
+                  Auto-verifying subscriber transactions
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. SUBSCRIBER TIERS & BADGE CONFIGURATION */}
@@ -648,9 +1005,10 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
           {tiers.map((tier, idx) => (
             <div
               key={tier.id}
-              className={`p-5 rounded-2xl bg-[#090d16] border transition-all shadow-xl flex flex-col justify-between space-y-4 relative group ${
+              onClick={() => handleOpenTierAlert(tier)}
+              className={`p-5 rounded-2xl bg-[#090d16] border transition-all shadow-xl flex flex-col justify-between space-y-4 relative group cursor-pointer ${
                 tier.enabled !== false
-                  ? 'border-slate-800 hover:border-slate-700'
+                  ? 'border-slate-800 hover:border-cyan-500/50 hover:shadow-cyan-500/10'
                   : 'border-slate-800/60 bg-[#090d16]/60 opacity-75'
               }`}
             >
@@ -660,17 +1018,22 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Tier #{idx + 1}</span>
-                      {tier.enabled === false && (
+                      {tier.enabled === false ? (
                         <span className="px-1.5 py-0.2 rounded text-[9px] font-bold font-mono uppercase bg-slate-800 text-slate-400 border border-slate-700">
                           Paused
                         </span>
+                      ) : (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold font-mono uppercase bg-cyan-950/60 text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
+                          <Bell className="w-2.5 h-2.5" />
+                          <span>Alert Setup</span>
+                        </span>
                       )}
                     </div>
-                    <h3 className="text-base font-bold text-white font-['Chakra_Petch'] truncate">{tier.name}</h3>
+                    <h3 className="text-base font-bold text-white font-['Chakra_Petch'] truncate mt-0.5">{tier.name}</h3>
                   </div>
 
                   {/* Individual Tier ON / OFF Switch */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
                       onClick={() => handleToggleTier(tier.id)}
@@ -740,18 +1103,36 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
               <div className="flex items-center gap-2 pt-3 border-t border-slate-800/80">
                 <button
                   type="button"
-                  onClick={() => handleTestOverlayComment(tier)}
-                  disabled={testingComment}
-                  className="flex-1 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-300 text-[11px] font-semibold border border-slate-800 hover:border-cyan-500/40 transition-all flex items-center justify-center gap-1 cursor-pointer"
-                  title="Test comment on live OBS chat overlay"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenTierAlert(tier);
+                  }}
+                  className="flex-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-cyan-500/20 active:scale-95"
+                  title="Open Alert Dashboard for this Tier"
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Test on Chat</span>
+                  <Bell className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Alert Dashboard</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleOpenTierModal(tier)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTestOverlayComment(tier);
+                  }}
+                  disabled={testingComment}
+                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-white border border-slate-800 hover:border-cyan-500/40 transition-colors cursor-pointer"
+                  title="Test comment on live OBS chat overlay"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenTierModal(tier);
+                  }}
                   className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors cursor-pointer"
                   title="Edit Tier"
                 >
@@ -760,7 +1141,10 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => handleDeleteTier(tier.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteTier(tier.id);
+                  }}
                   className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors cursor-pointer"
                   title="Delete Tier"
                 >
@@ -1331,6 +1715,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                       id: 'preview',
                       name: tierName || 'Subscriber',
                       price: parseFloat(tierPrice) || 4.99,
+                      currency: tierCurrency || 'USD',
                       badgeText: tierBadgeText,
                       badgeIcon: tierBadgeIcon,
                       badgeColor: tierBadgeColor,
@@ -1470,6 +1855,209 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
         </div>
       )}
 
+      {/* 6. TELEGRAM OUTLET GROUP SELECTION MODAL */}
+      {isOutletModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0A0F1D] border border-cyan-500/30 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.95)] overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-[#070B14]">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#24A1DE]/20 border border-[#24A1DE]/40 flex items-center justify-center text-[#24A1DE] shadow-md shadow-[#24A1DE]/20">
+                  <Send className="w-4 h-4 transform -rotate-45 translate-x-0.5 -translate-y-0.5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
+                    <span>Subscriber Telegram Outlet</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Select a group to monitor for incoming subscriber bank receipts
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOutletModalOpen(false)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search groups from your Telegram session..."
+                  value={outletSearchQuery}
+                  onChange={(e) => setOutletSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl text-xs text-white placeholder-slate-500 outline-none transition-all font-mono"
+                />
+              </div>
+
+              {/* Telegram Groups List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                    Available Telegram Groups
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleOpenOutletModal}
+                    disabled={fetchingDialogs}
+                    className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${fetchingDialogs ? 'animate-spin' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+
+                {fetchingDialogs ? (
+                  <div className="py-8 text-center space-y-2">
+                    <Loader2 className="w-6 h-6 text-cyan-400 animate-spin mx-auto" />
+                    <p className="text-xs text-slate-400 font-mono">Fetching Telegram dialogs via GramJS...</p>
+                  </div>
+                ) : filteredDialogs.length > 0 ? (
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                    {filteredDialogs.map((dialog) => {
+                      const isCurrent = telegramOutletGroup?.chatId === dialog.id;
+                      return (
+                        <div
+                          key={dialog.id}
+                          className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                            isCurrent
+                              ? 'bg-cyan-950/30 border-cyan-500/50'
+                              : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-white truncate font-['Chakra_Petch']">
+                              {dialog.title}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-slate-500 font-mono">ID: {dialog.id}</span>
+                              {dialog.username && (
+                                <span className="text-[10px] text-cyan-400 font-mono">@{dialog.username}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={loadingOutlet || isCurrent}
+                            onClick={() =>
+                              handleConnectOutletGroup({
+                                chatId: dialog.id,
+                                title: dialog.title,
+                                username: dialog.username
+                              })
+                            }
+                            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
+                              isCurrent
+                                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md'
+                            }`}
+                          >
+                            {isCurrent ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Connected</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Connect</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center space-y-1.5">
+                    <AlertCircle className="w-5 h-5 text-amber-400 mx-auto" />
+                    <p className="text-xs text-slate-300 font-medium">No Telegram groups found via session</p>
+                    <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                      Ensure your Telegram User Client is signed in under Payment Gateway, or enter your group details manually below.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Connection Section */}
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-800"></div>
+                <span className="flex-shrink mx-3 text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                  Or Connect Manually
+                </span>
+                <div className="flex-grow border-t border-slate-800"></div>
+              </div>
+
+              <div className="space-y-3 p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono uppercase text-slate-400">
+                      Telegram Chat ID *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="-1001234567890 or @groupname"
+                      value={customOutletChatId}
+                      onChange={(e) => setCustomOutletChatId(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg text-xs text-white placeholder-slate-600 outline-none font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono uppercase text-slate-400">
+                      Group Title (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. VIP Subscriber Alerts"
+                      value={customOutletTitle}
+                      onChange={(e) => setCustomOutletTitle(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg text-xs text-white placeholder-slate-600 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  disabled={loadingOutlet || !customOutletChatId.trim()}
+                  onClick={() =>
+                    handleConnectOutletGroup({
+                      chatId: customOutletChatId.trim(),
+                      title: customOutletTitle.trim() || `Telegram Group (${customOutletChatId.trim()})`,
+                      username: customOutletChatId.trim().startsWith('@')
+                        ? customOutletChatId.trim().replace('@', '')
+                        : undefined
+                    })
+                  }
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Connect Custom Chat ID</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-[#070B14] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsOutletModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 7. FLOATING UNSAVED CHANGES TOAST BAR */}
       <div
         className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1.5rem)] max-w-xl transition-all duration-300 ease-in-out ${
@@ -1563,6 +2151,26 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
           <div className="rounded-xl px-4 py-2.5 bg-cyan-950/90 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-bold flex items-center gap-2 shadow-2xl shadow-cyan-950/50">
             <MessageSquare className="w-4 h-4 text-cyan-400 animate-pulse" />
             <span>{testSuccessToast}</span>
+          </div>
+        </div>
+      )}
+
+      {/* 10. TELEGRAM OUTLET TOAST */}
+      {outletToast && (
+        <div className="fixed top-28 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
+          <div
+            className={`rounded-xl px-4 py-2.5 border text-xs font-mono font-bold flex items-center gap-2 shadow-2xl ${
+              outletToast.type === 'success'
+                ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-300 shadow-emerald-950/50'
+                : 'bg-red-950/90 border-red-500/40 text-red-300 shadow-red-950/50'
+            }`}
+          >
+            {outletToast.type === 'success' ? (
+              <Check className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-400" />
+            )}
+            <span>{outletToast.message}</span>
           </div>
         </div>
       )}

@@ -9,9 +9,9 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Extract tab and id gracefully, handling both ?tab=donation&id={id} and ?tab=donation?id={id}
+  // Extract tab and id gracefully, handling both ?tab=donation&id={id} and ?tab=subscribers&id={id}
   let rawTab = searchParams.get('tab') || '';
-  let id = searchParams.get('id') || '';
+  let id = searchParams.get('id') || searchParams.get('tierId') || '';
 
   if (rawTab.includes('?id=')) {
     const parts = rawTab.split('?id=');
@@ -21,11 +21,23 @@ function DashboardContent() {
     const parts = rawTab.split('&id=');
     rawTab = parts[0];
     id = parts[1];
+  } else if (rawTab.includes('?tierId=')) {
+    const parts = rawTab.split('?tierId=');
+    rawTab = parts[0];
+    id = parts[1];
+  } else if (rawTab.includes('&tierId=')) {
+    const parts = rawTab.split('&tierId=');
+    rawTab = parts[0];
+    id = parts[1];
   }
 
-  // If id is provided without tab or with default, activate donation tab
+  // If id is provided without tab, activate appropriate tab
   if (!rawTab && id) {
-    rawTab = 'donation';
+    if (searchParams.get('tierId') || id.startsWith('tier_')) {
+      rawTab = 'subscribers';
+    } else {
+      rawTab = 'donation';
+    }
   }
 
   // Normalize tab
