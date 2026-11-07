@@ -6,7 +6,6 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { getVoiceClonesCollection, VoiceCloneDoc } from '@/server/database/mongo';
 import { getAuthenticatedUser } from '@/server/auth';
-import { checkRateLimit, getClientIp } from '@/server/utils/rateLimiter';
 import { analyzeVoiceSampleFile } from '@/server/services/ttsService';
 
 const execFileAsync = promisify(execFile);
@@ -41,22 +40,6 @@ export async function POST(req: NextRequest) {
       );
     }
     const userId = user.id;
-
-    // Rate limiting: max 6 voice clones per 5 minutes per user/IP
-    const clientIp = getClientIp(req);
-    const rateCheck = checkRateLimit(`voice_clone:${userId || clientIp}`, 6, 300000);
-    if (!rateCheck.allowed) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Rate limit exceeded. Please wait ${rateCheck.retryAfterSeconds} seconds before cloning another voice model.`
-        },
-        {
-          status: 429,
-          headers: { 'Retry-After': String(rateCheck.retryAfterSeconds) }
-        }
-      );
-    }
 
     const body = await req.json();
     const {

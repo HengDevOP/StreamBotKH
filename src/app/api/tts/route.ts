@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { synthesizeTTSWithBuffer } from '@/server/services/ttsService';
-import { checkRateLimit, getClientIp } from '@/server/utils/rateLimiter';
+import { checkRateLimit, getClientIp, isRequestAuthenticated } from '@/server/utils/rateLimiter';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,16 +10,18 @@ const TTS_RATE_WINDOW_MS = 60000;
 
 export async function GET(req: NextRequest) {
   try {
-    const clientIp = getClientIp(req);
-    const rateCheck = checkRateLimit(`tts:${clientIp}`, TTS_RATE_LIMIT, TTS_RATE_WINDOW_MS);
-    if (!rateCheck.allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Too many TTS requests. Please slow down.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': String(rateCheck.retryAfterSeconds) }
-        }
-      );
+    if (!isRequestAuthenticated(req)) {
+      const clientIp = getClientIp(req);
+      const rateCheck = checkRateLimit(`tts:${clientIp}`, TTS_RATE_LIMIT, TTS_RATE_WINDOW_MS);
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          { success: false, error: 'Too many TTS requests. Please slow down.' },
+          {
+            status: 429,
+            headers: { 'Retry-After': String(rateCheck.retryAfterSeconds) }
+          }
+        );
+      }
     }
 
     const { searchParams } = new URL(req.url);
@@ -68,16 +70,18 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const clientIp = getClientIp(req);
-    const rateCheck = checkRateLimit(`tts:${clientIp}`, TTS_RATE_LIMIT, TTS_RATE_WINDOW_MS);
-    if (!rateCheck.allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Too many TTS requests. Please slow down.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': String(rateCheck.retryAfterSeconds) }
-        }
-      );
+    if (!isRequestAuthenticated(req)) {
+      const clientIp = getClientIp(req);
+      const rateCheck = checkRateLimit(`tts:${clientIp}`, TTS_RATE_LIMIT, TTS_RATE_WINDOW_MS);
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          { success: false, error: 'Too many TTS requests. Please slow down.' },
+          {
+            status: 429,
+            headers: { 'Retry-After': String(rateCheck.retryAfterSeconds) }
+          }
+        );
+      }
     }
 
     const body = await req.json().catch(() => ({}));

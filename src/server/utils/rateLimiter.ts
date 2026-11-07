@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../auth';
 
 interface RateLimitRecord {
   timestamps: number[];
@@ -77,6 +79,54 @@ export function getClientIp(req: NextRequest | any): string {
   }
 
   return req.ip || req.socket?.remoteAddress || '127.0.0.1';
+}
+
+/**
+ * Checks whether an incoming request carries a valid signed JWT (authenticated Google customer).
+ * Authenticated customers bypass external API rate limits.
+ */
+export function isRequestAuthenticated(req: NextRequest | any): boolean {
+  if (!req) return false;
+  try {
+    let token: string | null = null;
+
+    // 1. NextRequest headers.get
+    if (req.headers && typeof req.headers.get === 'function') {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.slice(7).trim();
+      } else {
+        token =
+          req.cookies?.get?.('streamneon_auth_token')?.value ||
+          req.cookies?.get?.('token')?.value ||
+          req.nextUrl?.searchParams?.get?.('token') ||
+          null;
+      }
+    }
+
+    // 2. Express / Node request headers
+    if (!token && req.headers && typeof req.headers === 'object') {
+      const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+      if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+        token = authHeader.slice(7).trim();
+      } else if (typeof req.headers.cookie === 'string') {
+        const match = req.headers.cookie.match(/(?:^|;\s*)(?:streamneon_auth_token|token)=([^;]+)/);
+        if (match && match[1]) {
+          token = decodeURIComponent(match[1].trim());
+        }
+      }
+      if (!token && req.query && typeof req.query.token === 'string') {
+        token = req.query.token.trim();
+      }
+    }
+
+    if (!token) return false;
+
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
+    return Boolean(decoded && (decoded.id || decoded.email));
+  } catch {
+    return false;
+  }
 }
 
 export interface RateLimitResult {
@@ -239,6 +289,11 @@ export function globalRateLimiterMiddleware(options?: {
       urlPath.startsWith('/_next/') ||
       urlPath === '/favicon.ico'
     ) {
+      return next();
+    }
+
+    // 2. Bypass rate limiting for authenticated Google OAuth customers
+    if (isRequestAuthenticated(req)) {
       return next();
     }
 
