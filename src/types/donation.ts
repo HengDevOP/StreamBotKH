@@ -48,6 +48,7 @@ export interface CreateDonationRequest {
   badgeImage?: string;
   isWheelSpin?: boolean;
   donationType?: 'tip' | 'subscribe' | 'wheel';
+  qrImage?: string;
 }
 
 export interface CreateDonationResponse {

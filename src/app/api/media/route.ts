@@ -213,7 +213,10 @@ export async function fetchUserMediaData(userId: string, email?: string): Promis
       : 0
   };
 
-  const latestTime = validMediaList[0]?.createdAt ? new Date(validMediaList[0].createdAt).getTime() : 0;
+  const latestTime = validMediaList.reduce((maxT, item) => {
+    const t = new Date((item as any).updatedAt || item.createdAt || 0).getTime();
+    return t > maxT ? t : maxT;
+  }, 0);
   const etag = `W/"media-${userId}-${validMediaList.length}-${usedBytes}-${latestTime}"`;
 
   return { media: validMediaList, storage, etag };

@@ -61,6 +61,7 @@ export interface DonorFormData {
   badgeImage?: string;
   isWheelSpin?: boolean;
   donationType?: 'tip' | 'subscribe' | 'wheel';
+  qrImage?: string;
 }
 
 import { getBadgeIconComponent } from '../../data/badgeIcons';
@@ -71,6 +72,10 @@ interface DonorFormProps {
   onSetupRequired?: () => void;
   loading?: boolean;
   isModalOpen?: boolean;
+  /** Embedded mode (e.g. TV side panel): hides the streamer profile header but keeps the language switch */
+  hideHeader?: boolean;
+  /** Optional override for the outer Card container classes */
+  className?: string;
 }
 
 const DEMO_YOUTUBE_URL = 'https://www.youtube.com/watch?v=HSsGnEOFY6U';
@@ -154,7 +159,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
-export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetupRequired, loading, isModalOpen }) => {
+export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetupRequired, loading, isModalOpen, hideHeader = false, className }) => {
   const storageKey = `streambotkh_draft_${streamer.username || 'neonstreamer'}`;
   const isLoadedRef = useRef<boolean>(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -188,12 +193,31 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   }, []);
 
   // Form states: Username, Bank Name, Text/Message, Video URL + Amount & Currency
-  const [currency, setCurrency] = useState<'USD' | 'KHR'>('USD');
-  const [amount, setAmount] = useState<number>(5);
+  const khqrItems = Array.isArray(streamer.khqrItems) ? streamer.khqrItems : [];
+  const usdKhqrList = khqrItems
+    .filter((i) => i.currency === 'USD')
+    .sort((a, b) => Number(a.amount) - Number(b.amount));
+  const khrKhqrList = khqrItems
+    .filter((i) => i.currency === 'KHR')
+    .sort((a, b) => Number(a.amount) - Number(b.amount));
+
+  const initialCurrency: 'USD' | 'KHR' =
+    usdKhqrList.length > 0 ? 'USD' : khrKhqrList.length > 0 ? 'KHR' : 'USD';
+  const initialAmount = khqrItems.length > 0 ? 0 : 0;
+
+  const [currency, setCurrency] = useState<'USD' | 'KHR'>(initialCurrency);
+  const [amount, setAmount] = useState<number>(initialAmount);
+  const [selectedKhqrId, setSelectedKhqrId] = useState<string>('');
   const [donorName, setDonorName] = useState<string>('');
   const [bankingName, setBankingName] = useState<string>('');
   const [donorMessage, setDonorMessage] = useState<string>('');
   const [showPayerInfoModal, setShowPayerInfoModal] = useState<boolean>(false);
+
+  const handleSelectTipCurrency = (nextCurr: 'USD' | 'KHR') => {
+    setCurrency(nextCurr);
+    setAmount(0);
+    setSelectedKhqrId('');
+  };
 
   // YouTube Video Overlay states
   const [videoUrl, setVideoUrl] = useState<string>('');
@@ -220,8 +244,13 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     spinSoundUrl: string;
     slices: Array<{ id: string; label: string; color: string; percentage?: number }>;
   } | null>(null);
+  const [liveVideoSettings, setLiveVideoSettings] = useState<{
+    isEnabled: boolean;
+    minTipAmount: number;
+    maxDurationSeconds: number;
+  } | null>(null);
 
-  // Fetch streamer subscriber settings
+  // Fetch streamer subscriber, wheel, and video alert settings
   useEffect(() => {
     if (!streamer?.username) return;
     fetch(`/api/streamer/${encodeURIComponent(streamer.username)}/subscribers`)
@@ -251,6 +280,20 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         }
       })
       .catch(() => {});
+
+    // Fetch streamer video alert settings ("Minimum Tip to Trigger Video")
+    fetch(`/api/streamer/settings/video?username=${encodeURIComponent(streamer.username)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setLiveVideoSettings({
+            isEnabled: Boolean(data.settings.isEnabled),
+            minTipAmount: Number(data.settings.minTipAmount ?? 2.0),
+            maxDurationSeconds: Number(data.settings.maxDurationSeconds ?? 30)
+          });
+        }
+      })
+      .catch(() => {});
   }, [streamer?.username]);
 
   const handleModeChange = (mode: 'tip' | 'subscribe' | 'wheel') => {
@@ -264,6 +307,14 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     } else if (mode === 'wheel' && wheelSettings) {
       setAmount(wheelSettings.minTipAmount || 2.0);
       setCurrency('USD');
+    } else if (mode === 'tip') {
+      const matched = khqrItems.find((i) => i.id === selectedKhqrId);
+      if (matched) {
+        setAmount(Number(matched.amount));
+        setCurrency(matched.currency);
+      } else {
+        setAmount(0);
+      }
     }
   };
 
@@ -419,7 +470,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   const handleResetForm = () => {
     setDonorName('');
     setBankingName('');
-    setAmount(currency === 'USD' ? 5 : 20000);
+    setAmount(0);
+    setSelectedKhqrId('');
     setDonorMessage('');
     handleClearVideo();
     try {
@@ -456,6 +508,11 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     const cleanBanking = bankingName.trim();
     if (!cleanDonor && !cleanBanking) return;
 
+    // Prevent proceeding if user has not selected any amount in Tip mode
+    if (donationType === 'tip' && (amount <= 0 || (khqrItems.length > 0 && !selectedKhqrId))) {
+      return;
+    }
+
     // Auto pause preview video immediately when viewer clicks Tip to show Bakong KHQR modal
     setIsPlayingPreview(false);
 
@@ -469,23 +526,36 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       ? (wheelSettings.minTipAmount || 2.0)
       : (amount || 0);
 
+    if (!finalAmount || finalAmount <= 0) {
+      return;
+    }
+
     const finalCurrency = donationType === 'subscribe' && selectedTier
       ? (selectedTier.currency || 'USD')
       : donationType === 'wheel'
       ? 'USD'
       : (currency || 'USD');
 
+    const activeKhqrList = finalCurrency === 'USD' ? usdKhqrList : khrKhqrList;
+    const matchedKhqrItem =
+      donationType === 'tip'
+        ? activeKhqrList.find((i) => i.id === selectedKhqrId) ||
+          activeKhqrList.find((i) => Math.abs(Number(i.amount) - finalAmount) < 0.001)
+        : null;
+    const resolvedFinalAmount = finalAmount;
+
     // Show donor username on alerts and TTS, and pass bankingName for bank payment matching
     await onSubmit({
       donorName: cleanDonor || cleanBanking || 'Supporter',
       bankingName: cleanBanking || cleanDonor,
       donorMessage: donorMessage.trim(),
-      amount: finalAmount,
+      amount: resolvedFinalAmount,
       currency: finalCurrency,
-      videoUrl: donationType === 'tip' && videoUrl.trim() ? videoUrl.trim() : undefined,
-      videoTitle: donationType === 'tip' && videoTitle.trim() ? videoTitle.trim() : undefined,
-      videoStartTime: donationType === 'tip' && videoUrl.trim() ? Math.max(0, videoStartTime) : undefined,
-      videoEndTime: donationType === 'tip' && videoUrl.trim() ? Math.max(videoStartTime + 5, videoEndTime) : undefined,
+      qrImage: matchedKhqrItem?.imageUrl || undefined,
+      videoUrl: donationType === 'tip' && meetsMinTip && videoUrl.trim() ? videoUrl.trim() : undefined,
+      videoTitle: donationType === 'tip' && meetsMinTip && videoTitle.trim() ? videoTitle.trim() : undefined,
+      videoStartTime: donationType === 'tip' && meetsMinTip && videoUrl.trim() ? Math.max(0, videoStartTime) : undefined,
+      videoEndTime: donationType === 'tip' && meetsMinTip && videoUrl.trim() ? Math.max(videoStartTime + 5, videoEndTime) : undefined,
       isSubscription: donationType === 'subscribe',
       isWheelSpin: donationType === 'wheel',
       donationType: donationType,
@@ -509,13 +579,20 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   const validLiveVideoId = extractYouTubeId(streamer.liveStreamUrl || '');
   const isStreamerLive = Boolean(validLiveVideoId);
 
-  // Video alert configuration constraints from streamer settings (unlocked only if streamer is Pro/Admin and enabled)
+  // Video alert configuration constraints from streamer settings ("Minimum Tip to Trigger Video")
   const isStreamerPlanUnlocked = (streamer.plan ? streamer.plan.toLowerCase() !== 'free' : false) || Boolean((streamer as any).isAdmin);
-  const isVideoAlertsEnabled = isStreamerPlanUnlocked && Boolean(streamer.videoAlertEnabled) && streamer.hasVideoOverlay !== false;
-  const videoMinTip = Number(streamer.videoMinTipAmount ?? 1.00);
-  const videoMaxDuration = Number(streamer.videoMaxDurationSeconds ?? 300); // up to 5 minutes
+  const isVideoAlertsEnabled =
+    isStreamerPlanUnlocked &&
+    Boolean(liveVideoSettings ? liveVideoSettings.isEnabled : streamer.videoAlertEnabled) &&
+    streamer.hasVideoOverlay !== false;
+  const videoMinTip = Number(liveVideoSettings?.minTipAmount ?? streamer.videoMinTipAmount ?? 2.0);
+  const videoMaxDuration = Number(liveVideoSettings?.maxDurationSeconds ?? streamer.videoMaxDurationSeconds ?? 300); // up to 5 minutes
   const currentAmountInUsd = currency === 'KHR' ? (amount || 0) / 4000 : (amount || 0);
-  const meetsMinTip = true;
+  const meetsMinTip = amount > 0 && currentAmountInUsd + 0.0001 >= videoMinTip;
+  const requiredTipLabel =
+    lang === 'kh'
+      ? `[ទាមទារ $${videoMinTip.toFixed(2)}]`
+      : `[Required $${videoMinTip.toFixed(2)}]`;
 
   const handleSetClipDuration = (durationSec: number) => {
     setVideoEndTime(videoStartTime + durationSec);
@@ -532,8 +609,42 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
   return (
     <>
-      <Card className="p-4 xs:p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl space-y-4 sm:space-y-5 w-full h-full flex flex-col justify-between">
+      <Card
+        className={
+          className ||
+          'p-4 xs:p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl space-y-4 sm:space-y-5 w-full h-full flex flex-col justify-between'
+        }
+      >
+      {/* Embedded mode: compact language switch only (streamer profile is shown by the host page) */}
+      {hideHeader && (
+        <div className="flex items-center justify-end">
+          <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-sm">
+            <button
+              type="button"
+              onClick={() => handleSwitchLang('en')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                lang === 'en' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Switch to English"
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSwitchLang('kh')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                lang === 'kh' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
+              title="ប្តូរទៅភាសាខ្មែរ (Khmer)"
+            >
+              KH
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. Streamer Profile & Bio Header */}
+      {!hideHeader && (
       <div className="flex items-start justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-800/80">
         <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
           {/* Streamer Avatar / Logo - clickable to /tv in a new window only if valid live stream URL is set */}
@@ -651,6 +762,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           </div>
         </div>
       </div>
+      )}
 
       {/* Donation Type Switch: Tip vs Subscribe / Membership vs Wheel */}
       {((subscriberSettings?.enabled && subscriberSettings.tiers.length > 0) || wheelSettings?.isEnabled) && (
@@ -958,6 +1070,81 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           /* TIP MODE: FAST 2-COLUMN COMPACT LAYOUT (ONE LINE)              */
           /* ============================================================== */
           <>
+            {/* CURRENCY & AMOUNT TAB SWITCH (FROM STREAMER CREATED KHQR) */}
+            {khqrItems.length > 0 && (
+              <div className="space-y-2">
+                {/* Currency Tab Switch Row */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch']">
+                    {lang === 'kh' ? 'ជ្រើសរើសរូបិយប័ណ្ណ និងចំនួនទឹកប្រាក់' : 'Select Currency & Amount'}
+                  </span>
+
+                  <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-800 shadow-sm">
+                    {usdKhqrList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTipCurrency('USD')}
+                        className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                          currency === 'USD'
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-sm'
+                            : 'text-slate-400 hover:text-white border border-transparent'
+                        }`}
+                      >
+                        USD ($)
+                      </button>
+                    )}
+
+                    {khrKhqrList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTipCurrency('KHR')}
+                        className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                          currency === 'KHR'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-sm'
+                            : 'text-slate-400 hover:text-white border border-transparent'
+                        }`}
+                      >
+                        KHR (៛)
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Amount Tab Switch Grid for Active Currency */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 p-1 bg-slate-950/90 border border-slate-800 rounded-xl">
+                  {(currency === 'USD' ? usdKhqrList : khrKhqrList).map((item) => {
+                    const isSelected =
+                      selectedKhqrId === item.id ||
+                      (!selectedKhqrId && amount > 0 && Math.abs(Number(item.amount) - amount) < 0.001);
+                    const formattedAmt =
+                      item.currency === 'KHR'
+                        ? `${Number(item.amount).toLocaleString()} ៛`
+                        : `$${Number(item.amount).toFixed(2)}`;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setAmount(Number(item.amount));
+                          setCurrency(item.currency);
+                          setSelectedKhqrId(item.id);
+                        }}
+                        className={`py-2 px-2.5 rounded-lg font-mono text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                          isSelected
+                            ? item.currency === 'USD'
+                              ? 'bg-gradient-to-r from-cyan-500/25 to-sky-500/25 border border-cyan-400 text-cyan-300 shadow-sm'
+                              : 'bg-gradient-to-r from-amber-500/25 to-yellow-500/25 border border-amber-400 text-amber-300 shadow-sm'
+                            : 'border border-transparent text-slate-400 hover:text-white hover:bg-slate-900/80'
+                        }`}
+                      >
+                        <span>{formattedAmt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
               {/* FIELD 1: Username */}
               <div className="space-y-1.5 min-w-0">
@@ -1031,34 +1218,43 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           </>
         )}
 
-        {/* FIELD 4: Video URL (Media Share) - Direct unlocked input with [Required $1.00] */}
+        {/* FIELD 4: Video URL (Media Share) - Blurred with [Required $X.XX] inside URL input until tip >= videoMinTip */}
         {isVideoAlertsEnabled && donationType === 'tip' && (
           <div className="space-y-2">
             <div className="flex items-start sm:items-center justify-between gap-2">
               <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
                 <span>{DONOR_TRANSLATIONS[lang].shareMedia}</span>
-                <span className="text-red-400 font-mono font-bold text-[10px] sm:text-[11px] normal-case tracking-normal">
-                  {DONOR_TRANSLATIONS[lang].requiredTip}
-                </span>
               </label>
-              <button
-                type="button"
-                onClick={handleLoadDemoVideo}
-                className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline shrink-0 whitespace-nowrap cursor-pointer"
-              >
-                {DONOR_TRANSLATIONS[lang].tryDemo}
-              </button>
+              {meetsMinTip && (
+                <button
+                  type="button"
+                  onClick={handleLoadDemoVideo}
+                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline shrink-0 whitespace-nowrap cursor-pointer"
+                >
+                  {DONOR_TRANSLATIONS[lang].tryDemo}
+                </button>
+              )}
             </div>
 
-            <div className="relative">
+            <div className="relative overflow-hidden">
               <input
                 type="url"
+                disabled={!meetsMinTip}
                 placeholder={DONOR_TRANSLATIONS[lang].videoPlaceholder}
                 value={videoUrl}
                 onChange={handleVideoUrlChange}
-                className="w-full px-3.5 py-2.5 pr-14 rounded-none bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-white transition-colors placeholder:text-slate-400"
+                className={`w-full px-3.5 py-2.5 pr-14 rounded-none bg-slate-950 border border-slate-700 text-white text-xs sm:text-sm font-medium focus:outline-none focus:border-white transition-all placeholder:text-slate-400 ${
+                  !meetsMinTip ? 'blur-[2px] opacity-40 select-none cursor-not-allowed' : ''
+                }`}
               />
-              {videoUrl && (
+              {!meetsMinTip && (
+                <div className="absolute inset-[1px] z-10 bg-slate-950/60 backdrop-blur-[4px] flex items-center justify-center select-none cursor-not-allowed">
+                  <span className="text-red-400 font-mono font-bold text-xs sm:text-sm tracking-wide">
+                    {requiredTipLabel}
+                  </span>
+                </div>
+              )}
+              {meetsMinTip && videoUrl && (
                 <button
                   type="button"
                   onClick={handleClearVideo}
@@ -1069,11 +1265,11 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
               )}
             </div>
 
-            {videoError && (
+            {meetsMinTip && videoError && (
               <p className="text-[10px] text-red-400 font-mono">{videoError}</p>
             )}
 
-            {videoTitle && (
+            {meetsMinTip && videoTitle && (
               <div className="flex items-center gap-2 p-1.5 bg-slate-950/80 border border-slate-800 text-[11px]">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
                 <span className="text-slate-300 truncate font-medium">{videoTitle}</span>
@@ -1081,7 +1277,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             )}
 
             {/* Video Preview Player & Scrubber Timeline */}
-            {activeVideoId && (
+            {meetsMinTip && activeVideoId && (
               <div className="space-y-2.5 pt-1 animate-fadeIn">
                 {/* Live Preview Player with Custom Progress Duration Bar at Bottom */}
                 <VideoPlayerWithProgressBar
@@ -1129,13 +1325,24 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
               ? (selectedTier.currency === 'KHR' ? `${selectedTier.price.toLocaleString()} ៛` : `$${selectedTier.price.toFixed(2)}`)
               : '';
 
+            const hasSelectedAmount =
+              donationType === 'subscribe'
+                ? Boolean(selectedTier && selectedTier.price > 0)
+                : donationType === 'wheel'
+                ? Boolean(wheelSettings && (wheelSettings.minTipAmount || 2) > 0)
+                : amount > 0 && (khqrItems.length === 0 || Boolean(selectedKhqrId));
+
             return (
               <Button
                 type="submit"
                 variant="primary"
                 size="lg"
                 loading={loading}
-                disabled={streamer.isTipConfigured === false ? false : !donorName.trim()}
+                disabled={
+                  streamer.isTipConfigured === false
+                    ? false
+                    : !donorName.trim() || !bankingName.trim() || !hasSelectedAmount
+                }
                 onClick={(e) => {
                   if (streamer.isTipConfigured === false) {
                     e.preventDefault();
@@ -1150,7 +1357,9 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                     : 'bg-cyan-400 hover:bg-cyan-300 shadow-cyan-500/20'
                 }`}
               >
-                {donationType === 'subscribe' ? (
+                {loading ? (
+                  <span>{DONOR_TRANSLATIONS[lang].loading}</span>
+                ) : donationType === 'subscribe' ? (
                   <>
                     <Crown size={18} className="fill-slate-950/20" />
                     <span>{DONOR_TRANSLATIONS[lang].subscribeWithKhqr(subPriceLabel)}</span>

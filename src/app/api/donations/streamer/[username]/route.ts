@@ -60,12 +60,24 @@ export async function GET(
     let videoSettings: any = null;
     try {
       const videoCol = await getVideoAlertSettingsCollection();
-      videoSettings = await videoCol.findOne({
-        $or: [
-          { streamerId },
-          ...(mongoUser.username ? [{ streamerId: mongoUser.username }] : [])
-        ]
-      });
+      const videoDocs = await videoCol
+        .find({
+          $or: [
+            { streamerId },
+            { streamer_id: streamerId as any },
+            { streamerId: String(mongoUser._id) },
+            ...(mongoUser.username
+              ? [
+                  { streamerId: mongoUser.username },
+                  { streamer_id: mongoUser.username as any }
+                ]
+              : [])
+          ]
+        })
+        .sort({ updatedAt: -1 })
+        .limit(1)
+        .toArray();
+      videoSettings = videoDocs[0] || null;
     } catch (e) {}
 
     let currentPlan = (mongoUser.plan || 'free').toLowerCase();
@@ -98,27 +110,36 @@ export async function GET(
     const isVideoAlertsUnlocked = currentPlan !== 'free' || isStreamerAdmin;
     const videoAlertEnabled = isVideoAlertsUnlocked && Boolean(videoSettings?.isEnabled ?? videoSettings?.is_enabled ?? true);
 
-    // Check if streamer has an active uploaded Master KHQR code (verified & restored)
+    // Check if streamer has an active uploaded Master KHQR code or created KHQR items
     let khqrImageUrl = '';
+    let khqrItems: any[] = [];
     try {
+      const gatewayCol = await getGatewayConfigCollection();
+      const gatewayDoc = await gatewayCol.findOne({
+        $or: [
+          { _id: `khqr_${streamerId}` },
+          { streamerId },
+          { _id: `khqr_${cleanUsername}` },
+          { streamerId: cleanUsername }
+        ]
+      });
+      if (Array.isArray(gatewayDoc?.khqrItems)) {
+        khqrItems = gatewayDoc.khqrItems;
+      } else if (Array.isArray(paymentSettings?.khqrItems)) {
+        khqrItems = paymentSettings.khqrItems;
+      }
+
       const restoreResult = await restoreMasterKhqrImage(streamerId, cleanUsername);
       if (restoreResult.restored && restoreResult.khqrImageUrl) {
         khqrImageUrl = restoreResult.khqrImageUrl;
-      } else {
-        const gatewayCol = await getGatewayConfigCollection();
-        const gatewayDoc = await gatewayCol.findOne({
-          $or: [
-            { _id: `khqr_${streamerId}` },
-            { streamerId },
-            { _id: `khqr_${cleanUsername}` },
-            { streamerId: cleanUsername }
-          ]
-        });
-        if (gatewayDoc?.khqrImageUrl) {
-          khqrImageUrl = gatewayDoc.khqrImageUrl;
-        }
+      } else if (gatewayDoc?.khqrImageUrl) {
+        khqrImageUrl = gatewayDoc.khqrImageUrl;
       }
     } catch (e) {}
+
+    if (!khqrImageUrl && khqrItems.length > 0 && khqrItems[0]?.imageUrl) {
+      khqrImageUrl = khqrItems[0].imageUrl;
+    }
 
     if (!khqrImageUrl && (paymentSettings?.masterKhqrImage || paymentSettings?.master_khqr_image)) {
       khqrImageUrl = paymentSettings.masterKhqrImage || paymentSettings.master_khqr_image;
@@ -150,8 +171,8 @@ export async function GET(
       hasTelegramGroup = groupCount > 0;
     } catch (e) {}
 
-    // 3. Check if streamer has uploaded their Master KHQR image
-    const hasMasterKhqr = Boolean(khqrImageUrl);
+    // 3. Check if streamer has uploaded their Master KHQR image or created KHQR items
+    const hasMasterKhqr = Boolean(khqrImageUrl || khqrItems.length > 0);
 
     // Tip is fully configured only if GramJS is connected, KHQR image is uploaded, and a monitored group is linked
     const isTipConfigured = Boolean(isTelegramConnected && hasMasterKhqr && hasTelegramGroup);
@@ -188,10 +209,21 @@ export async function GET(
       isSandbox: paymentSettings?.isLiveMode !== undefined ? (paymentSettings.isLiveMode ? 0 : 1) : (paymentSettings?.is_sandbox ?? 1),
       hasVideoOverlay: videoAlertEnabled,
       videoAlertEnabled: videoAlertEnabled,
-      videoMinTipAmount: Number(videoSettings?.minTipAmount ?? videoSettings?.min_tip_amount ?? 2.0),
-      videoMaxDurationSeconds: Number(videoSettings?.maxDurationSeconds ?? videoSettings?.max_duration_seconds ?? 30),
+      videoMinTipAmount: Number(
+        videoSettings?.minTipAmount ??
+          videoSettings?.min_tip_amount ??
+          (mongoUser as any).videoMinTipAmount ??
+          2.0
+      ),
+      videoMaxDurationSeconds: Number(
+        videoSettings?.maxDurationSeconds ??
+          videoSettings?.max_duration_seconds ??
+          (mongoUser as any).videoMaxDurationSeconds ??
+          30
+      ),
       hasMasterKhqr,
       khqrImageUrl: khqrImageUrl || undefined,
+      khqrItems,
       isTelegramConnected,
       hasTelegramGroup,
       isTipConfigured

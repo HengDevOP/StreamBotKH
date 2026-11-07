@@ -46,17 +46,29 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [cancelMessage, setCancelMessage] = useState<string | null>(null);
+  const [cancelToastExiting, setCancelToastExiting] = useState<boolean>(false);
   const [setupToastVisible, setSetupToastVisible] = useState<boolean>(false);
   const [setupToastActive, setSetupToastActive] = useState<boolean>(false);
   const setupToastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const setupToastExitTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const cancelToastExitTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-dismiss cancel toast after 6 seconds
+  const dismissCancelToast = () => {
+    if (cancelToastExitTimerRef.current) clearTimeout(cancelToastExitTimerRef.current);
+    setCancelToastExiting(true);
+    cancelToastExitTimerRef.current = setTimeout(() => {
+      setCancelMessage(null);
+      setCancelToastExiting(false);
+    }, 350);
+  };
+
+  // Auto-dismiss cancel toast after 5 seconds with slide-out to right
   useEffect(() => {
     if (!cancelMessage) return;
+    setCancelToastExiting(false);
     const timer = setTimeout(() => {
-      setCancelMessage(null);
-    }, 6000);
+      dismissCancelToast();
+    }, 5000);
     return () => clearTimeout(timer);
   }, [cancelMessage]);
 
@@ -66,7 +78,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
     setSetupToastActive(false);
     setupToastExitTimerRef.current = setTimeout(() => {
       setSetupToastVisible(false);
-    }, 450);
+    }, 350);
   };
 
   const handleSetupRequired = () => {
@@ -74,13 +86,8 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
     if (setupToastTimerRef.current) clearTimeout(setupToastTimerRef.current);
     if (setupToastExitTimerRef.current) clearTimeout(setupToastExitTimerRef.current);
 
+    setSetupToastActive(true);
     setSetupToastVisible(true);
-    // Double requestAnimationFrame ensures initial translate-x-[125%] is rendered before animating to translate-x-0
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setSetupToastActive(true);
-      });
-    });
 
     // Auto-dismiss after 4.5 seconds (toast slides back out to the right)
     setupToastTimerRef.current = setTimeout(() => {
@@ -92,6 +99,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
     return () => {
       if (setupToastTimerRef.current) clearTimeout(setupToastTimerRef.current);
       if (setupToastExitTimerRef.current) clearTimeout(setupToastExitTimerRef.current);
+      if (cancelToastExitTimerRef.current) clearTimeout(cancelToastExitTimerRef.current);
     };
   }, []);
 
@@ -147,9 +155,17 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
       return;
     }
 
+    if (!formData.amount || formData.amount <= 0) {
+      return;
+    }
+
     setCancelMessage(null);
     dismissSetupToast();
     setSubmitting(true);
+    setCurrentDonorName(formData.donorName);
+    setCurrentBankingName(formData.bankingName || formData.donorName || 'Bakong KHQR');
+    setActiveDonation(null);
+    setIsModalOpen(true);
     try {
       if (formData.isSubscription) {
         setSubscriptionMeta({
@@ -183,14 +199,13 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         badgeGifUrl: formData.badgeGifUrl,
         badgeImage: formData.badgeImage,
         isWheelSpin: formData.isWheelSpin,
-        donationType: formData.donationType
+        donationType: formData.donationType,
+        qrImage: formData.qrImage
       });
 
-      setCurrentDonorName(formData.donorName);
-      setCurrentBankingName(formData.bankingName || formData.donorName || 'Bakong KHQR');
       setActiveDonation(res);
-      setIsModalOpen(true);
     } catch (err: any) {
+      setIsModalOpen(false);
       const errMsg = err.message || '';
       showAlert({
         title: 'Checkout Error',
@@ -203,8 +218,6 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
   };
 
   const handlePaymentSuccess = (paidDetails?: any) => {
-    setIsModalOpen(false);
-    setIsSuccess(true);
     if (paidDetails) {
       if (paidDetails.amount) {
         setActiveDonation((prev) =>
@@ -290,39 +303,27 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
 
   return (
     <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col items-center justify-center py-4 xs:py-6 sm:py-12 px-2.5 xs:px-4 sm:px-6">
-      {/* Cancellation Notice Toast (Device: Pop top / Desktop: Pop slide left top-right) */}
+      {/* Simple Session Expired / Cancelled Toast (Slides in from right side on all screens) */}
       {cancelMessage && !isSuccess && (
         <div
           role="alert"
           aria-live="assertive"
-          className="fixed z-50 top-3 left-2 right-2 max-w-sm mx-auto md:top-6 md:right-6 md:left-auto md:w-96 md:max-w-none animate-cancel-toast pointer-events-auto"
+          className={`fixed z-50 top-3 right-3 sm:top-6 sm:right-6 max-w-[calc(100vw-1.5rem)] sm:max-w-md pointer-events-auto ${
+            cancelToastExiting ? 'animate-cancel-toast-exit' : 'animate-cancel-toast'
+          }`}
         >
-          <div className="relative overflow-hidden rounded-xl bg-[#0d0910]/95 backdrop-blur-md border border-red-500/40 p-3 sm:p-4 shadow-2xl shadow-red-950/70 flex items-start gap-2.5 sm:gap-3 text-slate-100">
-            {/* Ambient Red Glow Line */}
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500" />
-
-            <div className="mt-0.5 flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shadow-inner shadow-red-500/20">
-              <XCircle size={16} className="animate-pulse" />
-            </div>
-
-            <div className="flex-1 min-w-0 pr-1">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="text-[9px] sm:text-[10px] uppercase font-mono tracking-wider font-semibold text-red-400 bg-red-950/70 px-1.5 py-0.5 rounded border border-red-800/50">
-                  {lang === 'kh' ? 'បានបោះបង់' : 'Cancelled'}
-                </span>
-                <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">
-                  {lang === 'kh' ? 'ការទូទាត់ត្រូវបានមោឃៈ' : 'Payment Voided'}
-                </span>
-              </div>
-              <p className="mt-1 text-xs sm:text-sm font-semibold text-slate-100 font-['Chakra_Petch'] leading-tight">
-                {cancelMessage}
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#0d0910]/95 backdrop-blur-md border border-red-500/40 shadow-2xl shadow-red-950/70 text-slate-100">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <XCircle size={17} className="shrink-0 text-red-400" />
+              <p className="text-xs sm:text-sm font-medium text-white leading-snug">
+                Payment session has expired. Please try again later.
               </p>
             </div>
 
             <button
-              onClick={() => setCancelMessage(null)}
-              className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors"
-              title={lang === 'kh' ? 'បិទ' : 'Dismiss'}
+              onClick={dismissCancelToast}
+              className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+              title="Dismiss"
             >
               <X size={15} />
             </button>
@@ -330,15 +331,13 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         </div>
       )}
 
-      {/* Payment Setup Required Toast (Slides in from right to left, slides back to right on dismiss) */}
+      {/* Payment Setup Required Toast (Slides in from right side on all screens) */}
       {setupToastVisible && !isSuccess && (
         <div
           role="alert"
           aria-live="assertive"
-          className={`fixed z-50 top-4 right-4 sm:top-6 sm:right-6 max-w-[calc(100vw-2rem)] sm:max-w-md transition-all duration-400 ease-out transform pointer-events-auto ${
-            setupToastActive
-              ? 'translate-x-0 opacity-100 shadow-2xl shadow-red-950/70'
-              : 'translate-x-[125%] opacity-0 pointer-events-none'
+          className={`fixed z-50 top-3 right-3 sm:top-6 sm:right-6 max-w-[calc(100vw-1.5rem)] sm:max-w-md pointer-events-auto ${
+            setupToastActive ? 'animate-cancel-toast' : 'animate-cancel-toast-exit'
           }`}
         >
           <div className="flex items-center gap-2.5 sm:gap-3 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl bg-red-600 text-white shadow-xl border border-red-500/80">
@@ -463,17 +462,17 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         {/* Bakong KHQR Modal */}
         <BakongKHQRModal
           isOpen={isModalOpen}
+          isGenerating={submitting}
           onClose={() => setIsModalOpen(false)}
-          onCancel={(msg) =>
-            setCancelMessage(
-              msg || (lang === 'kh' ? 'អ្នកបានបោះបង់ការឧបត្ថម្ភ' : 'You have cancelled the donation')
-            )
+          onCancel={() =>
+            setCancelMessage('Payment session has expired. Please try again later.')
           }
           donationData={activeDonation}
           donorName={currentDonorName}
           bankingName={currentBankingName}
           streamerId={streamer.id}
           streamerUsername={streamer.username}
+          streamerKhqrItems={streamer.khqrItems}
           onPaymentSuccess={handlePaymentSuccess}
           lang={lang}
         />

@@ -34,6 +34,118 @@ function safeBroadcastMediaUpdate(userId: string, data: { media: any[]; storage:
   }
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authUser = getAuthenticatedUser(req);
+    const userId = authUser?.id || 'demo-streamer-id-1001';
+    const email = authUser?.email || '';
+
+    const mediaId = params.id;
+    if (!mediaId) {
+      return NextResponse.json(
+        { error: 'Invalid media ID' },
+        { status: 400 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const rawNewName = typeof body.filename === 'string' ? body.filename.trim() : '';
+    const sanitizedName = rawNewName.replace(/[\\/:*?"<>|]/g, '').trim();
+
+    if (!sanitizedName) {
+      return NextResponse.json(
+        { error: 'File name cannot be empty' },
+        { status: 400 }
+      );
+    }
+
+    const mediaCol = await getMediaCollection();
+    const escapedEmail = email ? email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : null;
+    const ownerClause = escapedEmail
+      ? {
+          $or: [
+            { userId },
+            { userEmail: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } }
+          ]
+        }
+      : { userId };
+
+    let filter: any;
+    if (ObjectId.isValid(mediaId)) {
+      filter = {
+        $and: [{ _id: new ObjectId(mediaId) }, ownerClause]
+      };
+    } else {
+      filter = {
+        $and: [
+          { $or: [{ _id: mediaId as any }, { id: mediaId as any }] },
+          ownerClause
+        ]
+      };
+    }
+
+    // Strict ownership check: only allow renaming media uploaded by this user
+    const media = await mediaCol.findOne(filter);
+    if (!media) {
+      return NextResponse.json(
+        { error: 'Media asset not found or you do not have permission to rename it.' },
+        { status: 403 }
+      );
+    }
+
+    // Preserve original file extension
+    const origExt = path.extname(media.filename || media.storedFilename || '');
+    let finalFilename = sanitizedName;
+    if (origExt && !finalFilename.toLowerCase().endsWith(origExt.toLowerCase())) {
+      finalFilename = `${finalFilename}${origExt}`;
+    }
+    finalFilename = finalFilename.slice(0, 120);
+
+    const now = new Date();
+    await mediaCol.updateOne(
+      { _id: media._id },
+      {
+        $set: {
+          filename: finalFilename,
+          updatedAt: now
+        } as any
+      }
+    );
+
+    invalidateMediaCache(userId);
+    const freshData = await fetchUserMediaData(userId, email);
+
+    safeBroadcastMediaUpdate(userId, {
+      media: freshData.media,
+      storage: freshData.storage
+    });
+
+    const updatedItem = freshData.media.find(
+      (m: any) => String(m._id) === String(media._id)
+    ) || {
+      ...media,
+      _id: String(media._id),
+      filename: finalFilename
+    };
+
+    return NextResponse.json({
+      success: true,
+      message: 'File renamed successfully.',
+      media: updatedItem,
+      storage: freshData.storage
+    });
+  } catch (err: any) {
+    console.error('API /api/media/[id] PATCH error:', err);
+    return NextResponse.json(
+      { error: err.message || 'Failed to rename media file' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }

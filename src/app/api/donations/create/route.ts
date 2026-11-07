@@ -92,24 +92,40 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) {}
 
-    // Use the official Payment Gateway Master KHQR image uploaded by the streamer (verified & restored)
-    let khqrImage = '';
+    // Use the exact matching KHQR item created by the streamer for (currency, amount), or fallback to Master KHQR
+    let khqrImage = typeof body.qrImage === 'string' && body.qrImage.trim() ? body.qrImage.trim() : '';
     try {
-      const restoreResult = await restoreMasterKhqrImage(resolvedStreamerId, resolvedUsername);
-      if (restoreResult.restored && restoreResult.khqrImageUrl) {
-        khqrImage = restoreResult.khqrImageUrl;
-      } else {
-        const gatewayCol = await getGatewayConfigCollection();
-        const streamerConfig = await gatewayCol.findOne({
-          $or: [
-            { _id: `khqr_${resolvedStreamerId}` },
-            { streamerId: resolvedStreamerId },
-            { _id: `khqr_${streamerId}` },
-            { streamerId: streamerId },
-            ...(resolvedUsername ? [{ _id: `khqr_${resolvedUsername}` }, { streamerId: resolvedUsername }] : [])
-          ]
-        });
-        if (streamerConfig?.khqrImageUrl) {
+      const gatewayCol = await getGatewayConfigCollection();
+      const streamerConfig = await gatewayCol.findOne({
+        $or: [
+          { _id: `khqr_${resolvedStreamerId}` },
+          { streamerId: resolvedStreamerId },
+          { _id: `khqr_${streamerId}` },
+          { streamerId: streamerId },
+          ...(resolvedUsername ? [{ _id: `khqr_${resolvedUsername}` }, { streamerId: resolvedUsername }] : [])
+        ]
+      });
+
+      const items: any[] = Array.isArray(streamerConfig?.khqrItems) ? streamerConfig.khqrItems : [];
+      if (!khqrImage && items.length > 0) {
+        const exactMatch = items.find(
+          (i) => i.currency === validCurrency && Math.abs(Number(i.amount) - numAmount) < 0.001 && i.imageUrl
+        );
+        const currencyMatch = items.find((i) => i.currency === validCurrency && i.imageUrl);
+        if (exactMatch?.imageUrl) {
+          khqrImage = exactMatch.imageUrl;
+        } else if (currencyMatch?.imageUrl) {
+          khqrImage = currencyMatch.imageUrl;
+        } else if (items[0]?.imageUrl) {
+          khqrImage = items[0].imageUrl;
+        }
+      }
+
+      if (!khqrImage) {
+        const restoreResult = await restoreMasterKhqrImage(resolvedStreamerId, resolvedUsername);
+        if (restoreResult.restored && restoreResult.khqrImageUrl) {
+          khqrImage = restoreResult.khqrImageUrl;
+        } else if (streamerConfig?.khqrImageUrl) {
           khqrImage = streamerConfig.khqrImageUrl;
         }
       }
@@ -239,7 +255,7 @@ export async function POST(req: NextRequest) {
       qrImage: khqrImage,
       abaDeepLink: '',
       bakongDeepLink: '',
-      expiresInSeconds: 300, // 5 minutes
+      expiresInSeconds: 180, // 3 minutes
       isSubscription: Boolean(isSubscription),
       tierId: tierId || undefined,
       tierName: tierName || undefined,

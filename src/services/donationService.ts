@@ -1,6 +1,15 @@
 import { request } from './api';
 import { CreateDonationRequest, CreateDonationResponse, Donation } from '../types/donation';
 
+export interface KhqrPresetItem {
+  id: string;
+  amount: number;
+  currency: 'USD' | 'KHR';
+  imageUrl: string;
+  filename?: string;
+  createdAt?: string;
+}
+
 export interface PublicStreamerInfo {
   id: string;
   username: string;
@@ -25,6 +34,7 @@ export interface PublicStreamerInfo {
   viewers?: number;
   hasMasterKhqr?: boolean;
   khqrImageUrl?: string;
+  khqrItems?: KhqrPresetItem[];
   isTelegramConnected?: boolean;
   hasTelegramGroup?: boolean;
   isTipConfigured?: boolean;

@@ -21,7 +21,9 @@ import {
   Crown,
   Smile,
   Film,
-  Music
+  Music,
+  Edit2,
+  X
 } from 'lucide-react';
 import { useModal } from '../../context/ModalContext';
 import { mediaService, MediaItem, StorageInfo } from '../../services/mediaService';
@@ -82,6 +84,9 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(() => mediaService.getCachedStorage());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
+  const [savingRenameId, setSavingRenameId] = useState<string | null>(null);
 
   // Pro Plan / Trial Guard
   const [showProModal, setShowProModal] = useState(false);
@@ -343,6 +348,56 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileProcess(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleStartRename = (item: MediaItem) => {
+    const dotIdx = item.filename.lastIndexOf('.');
+    const baseName = dotIdx > 0 ? item.filename.slice(0, dotIdx) : item.filename;
+    setEditingId(item._id);
+    setEditingName(baseName);
+  };
+
+  const handleCancelRename = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const handleSaveRename = async (item: MediaItem) => {
+    const trimmed = editingName.trim();
+    if (!trimmed) {
+      handleCancelRename();
+      return;
+    }
+
+    const dotIdx = item.filename.lastIndexOf('.');
+    const ext = dotIdx > 0 ? item.filename.slice(dotIdx) : '';
+    const nextFilename =
+      ext && !trimmed.toLowerCase().endsWith(ext.toLowerCase())
+        ? `${trimmed}${ext}`
+        : trimmed;
+
+    if (nextFilename === item.filename) {
+      handleCancelRename();
+      return;
+    }
+
+    setSavingRenameId(item._id);
+    setErrorMsg(null);
+    try {
+      const updated = await mediaService.renameMedia(item._id, nextFilename);
+      setMediaList((prev) =>
+        prev.map((m) =>
+          m._id === item._id ? { ...m, filename: updated?.filename || nextFilename } : m
+        )
+      );
+      setSuccessMsg(`Renamed to "${updated?.filename || nextFilename}"!`);
+      setTimeout(() => setSuccessMsg(null), 2500);
+      handleCancelRename();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to rename file.');
+    } finally {
+      setSavingRenameId(null);
     }
   };
 
@@ -750,25 +805,90 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                       </div>
 
                       <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold text-slate-200 truncate" title={item.filename}>
-                              {item.filename}
+                        {editingId === item._id ? (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSaveRename(item);
+                                  } else if (e.key === 'Escape') {
+                                    handleCancelRename();
+                                  }
+                                }}
+                                disabled={savingRenameId === item._id}
+                                placeholder="Enter file name..."
+                                className="w-full px-2.5 py-1 rounded-lg bg-slate-950 border border-cyan-400 text-xs text-white font-medium focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveRename(item)}
+                                disabled={savingRenameId === item._id}
+                                title="Save file name"
+                                className="p-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors cursor-pointer flex-shrink-0 disabled:opacity-50"
+                              >
+                                {savingRenameId === item._id ? (
+                                  <RefreshCw size={12} className="animate-spin" />
+                                ) : (
+                                  <Check size={12} strokeWidth={3} />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelRename}
+                                disabled={savingRenameId === item._id}
+                                title="Cancel rename"
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer flex-shrink-0"
+                              >
+                                <X size={12} />
+                              </button>
                             </div>
-                            <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-1">
+                            <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
                               <span>{formatFileSize(item.fileSize)}</span>
                               <span>{new Date(item.createdAt).toLocaleDateString()}</span>
                             </div>
                           </div>
+                        ) : (
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div
+                                onDoubleClick={() => handleStartRename(item)}
+                                className="text-xs font-semibold text-slate-200 truncate cursor-pointer hover:text-cyan-300 transition-colors"
+                                title={`${item.filename} (Click edit or double-click to rename)`}
+                              >
+                                {item.filename}
+                              </div>
+                              <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-1">
+                                <span>{formatFileSize(item.fileSize)}</span>
+                                <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
 
-                          <button
-                            onClick={() => handleDelete(item._id, item.filename)}
-                            title="Delete from Cloud"
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex-shrink-0"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleStartRename(item)}
+                                title="Rename File"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(item._id, item.filename)}
+                                title="Delete from Cloud"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

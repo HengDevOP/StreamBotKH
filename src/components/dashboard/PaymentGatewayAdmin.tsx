@@ -25,13 +25,29 @@ import {
   CheckCheck,
   Bot,
   Search,
-  X
+  X,
+  Edit2,
+  Image as ImageIcon,
+  DollarSign
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
+import { Modal } from '../common/Modal';
 import { QRCodeSVG } from 'qrcode.react';
 import { useModal } from '../../context/ModalContext';
 import { useAuth } from '../../context/AuthContext';
+import { mediaService, MediaItem } from '../../services/mediaService';
+import { isImageAsset } from './MediaLibraryManager';
+import { MediaPickerModal } from './MediaPickerModal';
+
+export interface KhqrItem {
+  id: string;
+  amount: number;
+  currency: 'USD' | 'KHR';
+  imageUrl: string;
+  filename?: string;
+  createdAt?: string;
+}
 
 interface GatewayConfig {
   _id: string;
@@ -39,6 +55,7 @@ interface GatewayConfig {
   khqrFilename: string;
   khqrFileSize: number;
   khqrMimeType: string;
+  khqrItems?: KhqrItem[];
   bankAccountName?: string;
   bakongAccountId?: string;
   updatedAt?: string;
@@ -280,21 +297,34 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
   const [step1Msg, setStep1Msg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // ================================================================
-  // STEP 2 STATE: Master KHQR Image Upload (Max 5MB)
+  // STEP 2 STATE: Create KHQR Data (Multiple Currency & Media Picker)
   // ================================================================
   const [gatewayConfig, setGatewayConfig] = useState<GatewayConfig | null>(null);
+  const [khqrItems, setKhqrItems] = useState<KhqrItem[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
-  const [uploadingKhqr, setUploadingKhqr] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
+  const [savingKhqrItem, setSavingKhqrItem] = useState(false);
   const [step2Msg, setStep2Msg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [uploadSuccessToast, setUploadSuccessToast] = useState<{ show: boolean; message: string }>({
     show: false,
     message: ''
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
-  const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
+  // Create / Edit KHQR Modal State
+  const [isKhqrModalOpen, setIsKhqrModalOpen] = useState(false);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [editingKhqrItem, setEditingKhqrItem] = useState<KhqrItem | null>(null);
+  const [modalCurrency, setModalCurrency] = useState<'USD' | 'KHR'>('USD');
+  const [modalAmount, setModalAmount] = useState<string>('1');
+  const [modalSelectedImageUrl, setModalSelectedImageUrl] = useState<string>('');
+  const [modalSelectedFilename, setModalSelectedFilename] = useState<string>('');
+  const [uploadedMediaImages, setUploadedMediaImages] = useState<MediaItem[]>([]);
+  const [loadingMediaImages, setLoadingMediaImages] = useState(false);
+  const [uploadingNewMedia, setUploadingNewMedia] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const mediaUploadInputRef = useRef<HTMLInputElement>(null);
+
+  const USD_PRESET_AMOUNTS = [1, 2, 5, 10, 20, 50];
+  const KHR_PRESET_AMOUNTS = [2000, 4000, 8000, 10000, 20000, 40000];
 
   // ================================================================
   // STEP 3 STATE: Target Telegram Groups & Group Link Listener
@@ -334,6 +364,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
       const data = await res.json();
       if (res.ok && data.success) {
         setGatewayConfig(data.config);
+        setKhqrItems(Array.isArray(data.config?.khqrItems) ? data.config.khqrItems : []);
         return data.config as GatewayConfig;
       }
     } catch (e) {
@@ -444,9 +475,12 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
         }
 
         // Direct smart step selection based on verified backend status
+        const hasKhqrData = Boolean(
+          (Array.isArray(config?.khqrItems) && config.khqrItems.length > 0) || config?.khqrImageUrl
+        );
         if (!status?.isConnected) {
           setActiveStep(1);
-        } else if (!config?.khqrImageUrl) {
+        } else if (!hasKhqrData) {
           setActiveStep(2);
         } else {
           setActiveStep(3);
@@ -483,7 +517,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
 
   // Step completion flags
   const isStep1Done = Boolean(userClientStatus.isConnected);
-  const isStep2Done = Boolean(gatewayConfig?.khqrImageUrl);
+  const isStep2Done = Boolean(khqrItems.length > 0 || gatewayConfig?.khqrImageUrl);
   const isStep3Done = Boolean(userClientStatus.isConnected && targetGroups.length > 0);
 
   const completedStepsCount = (isStep1Done ? 1 : 0) + (isStep2Done ? 1 : 0) + (isStep3Done ? 1 : 0);
@@ -905,115 +939,164 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
   };
 
   // ----------------------------------------------------------------
-  // STEP 2 HANDLERS: Master KHQR Image Upload
+  // STEP 2 HANDLERS: Create / Edit / Delete KHQR Items & Media Picker
   // ----------------------------------------------------------------
-  const formatFileSize = (bytes: number) => {
-    if (!bytes) return '0 B';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  const loadUploadedMediaImages = async (force = false) => {
+    setLoadingMediaImages(true);
+    try {
+      const data = await mediaService.fetchMedia({ force });
+      const allMedia = data.media || [];
+      const imagesOnly = allMedia.filter((m) => isImageAsset(m));
+      setUploadedMediaImages(imagesOnly);
+    } catch (e) {
+      console.error('Error loading uploaded media images:', e);
+    } finally {
+      setLoadingMediaImages(false);
+    }
   };
 
-  const handleKhqrFile = async (file: File) => {
+  const handleOpenCreateKhqrModal = (defaultCurrency: 'USD' | 'KHR' = 'USD', itemToEdit?: KhqrItem) => {
+    setModalError(null);
+    if (itemToEdit) {
+      setEditingKhqrItem(itemToEdit);
+      setModalCurrency(itemToEdit.currency);
+      setModalAmount(String(itemToEdit.amount));
+      setModalSelectedImageUrl(itemToEdit.imageUrl);
+      setModalSelectedFilename(itemToEdit.filename || '');
+    } else {
+      setEditingKhqrItem(null);
+      setModalCurrency(defaultCurrency);
+      setModalAmount(defaultCurrency === 'USD' ? '1' : '4000');
+      setModalSelectedImageUrl('');
+      setModalSelectedFilename('');
+    }
+    setIsKhqrModalOpen(true);
+    loadUploadedMediaImages(false);
+  };
+
+  const handleModalCurrencyChange = (nextCurr: 'USD' | 'KHR') => {
+    if (nextCurr === modalCurrency) return;
+    setModalCurrency(nextCurr);
+    if (!editingKhqrItem) {
+      setModalAmount(nextCurr === 'USD' ? '1' : '4000');
+    }
+  };
+
+  const handleUploadNewMediaInModal = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setModalError(null);
+    setUploadingNewMedia(true);
+    try {
+      const result = await mediaService.uploadMedia(file);
+      await loadUploadedMediaImages(true);
+      if (result.media?.url) {
+        setModalSelectedImageUrl(result.media.url);
+        setModalSelectedFilename(result.media.filename || file.name);
+      }
+    } catch (err: any) {
+      setModalError(err.message || 'Failed to upload image to Media Library');
+    } finally {
+      setUploadingNewMedia(false);
+      if (mediaUploadInputRef.current) {
+        mediaUploadInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSaveKhqrModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalError(null);
     setStep2Msg(null);
 
-    if (file.size > MAX_FILE_SIZE) {
-      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      setStep2Msg({
-        type: 'error',
-        text: `File exceeds 2MB limit (${sizeMb} MB). Please choose a PNG or JPG under 2MB.`
-      });
+    const parsedAmount = parseFloat(modalAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setModalError('Please enter or tick a valid amount greater than 0.');
       return;
     }
 
-    const mime = file.type.toLowerCase();
-    const isImage = ALLOWED_TYPES.includes(mime) || /\.(png|jpe?g)$/i.test(file.name);
-    if (!isImage) {
-      setStep2Msg({
-        type: 'error',
-        text: 'Unsupported format. Please upload PNG or JPG only.'
-      });
+    if (!modalSelectedImageUrl.trim()) {
+      setModalError('Please select a KHQR image from your uploaded media.');
       return;
     }
 
-    setUploadingKhqr(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
+    setSavingKhqrItem(true);
     try {
-      const res = await authFetch('/api/payment-gateway/upload-khqr', {
+      const itemPayload: KhqrItem = {
+        id: editingKhqrItem ? editingKhqrItem.id : `khqr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        amount: parsedAmount,
+        currency: modalCurrency,
+        imageUrl: modalSelectedImageUrl.trim(),
+        filename: modalSelectedFilename || undefined,
+        createdAt: editingKhqrItem?.createdAt || new Date().toISOString()
+      };
+
+      const res = await authFetch('/api/payment-gateway/config', {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add',
+          item: itemPayload
+        })
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setStep2Msg({
-          type: 'success',
-          text: 'Official Master KHQR payment image uploaded successfully and activated!'
-        });
-        await fetchGatewayConfig();
-
-        // Slide in bottom-right success toast, then slide back after 4.5s
+        const updatedList: KhqrItem[] = Array.isArray(data.khqrItems) ? data.khqrItems : [];
+        setKhqrItems(updatedList);
+        if (data.config) {
+          setGatewayConfig(data.config);
+        }
+        setIsKhqrModalOpen(false);
+        const formattedLabel =
+          modalCurrency === 'KHR'
+            ? `${parsedAmount.toLocaleString()} ៛ (KHR)`
+            : `$${parsedAmount.toFixed(2)} (USD)`;
         setUploadSuccessToast({
           show: true,
-          message: 'Official Master KHQR uploaded successfully! Live on your donation page.'
+          message: `${editingKhqrItem ? 'Updated' : 'Created'} KHQR for ${formattedLabel}! Live on your donation page.`
         });
         setTimeout(() => {
           setUploadSuccessToast((prev) => ({ ...prev, show: false }));
         }, 4500);
-
-        goToStep(3); // Automate the client into step 3!
       } else {
-        setStep2Msg({
-          type: 'error',
-          text: data.error || 'Failed to upload KHQR image.'
-        });
+        setModalError(data.error || 'Failed to save KHQR item.');
       }
     } catch (err: any) {
-      setStep2Msg({
-        type: 'error',
-        text: err.message || 'Network error during upload.'
-      });
+      setModalError(err.message || 'Network error saving KHQR item.');
     } finally {
-      setUploadingKhqr(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setSavingKhqrItem(false);
     }
   };
 
-  const handleDeleteKhqr = () => {
+  const handleDeleteKhqrItem = (item: KhqrItem) => {
+    const formattedAmount =
+      item.currency === 'KHR'
+        ? `${Number(item.amount).toLocaleString()} ៛ (KHR)`
+        : `$${Number(item.amount).toFixed(2)} (USD)`;
+
     showConfirm({
-      title: 'Remove Master KHQR Payment Image?',
-      message: 'Are you sure you want to remove the custom KHQR payment image? Client donation pages will revert to the default template until a new image is provided.',
+      title: 'Delete KHQR Amount?',
+      message: `Are you sure you want to remove the ${formattedAmount} KHQR option from your donation page?`,
       type: 'danger',
-      confirmText: 'Remove Image',
+      confirmText: 'Remove KHQR',
       onConfirm: async () => {
         try {
-          // Immediately reset config in state so page returns to upload design styling
-          setGatewayConfig((prev: any) => (prev ? { ...prev, khqrImageUrl: '' } : null));
-
-          const res = await authFetch('/api/payment-gateway/upload-khqr', { method: 'DELETE' });
+          const res = await authFetch('/api/payment-gateway/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'delete',
+              itemId: item.id
+            })
+          });
           const data = await res.json();
           if (res.ok && data.success) {
-            setStep2Msg({ type: 'success', text: data.message });
-            await fetchGatewayConfig();
-          } else {
-            showAlert({
-              title: 'Remove Failed',
-              message: data.error || 'Failed to remove image',
-              type: 'danger'
-            });
-            await fetchGatewayConfig();
+            setKhqrItems(Array.isArray(data.khqrItems) ? data.khqrItems : []);
+            if (data.config) setGatewayConfig(data.config);
           }
-        } catch (e: any) {
-          showAlert({
-            title: 'Error',
-            message: 'Error removing image',
-            type: 'danger'
-          });
-          await fetchGatewayConfig();
+        } catch (err) {
+          console.error('Failed to delete KHQR item:', err);
         }
       }
     });
@@ -1170,7 +1253,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                 onClick={() => goToStep(2)}
                 className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer font-['Chakra_Petch']"
               >
-                <span>Upload KHQR</span>
+                <span>Create KHQR</span>
               </button>
             ) : (
               <button
@@ -1716,215 +1799,318 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
       )}
 
         {/* ============================================================== */}
-        {/* STEP 2 CONTENT: "Provide Master KHQR Image"                    */}
+        {/* STEP 2 CONTENT: "Create KHQR Data (Multiple Currency Sections)"*/}
         {/* ============================================================== */}
-        {activeStep === 2 && (
-          <Card glow="cyan" className="space-y-6">
-          {step2Msg && step2Msg.type === 'error' && (
-            <div className="p-3.5 rounded-xl border text-xs flex items-center gap-2 bg-red-950/40 border-red-500/30 text-red-300">
-              <AlertCircle size={16} />
-              <span>{step2Msg.text}</span>
-            </div>
-          )}
+        {activeStep === 2 && (() => {
+          const usdKhqrItems = khqrItems
+            .filter((item) => item.currency === 'USD')
+            .sort((a, b) => Number(a.amount) - Number(b.amount));
+          const khrKhqrItems = khqrItems
+            .filter((item) => item.currency === 'KHR')
+            .sort((a, b) => Number(a.amount) - Number(b.amount));
 
-          {gatewayConfig?.khqrImageUrl ? (
-            /* Active KHQR View - Clean Centered Preview */
-            <div className="p-6 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
-              <div className="flex flex-col items-center justify-center text-center gap-3 py-2">
-                {uploadingKhqr ? (
-                  <div className="w-36 h-36 rounded-2xl bg-cyan-950/30 border-2 border-cyan-400/40 flex flex-col items-center justify-center gap-2 p-2 shadow-[0_0_25px_rgba(0,240,255,0.25)]">
-                    <RefreshCw size={24} className="animate-spin text-cyan-400" />
-                    <span className="text-[11px] font-bold text-cyan-300 font-mono animate-pulse text-center">
-                      Uploading Into Cloud...
+          return (
+            <div className="rounded-2xl bg-[#090D18] border border-cyan-500/30 p-5 sm:p-7 space-y-6 shadow-lg shadow-cyan-500/5">
+              {step2Msg && step2Msg.type === 'error' && (
+                <div className="p-3.5 rounded-xl border text-xs flex items-center gap-2 bg-red-950/40 border-red-500/30 text-red-300">
+                  <AlertCircle size={16} />
+                  <span>{step2Msg.text}</span>
+                </div>
+              )}
+
+              {/* Top Header Bar: Title & Create KHQR Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                      <QrCode size={17} />
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] tracking-wide">
+                      KHQR Payment Amounts
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-cyan-400">
+                      {khqrItems.length} Total
                     </span>
                   </div>
-                ) : (
-                  <div className="w-36 h-36 rounded-2xl bg-white p-2.5 border-2 border-cyan-400/40 flex items-center justify-center overflow-hidden shadow-[0_0_25px_rgba(0,240,255,0.25)]">
-                    <img
-                      src={gatewayConfig.khqrImageUrl}
-                      alt="Active Master KHQR"
-                      className="max-h-full max-w-full object-contain"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        if (!target.dataset.retried) {
-                          target.dataset.retried = 'true';
-                          target.src = `${gatewayConfig.khqrImageUrl}?t=${Date.now()}`;
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-1.5 max-w-sm">
-                  <div className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
-                    Master KHQR Active
-                  </div>
-                  <p className="text-xs text-slate-400 font-sans leading-relaxed">
-                    This KHQR image is displayed on your public donation page for your viewers to scan and tip you directly.
+                  <p className="text-xs text-slate-400 font-sans">
+                    Create KHQR payment options separated by USD ($) and KHR (៛) currencies using KHQR images from your uploaded media.
                   </p>
                 </div>
 
-                {/* View Donation / Tip Page Button */}
-                <div className="pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => window.open(`/@${currentStreamerUsername}`, '_blank', 'noopener,noreferrer')}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-cyan-200 text-xs font-mono font-bold transition-all shadow-[0_0_15px_rgba(0,240,255,0.15)] cursor-pointer"
-                  >
-                    <span>View Donation Page</span>
-                    <ExternalLink size={13} />
-                  </button>
-                </div>
+                <div className="flex items-center gap-2.5 self-start sm:self-center shrink-0">
+                  {khqrItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => window.open(`/@${currentStreamerUsername}`, '_blank', 'noopener,noreferrer')}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/40 text-slate-200 hover:text-cyan-300 text-xs font-mono font-bold transition-all cursor-pointer"
+                    >
+                      <span>View Tip Page</span>
+                      <ExternalLink size={13} />
+                    </button>
+                  )}
 
-                <div className="flex items-center justify-center gap-3 pt-1">
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs font-mono text-slate-400 hover:text-cyan-400 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    variant="primary"
+                    size="md"
+                    onClick={() => handleOpenCreateKhqrModal('USD')}
+                    className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
                   >
-                    <UploadCloud size={13} />
-                    <span>Replace Image</span>
-                  </button>
-                  <span className="text-slate-700">•</span>
-                  <button
-                    type="button"
-                    onClick={handleDeleteKhqr}
-                    className="text-xs font-mono text-slate-500 hover:text-red-400 flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Trash2 size={13} />
-                    <span>Remove</span>
-                  </button>
+                    <Plus size={15} className="mr-1.5" />
+                    <span>Create KHQR</span>
+                  </Button>
                 </div>
               </div>
 
-              {/* Hidden file input for replacing */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/jpg"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleKhqrFile(e.target.files[0]);
-                  }
-                }}
-                disabled={uploadingKhqr}
-              />
-
-              {/* Bottom Actions Row: Back to Step 1 (left) & Continue to Step 3 (right) */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="md"
-                  onClick={() => goToStep(1)}
-                  className="font-bold cursor-pointer"
-                >
-                  <ChevronLeft size={16} className="mr-1" />
-                  <span>Back to Step 1</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="md"
-                  onClick={() => goToStep(3)}
-                  className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
-                >
-                  <span>Continue</span>
-                  <ArrowRight size={15} className="ml-1" />
-                </Button>
-              </div>
-            </div>
-          ) : (
-            /* Upload Dropzone - Clean Centered Box */
-            <div className="p-6 sm:p-8 rounded-2xl bg-[#090D18] border border-cyan-500/30 space-y-6 shadow-lg shadow-cyan-500/5">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/jpg"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleKhqrFile(e.target.files[0]);
-                  }
-                }}
-                disabled={uploadingKhqr}
-              />
-
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragActive(false);
-                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    handleKhqrFile(e.dataTransfer.files[0]);
-                  }
-                }}
-                onClick={() => !uploadingKhqr && fileInputRef.current?.click()}
-                className={`p-8 sm:p-10 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center text-center gap-4 cursor-pointer ${
-                  dragActive
-                    ? 'border-cyan-400 bg-cyan-950/25 scale-[1.01]'
-                    : 'border-slate-800 hover:border-cyan-500/50 bg-slate-950/60 hover:bg-slate-950'
-                }`}
-              >
-                {uploadingKhqr ? (
-                  /* Animated Uploading State */
-                  <div className="py-6 flex flex-col items-center justify-center space-y-3">
-                    <div className="relative w-14 h-14 rounded-2xl bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.3)]">
-                      <RefreshCw size={26} className="animate-spin text-cyan-400" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-base font-bold text-cyan-300 font-['Chakra_Petch'] tracking-wide animate-pulse">
-                        Uploading Into Cloud...
-                      </div>
-                      <p className="text-xs text-slate-500 font-mono">
-                        Validating KHQR and activating payment listener
-                      </p>
-                    </div>
+              {/* Blank Default State when no KHQR items created yet */}
+              {khqrItems.length === 0 ? (
+                <div className="py-8 sm:py-10 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)]">
+                    <QrCode size={28} />
                   </div>
-                ) : (
-                  /* Normal Upload State */
-                  <>
-                    <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)]">
-                      <QrCode size={28} />
-                    </div>
+                  <div className="space-y-1.5 max-w-md">
+                    <h4 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
+                      No KHQR Data Created Yet
+                    </h4>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Your KHQR list is blank by default. Click the button below to create KHQR payment amounts for <strong className="text-cyan-400">USD ($)</strong> or <strong className="text-amber-400">KHR (៛)</strong> and choose the KHQR image from your uploaded media.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="md"
+                      onClick={() => handleOpenCreateKhqrModal('USD')}
+                      className="font-bold px-5 py-2.5 shadow-lg shadow-cyan-400/20 cursor-pointer"
+                    >
+                      <Plus size={15} className="mr-1.5" />
+                      <span>Create USD ($) KHQR</span>
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCreateKhqrModal('KHR')}
+                      className="px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-['Chakra_Petch'] font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Plus size={15} />
+                      <span>Create KHR (៛) KHQR</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Separate Currency Sections: Section 1 (USD $) & Section 2 (KHR ៛) */
+                <div className="space-y-6">
+                  {/* ============================================================ */}
+                  {/* SECTION 1: USD ($) CURRENCY KHQR SECTION                     */}
+                  {/* ============================================================ */}
+                  <div className="space-y-3.5">
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-mono font-black text-sm flex items-center justify-center">
+                          $
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                              USD ($) KHQR Section
+                            </h4>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950/60 border border-cyan-500/30 text-cyan-300">
+                              {usdKhqrItems.length} {usdKhqrItems.length === 1 ? 'Item' : 'Items'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-mono">
+                            US Dollar payment QR codes displayed when donor ticks USD ($)
+                          </p>
+                        </div>
+                      </div>
 
-                    <div className="space-y-2 max-w-md">
-                      <Button
+                      <button
                         type="button"
-                        variant="primary"
-                        size="md"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          fileInputRef.current?.click();
-                        }}
-                        className="font-bold py-2.5 px-6 shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer mx-auto"
+                        onClick={() => handleOpenCreateKhqrModal('USD')}
+                        className="px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                       >
-                        <UploadCloud size={16} className="mr-1.5" />
-                        <span>Click To Upload</span>
-                      </Button>
-
-                      <p className="text-xs text-slate-400 font-mono pt-1">
-                        or drag and drop your official Bakong KHQR image here
-                      </p>
+                        <Plus size={13} />
+                        <span>Add USD ($)</span>
+                      </button>
                     </div>
 
-                    {/* Guidelines and Recommended Scale / Size Box */}
-                    <div className="pt-3 border-t border-slate-800/80 w-full max-w-md grid grid-cols-2 gap-2 text-[11px] font-mono">
-                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 text-left">
-                        <span className="text-slate-500 block uppercase font-bold text-[9px]">RECOMMENDED SCALE</span>
-                        <span className="text-cyan-400 font-semibold">1024 × 1024 (1:1)</span>
+                    {usdKhqrItems.length === 0 ? (
+                      <div className="py-6 px-4 rounded-xl bg-[#090D18] text-center space-y-2">
+                        <p className="text-xs text-slate-400 font-mono">No USD ($) KHQR amounts created yet.</p>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCreateKhqrModal('USD')}
+                          className="text-xs font-mono font-bold text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus size={13} />
+                          <span>Create first USD ($) KHQR</span>
+                        </button>
                       </div>
-                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 text-left">
-                        <span className="text-slate-500 block uppercase font-bold text-[9px]">MAX FILE SIZE</span>
-                        <span className="text-cyan-400 font-semibold">2 MB (PNG / JPG)</span>
+                    ) : (
+                      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+                        {usdKhqrItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="p-3.5 rounded-2xl bg-[#090D18] border border-slate-800/90 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-3 group shadow-md"
+                          >
+                            {/* Top Row: Amount & Currency Tick Badge + Actions */}
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 font-mono font-black text-xs">
+                                <span className="w-3.5 h-3.5 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center">
+                                  <Check size={10} className="stroke-[3]" />
+                                </span>
+                                <span>${Number(item.amount).toFixed(2)} USD</span>
+                              </span>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenCreateKhqrModal('USD', item)}
+                                  title="Edit KHQR"
+                                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteKhqrItem(item)}
+                                  title="Delete KHQR"
+                                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/60 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Center: KHQR Image Preview */}
+                            <div
+                              onClick={() => handleOpenCreateKhqrModal('USD', item)}
+                              className="w-full aspect-square rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden cursor-pointer"
+                            >
+                              <img
+                                src={item.imageUrl}
+                                alt={`$${item.amount} USD KHQR`}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+
+                            {/* Bottom: Filename */}
+                            <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 truncate">
+                              <span className="truncate">{item.filename || 'Media Library KHQR'}</span>
+                              <span className="text-emerald-400 font-bold shrink-0 ml-1">Active</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
+                    )}
+                  </div>
+
+                  {/* ============================================================ */}
+                  {/* SECTION 2: KHR (៛) CURRENCY KHQR SECTION                     */}
+                  {/* ============================================================ */}
+                  <div className="space-y-3.5">
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono font-black text-sm flex items-center justify-center">
+                          ៛
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                              KHR (៛) KHQR Section
+                            </h4>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950/60 border border-amber-500/30 text-amber-300">
+                              {khrKhqrItems.length} {khrKhqrItems.length === 1 ? 'Item' : 'Items'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-mono">
+                            Khmer Riel payment QR codes displayed when donor ticks KHR (៛)
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCreateKhqrModal('KHR')}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-mono font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                      >
+                        <Plus size={13} />
+                        <span>Add KHR (៛)</span>
+                      </button>
                     </div>
-                  </>
-                )}
-              </div>
+
+                    {khrKhqrItems.length === 0 ? (
+                      <div className="py-6 px-4 rounded-xl bg-[#090D18] text-center space-y-2">
+                        <p className="text-xs text-slate-400 font-mono">No KHR (៛) KHQR amounts created yet.</p>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCreateKhqrModal('KHR')}
+                          className="text-xs font-mono font-bold text-amber-400 hover:text-amber-300 inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus size={13} />
+                          <span>Create first KHR (៛) KHQR</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+                        {khrKhqrItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="p-3.5 rounded-2xl bg-[#090D18] border border-slate-800/90 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-3 group shadow-md"
+                          >
+                            {/* Top Row: Amount & Currency Tick Badge + Actions */}
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 font-mono font-black text-xs">
+                                <span className="w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center">
+                                  <Check size={10} className="stroke-[3]" />
+                                </span>
+                                <span>{Number(item.amount).toLocaleString()} ៛ KHR</span>
+                              </span>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenCreateKhqrModal('KHR', item)}
+                                  title="Edit KHQR"
+                                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-colors cursor-pointer"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteKhqrItem(item)}
+                                  title="Delete KHQR"
+                                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/60 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Center: KHQR Image Preview */}
+                            <div
+                              onClick={() => handleOpenCreateKhqrModal('KHR', item)}
+                              className="w-full aspect-square rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden cursor-pointer"
+                            >
+                              <img
+                                src={item.imageUrl}
+                                alt={`${item.amount} KHR KHQR`}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+
+                            {/* Bottom: Filename */}
+                            <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 truncate">
+                              <span className="truncate">{item.filename || 'Media Library KHQR'}</span>
+                              <span className="text-emerald-400 font-bold shrink-0 ml-1">Active</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Bottom Actions Row: Back to Step 1 (left) & Continue to Step 3 (right) */}
               <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
@@ -1951,9 +2137,8 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                 </Button>
               </div>
             </div>
-          )}
-        </Card>
-      )}
+          );
+        })()}
 
         {/* ============================================================== */}
         {/* STEP 3 CONTENT: "Connect to Group via Link Telegram"           */}
@@ -2315,6 +2500,322 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
           </button>
         </div>
       </div>
+
+      {/* ============================================================== */}
+      {/* CREATE / EDIT KHQR AMOUNT MODAL                                 */}
+      {/* ============================================================== */}
+      <Modal
+        isOpen={isKhqrModalOpen}
+        onClose={() => !savingKhqrItem && !isMediaPickerOpen && setIsKhqrModalOpen(false)}
+        title={editingKhqrItem ? 'Edit KHQR Payment Amount' : 'Create KHQR Payment Amount'}
+        maxWidth="lg"
+      >
+        <form onSubmit={handleSaveKhqrModal} className="space-y-5">
+          {modalError && (
+            <div className="p-3 rounded-xl bg-red-950/50 border border-red-500/40 text-red-300 text-xs flex items-center gap-2">
+              <AlertCircle size={15} className="shrink-0 text-red-400" />
+              <span>{modalError}</span>
+            </div>
+          )}
+
+          {/* 1. CURRENCY TICK SELECTOR */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between">
+              <span>1. Currency Tick</span>
+              <span className="text-[10px] font-mono text-slate-400">Select KHQR currency</span>
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* USD ($) Tick Card */}
+              <button
+                type="button"
+                onClick={() => handleModalCurrencyChange('USD')}
+                className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2.5 cursor-pointer ${
+                  modalCurrency === 'USD'
+                    ? 'bg-cyan-500/15 border-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)]'
+                    : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    className={`w-8 h-8 rounded-lg font-mono font-black text-sm flex items-center justify-center shrink-0 ${
+                      modalCurrency === 'USD'
+                        ? 'bg-cyan-400 text-slate-950'
+                        : 'bg-slate-900 border border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    $
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch']">
+                      USD ($)
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 truncate">
+                      US Dollar
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                    modalCurrency === 'USD'
+                      ? 'bg-cyan-400 border-cyan-400 text-slate-950 shadow-sm shadow-cyan-400/50'
+                      : 'border-slate-700'
+                  }`}
+                >
+                  {modalCurrency === 'USD' && <Check size={12} className="stroke-[3]" />}
+                </div>
+              </button>
+
+              {/* KHR (៛) Tick Card */}
+              <button
+                type="button"
+                onClick={() => handleModalCurrencyChange('KHR')}
+                className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2.5 cursor-pointer ${
+                  modalCurrency === 'KHR'
+                    ? 'bg-amber-500/15 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                    : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    className={`w-8 h-8 rounded-lg font-mono font-black text-sm flex items-center justify-center shrink-0 ${
+                      modalCurrency === 'KHR'
+                        ? 'bg-amber-400 text-slate-950'
+                        : 'bg-slate-900 border border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    ៛
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch']">
+                      KHR (៛)
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 truncate">
+                      Khmer Riel
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                    modalCurrency === 'KHR'
+                      ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-sm shadow-amber-400/50'
+                      : 'border-slate-700'
+                  }`}
+                >
+                  {modalCurrency === 'KHR' && <Check size={12} className="stroke-[3]" />}
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* 2. AMOUNT TICK & CUSTOM AMOUNT INPUT */}
+          <div className="space-y-2.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center justify-between">
+              <span>2. Amount Tick ({modalCurrency === 'USD' ? 'USD $' : 'KHR ៛'})</span>
+              <span className="text-[10px] font-mono text-slate-400">Tick a preset or type custom amount</span>
+            </label>
+
+            {/* Quick-Tick Preset Amount Buttons */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {(modalCurrency === 'USD' ? USD_PRESET_AMOUNTS : KHR_PRESET_AMOUNTS).map((preset) => {
+                const isSelected = Math.abs((parseFloat(modalAmount) || 0) - preset) < 0.001;
+                const label = modalCurrency === 'USD' ? `$${preset}` : `${preset.toLocaleString()} ៛`;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setModalAmount(String(preset))}
+                    className={`py-2 px-2.5 rounded-xl border font-mono text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      isSelected
+                        ? modalCurrency === 'USD'
+                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-sm'
+                          : 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-sm'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    {isSelected && <Check size={11} className="stroke-[3] shrink-0" />}
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom Amount Input Field */}
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-sm text-slate-400">
+                {modalCurrency === 'USD' ? '$' : '៛'}
+              </span>
+              <input
+                type="number"
+                step={modalCurrency === 'USD' ? '0.01' : '100'}
+                min={modalCurrency === 'USD' ? '0.01' : '100'}
+                required
+                value={modalAmount}
+                onChange={(e) => setModalAmount(e.target.value)}
+                placeholder={modalCurrency === 'USD' ? 'Enter amount (e.g. 1.00)' : 'Enter amount (e.g. 4000)'}
+                className="w-full pl-9 pr-24 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-400 text-sm font-mono font-bold text-white focus:outline-none"
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-cyan-400">
+                {modalCurrency}
+              </span>
+            </div>
+          </div>
+
+          {/* 3. CHOOSE KHQR IMAGE FROM MEDIA LIBRARY */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center gap-1.5">
+                <ImageIcon size={14} className="text-cyan-400" />
+                <span>3. Choose KHQR Image from Media Library</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setIsMediaPickerOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ImageIcon size={12} />
+                <span>{modalSelectedImageUrl ? 'Change Image' : 'Choose from Media Library'}</span>
+              </button>
+            </div>
+
+            {modalSelectedImageUrl ? (
+              <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-cyan-500/40 flex items-center justify-between gap-3.5">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-20 h-20 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0 overflow-hidden shadow-md">
+                    <img
+                      src={modalSelectedImageUrl}
+                      alt={modalSelectedFilename || 'Selected KHQR'}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold">
+                      <Check size={11} className="stroke-[3]" />
+                      <span>KHQR Image Selected</span>
+                    </div>
+                    <p className="text-xs font-mono text-white font-bold truncate">
+                      {modalSelectedFilename || modalSelectedImageUrl.split('/').pop() || 'KHQR Image'}
+                    </p>
+                    <p className="text-[11px] font-mono text-slate-400">
+                      {modalCurrency === 'KHR'
+                        ? `${(parseFloat(modalAmount) || 0).toLocaleString()} ៛ (KHR)`
+                        : `$${(parseFloat(modalAmount) || 0).toFixed(2)} (USD)`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsMediaPickerOpen(true)}
+                    className="px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ImageIcon size={13} />
+                    <span>Media Library</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalSelectedImageUrl('');
+                      setModalSelectedFilename('');
+                    }}
+                    title="Clear selected image"
+                    className="p-2 rounded-xl bg-slate-900 hover:bg-red-950/50 border border-slate-800 hover:border-red-500/40 text-slate-400 hover:text-red-300 transition-colors cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsMediaPickerOpen(true)}
+                className="w-full p-6 rounded-2xl bg-slate-950/80 hover:bg-slate-900/80 border border-dashed border-cyan-500/40 hover:border-cyan-400 transition-all flex flex-col items-center justify-center gap-2.5 text-center cursor-pointer group"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform">
+                  <ImageIcon size={22} />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] group-hover:text-cyan-300 transition-colors">
+                    Choose KHQR Image from Media Library
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Click to open your Media Library and select your uploaded Bakong KHQR image
+                  </p>
+                </div>
+                <span className="mt-1 px-4 py-2 rounded-xl bg-cyan-500 group-hover:bg-cyan-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-cyan-500/20">
+                  <ImageIcon size={14} />
+                  <span>Open Media Library</span>
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* Live Summary Bar & Actions */}
+          <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+            <div className="text-xs font-mono text-slate-400 truncate">
+              {modalSelectedImageUrl ? (
+                <span className="inline-flex items-center gap-1.5 text-emerald-400 font-bold">
+                  <Check size={13} className="stroke-[3]" />
+                  <span>
+                    Selected:{' '}
+                    {modalCurrency === 'KHR'
+                      ? `${(parseFloat(modalAmount) || 0).toLocaleString()} ៛ KHR`
+                      : `$${(parseFloat(modalAmount) || 0).toFixed(2)} USD`}
+                  </span>
+                </span>
+              ) : (
+                <span>Choose a KHQR image from Media Library above</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsKhqrModalOpen(false)}
+                disabled={savingKhqrItem}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                loading={savingKhqrItem}
+                className="font-bold px-5 shadow-lg shadow-cyan-400/20"
+              >
+                <Check size={14} className="mr-1.5" />
+                <span>{editingKhqrItem ? 'Update KHQR' : 'Create KHQR'}</span>
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Media Library Picker Modal for KHQR Image Selection */}
+      <MediaPickerModal
+        isOpen={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        currentUrl={modalSelectedImageUrl}
+        initialSection="uploads"
+        filterMode="image"
+        currentPlan={user?.plan}
+        isTrialActive={Boolean((user as any)?.isTrialActive)}
+        isAdmin={user?.role === 'admin'}
+        title="Choose KHQR Image from Media Library"
+        subtitle="Select your uploaded Bakong KHQR image from your Media Library."
+        onSelect={(selectedUrl, item) => {
+          setModalSelectedImageUrl(selectedUrl);
+          setModalSelectedFilename(item?.filename || selectedUrl.split('/').pop() || '');
+          setModalError(null);
+          setIsMediaPickerOpen(false);
+        }}
+      />
     </div>
   );
 };

@@ -273,45 +273,39 @@ body:has(.app-viewport-lock),
   animation: fadeIn 0.4s ease-out forwards;
 }
 
-/* Toast Pop & Slide Animations (Device top pop, Desktop top-right slide left) */
-@keyframes cancelToastPopTop {
-  0% {
-    opacity: 0;
-    transform: translateY(-36px) scale(0.92);
-  }
-  60% {
-    opacity: 1;
-    transform: translateY(4px) scale(1.02);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
+/* Toast Slide Animations from Right Side (All Device Screens & Desktop) */
 @keyframes cancelToastSlidePopLeft {
   0% {
     opacity: 0;
-    transform: translateX(120%) scale(0.92);
+    transform: translate3d(120%, 0, 0) scale(0.95);
   }
   65% {
     opacity: 1;
-    transform: translateX(-10px) scale(1.02);
+    transform: translate3d(-8px, 0, 0) scale(1.01);
   }
   100% {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes cancelToastSlideOutRight {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(120%, 0, 0) scale(0.95);
   }
 }
 
 .animate-cancel-toast {
-  animation: cancelToastPopTop 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: cancelToastSlidePopLeft 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@media (min-width: 768px) {
-  .animate-cancel-toast {
-    animation: cancelToastSlidePopLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
+.animate-cancel-toast-exit {
+  animation: cancelToastSlideOutRight 0.35s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 /* Step Transition Swipe Animations (Forward = Swipe Left, Backward = Swipe Right) */

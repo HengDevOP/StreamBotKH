@@ -262,6 +262,43 @@ export const mediaService = {
   },
 
   /**
+   * Rename an uploaded media asset (owner only)
+   */
+  async renameMedia(id: string, filename: string): Promise<MediaItem> {
+    const res = await fetch(`/api/media/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ filename })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to rename file');
+    }
+
+    const updatedItem: MediaItem = data.media;
+    if (memoryCache) {
+      const updatedMedia = memoryCache.media.map((m) =>
+        m._id === id ? { ...m, filename: updatedItem?.filename || filename } : m
+      );
+      memoryCache = {
+        ...memoryCache,
+        media: updatedMedia,
+        storage: data.storage || memoryCache.storage,
+        etag: null,
+        timestamp: Date.now()
+      };
+      saveSessionCache(updatedMedia, memoryCache.storage, null);
+      notifyListeners({ media: updatedMedia, storage: memoryCache.storage });
+    }
+
+    return updatedItem;
+  },
+
+  /**
    * Delete or prune media asset
    */
   async deleteMedia(id: string): Promise<boolean> {

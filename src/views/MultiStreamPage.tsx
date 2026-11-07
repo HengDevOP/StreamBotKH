@@ -49,11 +49,10 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useAudio } from '../hooks/useAudio';
-import { donationService } from '../services/donationService';
+import { donationService, PublicStreamerInfo } from '../services/donationService';
 import { CreateDonationResponse } from '../types/donation';
 import { BakongKHQRModal } from '../components/donate/BakongKHQRModal';
-import { VideoPlayerWithProgressBar } from '../components/common/VideoPlayerWithProgressBar';
-import { VideoClipScrubberLine } from '../components/donate/VideoClipScrubberLine';
+import { DonorForm, DonorFormData } from '../components/donate/DonorForm';
 import { extractYoutubeId } from '../utils/youtube';
 
 export interface StreamerClient {
@@ -607,161 +606,64 @@ export const MultiStreamPage: React.FC = () => {
     return host === '127.0.0.1' ? 'localhost' : host;
   }, []);
 
-  // Tip / Donation Page States (Work like Donation Page)
-  const [currency] = useState<'USD' | 'KHR'>('USD');
-  const [tipAmount] = useState<string>('5.00');
-  const [customAmount] = useState<string>('');
-  const [tipDonorName, setTipDonorName] = useState<string>('');
-  const [bankingName, setBankingName] = useState<string>('');
-  const [tipDonorMessage, setTipDonorMessage] = useState<string>('');
-
-  // Share Media (YouTube Video & Clip Duration) States — Matches Donation Page
-  const [videoUrl, setVideoUrl] = useState<string>('');
-  const [videoTitle, setVideoTitle] = useState<string>('');
-  const [videoDuration, setVideoDuration] = useState<number | undefined>(undefined);
-  const [videoStartTime, setVideoStartTime] = useState<number>(0);
-  const [videoEndTime, setVideoEndTime] = useState<number>(30);
-  const [fetchingVideo, setFetchingVideo] = useState<boolean>(false);
-  const [videoError, setVideoError] = useState<string | null>(null);
-  const [isPlayingPreview, setIsPlayingPreview] = useState<boolean>(false);
-  const [sharePreviewKey, setSharePreviewKey] = useState<number>(0);
-  const shareDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const lastFetchedShareUrlRef = useRef<string>('');
+  // Tip / Donation States — exact working copy of the Donation Page flow (/donate)
+  const [tipStreamerInfo, setTipStreamerInfo] = useState<PublicStreamerInfo | null>(null);
+  const [tipStreamerInfoLoading, setTipStreamerInfoLoading] = useState<boolean>(false);
+  const [currentDonorName, setCurrentDonorName] = useState<string>('');
+  const [currentBankingName, setCurrentBankingName] = useState<string>('Bakong KHQR');
+  const [subscriptionMeta, setSubscriptionMeta] = useState<{ isSubscription: boolean; tierId?: string; tierName?: string } | null>(null);
+  const [tipLang, setTipLang] = useState<'en' | 'kh'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('stream_lang');
+      if (saved === 'kh' || saved === 'en') return saved;
+    }
+    return 'en';
+  });
 
   const [submittingTip, setSubmittingTip] = useState<boolean>(false);
   const [activeDonation, setActiveDonation] = useState<CreateDonationResponse | null>(null);
   const [isKHQRModalOpen, setIsKHQRModalOpen] = useState<boolean>(false);
-  const [tipSuccess, setTipSuccess] = useState<boolean>(false);
   const [tipTargetStreamer, setTipTargetStreamer] = useState<StreamerClient>(INITIAL_STREAMERS[0]);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isUnconfiguredTipModalOpen, setIsUnconfiguredTipModalOpen] = useState<boolean>(false);
 
-  const activeShareVideoId = useMemo(() => extractYoutubeId(videoUrl), [videoUrl]);
+  // Toasts (same behaviour as Donation Page: slide in from the right on all screens)
+  const [tipToastMessage, setTipToastMessage] = useState<string | null>(null);
+  const [tipToastExiting, setTipToastExiting] = useState<boolean>(false);
+  const tipToastExitTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchShareYoutubeDetails = async (url: string) => {
-    const trimmed = url.trim();
-    if (!trimmed) {
-      setVideoTitle('');
-      setVideoError(null);
-      setIsPlayingPreview(false);
-      return;
-    }
-
-    const vid = extractYoutubeId(trimmed);
-    if (!vid) {
-      setVideoError('Please enter a valid YouTube video link');
-      setVideoTitle('');
-      setIsPlayingPreview(false);
-      return;
-    }
-
-    if (trimmed === lastFetchedShareUrlRef.current && videoTitle) {
-      setIsPlayingPreview(true);
-      return;
-    }
-
-    setFetchingVideo(true);
-    setVideoError(null);
-
-    try {
-      const res = await fetch(`/api/youtube/details?url=${encodeURIComponent(trimmed)}`);
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Invalid YouTube URL');
-      }
-
-      lastFetchedShareUrlRef.current = trimmed;
-      setVideoTitle(data.title || `YouTube Video (${vid})`);
-
-      const vDur = data.videoDuration ? Number(data.videoDuration) : undefined;
-      setVideoDuration(vDur);
-
-      if (vDur && vDur < 30) {
-        setVideoStartTime(0);
-        setVideoEndTime(vDur);
-      } else {
-        const defaultDur = data.defaultDuration || 30;
-        setVideoStartTime(0);
-        setVideoEndTime(defaultDur);
-      }
-      setIsPlayingPreview(true);
-    } catch {
-      setVideoError(null);
-      setVideoTitle(`YouTube Video (${vid})`);
-      setIsPlayingPreview(true);
-    } finally {
-      setFetchingVideo(false);
-    }
+  const dismissTipToast = () => {
+    if (tipToastExitTimerRef.current) clearTimeout(tipToastExitTimerRef.current);
+    setTipToastExiting(true);
+    tipToastExitTimerRef.current = setTimeout(() => {
+      setTipToastMessage(null);
+      setTipToastExiting(false);
+    }, 350);
   };
 
-  const handleClearShareVideo = () => {
-    setVideoUrl('');
-    setVideoTitle('');
-    setVideoDuration(undefined);
-    setVideoStartTime(0);
-    setVideoEndTime(30);
-    setVideoError(null);
-    setIsPlayingPreview(false);
-    lastFetchedShareUrlRef.current = '';
-  };
-
-  const handleShareVideoUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newUrl = e.target.value;
-    setVideoUrl(newUrl);
-
-    if (shareDebounceRef.current) {
-      clearTimeout(shareDebounceRef.current);
-    }
-
-    if (!newUrl.trim()) {
-      handleClearShareVideo();
-      return;
-    }
-
-    if (extractYoutubeId(newUrl.trim())) {
-      setVideoError(null);
-      setIsPlayingPreview(true);
-    }
-
-    shareDebounceRef.current = setTimeout(() => {
-      fetchShareYoutubeDetails(newUrl);
-    }, 400);
-  };
-
-  const handleLoadDemoShareVideo = () => {
-    const demoUrl = 'https://www.youtube.com/watch?v=HSsGnEOFY6U';
-    if (shareDebounceRef.current) {
-      clearTimeout(shareDebounceRef.current);
-    }
-    setVideoError(null);
-    setVideoUrl(demoUrl);
-    setVideoStartTime(0);
-    setVideoEndTime(30);
-    setIsPlayingPreview(true);
-    setSharePreviewKey((k) => k + 1);
-    void fetchShareYoutubeDetails(demoUrl);
-  };
-
-  // Auto pause Share Media preview when KHQR modal opens, submitting, or switching away from tip tab
   useEffect(() => {
-    if (submittingTip || isKHQRModalOpen || sideTab !== 'tip') {
-      setIsPlayingPreview(false);
-    }
-  }, [submittingTip, isKHQRModalOpen, sideTab]);
+    if (!tipToastMessage) return;
+    setTipToastExiting(false);
+    const timer = setTimeout(() => dismissTipToast(), 5000);
+    return () => clearTimeout(timer);
+  }, [tipToastMessage]);
 
-  // Clamp clip duration boundaries to videoDuration
   useEffect(() => {
-    if (videoDuration && videoDuration > 0) {
-      if (videoEndTime > videoDuration) {
-        setVideoEndTime(videoDuration);
-      }
-      if (videoStartTime >= videoDuration) {
-        setVideoStartTime(Math.max(0, videoDuration - Math.min(30, videoDuration)));
-      }
-    }
-  }, [videoDuration]);
+    return () => {
+      if (tipToastExitTimerRef.current) clearTimeout(tipToastExitTimerRef.current);
+    };
+  }, []);
+
+  // Keep KHQR modal language in sync with the DonorForm language switch
+  useEffect(() => {
+    const onLangChange = (e: any) => {
+      const l = e.detail || localStorage.getItem('stream_lang');
+      if (l === 'kh' || l === 'en') setTipLang(l);
+    };
+    window.addEventListener('stream_lang_change', onLangChange);
+    return () => window.removeEventListener('stream_lang_change', onLangChange);
+  }, []);
 
   // Handle escape key for unconfigured tip popup modal
   useEffect(() => {
@@ -1014,16 +916,22 @@ export const MultiStreamPage: React.FC = () => {
     }
   }, [location.search, paramUsername]);
 
-  // Keep selected streamer's tip & media share requirements fresh when viewing Tip tab
+  // Load the selected streamer's full public donation profile (KHQR items, video alert, subscribers...) — same data as Donation Page
   useEffect(() => {
     const uname = selectedStreamer?.username?.trim();
     if (!uname || sideTab !== 'tip') return;
     let cancelled = false;
 
+    setTipStreamerInfo((prev) =>
+      prev && prev.username?.toLowerCase() === uname.toLowerCase() ? prev : null
+    );
+    setTipStreamerInfoLoading(true);
+
     donationService
       .getPublicStreamer(uname)
       .then((pub) => {
         if (cancelled || !pub) return;
+        setTipStreamerInfo(pub);
         const nextMinTip = Number(pub.videoMinTipAmount ?? 2.0);
         const nextMaxDur = Number(pub.videoMaxDurationSeconds ?? 300);
 
@@ -1064,7 +972,10 @@ export const MultiStreamPage: React.FC = () => {
           )
         );
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setTipStreamerInfoLoading(false);
+      });
 
     return () => {
       cancelled = true;
@@ -1302,107 +1213,135 @@ export const MultiStreamPage: React.FC = () => {
     setInputMessage('');
   };
 
-  const handleOpenTipModal = (streamer: StreamerClient) => {
-    handleSelectStreamer(streamer);
-    setSideTab('tip');
-    if (streamer.isTipConfigured === false) {
-      setTipTargetStreamer(streamer);
-      setIsUnconfiguredTipModalOpen(true);
-      return;
-    }
-    handleProceedToKHQR(undefined, streamer);
-  };
+  // Submit handler — exact working copy of DonatePage.handleFormSubmit
+  const handleTipFormSubmit = async (formData: DonorFormData) => {
+    const target = selectedStreamer;
+    if (!target || !tipStreamerInfo) return;
 
-  const handleProceedToKHQR = async (e?: React.FormEvent, customTargetStreamer?: StreamerClient) => {
-    if (e) e.preventDefault();
-    const target = customTargetStreamer || tipTargetStreamer || selectedStreamer;
-
-    // Check if streamer has fully configured GramJS, KHQR image, and monitored group
-    if (target.isTipConfigured === false) {
+    if (tipStreamerInfo.isTipConfigured === false || target.isTipConfigured === false) {
       setTipTargetStreamer(target);
       setIsUnconfiguredTipModalOpen(true);
       return;
     }
 
-    if (target.isTipConfigured === undefined && target.username) {
-      try {
-        const pub = await donationService.getPublicStreamer(target.username);
-        if (pub && pub.isTipConfigured === false) {
-          const updated = { ...target, ...pub };
-          setTipTargetStreamer(updated);
-          setSelectedStreamer((prev) => (prev.id === target.id ? updated : prev));
-          setIsUnconfiguredTipModalOpen(true);
-          return;
-        }
-      } catch (e) {}
+    if (!formData.amount || formData.amount <= 0) {
+      return;
     }
 
-    setIsPlayingPreview(false);
+    setTipToastMessage(null);
+    setTipTargetStreamer(target);
     setSubmittingTip(true);
-
-    const amountNum = parseFloat(customAmount || tipAmount) || (currency === 'KHR' ? 4000 : 1);
-    const donor = tipDonorName.trim() || user?.displayName || user?.username || 'Anonymous Supporter';
-    const bank = bankingName.trim() || donor || 'Bakong KHQR';
-    const msg = tipDonorMessage.trim() || `Cheering for ${target.name}! 🔥`;
-    const isShareVideoAllowed = Boolean(target.videoAlertEnabled && target.hasVideoOverlay !== false);
-    const cleanShareUrl = isShareVideoAllowed && activeShareVideoId && videoUrl.trim() ? videoUrl.trim() : '';
+    setCurrentDonorName(formData.donorName);
+    setCurrentBankingName(formData.bankingName || formData.donorName || 'Bakong KHQR');
+    setActiveDonation(null);
+    setIsKHQRModalOpen(true);
 
     try {
+      if (formData.isSubscription) {
+        setSubscriptionMeta({
+          isSubscription: true,
+          tierId: formData.tierId,
+          tierName: formData.tierName
+        });
+      } else {
+        setSubscriptionMeta(null);
+      }
+
       const res = await donationService.createDonation({
-        streamerId: target.id,
-        donorName: donor,
-        donorMessage: msg,
-        amount: amountNum,
-        currency: currency,
-        bankingName: bank,
-        videoUrl: cleanShareUrl || undefined,
-        videoTitle: cleanShareUrl && videoTitle.trim() ? videoTitle.trim() : undefined,
-        videoStartTime: cleanShareUrl ? Math.max(0, videoStartTime) : undefined,
-        videoEndTime: cleanShareUrl ? Math.max(videoStartTime + 5, videoEndTime) : undefined
+        streamerId: tipStreamerInfo.id || target.id,
+        donorName: formData.donorName,
+        donorMessage: formData.donorMessage,
+        amount: formData.amount || 0,
+        currency: formData.currency || 'USD',
+        bankingName: formData.bankingName || formData.donorName || 'Bakong KHQR',
+        videoUrl: formData.videoUrl,
+        videoTitle: formData.videoTitle,
+        videoStartTime: formData.videoStartTime,
+        videoEndTime: formData.videoEndTime,
+        isSubscription: formData.isSubscription,
+        tierId: formData.tierId,
+        tierName: formData.tierName,
+        badgeText: formData.badgeText,
+        badgeColor: formData.badgeColor,
+        badgeBg: formData.badgeBg,
+        badgeBorder: formData.badgeBorder,
+        badgeIcon: formData.badgeIcon,
+        badgeGifUrl: formData.badgeGifUrl,
+        badgeImage: formData.badgeImage,
+        isWheelSpin: formData.isWheelSpin,
+        donationType: formData.donationType,
+        qrImage: formData.qrImage
       });
 
       setActiveDonation(res);
-      setIsKHQRModalOpen(true);
     } catch (err: any) {
-      console.warn('Backend donation creation error, using fallback KHQR payload:', err);
-      const fallbackId = 'tip_' + Date.now();
-      const fallbackPayload = `bakong://khqr?amount=${amountNum}&currency=${currency}&recipient=${target.username}&order=${fallbackId}`;
-      const fallbackQr = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(fallbackPayload)}`;
-      setActiveDonation({
-        donationId: fallbackId,
-        amount: amountNum,
-        currency: currency,
-        bankingName: bank,
-        qrString: fallbackPayload,
-        qrImage: fallbackQr,
-        abaDeepLink: '',
-        bakongDeepLink: '',
-        expiresInSeconds: 300
-      });
-      setIsKHQRModalOpen(true);
+      setIsKHQRModalOpen(false);
+      const errMsg = err?.message || '';
+      setTipToastMessage(
+        errMsg.includes('KHQR') || errMsg.includes('streamer')
+          ? errMsg
+          : `Failed to generate Bakong KHQR${errMsg ? `: ${errMsg}` : ''}`
+      );
     } finally {
       setSubmittingTip(false);
     }
   };
 
+  // Payment success — exact working copy of DonatePage.handlePaymentSuccess (+ TV room chat notification)
   const handlePaymentSuccess = (paidDetails?: any) => {
-    setIsKHQRModalOpen(false);
-    setTipSuccess(true);
+    const target = tipTargetStreamer || selectedStreamer;
+    const paidAmount = Number(paidDetails?.amount ?? activeDonation?.amount ?? 0);
+    const paidCurrency = (paidDetails?.currency || activeDonation?.currency || 'USD') as 'USD' | 'KHR';
+
+    if (paidDetails?.amount) {
+      setActiveDonation((prev) =>
+        prev ? { ...prev, amount: Number(paidDetails.amount), currency: paidDetails.currency || prev.currency } : prev
+      );
+    }
+    if (paidDetails?.banking_name) {
+      setCurrentBankingName(paidDetails.banking_name);
+    }
+
+    // If viewer subscribed, register membership in database & emit real-time event
+    if (subscriptionMeta?.isSubscription && tipStreamerInfo) {
+      const finalSubscriberName = (currentDonorName || paidDetails?.donor_name || 'Supporter').trim();
+      const finalBankingName = (paidDetails?.banking_name || currentBankingName || finalSubscriberName).trim();
+
+      fetch('/api/widgets/subscribers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_subscription',
+          streamerUsername: tipStreamerInfo.username,
+          streamerToken: (tipStreamerInfo as any).overlayToken || tipStreamerInfo.id,
+          subscriberName: finalSubscriberName,
+          bankingName: finalBankingName,
+          tierId: subscriptionMeta.tierId,
+          donorMessage: (activeDonation as any)?.donor_message || '',
+          paymentMethod: 'Bakong KHQR',
+          transactionId: paidDetails?.hash || paidDetails?.md5 || (activeDonation as any)?.md5 || ('khqr_' + Date.now())
+        })
+      }).catch((err) => {
+        console.error('Failed to create subscription record:', err);
+      });
+    }
+
     playSynthNeonChime(0.9);
 
+    // Post a tip notification in the local TV room chat
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const amountNum = paidDetails?.amount || parseFloat(customAmount || tipAmount) || (currency === 'KHR' ? 20000 : 5);
-    const formattedAmount = currency === 'KHR' ? `${Number(amountNum).toLocaleString()} ៛` : `$${Number(amountNum).toFixed(2)}`;
-    const donor = paidDetails?.donor_name || tipDonorName.trim() || user?.displayName || 'Anonymous Supporter';
-    const msg = paidDetails?.donor_message || tipDonorMessage.trim() || `Bakong KHQR Tip Sent to ${selectedStreamer.name}! ⚡️`;
+    const formattedAmount =
+      paidCurrency === 'KHR' ? `${paidAmount.toLocaleString()} ៛` : `$${paidAmount.toFixed(2)}`;
+    const donor = paidDetails?.donor_name || currentDonorName || 'Anonymous Supporter';
+    const msg = paidDetails?.donor_message || `Bakong KHQR Tip Sent to ${target.name}! ⚡️`;
 
     setChatMessages((prev) => [
       ...prev,
       {
         id: 'tip_' + Date.now(),
         author: donor,
-        badge: 'BAKONG TIP',
+        badge: subscriptionMeta?.isSubscription ? 'SUBSCRIBER' : 'BAKONG TIP',
         badgeColor: 'bg-emerald-500 text-slate-950',
         message: `${msg} ⚡️`,
         time: timeStr,
@@ -1410,10 +1349,6 @@ export const MultiStreamPage: React.FC = () => {
         tipAmount: formattedAmount
       }
     ]);
-
-    setTimeout(() => {
-      setTipSuccess(false);
-    }, 4000);
   };
 
   // Reusable Streamer Item Component (Used in Sidebar, NavMenu, and Mobile Tab)
@@ -2607,185 +2542,84 @@ export const MultiStreamPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Donor Name & Banking Account */}
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-[11px] font-mono text-slate-400 mb-1">
-                      Your Name (Visible on Stream)
-                    </label>
-                    <input
-                      type="text"
-                      value={tipDonorName}
-                      onChange={(e) => setTipDonorName(e.target.value)}
-                      placeholder={user?.displayName || user?.username || 'e.g. Sokha Gamer'}
-                      className="w-full px-3 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-mono text-slate-400 mb-1">
-                      ABA / Banking Account Name (For Auto-Verify)
-                    </label>
-                    <input
-                      type="text"
-                      value={bankingName}
-                      onChange={(e) => setBankingName(e.target.value)}
-                      placeholder="e.g. HENG HOCHEN"
-                      className="w-full px-3 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
-                      <span>Cheer Message (TTS Alert on Stream)</span>
-                      <span>{tipDonorMessage.length}/250</span>
-                    </div>
-                    <textarea
-                      rows={2}
-                      maxLength={250}
-                      value={tipDonorMessage}
-                      onChange={(e) => setTipDonorMessage(e.target.value)}
-                      placeholder={`Cheering for ${selectedStreamer.name}! 🔥`}
-                      className="w-full px-3 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none font-sans"
-                    />
-                  </div>
-                </div>
-
-                {/* Share Media (YouTube Video & Clip Duration — Exact Donation Page Experience) - ONLY if streamer has unlocked Video Alerts */}
-                {Boolean(selectedStreamer.videoAlertEnabled && selectedStreamer.hasVideoOverlay !== false && (selectedStreamer.plan ? selectedStreamer.plan.toLowerCase() !== 'free' : true)) && (
-                <div className="space-y-2 pt-0.5">
-                  <div className="flex items-start sm:items-center justify-between gap-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 font-['Chakra_Petch'] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
-                      <span className="inline-flex items-center gap-1.5 shrink-0">
-                        <Youtube size={14} className="text-red-500" />
-                        <span>Share Media</span>
-                      </span>
-                      <span className="text-red-500 font-mono font-bold text-[10px] sm:text-[11px] normal-case tracking-normal">
-                        [Required $1.00]
-                      </span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleLoadDemoShareVideo}
-                      className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline cursor-pointer shrink-0 whitespace-nowrap"
-                    >
-                      Try Demo Video
-                    </button>
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-red-500">
-                      {fetchingVideo ? (
-                        <Loader2 size={14} className="animate-spin text-cyan-400" />
-                      ) : (
-                        <Youtube size={14} />
-                      )}
-                    </div>
-                    <input
-                      type="url"
-                      placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=...)"
-                      value={videoUrl}
-                      onChange={handleShareVideoUrlChange}
-                      className="w-full pl-9 pr-14 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-red-500/70 transition-colors placeholder:text-slate-500"
-                    />
-                    {videoUrl && (
-                      <button
-                        type="button"
-                        onClick={handleClearShareVideo}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-red-400 text-[11px] font-mono transition-colors cursor-pointer"
-                      >
-                        Clear
-                      </button>
+                {/* Donation Form — exact working copy of the Donation Page (/donate) */}
+                {tipStreamerInfo && tipStreamerInfo.username?.toLowerCase() === selectedStreamer.username?.toLowerCase() ? (
+                  <DonorForm
+                    key={tipStreamerInfo.username}
+                    streamer={tipStreamerInfo}
+                    onSubmit={handleTipFormSubmit}
+                    onSetupRequired={() => {
+                      setTipTargetStreamer(selectedStreamer);
+                      setIsUnconfiguredTipModalOpen(true);
+                    }}
+                    loading={submittingTip}
+                    isModalOpen={isKHQRModalOpen}
+                    hideHeader
+                    className="p-3 sm:p-4 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-xl space-y-4 w-full flex flex-col"
+                  />
+                ) : (
+                  <div className="p-6 rounded-2xl border border-slate-800 bg-[#0C101C] flex flex-col items-center justify-center gap-2 text-slate-400">
+                    {tipStreamerInfoLoading ? (
+                      <>
+                        <Loader2 size={22} className="animate-spin text-cyan-400" />
+                        <span className="text-[11px] font-mono tracking-wider">LOADING DONATION FORM...</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle size={22} className="text-amber-400" />
+                        <span className="text-[11px] font-mono text-center">
+                          Donation page is unavailable for @{selectedStreamer.username}.
+                        </span>
+                      </>
                     )}
                   </div>
-
-                  {videoError && (
-                    <p className="text-[10px] text-red-400 font-mono">{videoError}</p>
-                  )}
-
-                  {videoTitle && (
-                    <div className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                      <span className="text-slate-300 truncate font-medium select-text">{videoTitle}</span>
-                    </div>
-                  )}
-
-                  {/* Video Preview Player & Interactive Clip Duration Scrubber */}
-                  {activeShareVideoId && (
-                    <div className="space-y-2.5 pt-1 animate-in fade-in duration-150">
-                      <VideoPlayerWithProgressBar
-                        key={sharePreviewKey}
-                        videoId={activeShareVideoId}
-                        startTime={videoStartTime}
-                        endTime={videoEndTime}
-                        autoplay={isPlayingPreview && !submittingTip && !isKHQRModalOpen && sideTab === 'tip'}
-                        isPaused={submittingTip || isKHQRModalOpen || sideTab !== 'tip'}
-                        muted={false}
-                        videoTitle={videoTitle}
-                        donorName={tipDonorName || user?.displayName || user?.username || 'Viewer'}
-                        isPreview={true}
-                        onPlayStateChange={setIsPlayingPreview}
-                      />
-
-                      <VideoClipScrubberLine
-                        startTime={videoStartTime}
-                        endTime={videoEndTime}
-                        videoDuration={videoDuration}
-                        maxAllowedDuration={Number(selectedStreamer.videoMaxDurationSeconds ?? 300)}
-                        onChange={(newStart, newEnd) => {
-                          setVideoStartTime(newStart);
-                          setVideoEndTime(newEnd);
-                          setIsPlayingPreview(true);
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
                 )}
-              </div>
-
-              {/* 2. Pinned Action Footer: Fits on application screen, always visible without getting cut off */}
-              <div className="p-2.5 sm:p-3 border-t border-slate-800 bg-[#0B0F19] shrink-0 pb-[max(0.6rem,env(safe-area-inset-bottom))] shadow-2xl">
-                <button
-                  type="button"
-                  onClick={handleProceedToKHQR}
-                  disabled={submittingTip}
-                  className="w-full py-2.5 sm:py-3 px-3 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-400 hover:from-emerald-300 hover:to-teal-300 active:scale-[0.99] text-slate-950 font-black text-xs sm:text-sm font-mono tracking-wide transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {submittingTip ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>GENERATING BAKONG KHQR...</span>
-                    </>
-                  ) : selectedStreamer.isTipConfigured === false ? (
-                    <>
-                      <AlertTriangle size={15} />
-                      <span>TIPPING SETUP REQUIRED</span>
-                    </>
-                  ) : (
-                    <>
-                      <DollarSign size={16} className="stroke-[3]" />
-                      <span>TIP STREAMER (BAKONG KHQR)</span>
-                    </>
-                  )}
-                </button>
               </div>
             </div>
           )}
         </aside>
       </div>
 
-      {/* Real Bakong KHQR Modal (Matches Donation Page Architecture) */}
+      {/* Real Bakong KHQR Modal (Exact Donation Page flow) */}
       <BakongKHQRModal
         isOpen={isKHQRModalOpen}
+        isGenerating={submittingTip}
         onClose={() => setIsKHQRModalOpen(false)}
+        onCancel={() => setTipToastMessage('Payment session has expired. Please try again later.')}
         donationData={activeDonation}
-        donorName={tipDonorName || user?.displayName || user?.username || 'Anonymous Supporter'}
-        bankingName={bankingName || tipDonorName || 'Bakong KHQR'}
-        streamerId={tipTargetStreamer?.id || selectedStreamer.id}
-        streamerUsername={tipTargetStreamer?.username || selectedStreamer.username}
+        donorName={currentDonorName}
+        bankingName={currentBankingName}
+        streamerId={tipStreamerInfo?.id || tipTargetStreamer?.id || selectedStreamer.id}
+        streamerUsername={tipStreamerInfo?.username || tipTargetStreamer?.username || selectedStreamer.username}
+        streamerKhqrItems={tipStreamerInfo?.khqrItems}
         onPaymentSuccess={handlePaymentSuccess}
+        lang={tipLang}
       />
+
+      {/* Payment Toast (Slides in from right side on all screens — same as Donation Page) */}
+      {tipToastMessage && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className={`fixed z-[60] top-3 right-3 sm:top-6 sm:right-6 max-w-[calc(100vw-1.5rem)] sm:max-w-md pointer-events-auto ${
+            tipToastExiting ? 'animate-cancel-toast-exit' : 'animate-cancel-toast'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#0d0910]/95 backdrop-blur-md border border-red-500/40 shadow-2xl shadow-red-950/70 text-slate-100">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertCircle size={17} className="shrink-0 text-red-400" />
+              <p className="text-xs sm:text-sm font-medium text-white leading-snug">{tipToastMessage}</p>
+            </div>
+            <button
+              onClick={dismissTipToast}
+              className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+              title="Dismiss"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Streamer Tipping Unconfigured Modal (Top-Tier Animated Popup Dialog) */}
       {isUnconfiguredTipModalOpen && (

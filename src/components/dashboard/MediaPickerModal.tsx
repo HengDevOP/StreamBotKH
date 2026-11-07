@@ -22,7 +22,8 @@ import {
   Smile,
   Film,
   Music,
-  Filter
+  Filter,
+  Edit2
 } from 'lucide-react';
 import { MediaItem, isVideoAsset, isAudioAsset, isImageAsset } from './MediaLibraryManager';
 import { mediaService, StorageInfo } from '../../services/mediaService';
@@ -79,6 +80,9 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(() => mediaService.getCachedStorage());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
+  const [savingRenameId, setSavingRenameId] = useState<string | null>(null);
 
   // Pro Plan / Trial Guard State
   const [showProModal, setShowProModal] = useState(false);
@@ -364,6 +368,59 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
     const mb = b / (1024 * 1024);
     return mb % 1 === 0 ? `${mb.toFixed(0)} MB` : `${mb.toFixed(1)} MB`;
+  };
+
+  const handleStartRename = (item: MediaItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const dotIdx = item.filename.lastIndexOf('.');
+    const baseName = dotIdx > 0 ? item.filename.slice(0, dotIdx) : item.filename;
+    setEditingId(item._id);
+    setEditingName(baseName);
+  };
+
+  const handleCancelRename = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const handleSaveRename = async (item: MediaItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const trimmed = editingName.trim();
+    if (!trimmed) {
+      handleCancelRename();
+      return;
+    }
+
+    const dotIdx = item.filename.lastIndexOf('.');
+    const ext = dotIdx > 0 ? item.filename.slice(dotIdx) : '';
+    const nextFilename =
+      ext && !trimmed.toLowerCase().endsWith(ext.toLowerCase())
+        ? `${trimmed}${ext}`
+        : trimmed;
+
+    if (nextFilename === item.filename) {
+      handleCancelRename();
+      return;
+    }
+
+    setSavingRenameId(item._id);
+    setErrorMsg(null);
+    try {
+      const updated = await mediaService.renameMedia(item._id, nextFilename);
+      setMediaList((prev) =>
+        prev.map((m) =>
+          m._id === item._id ? { ...m, filename: updated?.filename || nextFilename } : m
+        )
+      );
+      setSuccessMsg(`Renamed to "${updated?.filename || nextFilename}"!`);
+      setTimeout(() => setSuccessMsg(null), 2500);
+      handleCancelRename();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to rename file.');
+    } finally {
+      setSavingRenameId(null);
+    }
   };
 
   const handleUploadFile = async (file: File) => {
@@ -1656,13 +1713,82 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                             )}
                           </div>
 
-                          <div className="p-2.5 bg-[#0B0F19] border-t border-slate-800/80">
-                            <div className="text-[11px] font-semibold text-slate-200 truncate" title={item.filename}>
-                              {item.filename}
-                            </div>
-                            <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-                              {formatFileSize(item.fileSize || 0)}
-                            </div>
+                          <div
+                            className="p-2.5 bg-[#0B0F19] border-t border-slate-800/80"
+                            onClick={(e) => {
+                              if (editingId === item._id) e.stopPropagation();
+                            }}
+                          >
+                            {editingId === item._id ? (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    value={editingName}
+                                    onChange={(e) => setEditingName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSaveRename(item);
+                                      } else if (e.key === 'Escape') {
+                                        handleCancelRename();
+                                      }
+                                    }}
+                                    disabled={savingRenameId === item._id}
+                                    placeholder="File name..."
+                                    className="w-full px-2 py-1 rounded bg-slate-950 border border-cyan-400 text-[11px] text-white font-medium focus:outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleSaveRename(item, e)}
+                                    disabled={savingRenameId === item._id}
+                                    title="Save"
+                                    className="p-1 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors cursor-pointer flex-shrink-0"
+                                  >
+                                    {savingRenameId === item._id ? (
+                                      <RefreshCw size={10} className="animate-spin" />
+                                    ) : (
+                                      <Check size={10} strokeWidth={3} />
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleCancelRename(e)}
+                                    disabled={savingRenameId === item._id}
+                                    title="Cancel"
+                                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer flex-shrink-0"
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </div>
+                                <div className="text-[10px] font-mono text-slate-500">
+                                  {formatFileSize(item.fileSize || 0)}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-start justify-between gap-1.5">
+                                <div className="min-w-0 flex-1">
+                                  <div
+                                    className="text-[11px] font-semibold text-slate-200 truncate"
+                                    title={item.filename}
+                                  >
+                                    {item.filename}
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+                                    {formatFileSize(item.fileSize || 0)}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleStartRename(item, e)}
+                                  title="Rename File"
+                                  className="p-1 rounded-md text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer flex-shrink-0"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

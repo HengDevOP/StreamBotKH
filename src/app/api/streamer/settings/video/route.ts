@@ -10,6 +10,31 @@ export const dynamic = 'force-dynamic';
 
 async function resolveStreamerMongo(req: NextRequest, bodyToken?: string) {
   const usersCol = await getUsersCollection();
+  const { searchParams } = new URL(req.url);
+  const explicitUsername = searchParams.get('username') || '';
+
+  if (explicitUsername) {
+    try {
+      const escaped = String(explicitUsername).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const streamer = await usersCol.findOne({
+        $or: [
+          { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+          { userId: explicitUsername },
+          { id: explicitUsername as any }
+        ]
+      });
+      if (streamer) {
+        const sId = streamer.userId || (streamer as any).id || String(streamer._id);
+        return {
+          streamerId: sId,
+          username: streamer.username,
+          overlayToken: streamer.overlayToken || streamer.overlay_token,
+          mongoUser: streamer
+        };
+      }
+    } catch (e) {}
+  }
+
   const authUser = getAuthenticatedUser(req);
 
   if (authUser) {
@@ -41,8 +66,7 @@ async function resolveStreamerMongo(req: NextRequest, bodyToken?: string) {
     };
   }
 
-  const { searchParams } = new URL(req.url);
-  const token = searchParams.get('token') || bodyToken || searchParams.get('username') || '';
+  const token = searchParams.get('token') || bodyToken || '';
 
   if (token) {
     try {
@@ -79,16 +103,27 @@ async function resolveStreamerMongo(req: NextRequest, bodyToken?: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const { streamerId, username } = await resolveStreamerMongo(req);
+    const { streamerId, username, mongoUser } = await resolveStreamerMongo(req);
 
     const videoCol = await getVideoAlertSettingsCollection();
-    let doc = await videoCol.findOne({
-      $or: [
-        { streamerId },
-        { streamer_id: streamerId as any },
-        ...(username ? [{ streamerId: username }] : [])
-      ]
-    });
+    const docs = await videoCol
+      .find({
+        $or: [
+          { streamerId },
+          { streamer_id: streamerId as any },
+          ...(mongoUser?._id ? [{ streamerId: String(mongoUser._id) }] : []),
+          ...(username
+            ? [
+                { streamerId: username },
+                { streamer_id: username as any }
+              ]
+            : [])
+        ]
+      })
+      .sort({ updatedAt: -1 })
+      .limit(1)
+      .toArray();
+    let doc = docs[0] || null;
 
     if (!doc) {
       const defaultDoc = {
@@ -165,40 +200,41 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const videoCol = await getVideoAlertSettingsCollection();
 
-    // 1. Upsert into video_alert_settings collection
-    await videoCol.updateOne(
-      {
-        $or: [
-          { streamerId },
-          { streamer_id: streamerId as any },
-          ...(username ? [{ streamerId: username }] : [])
-        ]
-      },
-      {
-        $set: {
-          streamerId,
-          isEnabled,
-          is_enabled: isEnabled ? 1 : 0,
-          minTipAmount,
-          min_tip_amount: minTipAmount,
-          maxDurationSeconds,
-          max_duration_seconds: maxDurationSeconds,
-          videoVolume,
-          video_volume: videoVolume,
-          autoDucking,
-          auto_ducking: autoDucking ? 1 : 0,
-          headerColor,
-          headerBgColor,
-          footerColor,
-          footerBgColor,
-          headerTextAlign,
-          footerTextAlign,
-          updatedAt: now
-        },
-        $setOnInsert: { createdAt: now }
-      },
-      { upsert: true }
-    );
+    // 1. Upsert into video_alert_settings collection (update all matching docs to avoid stale duplicates)
+    const filter = {
+      $or: [
+        { streamerId },
+        { streamer_id: streamerId as any },
+        ...(username ? [{ streamerId: username }, { streamer_id: username as any }] : [])
+      ]
+    };
+    const updatePayload = {
+      streamerId,
+      isEnabled,
+      is_enabled: isEnabled ? 1 : 0,
+      minTipAmount,
+      min_tip_amount: minTipAmount,
+      maxDurationSeconds,
+      max_duration_seconds: maxDurationSeconds,
+      videoVolume,
+      video_volume: videoVolume,
+      autoDucking,
+      auto_ducking: autoDucking ? 1 : 0,
+      headerColor,
+      headerBgColor,
+      footerColor,
+      footerBgColor,
+      headerTextAlign,
+      footerTextAlign,
+      updatedAt: now
+    };
+    const updateRes = await videoCol.updateMany(filter, { $set: updatePayload });
+    if (updateRes.matchedCount === 0) {
+      await videoCol.insertOne({
+        ...updatePayload,
+        createdAt: now
+      } as any);
+    }
 
     // 2. Update users collection so the public donation page instantly gets updated constraints
     try {
