@@ -83,7 +83,7 @@ import { AlertSettings } from '../types/alert';
 import { detectPlatform, SocialLinkItem } from '../utils/socialPlatforms';
 import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
-import { OverviewStats } from '../components/dashboard/OverviewStats';
+import { OverviewStats, TimeframeOption } from '../components/dashboard/OverviewStats';
 import { RecentDonationsTable } from '../components/dashboard/RecentDonationsTable';
 import { AlertBoxStudio } from '../components/dashboard/AlertBoxStudio';
 import { PaymentGatewayConfig } from '../components/dashboard/PaymentGatewayConfig';
@@ -640,6 +640,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     }
   };
 
+  // Overview Timeframe Filter (shared between OverviewStats and RecentDonationsTable)
+  const [overviewTimeframe, setOverviewTimeframe] = useState<TimeframeOption>('today');
+
   // Donation Ledger Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState<'ALL' | 'USD' | 'KHR'>('ALL');
@@ -752,8 +755,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     }
   };
 
+  const currentUserId = user?.id || (user as any)?.userId;
+
   useEffect(() => {
-    if (user?.id) {
+    if (currentUserId || user?.email) {
       loadData();
     }
     // Fail-safe: ensure loading skeleton never blocks screen indefinitely
@@ -761,7 +766,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setLoading(false);
     }, 7000);
     return () => clearTimeout(failSafe);
-  }, [user?.id]);
+  }, [currentUserId, user?.email]);
 
   // Subscribe to real-time media & storage updates so storage usage bar reflects uploads/deletions immediately
   useEffect(() => {
@@ -791,8 +796,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   useEffect(() => {
     if (!user || !socket) return;
 
+    const activeUserId = user.id || (user as any).userId;
+
     const joinRooms = () => {
-      joinDashboardRoom(user.id);
+      if (activeUserId) {
+        joinDashboardRoom(activeUserId);
+      }
       if (user.overlayToken) {
         joinOverlayRoom(user.overlayToken);
       }
@@ -869,18 +878,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     const handleDonationPaid = (paidData: any) => {
       if (!paidData) return;
       // Filter out if explicitly addressed to another streamer
-      if (paidData.streamerId && paidData.streamerId !== user.id) return;
+      const matchesUser =
+        (!paidData.streamerId && !paidData.streamerUsername) ||
+        (activeUserId && paidData.streamerId === activeUserId) ||
+        (user.username &&
+          (String(paidData.streamerUsername || '').toLowerCase() === user.username.toLowerCase() ||
+            String(paidData.streamerId || '').toLowerCase() === user.username.toLowerCase()));
+      if (!matchesUser) return;
       if (paidData.overlayToken && user.overlayToken && paidData.overlayToken !== user.overlayToken) return;
       handleIncomingDonation(paidData);
     };
 
     socket.on('donation:new', handleIncomingDonation);
     socket.on('donation:paid', handleDonationPaid);
+    socket.on('donation:alert', handleDonationPaid);
 
     return () => {
       socket.off('connect', joinRooms);
       socket.off('donation:new', handleIncomingDonation);
       socket.off('donation:paid', handleDonationPaid);
+      socket.off('donation:alert', handleDonationPaid);
     };
   }, [user, socket]);
 
@@ -1620,12 +1637,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           badge: null
         },
         {
-          id: 'security' as DashboardTab,
-          label: 'Security & Tokens',
-          icon: Key,
-          badge: null
-        },
-        {
           id: 'account' as DashboardTab,
           label: 'My Account',
           icon: User,
@@ -2178,6 +2189,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         <div className={`flex-1 min-h-0 ${activeTab === 'chat' || activeTab === 'video-alerts' || activeTab === 'support' || activeTab === 'admin-requests' || (activeTab as any) === 'report-issue' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
         <div className={activeTab === 'chat' || activeTab === 'video-alerts' || activeTab === 'support' || activeTab === 'admin-requests' || (activeTab as any) === 'report-issue'
           ? 'w-full h-full p-2.5 sm:p-4 lg:p-5 flex-1 flex flex-col min-h-0 overflow-hidden'
+          : activeTab === 'overview'
+          ? 'w-full min-h-full p-3 xs:p-4 sm:p-5 lg:p-6 flex flex-col animate-fadeIn'
           : 'p-3 xs:p-4 sm:p-6 lg:p-7 max-w-7xl 2xl:max-w-[1600px] w-full mx-auto space-y-6 animate-fadeIn pb-16'
         }>
           {loading && activeTab !== 'account' ? (
@@ -2188,19 +2201,29 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* TAB 1: OVERVIEW & HUD                                          */}
           {/* ============================================================== */}
           {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Summary Stats Grid & Analytics Timeframe Filter */}
-              <OverviewStats stats={stats?.summary} timeframeAnalytics={stats?.timeframeAnalytics} />
+            <div className="flex-1 flex flex-col gap-4 sm:gap-5 w-full min-h-full">
+              {/* Summary Stats Grid, Analytics Graph & Pie Chart */}
+              <OverviewStats
+                stats={stats?.summary}
+                timeframeAnalytics={stats?.timeframeAnalytics}
+                donations={stats?.recentDonations}
+                trend={stats?.trend}
+                selectedTimeframe={overviewTimeframe}
+                onTimeframeChange={setOverviewTimeframe}
+              />
 
               {/* Recent Donations Table Preview */}
-              <RecentDonationsTable
-                donations={stats?.recentDonations}
-                limit={10}
-                title="Recent Donations"
-                onReplayAlert={handleReplayAlert}
-                onDeleteDonation={handleDeleteDonation}
-                deletingId={deletingDonationId}
-              />
+              <div className="flex-1 flex flex-col w-full min-h-[220px]">
+                <RecentDonationsTable
+                  donations={stats?.recentDonations}
+                  limit={10}
+                  title="Recent Donations"
+                  timeframe={overviewTimeframe}
+                  onReplayAlert={handleReplayAlert}
+                  onDeleteDonation={handleDeleteDonation}
+                  deletingId={deletingDonationId}
+                />
+              </div>
             </div>
           )}
 
@@ -3611,68 +3634,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <TicketSupportManager
               isAdmin={isAdmin && activeTab === 'admin-requests'}
             />
-          )}
-
-          {/* ============================================================== */}
-          {/* TAB 10: SECURITY & API TOKENS                                  */}
-          {/* ============================================================== */}
-          {activeTab === 'security' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white font-['Chakra_Petch']">
-                  Security, Sessions & API Keys
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Manage your OBS browser security tokens, active credentials, and webhook endpoints.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-6">
-                <div className="space-y-3 pb-6 border-b border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">OBS Overlay Security Token</h4>
-                      <p className="text-xs text-slate-400">Controls authentication for your live browser source alert feed.</p>
-                    </div>
-                    <button
-                      onClick={handleRegenerateToken}
-                      className="px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-xs font-bold text-red-400 transition-colors"
-                    >
-                      Regenerate Token
-                    </button>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300">
-                    {user.overlayToken}
-                  </div>
-                </div>
-
-                <div className="space-y-3 pb-6 border-b border-slate-800">
-                  <div>
-                    <h4 className="text-sm font-bold text-white">Merchant Pushback Webhook</h4>
-                    <p className="text-xs text-slate-400">ABA PayWay pushback URL for instant transaction verification.</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-cyan-400">
-                    {origin}/api/payway/webhook
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <div>
-                    <h4 className="text-sm font-bold text-white">Active Session</h4>
-                    <p className="text-xs text-slate-400">Signed in as {user.email}</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      logout();
-                      onNavigate('home');
-                    }}
-                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300 hover:text-red-400 transition-colors"
-                  >
-                    Log Out of All Devices
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
 
           {/* ============================================================== */}

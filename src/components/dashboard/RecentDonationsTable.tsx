@@ -2,8 +2,8 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Play, CheckCircle2, MessageSquare, Trash2, Loader2, Radio } from 'lucide-react';
-import { Card } from '../common/Card';
 import { Button } from '../common/Button';
+import type { TimeframeOption } from './OverviewStats';
 
 export interface DonationRecord {
   id: string;
@@ -23,25 +23,61 @@ interface RecentDonationsTableProps {
   limit?: number; // Capped at latest 10 records by default
   title?: string;
   subtitle?: string;
+  timeframe?: TimeframeOption;
   onReplayAlert?: (donation: DonationRecord) => void;
   onDeleteDonation?: (donationId: string) => void;
   deletingId?: string | null;
 }
+
+const TIMEFRAME_LABELS: Record<TimeframeOption, string> = {
+  today: 'Today',
+  '1d': '24h',
+  '3d': '3d',
+  last_week: 'Week',
+  last_month: 'Month',
+  lifetime: 'Lifetime'
+};
 
 export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
   donations = [],
   limit = 10,
   title = 'Recent Donations',
   subtitle,
+  timeframe,
   onReplayAlert,
   onDeleteDonation,
   deletingId
 }) => {
-  // Filter strictly for PAID status only, sorted newest first, and sliced to exactly `limit` (latest 10)
+  // Filter strictly for PAID status and active timeframe filter, sorted newest first, and sliced to `limit`
   const paidDonations = useMemo(() => {
-    const paidOnly = (donations || []).filter(
-      (d) => (d.status || '').toUpperCase() === 'PAID'
-    );
+    const now = Date.now();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayLocalDate = new Date().toDateString();
+    const ms1d = 24 * 60 * 60 * 1000;
+
+    const paidOnly = (donations || []).filter((d) => {
+      if ((d.status || '').toUpperCase() !== 'PAID') return false;
+      if (!timeframe || timeframe === 'lifetime') return true;
+
+      const dt = new Date(d.paid_at || d.created_at || now);
+      const t = dt.getTime();
+      const age = now - t;
+
+      switch (timeframe) {
+        case 'today':
+          return dt.toISOString().slice(0, 10) === todayStr || dt.toDateString() === todayLocalDate;
+        case '1d':
+          return age <= ms1d;
+        case '3d':
+          return age <= 3 * ms1d;
+        case 'last_week':
+          return age <= 7 * ms1d;
+        case 'last_month':
+          return age <= 30 * ms1d;
+        default:
+          return true;
+      }
+    });
 
     const sorted = [...paidOnly].sort((a, b) => {
       const timeA = new Date(a.paid_at || a.created_at || 0).getTime();
@@ -50,7 +86,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
     });
 
     return typeof limit === 'number' && limit > 0 ? sorted.slice(0, limit) : sorted;
-  }, [donations, limit]);
+  }, [donations, limit, timeframe]);
 
   // Visual pulse / highlight for newly arrived realtime donation
   const [newlyArrivedId, setNewlyArrivedId] = useState<string | null>(null);
@@ -122,25 +158,19 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
   };
 
   return (
-    <Card className="p-0 overflow-hidden border-slate-800/80 shadow-xl bg-slate-900/60 backdrop-blur-md">
+    <div className="w-full flex-1 flex flex-col p-0 overflow-hidden rounded-2xl border border-slate-800 shadow-sm bg-[#090D18]">
       {/* Header Bar */}
-      <div className="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="p-4 sm:p-5 border-b border-slate-800/80 flex items-center justify-between gap-3 shrink-0">
         <div>
           <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
-            {title}
+            {title}{timeframe ? ` (${TIMEFRAME_LABELS[timeframe]})` : ''}
           </h3>
           {subtitle ? <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p> : null}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="px-3 py-1 rounded-full bg-slate-800/80 text-xs font-mono text-cyan-400 border border-slate-700/80 shadow-sm">
-            Latest {paidDonations.length} records {limit ? `(Max ${limit})` : ''}
-          </div>
         </div>
       </div>
 
       {/* Mobile Card List View (< 640px) */}
-      <div className="block sm:hidden divide-y divide-slate-800/60">
+      <div className="block sm:hidden divide-y divide-slate-800/60 flex-1">
         {paidDonations.length === 0 ? (
           <div className="py-10 text-center text-xs text-slate-500 font-mono px-4 space-y-2">
             <div className="w-8 h-8 rounded-full bg-slate-800/60 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400">
@@ -241,30 +271,21 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
       </div>
 
       {/* Desktop & Tablet Table View (>= 640px) */}
-      <div className="hidden sm:block overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
-        <table className="w-full min-w-[620px] text-left border-collapse">
+      <div className="hidden sm:flex sm:flex-col flex-1 w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
+        <table className="w-full min-w-[640px] table-fixed text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-950/40 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              <th className="py-3 px-5">Donor</th>
-              <th className="py-3 px-5">Amount</th>
-              <th className="py-3 px-5">Message</th>
-              <th className="py-3 px-5">Method</th>
-              <th className="py-3 px-5">Status</th>
-              <th className="py-3 px-5 text-right">Action</th>
+              <th className="py-3 px-5 w-[22%]">Donor</th>
+              <th className="py-3 px-5 w-[14%]">Amount</th>
+              <th className="py-3 px-5 w-[28%]">Message</th>
+              <th className="py-3 px-5 w-[14%]">Method</th>
+              <th className="py-3 px-5 w-[12%]">Status</th>
+              <th className="py-3 px-5 w-[10%] text-right">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 text-sm">
-            {paidDonations.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="py-12 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <Radio size={18} className="animate-pulse text-emerald-400" />
-                    <p className="font-mono text-xs">No Data</p>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              paidDonations.map((d) => {
+          {paidDonations.length > 0 && (
+            <tbody className="divide-y divide-slate-800/60 text-sm">
+              {paidDonations.map((d) => {
                 const isNew = newlyArrivedId === d.id;
                 return (
                   <tr
@@ -275,27 +296,29 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
                         : 'hover:bg-slate-800/30'
                     }`}
                   >
-                    <td className="py-3.5 px-5 font-semibold text-slate-100 flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-pink-600 flex items-center justify-center text-xs font-bold text-white uppercase flex-shrink-0 shadow-sm">
-                        {d.donor_name.slice(0, 1)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-slate-100 truncate block text-sm">{d.donor_name}</span>
-                          {isNew && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
-                              LIVE
-                            </span>
-                          )}
+                    <td className="py-3.5 px-5 font-semibold text-slate-100">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-pink-600 flex items-center justify-center text-xs font-bold text-white uppercase flex-shrink-0 shadow-sm">
+                          {d.donor_name.slice(0, 1)}
                         </div>
-                        <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 font-normal">
-                          <span>{formatTime(d.paid_at, d.created_at)}</span>
-                          {formatDate(d.paid_at, d.created_at) && (
-                            <>
-                              <span className="text-slate-600">•</span>
-                              <span>{formatDate(d.paid_at, d.created_at)}</span>
-                            </>
-                          )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-100 truncate block text-sm">{d.donor_name}</span>
+                            {isNew && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
+                                LIVE
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 font-normal">
+                            <span>{formatTime(d.paid_at, d.created_at)}</span>
+                            {formatDate(d.paid_at, d.created_at) && (
+                              <>
+                                <span className="text-slate-600">•</span>
+                                <span>{formatDate(d.paid_at, d.created_at)}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -306,7 +329,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
                         <span className="text-cyan-400 font-black">${Number(d.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-5 max-w-xs truncate text-slate-300">
+                    <td className="py-3.5 px-5 truncate text-slate-300">
                       {d.donor_message ? (
                         <span className="flex items-center gap-1.5 text-xs italic text-slate-300" title={d.donor_message}>
                           <MessageSquare size={13} className="text-slate-500 flex-shrink-0" />
@@ -357,11 +380,18 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
                     </td>
                   </tr>
                 );
-              })
-            )}
-          </tbody>
+              })}
+            </tbody>
+          )}
         </table>
+
+        {paidDonations.length === 0 && (
+          <div className="flex-1 flex flex-col items-center justify-center py-10 text-center text-slate-500 gap-2 min-h-[140px]">
+            <Radio size={18} className="animate-pulse text-emerald-400" />
+            <p className="font-mono text-xs">No Data</p>
+          </div>
+        )}
       </div>
-    </Card>
+    </div>
   );
 };

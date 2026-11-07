@@ -1,16 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  ShieldAlert,
-  RotateCcw,
-  CheckCircle2,
-  Loader2,
-  ChevronDown
+  ChevronDown,
+  TrendingUp,
+  PieChart as PieChartIcon
 } from 'lucide-react';
 import { TimeframeMetrics } from '../../types/streamer';
 
-export type TimeframeOption = 'today' | '1d' | '3d' | 'last_week' | 'last_month';
+export type TimeframeOption = 'today' | '1d' | '3d' | 'last_week' | 'last_month' | 'lifetime';
 
 interface OverviewStatsProps {
   stats?: {
@@ -27,11 +25,42 @@ interface OverviewStatsProps {
     '3d': TimeframeMetrics;
     'last_week': TimeframeMetrics;
     'last_month': TimeframeMetrics;
+    lifetime?: TimeframeMetrics;
   };
+  donations?: Array<{
+    id: string;
+    donor_name: string;
+    amount: number;
+    currency: 'USD' | 'KHR';
+    banking_name?: string;
+    payment_method: string;
+    status: string;
+    created_at: string;
+    paid_at?: string;
+  }>;
+  trend?: Array<{
+    date: string;
+    amount_usd: number;
+    count: number;
+  }>;
+  selectedTimeframe?: TimeframeOption;
+  onTimeframeChange?: (timeframe: TimeframeOption) => void;
 }
 
-export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAnalytics }) => {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<TimeframeOption>('today');
+export const OverviewStats: React.FC<OverviewStatsProps> = ({
+  stats,
+  timeframeAnalytics,
+  donations = [],
+  selectedTimeframe: controlledTimeframe,
+  onTimeframeChange
+}) => {
+  const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>('today');
+  const selectedTimeframe = controlledTimeframe ?? internalTimeframe;
+  const setSelectedTimeframe = (next: TimeframeOption) => {
+    setInternalTimeframe(next);
+    onTimeframeChange?.(next);
+  };
+  const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
 
   // Number & currency locale formatters (e.g. 12,123.60, 4,000 ៛)
   const formatUSD = (val: number) =>
@@ -41,82 +70,211 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
   const formatCount = (val: number) =>
     (val || 0).toLocaleString('en-US');
 
-  // Active metrics based on selected timeframe
-  const activeMetrics: TimeframeMetrics = timeframeAnalytics?.[selectedTimeframe] || {
-    usd: selectedTimeframe === 'today' ? (stats?.todayRevenueUsd ?? 0) : 0,
-    khr: selectedTimeframe === 'today' ? (stats?.todayRevenueKhr ?? 0) : 0,
-    count: selectedTimeframe === 'today' ? (stats?.todayDonationsCount ?? 0) : 0,
-    avgPerDayUsd: selectedTimeframe === 'today' ? (stats?.todayRevenueUsd ?? 0) : 0,
-    avgPerDayKhr: selectedTimeframe === 'today' ? (stats?.todayRevenueKhr ?? 0) : 0,
-    potentialMonthlyUsd: (selectedTimeframe === 'today' ? (stats?.todayRevenueUsd ?? 0) : 0) * 30,
-    potentialMonthlyKhr: (selectedTimeframe === 'today' ? (stats?.todayRevenueKhr ?? 0) : 0) * 30
-  };
+  // Filter paid donations for the selected timeframe
+  const filteredDonations = useMemo(() => {
+    const now = Date.now();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayLocalDate = new Date().toDateString();
+    const ms1d = 24 * 60 * 60 * 1000;
+
+    return (donations || []).filter((d) => {
+      if ((d.status || '').toUpperCase() !== 'PAID') return false;
+      const dt = new Date(d.paid_at || d.created_at || now);
+      const t = dt.getTime();
+      const age = now - t;
+
+      switch (selectedTimeframe) {
+        case 'today':
+          return dt.toISOString().slice(0, 10) === todayStr || dt.toDateString() === todayLocalDate;
+        case '1d':
+          return age <= ms1d;
+        case '3d':
+          return age <= 3 * ms1d;
+        case 'last_week':
+          return age <= 7 * ms1d;
+        case 'last_month':
+          return age <= 30 * ms1d;
+        case 'lifetime':
+        default:
+          return true;
+      }
+    });
+  }, [donations, selectedTimeframe]);
+
+  // Active metrics based on selected timeframe (merging server timeframeAnalytics with filteredDonations)
+  const activeMetrics: TimeframeMetrics = useMemo(() => {
+    let calcUsd = 0;
+    let calcKhr = 0;
+    for (const d of filteredDonations) {
+      const amt = Number(d.amount) || 0;
+      if (d.currency === 'KHR') calcKhr += amt;
+      else calcUsd += amt;
+    }
+    const calcCount = filteredDonations.length;
+    const daysFactor =
+      selectedTimeframe === 'today' || selectedTimeframe === '1d'
+        ? 1
+        : selectedTimeframe === '3d'
+        ? 3
+        : selectedTimeframe === 'last_week'
+        ? 7
+        : 30;
+
+    const serverMetrics = timeframeAnalytics?.[selectedTimeframe];
+    const usd = Math.max(serverMetrics?.usd ?? 0, calcUsd);
+    const khr = Math.max(serverMetrics?.khr ?? 0, calcKhr);
+    const count = Math.max(serverMetrics?.count ?? 0, calcCount);
+
+    return {
+      usd,
+      khr,
+      count,
+      avgPerDayUsd: serverMetrics?.avgPerDayUsd ?? Number((usd / daysFactor).toFixed(2)),
+      avgPerDayKhr: serverMetrics?.avgPerDayKhr ?? Math.round(khr / daysFactor),
+      potentialMonthlyUsd: serverMetrics?.potentialMonthlyUsd ?? Number(((usd / daysFactor) * 30).toFixed(2)),
+      potentialMonthlyKhr: serverMetrics?.potentialMonthlyKhr ?? Math.round((khr / daysFactor) * 30)
+    };
+  }, [timeframeAnalytics, selectedTimeframe, filteredDonations]);
 
   const timeframeTabs: Array<{ key: TimeframeOption; label: string; periodLabel: string }> = [
     { key: 'today', label: 'Today', periodLabel: "Today's stream" },
-    { key: '1d', label: '1d', periodLabel: 'Past 24 hours' },
+    { key: '1d', label: '24h', periodLabel: 'Past 24 hours' },
     { key: '3d', label: '3d', periodLabel: 'Past 3 days' },
-    { key: 'last_week', label: 'Last Week', periodLabel: 'Past 7 days' },
-    { key: 'last_month', label: 'Last Month', periodLabel: 'Past 30 days' }
+    { key: 'last_week', label: 'Week', periodLabel: 'Past 7 days' },
+    { key: 'last_month', label: 'Month', periodLabel: 'Past 30 days' },
+    { key: 'lifetime', label: 'Lifetime', periodLabel: 'All-time lifetime' }
   ];
 
   const currentTab = timeframeTabs.find((t) => t.key === selectedTimeframe) || timeframeTabs[0];
 
-  const [pendingCount, setPendingCount] = useState<number>(0);
-  const [isResetting, setIsResetting] = useState<boolean>(false);
-  const [resetMsg, setResetMsg] = useState<string | null>(null);
+  // Combined Earning Revenue for the selected filter: USD tips + (KHR tips / 4000)
+  const khrConvertedToUsd = Number(activeMetrics.khr || 0) / 4000;
+  const totalEarningRevenueUsd = Number(activeMetrics.usd || 0) + khrConvertedToUsd;
 
-  const fetchPending = async () => {
-    try {
-      const res = await fetch('/api/streamer/donations/reset-pending');
-      const data = await res.json();
-      if (data.success && typeof data.pendingCount === 'number') {
-        setPendingCount(data.pendingCount);
+  // Build time-series buckets for the Analytics Graph
+  const graphSeries = useMemo(() => {
+    const now = new Date();
+    const buckets: Array<{ label: string; usdEquiv: number; count: number }> = [];
+
+    if (selectedTimeframe === 'today' || selectedTimeframe === '1d') {
+      // 8 x 3-hour buckets over the last 24h
+      for (let i = 7; i >= 0; i--) {
+        const end = new Date(now.getTime() - i * 3 * 3600 * 1000);
+        const start = new Date(end.getTime() - 3 * 3600 * 1000);
+        const label = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        let usdEquiv = 0;
+        let count = 0;
+        for (const d of filteredDonations) {
+          const t = new Date(d.paid_at || d.created_at).getTime();
+          if (t > start.getTime() && t <= end.getTime()) {
+            const amt = Number(d.amount) || 0;
+            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+            count++;
+          }
+        }
+        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
       }
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    fetchPending();
-    const interval = setInterval(fetchPending, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleResetPending = async () => {
-    setIsResetting(true);
-    setResetMsg(null);
-    try {
-      const res = await fetch('/api/streamer/donations/reset-pending', {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPendingCount(0);
-        setResetMsg(`Cleared ${data.clearedDonations || 0} session(s)`);
-        setTimeout(() => setResetMsg(null), 3500);
+    } else if (selectedTimeframe === '3d') {
+      for (let i = 2; i >= 0; i--) {
+        const day = new Date(now.getTime() - i * 86400000);
+        const dateStr = day.toISOString().slice(0, 10);
+        const label = day.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+        let usdEquiv = 0;
+        let count = 0;
+        for (const d of filteredDonations) {
+          const dStr = new Date(d.paid_at || d.created_at).toISOString().slice(0, 10);
+          if (dStr === dateStr) {
+            const amt = Number(d.amount) || 0;
+            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+            count++;
+          }
+        }
+        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
       }
-    } catch (e) {
-      console.error('Error resetting pending donations:', e);
-    } finally {
-      setIsResetting(false);
+    } else if (selectedTimeframe === 'last_week') {
+      for (let i = 6; i >= 0; i--) {
+        const day = new Date(now.getTime() - i * 86400000);
+        const dateStr = day.toISOString().slice(0, 10);
+        const label = day.toLocaleDateString([], { weekday: 'short' });
+        let usdEquiv = 0;
+        let count = 0;
+        for (const d of filteredDonations) {
+          const dStr = new Date(d.paid_at || d.created_at).toISOString().slice(0, 10);
+          if (dStr === dateStr) {
+            const amt = Number(d.amount) || 0;
+            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+            count++;
+          }
+        }
+        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+      }
+    } else {
+      // Month / Lifetime: 6 x 5-day buckets (last 30 days)
+      for (let i = 5; i >= 0; i--) {
+        const end = new Date(now.getTime() - i * 5 * 86400000);
+        const start = new Date(end.getTime() - 5 * 86400000);
+        const label = end.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        let usdEquiv = 0;
+        let count = 0;
+        for (const d of filteredDonations) {
+          const t = new Date(d.paid_at || d.created_at).getTime();
+          if (t > start.getTime() && t <= end.getTime()) {
+            const amt = Number(d.amount) || 0;
+            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+            count++;
+          }
+        }
+        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+      }
     }
-  };
+
+    return buckets;
+  }, [filteredDonations, selectedTimeframe]);
+
+  // Build Pie / Donut Chart slices
+  const pieSlices = useMemo(() => {
+    const usdVal = Number(activeMetrics.usd || 0);
+    const khrEquivUsd = Number((activeMetrics.khr || 0) / 4000);
+    const total = usdVal + khrEquivUsd;
+
+    if (total <= 0) {
+      return [
+        { label: 'USD ($)', value: 0, displayAmount: '$0.00', percent: 50, color: '#00F0FF' },
+        { label: 'KHR (៛)', value: 0, displayAmount: '0 ៛', percent: 50, color: '#EC4899' }
+      ];
+    }
+
+    const usdPct = Math.round((usdVal / total) * 100);
+    const khrPct = Math.max(0, 100 - usdPct);
+
+    return [
+      {
+        label: 'USD ($)',
+        value: usdVal,
+        displayAmount: `$${formatUSD(usdVal)}`,
+        percent: usdPct,
+        color: '#00F0FF'
+      },
+      {
+        label: 'KHR (៛)',
+        value: khrEquivUsd,
+        displayAmount: `${formatKHR(activeMetrics.khr)} ៛`,
+        percent: khrPct,
+        color: '#EC4899'
+      }
+    ];
+  }, [activeMetrics]);
 
   return (
     <div className="space-y-4">
       {/* Top Header Bar & Timeframe Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-0.5">
-        <div>
-          <h2 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] tracking-wide">
-            Performance &amp; Approximate Earnings
-          </h2>
-          <p className="text-xs text-slate-400">
-            Real-time tip velocity and projected monthly run-rate for {currentTab.periodLabel.toLowerCase()}
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-3 pb-0.5">
+        <h2 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] tracking-wide truncate">
+          Performance &amp; Earning Revenue
+        </h2>
 
         {/* Timeframe Filter Dropdown */}
-        <div className="relative self-start sm:self-auto">
+        <div className="relative self-end sm:self-auto ml-auto shrink-0">
           <select
             value={selectedTimeframe}
             onChange={(e) => setSelectedTimeframe(e.target.value as TimeframeOption)}
@@ -125,7 +283,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
           >
             {timeframeTabs.map((tab) => (
               <option key={tab.key} value={tab.key} className="bg-slate-950 text-white py-1">
-                {tab.label} ({tab.periodLabel})
+                {tab.label}
               </option>
             ))}
           </select>
@@ -133,142 +291,336 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats, timeframeAn
         </div>
       </div>
 
-      {/* 4 Stat Cards Row (Primary Approximate Earnings: 2 cols, Others: 1 col each) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 items-stretch">
-        {/* Primary: Approximate Earnings (spans 2 cols, bigger, monochrome clean design, no icon) */}
-        <div className="col-span-1 md:col-span-2 lg:col-span-2 rounded-2xl bg-[#090D18] border border-slate-800 p-5 flex flex-col justify-between shadow-sm">
+      {/* Primary Earning Revenue Big Card + 3 Child Cards Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3.5 sm:gap-4 items-stretch">
+        {/* Primary Big Card: Earning Revenue */}
+        <div className="lg:col-span-2 rounded-2xl bg-[#090D18] border border-slate-800 p-5 sm:p-6 flex flex-col justify-between shadow-sm">
           <div>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider font-['Chakra_Petch']">
-                Approximate Earnings ({currentTab.label})
-              </span>
-              <span className="text-[10px] font-mono text-slate-400 font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 whitespace-nowrap">
-                Projected Monthly
+              <span className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-wider font-['Chakra_Petch']">
+                Earning Revenue ({currentTab.label})
               </span>
             </div>
 
             <div className="mt-3.5 flex items-baseline gap-2">
               <span className="text-3xl sm:text-4xl font-black tracking-tight text-white font-mono">
-                ${formatUSD(activeMetrics.potentialMonthlyUsd)}
+                ${formatUSD(totalEarningRevenueUsd)}
               </span>
-              <span className="text-xs font-mono text-slate-400 font-bold">/mo</span>
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 text-[11px] text-slate-400 font-mono">
-            {activeMetrics.potentialMonthlyKhr > 0 ? (
-              <span className="text-slate-300 font-medium truncate">
-                + {formatKHR(activeMetrics.potentialMonthlyKhr)} ៛/mo projected
+            <span className="text-slate-300 font-medium truncate">
+              ${formatUSD(activeMetrics.usd)} + {formatKHR(activeMetrics.khr)} ៛ (${formatUSD(khrConvertedToUsd)})
+            </span>
+            <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">4,000 ៛ = $1</span>
+          </div>
+        </div>
+
+        {/* 3 Child Cards Displayed as a 3-Column Grid Across Device Screens */}
+        <div className="lg:col-span-3 grid grid-cols-3 gap-2.5 sm:gap-4 items-stretch">
+          {/* Child Card 1: Tips USD */}
+          <div className="rounded-2xl bg-[#090D18] border border-slate-800 p-3 sm:p-5 flex flex-col justify-between shadow-sm min-w-0">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider truncate">
+              Tips (USD)
+            </span>
+            <div className="my-2 sm:my-2.5">
+              <span className="text-base sm:text-2xl font-black tracking-tight text-white font-mono block truncate">
+                ${formatUSD(activeMetrics.usd)}
               </span>
-            ) : (
-              <span className="text-slate-400 truncate">
-                ${formatUSD(activeMetrics.avgPerDayUsd)}/day velocity
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
+              ${formatUSD(activeMetrics.avgPerDayUsd)}/day rate
+            </div>
+          </div>
+
+          {/* Child Card 2: Tips KHR */}
+          <div className="rounded-2xl bg-[#090D18] border border-slate-800 p-3 sm:p-5 flex flex-col justify-between shadow-sm min-w-0">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider truncate">
+              Tips (KHR)
+            </span>
+            <div className="my-2 sm:my-2.5">
+              <span className="text-base sm:text-2xl font-black tracking-tight text-white font-mono block truncate">
+                {formatKHR(activeMetrics.khr)} <span className="text-[10px] sm:text-xs font-bold text-slate-400">៛</span>
               </span>
-            )}
-            <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">Auto-projected</span>
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
+              ~{formatKHR(activeMetrics.avgPerDayKhr)} ៛/day rate
+            </div>
           </div>
-        </div>
 
-        {/* Supporting Card 1: Tips USD */}
-        <div className="col-span-1 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Tips (USD)
-          </span>
-          <div className="my-2.5">
-            <span className="text-2xl font-black tracking-tight text-white font-mono">
-              ${formatUSD(activeMetrics.usd)}
+          {/* Child Card 3: Tips Count */}
+          <div className="rounded-2xl bg-[#090D18] border border-slate-800 p-3 sm:p-5 flex flex-col justify-between shadow-sm min-w-0">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider truncate">
+              Tips Count
             </span>
-          </div>
-          <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
-            ${formatUSD(activeMetrics.avgPerDayUsd)}/day rate
-          </div>
-        </div>
-
-        {/* Supporting Card 2: Tips KHR */}
-        <div className="col-span-1 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Tips (KHR)
-          </span>
-          <div className="my-2.5">
-            <span className="text-2xl font-black tracking-tight text-white font-mono">
-              {formatKHR(activeMetrics.khr)} <span className="text-xs font-bold text-slate-400">៛</span>
-            </span>
-          </div>
-          <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
-            ~{formatKHR(activeMetrics.avgPerDayKhr)} ៛/day rate
-          </div>
-        </div>
-
-        {/* Supporting Card 3: Tips Count */}
-        <div className="col-span-1 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Tips Count
-          </span>
-          <div className="my-2.5">
-            <span className="text-2xl font-black tracking-tight text-white font-mono">
-              {formatCount(activeMetrics.count)}
-            </span>
-          </div>
-          <div className="text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
-            {currentTab.periodLabel}
+            <div className="my-2 sm:my-2.5">
+              <span className="text-base sm:text-2xl font-black tracking-tight text-white font-mono block truncate">
+                {formatCount(activeMetrics.count)}
+              </span>
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800/60 truncate">
+              {currentTab.periodLabel}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Pending Session Management & Auto-Expiry Monitor Bar (Compact) */}
-      <div className="px-4 py-2.5 rounded-xl bg-[#090D18] border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 font-mono text-xs select-none shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <ShieldAlert size={15} className="text-cyan-400 flex-shrink-0" />
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-white uppercase tracking-wider font-['Chakra_Petch'] text-[11px]">
-              Pending Sessions
-            </span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1.5 ${
-                pendingCount > 0
-                  ? 'bg-amber-500/15 border border-amber-500/40 text-amber-300 animate-pulse'
-                  : 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300'
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${pendingCount > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-              {pendingCount} Pending
-            </span>
-            <span className="text-[11px] text-slate-400 hidden md:inline">
-              • 5m auto-clear active
-            </span>
+      {/* Next Section: Analytics Graph & Pie Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3.5 sm:gap-4 items-stretch">
+        {/* Left (3 cols): Revenue Analytics Graph */}
+        <div className="lg:col-span-3 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-800/80">
+            <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+              <TrendingUp size={15} />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider font-['Chakra_Petch']">
+                Revenue Analytics Graph ({currentTab.label})
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                USD-equivalent tip trend across {currentTab.periodLabel.toLowerCase()}
+              </p>
+            </div>
+          </div>
+
+          {/* SVG Graph Canvas */}
+          <div className="relative pt-4 pb-1 flex-1 flex flex-col justify-end min-h-[190px]">
+            {(() => {
+              const maxVal = Math.max(...graphSeries.map((b) => b.usdEquiv), 10);
+              const width = 560;
+              const height = 145;
+              const padLeft = 36;
+              const padRight = 16;
+              const padTop = 14;
+              const padBottom = 26;
+              const plotW = width - padLeft - padRight;
+              const plotH = height - padTop - padBottom;
+
+              const points = graphSeries.map((b, i) => {
+                const x =
+                  graphSeries.length > 1
+                    ? padLeft + (i / (graphSeries.length - 1)) * plotW
+                    : padLeft + plotW / 2;
+                const y = padTop + plotH - (b.usdEquiv / maxVal) * plotH;
+                return { x, y, ...b };
+              });
+
+              const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(' ');
+              const areaPath =
+                points.length > 0
+                  ? `M ${points[0].x},${padTop + plotH} L ${points
+                      .map((p) => `${p.x},${p.y}`)
+                      .join(' L ')} L ${points[points.length - 1].x},${padTop + plotH} Z`
+                  : '';
+
+              return (
+                <svg
+                  viewBox={`0 0 ${width} ${height}`}
+                  className="w-full h-44 overflow-visible select-none"
+                >
+                  <defs>
+                    <linearGradient id="overviewAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#00F0FF" stopOpacity="0.32" />
+                      <stop offset="100%" stopColor="#00F0FF" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+
+                  {/* Horizontal Grid Lines */}
+                  {[0, 0.5, 1].map((ratio, idx) => {
+                    const y = padTop + plotH * (1 - ratio);
+                    const labelVal = Math.round(maxVal * ratio);
+                    return (
+                      <g key={idx}>
+                        <line
+                          x1={padLeft}
+                          y1={y}
+                          x2={width - padRight}
+                          y2={y}
+                          stroke="#1E293B"
+                          strokeDasharray="3 3"
+                          strokeWidth="1"
+                        />
+                        <text
+                          x={padLeft - 6}
+                          y={y + 3}
+                          textAnchor="end"
+                          className="fill-slate-500 text-[9px] font-mono"
+                        >
+                          ${labelVal}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {areaPath && <path d={areaPath} fill="url(#overviewAreaGrad)" />}
+                  {points.length > 1 && (
+                    <polyline
+                      fill="none"
+                      stroke="#00F0FF"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      points={polylinePoints}
+                    />
+                  )}
+                  {points.map((p, idx) => {
+                    const isHovered = hoveredPointIdx === idx;
+                    return (
+                      <g
+                        key={idx}
+                        onMouseEnter={() => setHoveredPointIdx(idx)}
+                        onMouseLeave={() => setHoveredPointIdx(null)}
+                        className="cursor-pointer"
+                      >
+                        <circle
+                          cx={p.x}
+                          cy={p.y}
+                          r={isHovered ? 5.5 : 3.5}
+                          fill="#090D18"
+                          stroke="#00F0FF"
+                          strokeWidth={isHovered ? 3 : 2}
+                        />
+                        {isHovered && (
+                          <g transform={`translate(${Math.min(Math.max(p.x, 60), width - 60)}, ${Math.max(p.y - 28, 12)})`}>
+                            <rect
+                              x="-48"
+                              y="-14"
+                              width="96"
+                              height="20"
+                              rx="5"
+                              fill="#0F172A"
+                              stroke="#00F0FF"
+                              strokeWidth="1"
+                            />
+                            <text
+                              x="0"
+                              y="-1"
+                              textAnchor="middle"
+                              className="fill-cyan-300 text-[9px] font-mono font-bold"
+                            >
+                              ${formatUSD(p.usdEquiv)} ({p.count})
+                            </text>
+                          </g>
+                        )}
+                      </g>
+                    );
+                  })}
+
+                  {/* X-Axis Labels */}
+                  {points.map((p, idx) => (
+                    <text
+                      key={idx}
+                      x={p.x}
+                      y={height - 6}
+                      textAnchor="middle"
+                      className="fill-slate-400 text-[9px] font-mono"
+                    >
+                      {p.label}
+                    </text>
+                  ))}
+                </svg>
+              );
+            })()}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          {resetMsg && (
-            <span className="text-xs text-emerald-400 font-bold flex items-center gap-1 animate-fadeIn">
-              <CheckCircle2 size={13} />
-              <span>{resetMsg}</span>
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={handleResetPending}
-            disabled={isResetting}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border cursor-pointer ${
-              pendingCount > 0
-                ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
-                : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700/60'
-            }`}
-            title="Reset all pending sessions to cancelled to avoid unmatched GramJS alerts"
-          >
-            {isResetting ? (
-              <>
-                <Loader2 size={12} className="animate-spin" />
-                <span>Resetting...</span>
-              </>
-            ) : (
-              <>
-                <RotateCcw size={12} />
-                <span>Reset Pending</span>
-              </>
-            )}
-          </button>
+        {/* Right (2 cols): Pie / Donut Breakdown Chart */}
+        <div className="lg:col-span-2 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-800/80">
+            <div className="p-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20 text-pink-400">
+              <PieChartIcon size={15} />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider font-['Chakra_Petch']">
+                Revenue Pie Chart
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Distribution by currency
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4 flex-1">
+            {/* SVG Donut Pie Chart */}
+            <div className="relative w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center shrink-0">
+              {(() => {
+                const size = 136;
+                const strokeWidth = 18;
+                const radius = (size - strokeWidth) / 2;
+                const circumference = 2 * Math.PI * radius;
+                let cumulativePercent = 0;
+
+                const totalVal = pieSlices.reduce((acc, s) => acc + s.value, 0);
+
+                return (
+                  <>
+                    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+                      <circle
+                        cx={size / 2}
+                        cy={size / 2}
+                        r={radius}
+                        fill="transparent"
+                        stroke="#1E293B"
+                        strokeWidth={strokeWidth}
+                      />
+                      {totalVal > 0 &&
+                        pieSlices.map((slice, idx) => {
+                          const strokeDasharray = `${(slice.percent / 100) * circumference} ${circumference}`;
+                          const strokeDashoffset = -((cumulativePercent / 100) * circumference);
+                          cumulativePercent += slice.percent;
+
+                          return (
+                            <circle
+                              key={idx}
+                              cx={size / 2}
+                              cy={size / 2}
+                              r={radius}
+                              fill="transparent"
+                              stroke={slice.color}
+                              strokeWidth={strokeWidth}
+                              strokeDasharray={strokeDasharray}
+                              strokeDashoffset={strokeDashoffset}
+                              strokeLinecap="butt"
+                            />
+                          );
+                        })}
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase">Total</span>
+                      <span className="text-xs sm:text-sm font-black font-mono text-white">
+                        ${formatUSD(activeMetrics.usd + (activeMetrics.khr || 0) / 4000)}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Pie Legend List */}
+            <div className="flex-1 w-full space-y-2">
+              {pieSlices.map((slice, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: slice.color }}
+                    />
+                    <span className="text-slate-200 font-bold truncate">{slice.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-slate-400 text-[11px]">{slice.displayAmount}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-bold text-white">
+                      {slice.percent}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

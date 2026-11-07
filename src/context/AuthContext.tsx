@@ -31,7 +31,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storedToken = localStorage.getItem('streamneon_auth_token');
         const storedUser = localStorage.getItem('streamneon_user');
         if (storedToken && storedUser) {
-          return JSON.parse(storedUser);
+          const parsed = JSON.parse(storedUser);
+          if (parsed && !parsed.id && parsed.userId) {
+            parsed.id = parsed.userId;
+          }
+          return parsed;
         }
       } catch (_) {}
     }
@@ -86,6 +90,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (typeof window !== 'undefined' && localStorage.getItem('streamneon_auth_token')) {
         const profile = await authService.getMe();
+        if (profile && !(profile as any).id && (profile as any).userId) {
+          (profile as any).id = (profile as any).userId;
+        }
+        if ((profile as any)?.token && typeof window !== 'undefined') {
+          localStorage.setItem('streamneon_auth_token', (profile as any).token);
+          setToken((profile as any).token);
+        }
         setUser(profile);
         if (typeof window !== 'undefined') {
           localStorage.setItem('streamneon_user', JSON.stringify(profile));

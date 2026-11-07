@@ -113,6 +113,7 @@ export interface StreamerDashboardStats {
     '3d': TimeframeMetrics;
     'last_week': TimeframeMetrics;
     'last_month': TimeframeMetrics;
+    lifetime?: TimeframeMetrics;
   };
   topDonors: Array<{
     donor_name: string;

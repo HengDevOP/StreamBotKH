@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getDonationsCollection, cleanupOlderDonationsMongo } from '@/server/database/mongo';
+import {
+  getUsersCollection,
+  getDonationsCollection,
+  cleanupOlderDonationsMongo,
+  cleanupExpiredPendingDonationsMongo
+} from '@/server/database/mongo';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,30 +14,70 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const streamerId = user.id;
-
-    // Enforce 6-month retention policy cleanup in MongoDB
+    // Enforce 6-month retention policy cleanup & 5-minute pending session auto-clear in MongoDB
     try {
       await cleanupOlderDonationsMongo(6);
+      await cleanupExpiredPendingDonationsMongo();
     } catch (e) {}
+
+    // Resolve current user record in MongoDB by userId, id, or email so any token/username updates stay in sync
+    const candidateIds = new Set<string>([user.id]);
+    const candidateUsernames = new Set<string>();
+    if (user.username) {
+      candidateUsernames.add(user.username);
+      candidateIds.add(user.username);
+    }
+
+    try {
+      const usersCol = await getUsersCollection();
+      const escapedEmail = (user.email || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const dbUser = await usersCol.findOne({
+        $or: [
+          { userId: user.id },
+          { id: user.id as any },
+          ...(escapedEmail ? [{ email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } }] : [])
+        ]
+      });
+
+      if (dbUser) {
+        if (dbUser.userId) candidateIds.add(dbUser.userId);
+        if ((dbUser as any).id) candidateIds.add(String((dbUser as any).id));
+        if (dbUser._id) candidateIds.add(String(dbUser._id));
+        if (dbUser.username) {
+          candidateUsernames.add(dbUser.username);
+          candidateIds.add(dbUser.username);
+        }
+      }
+    } catch (e) {}
+
+    const idList = Array.from(candidateIds).filter(Boolean);
+    const usernameRegexes = Array.from(candidateUsernames)
+      .filter(Boolean)
+      .map((u) => new RegExp(`^${u.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'));
 
     const donationsCol = await getDonationsCollection();
 
-    // Query all PAID donations for this streamer
+    // Query all PAID donations for this streamer across all matching IDs & usernames
     const allPaid = await donationsCol
       .find({
         $or: [
-          { streamerId },
-          { streamer_id: streamerId as any },
-          ...(user.username ? [{ streamerId: user.username }] : [])
+          { streamerId: { $in: idList } },
+          { streamer_id: { $in: idList } as any },
+          ...(usernameRegexes.length > 0
+            ? [
+                { streamerUsername: { $in: usernameRegexes } as any },
+                { streamerId: { $in: usernameRegexes } as any }
+              ]
+            : [])
         ],
         status: 'PAID'
       })
-      .sort({ createdAt: -1 })
+      .sort({ paidAt: -1, createdAt: -1 })
       .toArray();
 
     const now = Date.now();
     const todayStr = new Date().toISOString().slice(0, 10);
+    const todayLocalStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
 
     let totalUsd = 0;
     let totalUsdCount = 0;
@@ -58,8 +103,11 @@ export async function GET(req: NextRequest) {
       '1d': { usd: 0, khr: 0, count: 0 },
       '3d': { usd: 0, khr: 0, count: 0 },
       last_week: { usd: 0, khr: 0, count: 0 },
-      last_month: { usd: 0, khr: 0, count: 0 }
+      last_month: { usd: 0, khr: 0, count: 0 },
+      lifetime: { usd: 0, khr: 0, count: 0 }
     };
+
+    let oldestPaidTime = now;
 
     for (const d of allPaid) {
       const amt = Number(d.amount) || 0;
@@ -68,19 +116,26 @@ export async function GET(req: NextRequest) {
       const paidDate = d.paidAt ? new Date(d.paidAt) : (d.createdAt ? new Date(d.createdAt) : new Date());
       const paidTime = paidDate.getTime();
       const paidDateStr = paidDate.toISOString().slice(0, 10);
+      const paidLocalStr = paidDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
       const donorName = d.donorName || (d as any).donor_name || 'Generous Supporter';
 
-      // Totals
+      // Totals & Lifetime
+      if (paidTime < oldestPaidTime) {
+        oldestPaidTime = paidTime;
+      }
+      tf.lifetime.count++;
       if (isKhr) {
         totalKhr += amt;
         totalKhrCount++;
+        tf.lifetime.khr += amt;
       } else {
         totalUsd += amt;
         totalUsdCount++;
+        tf.lifetime.usd += amt;
       }
 
       // Today
-      if (paidDateStr === todayStr) {
+      if (paidDateStr === todayStr || paidLocalStr === todayLocalStr) {
         if (isKhr) {
           todayKhr += amt;
           todayKhrCount++;
@@ -140,12 +195,15 @@ export async function GET(req: NextRequest) {
       };
     };
 
+    const lifetimeDays = Math.max(1, Math.ceil((now - oldestPaidTime) / ms1d));
+
     const timeframeAnalytics = {
       today: calcTf(tf.today, 1),
       '1d': calcTf(tf['1d'], 1),
       '3d': calcTf(tf['3d'], 3),
       last_week: calcTf(tf.last_week, 7),
-      last_month: calcTf(tf.last_month, 30)
+      last_month: calcTf(tf.last_month, 30),
+      lifetime: calcTf(tf.lifetime, lifetimeDays)
     };
 
     const topDonors = Array.from(donorTotals.entries())
@@ -165,7 +223,7 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    const recentDonations = allPaid.slice(0, 50).map((d) => ({
+    const recentDonations = allPaid.slice(0, 200).map((d) => ({
       id: d.id,
       streamer_id: d.streamerId || (d as any).streamer_id,
       donor_name: d.donorName || (d as any).donor_name,

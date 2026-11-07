@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/server/auth';
+import { getAuthenticatedUser, generateToken } from '@/server/auth';
 import { getUsersCollection, processExpiredAccountDeletions } from '@/server/database/mongo';
 import { isAdminEmail } from '@/server/database/db';
 
@@ -93,8 +93,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const resolvedUserId = streamer.userId || (streamer as any).id || String(streamer._id);
+  const refreshedToken =
+    user.id !== resolvedUserId || user.username !== streamer.username
+      ? generateToken({
+          id: resolvedUserId,
+          username: streamer.username || 'streamer',
+          email: streamer.email || ''
+        })
+      : undefined;
+
   return NextResponse.json({
-    userId: streamer.userId || (streamer as any).id || String(streamer._id),
+    id: resolvedUserId,
+    userId: resolvedUserId,
+    ...(refreshedToken ? { token: refreshedToken } : {}),
     email: streamer.email,
     username: streamer.username,
     displayName: streamer.displayName,
