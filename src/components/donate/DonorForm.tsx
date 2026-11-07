@@ -27,7 +27,8 @@ import {
   Check,
   CreditCard,
   X,
-  AlertCircle
+  AlertCircle,
+  Disc
 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
@@ -58,6 +59,8 @@ export interface DonorFormData {
   badgeIcon?: string;
   badgeGifUrl?: string;
   badgeImage?: string;
+  isWheelSpin?: boolean;
+  donationType?: 'tip' | 'subscribe' | 'wheel';
 }
 
 import { getBadgeIconComponent } from '../../data/badgeIcons';
@@ -109,12 +112,16 @@ export const DONOR_TRANSLATIONS = {
     videoPlaceholder: 'Paste YouTube link (e.g. https://www.youtube.com/watch?v=...)',
     clear: 'Clear',
     sendTip: 'Send Tip',
+    wheel: 'Wheel',
+    spinWheelWithKhqr: (price: string) => `Spin Wheel with Bakong KHQR ${price ? `(${price})` : ''}`,
     subscribeWithKhqr: (price: string) => `Subscribe with Bakong KHQR ${price ? `(${price})` : ''}`,
     loading: 'Generating KHQR...'
   },
   kh: {
     oneTimeTip: 'ឧបត្ថម្ភ (Tip)',
     subscribe: 'ជាវសមាជិក (Subscribe)',
+    wheel: 'កងបង្វិល (Wheel)',
+    spinWheelWithKhqr: (price: string) => `បង្វិលកងជាមួយ Bakong KHQR ${price ? `(${price})` : ''}`,
     vipBadge: 'ផ្លាក VIP',
     selectTier: 'ជ្រើសរើសកម្រិតសមាជិក',
     activeBadge: 'ផ្លាកមានសុពលភាព 30 ថ្ងៃ',
@@ -203,10 +210,16 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   const [isPlayingPreview, setIsPlayingPreview] = useState<boolean>(false);
   const [previewKey, setPreviewKey] = useState<number>(0);
 
-  // Subscriber / Membership State
-  const [donationType, setDonationType] = useState<'tip' | 'subscribe'>('tip');
+  // Subscriber & Wheel State
+  const [donationType, setDonationType] = useState<'tip' | 'subscribe' | 'wheel'>('tip');
   const [subscriberSettings, setSubscriberSettings] = useState<{ enabled: boolean; tiers: SubscriberTier[] } | null>(null);
   const [selectedTierId, setSelectedTierId] = useState<string>('');
+  const [wheelSettings, setWheelSettings] = useState<{
+    isEnabled: boolean;
+    minTipAmount: number;
+    spinSoundUrl: string;
+    slices: Array<{ id: string; label: string; color: string; percentage?: number }>;
+  } | null>(null);
 
   // Fetch streamer subscriber settings
   useEffect(() => {
@@ -223,9 +236,24 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         }
       })
       .catch(() => {});
+
+    // Fetch streamer wheel settings
+    fetch(`/api/streamer/${encodeURIComponent(streamer.username)}/wheel`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.isEnabled && Array.isArray(data.slices) && data.slices.length > 0) {
+          setWheelSettings({
+            isEnabled: true,
+            minTipAmount: Number(data.minTipAmount) || 2.0,
+            spinSoundUrl: data.spinSoundUrl || '/sounds/neon-chime.mp3',
+            slices: data.slices
+          });
+        }
+      })
+      .catch(() => {});
   }, [streamer?.username]);
 
-  const handleModeChange = (mode: 'tip' | 'subscribe') => {
+  const handleModeChange = (mode: 'tip' | 'subscribe' | 'wheel') => {
     setDonationType(mode);
     if (mode === 'subscribe' && subscriberSettings?.tiers?.length) {
       const activeTier = subscriberSettings.tiers.find((t) => t.id === selectedTierId) || subscriberSettings.tiers[0];
@@ -233,6 +261,9 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         setAmount(activeTier.price);
         setCurrency(activeTier.currency || 'USD');
       }
+    } else if (mode === 'wheel' && wheelSettings) {
+      setAmount(wheelSettings.minTipAmount || 2.0);
+      setCurrency('USD');
     }
   };
 
@@ -432,8 +463,17 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       ? subscriberSettings.tiers.find((t) => t.id === selectedTierId) || subscriberSettings.tiers[0]
       : null;
 
-    const finalAmount = donationType === 'subscribe' && selectedTier ? selectedTier.price : (amount || 0);
-    const finalCurrency = donationType === 'subscribe' && selectedTier ? (selectedTier.currency || 'USD') : (currency || 'USD');
+    const finalAmount = donationType === 'subscribe' && selectedTier
+      ? selectedTier.price
+      : donationType === 'wheel' && wheelSettings
+      ? (wheelSettings.minTipAmount || 2.0)
+      : (amount || 0);
+
+    const finalCurrency = donationType === 'subscribe' && selectedTier
+      ? (selectedTier.currency || 'USD')
+      : donationType === 'wheel'
+      ? 'USD'
+      : (currency || 'USD');
 
     // Show donor username on alerts and TTS, and pass bankingName for bank payment matching
     await onSubmit({
@@ -447,6 +487,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       videoStartTime: donationType === 'tip' && videoUrl.trim() ? Math.max(0, videoStartTime) : undefined,
       videoEndTime: donationType === 'tip' && videoUrl.trim() ? Math.max(videoStartTime + 5, videoEndTime) : undefined,
       isSubscription: donationType === 'subscribe',
+      isWheelSpin: donationType === 'wheel',
+      donationType: donationType,
       tierId: selectedTier?.id,
       tierName: selectedTier?.name,
       badgeText: selectedTier?.badgeText,
@@ -610,9 +652,15 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         </div>
       </div>
 
-      {/* Donation Type Switch: Tip vs Subscribe / Membership */}
-      {subscriberSettings?.enabled && subscriberSettings.tiers.length > 0 && (
-        <div className="grid grid-cols-2 p-1 bg-slate-950/80 border border-slate-800 rounded-xl gap-1">
+      {/* Donation Type Switch: Tip vs Subscribe / Membership vs Wheel */}
+      {((subscriberSettings?.enabled && subscriberSettings.tiers.length > 0) || wheelSettings?.isEnabled) && (
+        <div
+          className={`grid p-1 bg-slate-950/80 border border-slate-800 rounded-xl gap-1 ${
+            subscriberSettings?.enabled && subscriberSettings.tiers.length > 0 && wheelSettings?.isEnabled
+              ? 'grid-cols-3'
+              : 'grid-cols-2'
+          }`}
+        >
           <button
             type="button"
             onClick={() => handleModeChange('tip')}
@@ -625,18 +673,36 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <Heart size={14} className={donationType === 'tip' ? 'text-pink-400 fill-pink-400/40' : ''} />
             <span>{DONOR_TRANSLATIONS[lang].oneTimeTip}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => handleModeChange('subscribe')}
-            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all cursor-pointer ${
-              donationType === 'subscribe'
-                ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Crown size={14} className={donationType === 'subscribe' ? 'text-amber-400' : ''} />
-            <span>{DONOR_TRANSLATIONS[lang].subscribe}</span>
-          </button>
+
+          {subscriberSettings?.enabled && subscriberSettings.tiers.length > 0 && (
+            <button
+              type="button"
+              onClick={() => handleModeChange('subscribe')}
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all cursor-pointer ${
+                donationType === 'subscribe'
+                  ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Crown size={14} className={donationType === 'subscribe' ? 'text-amber-400' : ''} />
+              <span>{DONOR_TRANSLATIONS[lang].subscribe}</span>
+            </button>
+          )}
+
+          {wheelSettings?.isEnabled && (
+            <button
+              type="button"
+              onClick={() => handleModeChange('wheel')}
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-['Chakra_Petch'] transition-all cursor-pointer ${
+                donationType === 'wheel'
+                  ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Disc size={14} className={donationType === 'wheel' ? 'text-purple-400' : ''} />
+              <span>{DONOR_TRANSLATIONS[lang].wheel}</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -765,6 +831,36 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <div className="p-3 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 rounded-xl flex items-center gap-2.5 text-xs text-amber-300 font-mono">
               <Crown size={16} className="text-amber-400 shrink-0" />
               <span className="leading-snug">{DONOR_TRANSLATIONS[lang].vipNotice}</span>
+            </div>
+          </div>
+        )}
+
+        {/* WHEEL REWARDS (Rendered in Wheel Mode) */}
+        {donationType === 'wheel' && wheelSettings && (
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <span>{lang === 'kh' ? 'រង្វាន់កងបង្វិល' : 'Wheel Rewards'}</span>
+              <span className="text-red-400 font-mono font-bold text-[10px] sm:text-[11px] normal-case tracking-normal">
+                [{lang === 'kh' ? 'ទាមទារ' : 'Required'} ${wheelSettings.minTipAmount.toFixed(2)}]
+              </span>
+            </label>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              {lang === 'kh'
+                ? 'ការឧបត្ថម្ភរបស់អ្នកនឹងបង្វិលកងរង្វាន់ដោយស្វ័យប្រវត្តិលើផ្ទាំងផ្សាយផ្ទាល់។'
+                : 'Your donation automatically spins the reward wheel live on stream.'}
+            </p>
+
+            <div className="flex flex-wrap gap-1.5">
+              {wheelSettings.slices.map((slice) => (
+                <span
+                  key={slice.id}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-950 border border-slate-800 text-xs font-medium text-slate-200"
+                >
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: slice.color }} />
+                  <span>{slice.label}</span>
+                </span>
+              ))}
             </div>
           </div>
         )}
@@ -1049,6 +1145,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                 className={`w-full py-3.5 text-sm sm:text-base font-bold text-slate-950 rounded-none shadow-lg transition-all font-['Chakra_Petch'] flex items-center justify-center gap-2 ${
                   donationType === 'subscribe'
                     ? 'bg-gradient-to-r from-amber-400 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 shadow-amber-500/20'
+                    : donationType === 'wheel'
+                    ? 'bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-300 hover:to-pink-300 shadow-purple-500/20'
                     : 'bg-cyan-400 hover:bg-cyan-300 shadow-cyan-500/20'
                 }`}
               >
@@ -1056,6 +1154,15 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                   <>
                     <Crown size={18} className="fill-slate-950/20" />
                     <span>{DONOR_TRANSLATIONS[lang].subscribeWithKhqr(subPriceLabel)}</span>
+                  </>
+                ) : donationType === 'wheel' ? (
+                  <>
+                    <Disc size={18} className="fill-slate-950/20" />
+                    <span>
+                      {DONOR_TRANSLATIONS[lang].spinWheelWithKhqr(
+                        `$${(wheelSettings?.minTipAmount || 2).toFixed(2)}`
+                      )}
+                    </span>
                   </>
                 ) : (
                   <span>{DONOR_TRANSLATIONS[lang].sendTip}</span>

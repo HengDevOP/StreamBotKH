@@ -10,7 +10,10 @@ import {
   getStreamLeaderboardsCollection,
   getSoundboardsCollection,
   getSoundboardItemsCollection,
-  getPokemonSettingsCollection
+  getPokemonSettingsCollection,
+  getSubscriberSettingsCollection,
+  getSubscribersCollection,
+  getWheelSettingsCollection
 } from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
@@ -95,6 +98,24 @@ export async function POST(req: NextRequest) {
         await pokeCol.updateMany(
           { $or: [{ streamerToken: oldToken }, { streamerId: user.id }] },
           { $set: { streamerToken: newToken, streamerId: user.id, updatedAt: new Date() } }
+        );
+
+        const subCol = await getSubscriberSettingsCollection();
+        await subCol.updateMany(
+          { $or: [{ streamerToken: oldToken }, { streamerUsername: currentStreamer?.username }] },
+          { $set: { streamerToken: newToken, streamerUsername: currentStreamer?.username, updatedAt: new Date() } }
+        );
+
+        const subsRosterCol = await getSubscribersCollection();
+        await subsRosterCol.updateMany(
+          { $or: [{ streamerToken: oldToken }, { streamerUsername: currentStreamer?.username }] },
+          { $set: { streamerToken: newToken, streamerUsername: currentStreamer?.username, updatedAt: new Date() } }
+        );
+
+        const wheelCol = await getWheelSettingsCollection();
+        await wheelCol.updateMany(
+          { $or: [{ streamerToken: oldToken }, { streamerUsername: currentStreamer?.username }] },
+          { $set: { streamerToken: newToken, streamerUsername: currentStreamer?.username, updatedAt: new Date() } }
         );
 
         console.log(`🔄 [Token Regenerate] Migrated MongoDB widget data from ${oldToken.slice(0, 10)}... → ${newToken.slice(0, 10)}...`);

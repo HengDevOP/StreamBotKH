@@ -185,14 +185,17 @@ export async function broadcastToAllStreamerRooms(token: string, event: string, 
       });
     }
 
+    const rooms = new Set<string>();
+    if (token) {
+      rooms.add(`overlay:${token}`);
+    }
+
     if (streamer) {
       // Collect every linked room and emit across all of them (Socket.IO natively de-duplicates sockets)
-      const rooms = new Set<string>();
       const sId = streamer.userId || (streamer as any).id;
       if (sId) rooms.add(`streamer_overlay:${sId}`);
       const activeTok = streamer.overlayToken || streamer.overlay_token;
       if (activeTok) rooms.add(`overlay:${activeTok}`);
-      if (token && token !== 'demo-token') rooms.add(`overlay:${token}`);
 
       if (sId) {
         const histories = await histCol.find({ streamerId: sId }).toArray();
@@ -204,10 +207,10 @@ export async function broadcastToAllStreamerRooms(token: string, event: string, 
           if (o.overlayToken) rooms.add(`overlay:${o.overlayToken}`);
         }
       }
+    }
 
-      if (rooms.size > 0) {
-        io.to(Array.from(rooms)).emit(event, payload);
-      }
+    if (rooms.size > 0) {
+      io.to(Array.from(rooms)).emit(event, payload);
     }
   } catch (e) {}
 }
@@ -339,11 +342,8 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
         }
       }
 
-      // Broadcast single alert event to target overlay room
-      io?.to(`overlay:${token}`).emit('donation:alert', testPayload);
-
-      // Also broadcast to streamer's master overlay room and active overlay token
-      broadcastToAllStreamerRooms(token, 'donation:alert', testPayload);
+      // Broadcast single alert event across all streamer overlay rooms
+      await broadcastToAllStreamerRooms(token, 'donation:alert', testPayload);
     });
 
     // Test video alert trigger from dashboard video alert manager
@@ -372,8 +372,7 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
         overlayToken: token
       };
 
-      io?.to(`overlay:${token}`).emit('donation:alert', alertPayload);
-      broadcastToAllStreamerRooms(token, 'donation:alert', alertPayload);
+      await broadcastToAllStreamerRooms(token, 'donation:alert', alertPayload);
     });
 
     // Broadcast live video alert settings update to overlay rooms
@@ -611,9 +610,7 @@ function emitAlertLocally(overlayToken: string, payload: AlertPayload) {
   const activeIo = getIO();
   if (!activeIo) return;
 
-  activeIo.to(`overlay:${overlayToken}`).emit('donation:alert', payload);
-
-  // Broadcast to streamer master room and all linked overlay tokens via MongoDB
+  // Broadcast once to streamer master room and all linked overlay tokens via MongoDB (rooms natively deduplicated)
   broadcastToAllStreamerRooms(overlayToken, 'donation:alert', payload);
 
   activeIo.emit('donation:paid', {

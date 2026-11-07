@@ -152,7 +152,7 @@ const DEFAULT_SETTINGS: ChatSettings = {
   authorFontFamily: 'Chakra Petch',
   messageFontFamily: 'Inter',
   fontSize: 'base',
-  lineStyle: 'indented',
+  lineStyle: 'inline',
   authorColor: '#00F0FF',
   messageColor: '#FFFFFF',
   animationStyle: 'slide-left',
@@ -194,9 +194,11 @@ const SAMPLE_NAMES = [
 
 const SAMPLE_MESSAGES = [
   'Let’s go! Epic live stream today! 🔥🚀',
-  'wwmwmwmwmwmwmwmwmwmmwmwmw wmwmwmwmwmmwmwmwmwmwmwmwm',
+  'Hello streamer! Loving the live broadcast today, keep up the amazing gameplay and positive energy! 🎮🔥',
   'GG clutch win! That play was insane 💯',
+  'Can you show us your build loadout and camera setup? That keyboard sound is so clean! 🎧✨',
   'Top tier broadcast quality today! ✨',
+  'Watching live from Phnom Penh! Drop the community link whenever you get a break! 🚀',
   'StreamBotKH live chat overlay is so smooth ⚡',
   'Just shared the stream with the squad 🙌',
   'Insane gameplay today, keep rocking! 🎯',
@@ -268,11 +270,12 @@ const INITIAL_MESSAGES: LocalChatMessage[] = [
 ];
 
 const QUICK_TAGS = [
-  '🔥 Hype Stream!',
-  '🎉 GG Clutch Play!',
-  '⚡ Top Tier Quality!',
-  '👑 Jackpot Winner!',
-  '✨ Welcome to the chat!'
+  'Welcome to the stream',
+  'Hello everyone',
+  'Great gameplay',
+  'Awesome stream quality',
+  'Keep up the good work',
+  'Multi-line chat test'
 ];
 
 export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
@@ -635,15 +638,20 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
     const sampleAuthors = ['CyberFan', 'SokhaAce', 'KompongChamp', 'GamerKhmer', 'ChakriyaX'];
     const sampleTexts = [
       'Amazing broadcast quality! ⚡',
+      'Hello streamer! Loving the broadcast today, keep up the amazing gameplay and positive energy! 🎮🔥',
       'Drop that link in chat! 🎯',
+      'Can you show us your build loadout and camera setup? That keyboard sound is so clean! 🎧✨',
       'The vibe here is unmatched 🙌',
       'StreamBotKH live chat is clean!',
+      'Watching live from Phnom Penh! Drop the community link whenever you get a break! 🚀',
       'Hype hype hype! 🔥🔥🔥'
     ];
     const randIdx = Math.floor(Math.random() * sampleAuthors.length);
 
     const authorName = customMsg ? 'Streamer' : sampleAuthors[randIdx];
-    const textContent = customMsg || sampleTexts[randIdx];
+    const textContent = customMsg === 'Multi-line chat test'
+      ? 'Hello streamer! Really loving your live broadcast quality today, keep up the great gameplay and positive energy for the squad tonight.'
+      : (customMsg || sampleTexts[randIdx % sampleTexts.length]);
 
     const assignedBadge = randIdx % 2 === 0 ? 'VIP' : 'MOD';
     const badgePreset = SAMPLE_BADGE_PRESETS[assignedBadge];
@@ -796,6 +804,192 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
     );
   };
 
+  const renderBadgeElement = (item: LocalChatMessage) => {
+    if (!settings.showBadges || !(item.badge || item.badgeIcon || item.badgeImage || item.badgeGifUrl)) {
+      return null;
+    }
+    return (
+      <span
+        className="inline-flex items-center self-center flex-shrink-0 leading-none align-middle"
+        style={{ color: item.badgeColor || '#00F0FF' }}
+        title={item.badge || 'Subscriber'}
+      >
+        {item.badgeImage || item.badgeGifUrl ? (
+          <img
+            src={item.badgeImage || item.badgeGifUrl}
+            alt="Badge"
+            className="w-3.5 h-3.5 object-contain inline-block flex-shrink-0 align-middle"
+          />
+        ) : (
+          renderBadgeIcon(item.badgeIcon, item.badgeColor || '#00F0FF')
+        )}
+        {item.badge ? (
+          <span
+            className="text-[9px] font-extrabold uppercase tracking-wider ml-1 leading-none align-middle"
+            style={{ color: item.badgeColor || '#00F0FF' }}
+          >
+            {item.badge}
+          </span>
+        ) : null}
+      </span>
+    );
+  };
+
+  const renderMessageContent = (item: LocalChatMessage) => {
+    const lineStyle = settings.lineStyle || 'inline';
+
+    // 1. STACKED (2-ROW) LAYOUT:
+    if (lineStyle === 'stacked') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full p-1 sm:p-1.5 mb-1.5 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)} text-left`}
+        >
+          <div className="w-full flex items-center gap-1.5 mb-0.5 select-none text-left">
+            <span className="inline-flex items-center justify-center flex-shrink-0">
+              {renderPlatformIcon((item as any).platform || 'youtube')}
+            </span>
+            <span
+              className="font-bold tracking-wide"
+              style={{
+                color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
+                fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
+                WebkitTextStroke: getTextStrokeCSS(),
+                paintOrder: 'stroke fill',
+                textShadow: getTextShadowCSS()
+              }}
+            >
+              {item.author}
+            </span>
+            {renderBadgeElement(item)}
+            {settings.showTimestamp && (
+              <span className="text-[10px] text-slate-400 ml-auto select-none opacity-75 font-mono">
+                {item.time}
+              </span>
+            )}
+          </div>
+          <div
+            className="w-full text-left font-medium text-white leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word]"
+            style={{
+              color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
+              fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
+              WebkitTextStroke: getTextStrokeCSS(),
+              paintOrder: 'stroke fill',
+              textShadow: getTextShadowCSS(),
+              wordBreak: 'break-word',
+              overflowWrap: 'anywhere'
+            }}
+          >
+            {item.message}
+          </div>
+        </div>
+      );
+    }
+
+    // 2. INDENTED (HANGING INDENT) LAYOUT:
+    if (lineStyle === 'indented') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full p-1 sm:p-1.5 mb-1 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)}`}
+        >
+          <div className="w-full flex items-baseline gap-1.5 select-none text-left break-words [overflow-wrap:anywhere] [word-break:break-word]">
+            <div className="flex-shrink-0 inline-flex items-baseline gap-1 self-baseline select-none whitespace-nowrap">
+              <span className="inline-flex items-center justify-center self-center flex-shrink-0">
+                {renderPlatformIcon((item as any).platform || 'youtube')}
+              </span>
+              <span
+                className="font-bold tracking-wide"
+                style={{
+                  color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
+                  fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
+                  WebkitTextStroke: getTextStrokeCSS(),
+                  paintOrder: 'stroke fill',
+                  textShadow: getTextShadowCSS()
+                }}
+              >
+                {item.author}
+              </span>
+              {renderBadgeElement(item)}
+              <span className="font-bold text-slate-300">:</span>
+            </div>
+            <div
+              className="flex-1 min-w-0 text-left font-medium text-white leading-relaxed"
+              style={{
+                color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
+                fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
+                WebkitTextStroke: getTextStrokeCSS(),
+                paintOrder: 'stroke fill',
+                textShadow: getTextShadowCSS(),
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere'
+              }}
+            >
+              <span>{item.message}</span>
+              {settings.showTimestamp && (
+                <span className="text-[10px] text-slate-400 ml-2 select-none opacity-75 inline-block font-mono">
+                  {item.time}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. INLINE FLOW LAYOUT (DEFAULT):
+    // Line fits complete configured width (e.g. 600px).
+    // If there is more context, subsequent lines wrap naturally across the full width!
+    return (
+      <div
+        key={item.id}
+        className={`w-full p-1 sm:p-1.5 mb-1 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)} text-left leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word]`}
+        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+      >
+        <span className="inline-flex items-center gap-1 mr-1.5 align-baseline select-none whitespace-nowrap">
+          <span className="inline-flex items-center justify-center self-center flex-shrink-0">
+            {renderPlatformIcon((item as any).platform || 'youtube')}
+          </span>
+          <span
+            className="font-bold tracking-wide"
+            style={{
+              color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
+              fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
+              WebkitTextStroke: getTextStrokeCSS(),
+              paintOrder: 'stroke fill',
+              textShadow: getTextShadowCSS()
+            }}
+          >
+            {item.author}
+          </span>
+          {renderBadgeElement(item)}
+          <span className="font-bold text-slate-300">:</span>
+        </span>
+
+        <span
+          className="font-medium text-white inline align-baseline"
+          style={{
+            color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
+            fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
+            WebkitTextStroke: getTextStrokeCSS(),
+            paintOrder: 'stroke fill',
+            textShadow: getTextShadowCSS(),
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere'
+          }}
+        >
+          {item.message}
+        </span>
+
+        {settings.showTimestamp && (
+          <span className="text-[10px] text-slate-400 ml-2 select-none opacity-75 inline-block align-baseline font-mono">
+            {item.time}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="relative w-full h-full flex-1 min-h-0 flex flex-col">
       <style>{CHAT_ANIMATIONS_CSS}</style>
@@ -808,23 +1002,8 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         {/* LEFT COLUMN: MAIN SIMPLE LIVE CHAT STAGE */}
         <div className="relative flex-1 min-w-0 w-full rounded-2xl bg-slate-950 border border-slate-800/90 shadow-2xl overflow-hidden flex flex-col min-h-[480px] lg:min-h-0 h-full">
           {/* Chat Stage Top Header */}
-          <div className="px-4 py-3 bg-[#0a0f1d] border-b border-slate-800 flex items-center justify-between gap-2 flex-shrink-0 z-10">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)] flex-shrink-0" />
-              <span className="text-xs font-bold text-white font-['Chakra_Petch'] tracking-wide truncate">
-                LIVE STREAM CHAT
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono hidden sm:inline flex-shrink-0">
-                ({messages.length} messages)
-              </span>
-              <span className="text-[10px] text-cyan-400 font-mono hidden md:inline-flex items-center gap-1 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40 flex-shrink-0">
-                <Maximize2 className="w-2.5 h-2.5" />
-                {settings.overlayWidth ? `${settings.overlayWidth}px` : 'Auto'} × {settings.overlayHeight ? `${settings.overlayHeight}px` : 'Auto'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-              {/* Copy OBS URL Button */}
+          <div className="px-4 py-2.5 bg-[#0a0f1d] border-b border-slate-800 flex items-center justify-end gap-1.5 sm:gap-2 flex-shrink-0 z-10">
+            {/* Copy OBS URL Button */}
               <button
                 type="button"
                 onClick={copyObsUrl}
@@ -884,13 +1063,12 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                 <Sliders className="w-3.5 h-3.5" />
                 <span>Settings</span>
               </button>
-            </div>
           </div>
 
         {/* Scrollable Chat Feed Area - Anchored to bottom like OBS Stream Overlay */}
         <div
           ref={chatScrollRef}
-          className="flex-1 p-4 sm:p-6 overflow-y-auto no-scrollbar relative flex flex-col justify-end"
+          className="flex-1 p-3 sm:p-5 overflow-auto no-scrollbar relative flex flex-col justify-end items-center"
           style={{
             backgroundImage: 'radial-gradient(ellipse at top, #0f172a 0%, #030712 100%)',
             fontFamily: settings.fontFamily || 'Chakra Petch, sans-serif'
@@ -901,96 +1079,33 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
 
           {/* OBS Canvas Bounds Indicator & Message Container */}
           <div
-            className="w-full mx-auto z-10 relative flex flex-col justify-end transition-all duration-300"
+            className={`relative z-10 transition-all duration-300 flex flex-col justify-end ${
+              settings.overlayWidth > 0 || settings.overlayHeight > 0
+                ? 'border border-cyan-500/20 rounded-xl bg-slate-950/20'
+                : 'w-full'
+            }`}
             style={{
               width: settings.overlayWidth && settings.overlayWidth > 0 ? `${settings.overlayWidth}px` : '100%',
               maxWidth: settings.overlayWidth && settings.overlayWidth > 0 ? `${settings.overlayWidth}px` : '100%',
-              maxHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : undefined
+              height: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '100%',
+              maxHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '100%',
+              minHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${Math.min(settings.overlayHeight, 320)}px` : undefined,
+              boxSizing: 'border-box'
             }}
           >
-            {messages.length === 0 ? (
-              <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500 space-y-2">
-                <MessageSquare className="w-8 h-8 opacity-40 text-cyan-400" />
-                <p className="text-xs">No chat messages yet.</p>
-                <p className="text-[11px] text-slate-600">
-                  Click <strong className="text-slate-400">Simulate</strong> or type a message below to broadcast to OBS.
-                </p>
-              </div>
-            ) : (
-              messages.map((item) => (
-                <div
-                  key={item.id}
-                  className={`w-full p-1 sm:p-1.5 mb-1 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)}`}
-                >
-                  {/* Format: [logo] {username} {badges}: {first part of message} */}
-                  {/* Wrapped lines wrap indented under message, never under logo */}
-                  <div className="w-full flex items-baseline gap-1.5 select-none break-words [overflow-wrap:anywhere] [word-break:break-word] text-left">
-                    <div className="flex-shrink-0 inline-flex items-baseline gap-1 self-baseline select-none whitespace-nowrap">
-                      <span className="inline-flex items-center justify-center self-center flex-shrink-0">
-                        {renderPlatformIcon((item as any).platform || 'youtube')}
-                      </span>
-                      <span
-                        className="font-bold tracking-wide"
-                        style={{
-                          color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
-                          fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
-                          WebkitTextStroke: getTextStrokeCSS(),
-                          paintOrder: 'stroke fill',
-                          textShadow: getTextShadowCSS()
-                        }}
-                      >
-                        {item.author}
-                      </span>
-                      {settings.showBadges && (item.badge || item.badgeIcon || item.badgeImage || item.badgeGifUrl) && (
-                        <span
-                          className="inline-flex items-center self-center flex-shrink-0 leading-none"
-                          style={{ color: item.badgeColor || '#00F0FF' }}
-                          title={item.badge || 'Subscriber'}
-                        >
-                          {item.badgeImage || item.badgeGifUrl ? (
-                            <img
-                              src={item.badgeImage || item.badgeGifUrl}
-                              alt="Badge"
-                              className="w-3.5 h-3.5 object-contain inline-block flex-shrink-0"
-                            />
-                          ) : (
-                            renderBadgeIcon(item.badgeIcon, item.badgeColor || '#00F0FF')
-                          )}
-                          {item.badge ? (
-                            <span
-                              className="text-[9px] font-extrabold uppercase tracking-wider ml-1 leading-none"
-                              style={{ color: item.badgeColor || '#00F0FF' }}
-                            >
-                              {item.badge}
-                            </span>
-                          ) : null}
-                        </span>
-                      )}
-                      <span className="font-bold text-slate-300">:</span>
-                    </div>
-                    <div
-                      className="flex-1 min-w-0 text-left font-medium text-white"
-                      style={{
-                        color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
-                        fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
-                        WebkitTextStroke: getTextStrokeCSS(),
-                        paintOrder: 'stroke fill',
-                        textShadow: getTextShadowCSS(),
-                        wordBreak: 'break-word',
-                        overflowWrap: 'anywhere'
-                      }}
-                    >
-                      <span>{item.message}</span>
-                      {settings.showTimestamp && (
-                        <span className="text-[10px] text-slate-400 ml-2 select-none opacity-75 inline-block">
-                          {item.time}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+            <div className="w-full flex flex-col justify-end overflow-y-auto no-scrollbar">
+              {messages.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500 space-y-2">
+                  <MessageSquare className="w-8 h-8 opacity-40 text-cyan-400" />
+                  <p className="text-xs">No chat messages yet.</p>
+                  <p className="text-[11px] text-slate-600">
+                    Click <strong className="text-slate-400">Simulate</strong> or type a message below to broadcast to OBS.
+                  </p>
                 </div>
-              ))
-            )}
+              ) : (
+                messages.map((item) => renderMessageContent(item))
+              )}
+            </div>
           </div>
         </div>
 
@@ -1022,7 +1137,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
           >
             <input
               type="text"
-              placeholder="Type a chat message to send to your OBS stream..."
+              placeholder="Type your message..."
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
@@ -1206,6 +1321,37 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* CHAT LINE STYLE (INLINE, INDENTED, STACKED) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] text-slate-400 font-medium">Chat Line Style</label>
+                  <span className="text-[9px] text-cyan-400 font-mono capitalize">
+                    {settings.lineStyle || 'inline'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'inline', label: 'Inline Flow', desc: 'Continuous line, fills full width (wraps across line)' },
+                    { id: 'indented', label: 'Indented', desc: 'Author on left, wrapped under message' },
+                    { id: 'stacked', label: 'Stacked (2-Row)', desc: 'Author on top, message full width below' }
+                  ].map((styleOption) => (
+                    <button
+                      key={styleOption.id}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, lineStyle: styleOption.id as any })}
+                      className={`py-2 px-1 text-center rounded-lg border transition-all cursor-pointer ${
+                        (settings.lineStyle || 'inline') === styleOption.id
+                          ? 'border-cyan-400 bg-cyan-500/20 text-cyan-300 shadow-[0_0_8px_rgba(0,240,255,0.3)] font-bold'
+                          : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                      title={styleOption.desc}
+                    >
+                      <div className="text-[11px] leading-tight">{styleOption.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1371,8 +1517,8 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               {[
                 { label: 'Auto (0)', w: 0, h: 0 },
                 { label: 'Compact', w: 360, h: 480 },
+                { label: 'Square 600', w: 600, h: 600 },
                 { label: 'Standard', w: 420, h: 600 },
-                { label: 'Wide', w: 560, h: 720 },
                 { label: 'HD Box', w: 640, h: 800 }
               ].map((p) => {
                 const active = settings.overlayWidth === p.w && settings.overlayHeight === p.h;

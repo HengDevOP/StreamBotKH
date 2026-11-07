@@ -6,6 +6,7 @@ import {
   SubscriberSettingsDoc,
   SubscriberTierDoc
 } from '@/server/database/mongo';
+import { getAuthenticatedUser } from '@/server/auth';
 import { getIO } from '@/server/services/socketService';
 import { telegramUserManager } from '@backend/telegram/telegramUserClient';
 import { DEFAULT_SUBSCRIBER_TIERS } from '@/types/subscriber';
@@ -18,29 +19,73 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token');
     const username = searchParams.get('username');
+    const authUser = getAuthenticatedUser(req);
 
-    if (!token && !username) {
+    const usersCol = await getUsersCollection();
+    let userDoc: any = null;
+
+    if (authUser?.id) {
+      userDoc = await usersCol.findOne({
+        $or: [{ userId: authUser.id }, { id: authUser.id as any }]
+      });
+    }
+
+    if (!userDoc && token && token !== 'demo-token') {
+      userDoc = await usersCol.findOne({
+        $or: [{ overlayToken: token }, { overlay_token: token }]
+      });
+    }
+
+    if (!userDoc && username && username !== 'streamer') {
+      userDoc = await usersCol.findOne({ username });
+    }
+
+    const effectiveToken = userDoc?.overlayToken || token || '';
+    const effectiveUsername = userDoc?.username || username || '';
+
+    if (!effectiveToken && !effectiveUsername) {
       return NextResponse.json({ success: false, error: 'Token or username required' }, { status: 400 });
     }
 
     const col = await getSubscriberSettingsCollection();
-    const query: any = {};
-    if (token) query.streamerToken = token;
-    else if (username) query.streamerUsername = username;
+    const orConditions: any[] = [];
+    if (effectiveToken && effectiveToken !== 'demo-token') {
+      orConditions.push({ streamerToken: effectiveToken });
+    }
+    if (token && token !== 'demo-token' && token !== effectiveToken) {
+      orConditions.push({ streamerToken: token });
+    }
+    if (effectiveUsername && effectiveUsername !== 'streamer') {
+      orConditions.push({ streamerUsername: effectiveUsername });
+    }
+    if (username && username !== 'streamer' && username !== effectiveUsername) {
+      orConditions.push({ streamerUsername: username });
+    }
 
-    let doc = await col.findOne(query);
+    const query: any = orConditions.length > 0
+      ? { $or: orConditions }
+      : (token ? { streamerToken: token } : { streamerUsername: username || '' });
+
+    const docs = await col.find(query).sort({ updatedAt: -1, _id: -1 }).toArray();
+    let doc = docs.find((d) => Array.isArray(d.tiers) && d.tiers.length > 0) || docs[0];
 
     if (!doc) {
       return NextResponse.json({
         success: true,
         settings: {
-          streamerToken: token || '',
-          streamerUsername: username || '',
+          streamerToken: effectiveToken || token || '',
+          streamerUsername: effectiveUsername || username || '',
           enabled: true,
           tiers: [],
           telegramOutletGroup: null
         }
       });
+    }
+
+    // Sync token if streamer regenerated their token
+    if (effectiveToken && doc.streamerToken !== effectiveToken) {
+      await col.updateOne({ _id: doc._id }, { $set: { streamerToken: effectiveToken, updatedAt: new Date() } });
+      doc.streamerToken = effectiveToken;
     }
 
     return NextResponse.json({
@@ -64,36 +109,53 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const token = body.token || body.streamerToken;
     const username = body.username || body.streamerUsername;
+    const authUser = getAuthenticatedUser(req);
 
-    if (!token && !username) {
+    const usersCol = await getUsersCollection();
+    let userDoc: any = null;
+
+    if (authUser?.id) {
+      userDoc = await usersCol.findOne({
+        $or: [{ userId: authUser.id }, { id: authUser.id as any }]
+      });
+    }
+
+    if (!userDoc && token && token !== 'demo-token') {
+      userDoc = await usersCol.findOne({
+        $or: [{ overlayToken: token }, { overlay_token: token }]
+      });
+    }
+
+    if (!userDoc && username && username !== 'streamer') {
+      userDoc = await usersCol.findOne({ username });
+    }
+
+    const effectiveToken = userDoc?.overlayToken || token || '';
+    const effectiveUsername = userDoc?.username || username || '';
+    const streamerUserId = userDoc?.userId || (userDoc as any)?.id || String(userDoc?._id || '');
+
+    if (!effectiveToken && !effectiveUsername) {
       return NextResponse.json({ success: false, error: 'Token or username required' }, { status: 400 });
     }
 
-    // Verify user exists and check plan permissions if token provided
-    let effectiveUsername = username;
-    let streamerUserId = '';
-    const usersCol = await getUsersCollection();
-
-    if (token && token !== 'demo-token') {
-      const user = await usersCol.findOne({ overlayToken: token });
-      if (user) {
-        effectiveUsername = user.username;
-        streamerUserId = user.userId || (user as any).id || String(user._id);
-      }
-    }
-
-    if (!streamerUserId && effectiveUsername) {
-      const user = await usersCol.findOne({ username: effectiveUsername });
-      if (user) {
-        streamerUserId = user.userId || (user as any).id || String(user._id);
-      }
-    }
-
     const col = await getSubscriberSettingsCollection();
-    const query: any = token ? { streamerToken: token } : { streamerUsername: effectiveUsername };
+    const orConditions: any[] = [];
+    if (effectiveToken && effectiveToken !== 'demo-token') {
+      orConditions.push({ streamerToken: effectiveToken });
+    }
+    if (token && token !== 'demo-token' && token !== effectiveToken) {
+      orConditions.push({ streamerToken: token });
+    }
+    if (effectiveUsername && effectiveUsername !== 'streamer') {
+      orConditions.push({ streamerUsername: effectiveUsername });
+    }
+
+    const query: any = orConditions.length > 0
+      ? { $or: orConditions }
+      : (token ? { streamerToken: token } : { streamerUsername: effectiveUsername || '' });
 
     const updateDoc: Partial<SubscriberSettingsDoc> = {
-      streamerToken: token || '',
+      streamerToken: effectiveToken || token || '',
       streamerUsername: effectiveUsername || '',
       enabled: body.enabled !== false,
       tiers: Array.isArray(body.tiers) ? body.tiers : [],
@@ -128,10 +190,24 @@ export async function POST(req: NextRequest) {
       { upsert: true }
     );
 
+    // Clean up older duplicate documents for this streamer
+    if (effectiveUsername) {
+      await col.deleteMany({
+        streamerUsername: effectiveUsername,
+        streamerToken: { $ne: updateDoc.streamerToken }
+      });
+    }
+
     const io = getIO();
-    if (io && token) {
-      io.to(`overlay:${token}`).emit('subscribers:settings_updated', updateDoc);
-      io.to(`dashboard:${token}`).emit('subscribers:settings_updated', updateDoc);
+    if (io) {
+      if (effectiveToken) {
+        io.to(`overlay:${effectiveToken}`).emit('subscribers:settings_updated', updateDoc);
+        io.to(`dashboard:${effectiveToken}`).emit('subscribers:settings_updated', updateDoc);
+      }
+      if (token && token !== effectiveToken) {
+        io.to(`overlay:${token}`).emit('subscribers:settings_updated', updateDoc);
+        io.to(`dashboard:${token}`).emit('subscribers:settings_updated', updateDoc);
+      }
     }
 
     return NextResponse.json({

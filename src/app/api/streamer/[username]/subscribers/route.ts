@@ -28,12 +28,14 @@ export async function GET(
     }
 
     const settingsCol = await getSubscriberSettingsCollection();
-    const settings = await settingsCol.findOne({
+    const docs = await settingsCol.find({
       $or: [
         { streamerUsername: user.username },
         { streamerToken: user.overlayToken }
       ]
-    });
+    }).sort({ updatedAt: -1, _id: -1 }).toArray();
+
+    const settings = docs.find((d: any) => Array.isArray(d.tiers) && d.tiers.length > 0) || docs[0];
 
     const rawTiers = Array.isArray(settings?.tiers) ? settings.tiers : [];
     const activeTiers = rawTiers.filter((t: any) => t.enabled !== false);

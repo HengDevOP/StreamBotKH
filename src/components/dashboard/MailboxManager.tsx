@@ -54,12 +54,14 @@ export const MailboxManager: React.FC<MailboxManagerProps> = ({
         setMessages(res.messages);
         onUnreadCountChange?.(res.unreadCount);
 
-        // Keep selected message in sync or select first
+        // Keep selected message in sync if already selected
         if (selectedMessage) {
           const fresh = res.messages.find((m) => m.id === selectedMessage.id);
-          if (fresh) setSelectedMessage(fresh);
-        } else if (res.messages.length > 0) {
-          setSelectedMessage(res.messages[0]);
+          if (fresh) {
+            setSelectedMessage(fresh);
+          } else {
+            setSelectedMessage(null);
+          }
         }
       }
     } catch (err) {
@@ -147,7 +149,7 @@ export const MailboxManager: React.FC<MailboxManagerProps> = ({
       const remaining = messages.filter((m) => m.id !== messageId);
       setMessages(remaining);
       if (selectedMessage?.id === messageId) {
-        setSelectedMessage(remaining[0] || null);
+        setSelectedMessage(null);
       }
       onUnreadCountChange?.(remaining.filter((m) => !m.isRead).length);
     } catch (err) {
@@ -163,15 +165,17 @@ export const MailboxManager: React.FC<MailboxManagerProps> = ({
     showConfirm({
       title: 'Clear Read Messages',
       message: `Delete all ${readCount} read messages permanently from your mailbox?`,
-      confirmVariant: 'danger',
-      confirmLabel: 'Clear Read',
+      type: 'danger',
+      confirmText: 'Clear Read',
       onConfirm: async () => {
         setDeletingAllRead(true);
         try {
           await request('/mailbox?allRead=true', { method: 'DELETE' });
           const unreadOnly = messages.filter((m) => !m.isRead);
           setMessages(unreadOnly);
-          setSelectedMessage(unreadOnly[0] || null);
+          if (selectedMessage?.isRead) {
+            setSelectedMessage(null);
+          }
         } catch (err) {
           console.error('[MailboxManager] Delete read failed:', err);
         } finally {

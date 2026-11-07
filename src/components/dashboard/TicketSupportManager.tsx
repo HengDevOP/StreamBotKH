@@ -334,8 +334,8 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
     showConfirm({
       title: 'Delete Support Ticket',
       message: 'Are you sure you want to delete this ticket and its entire chat history? This cannot be undone.',
-      confirmLabel: 'Delete Ticket',
-      confirmVariant: 'danger',
+      confirmText: 'Delete Ticket',
+      type: 'danger',
       onConfirm: async () => {
         try {
           await request(`/tickets/${ticketId}`, { method: 'DELETE' });
@@ -418,106 +418,68 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
   }, [tickets, isAdmin, adminQueueFilter, searchQuery]);
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-[#0A0E1A] p-5 sm:p-6 shadow-2xl">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-              <Headphones className="w-6 h-6 sm:w-7 sm:h-7" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  {isAdmin ? 'Admin Support Desk • Live Chat' : 'Ticket Support & Live Help'}
-                </h2>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                  LIVE DESK
-                </span>
-                {connected && (
-                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>WebSocket Synced</span>
-                  </span>
-                )}
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                {isAdmin
-                  ? 'Claim tickets submitted by Cambodian live streamers and communicate via real-time live chat.'
-                  : 'Submit a ticket for technical issues, KHQR tip questions, or overlay setup. Admin will claim and chat with you live.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={() => loadTickets()}
-              disabled={loading}
-              className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all text-xs flex items-center gap-1.5"
-              title="Refresh tickets"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Ticket</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Metric Pills */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-          <div className="px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800">
-            <div className="text-[11px] text-slate-400 uppercase font-mono">Total Tickets</div>
-            <div className="text-lg font-black text-white">{summary.total}</div>
-          </div>
-          <div className="px-3 py-2 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-            <div className="text-[11px] text-emerald-400 uppercase font-mono flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Open Queue</span>
-            </div>
-            <div className="text-lg font-black text-emerald-300">{summary.open}</div>
-          </div>
-          <div className="px-3 py-2 rounded-xl bg-purple-500/5 border border-purple-500/20">
-            <div className="text-[11px] text-purple-400 uppercase font-mono">Live in Chat</div>
-            <div className="text-lg font-black text-purple-300">{summary.claimed}</div>
-          </div>
-          <div className="px-3 py-2 rounded-xl bg-teal-500/5 border border-teal-500/20">
-            <div className="text-[11px] text-teal-400 uppercase font-mono">Resolved</div>
-            <div className="text-lg font-black text-teal-300">{summary.resolved}</div>
-          </div>
-          {isAdmin && (
-            <div className="px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/20 col-span-2 sm:col-span-1">
-              <div className="text-[11px] text-amber-400 uppercase font-mono">Needs Agent</div>
-              <div className="text-lg font-black text-amber-300">{summary.unclaimed}</div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Split-View Desk (Left: Tickets Queue, Right: Live Conversation) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[640px]">
+    <div className="w-full h-full flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* Main Full-View Split Desk (Left: Ticket Sidebar, Right: Dynamic Live Chat Content) */}
+      <div className="flex-1 min-h-0 h-full grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 overflow-hidden">
         
         {/* ============================================================== */}
-        {/* LEFT COLUMN: TICKET LIST & QUEUE BROWSER                       */}
+        {/* LEFT SIDEBAR: TICKET LIST & QUEUE BROWSER                      */}
         {/* ============================================================== */}
-        <div className="lg:col-span-5 xl:col-span-4 flex flex-col rounded-2xl border border-slate-800 bg-[#070A13] overflow-hidden">
-          
-          {/* Search & Status Filters */}
-          <div className="p-3.5 border-b border-slate-800/80 space-y-2.5 bg-slate-900/40">
+        <div
+          className={`lg:col-span-4 xl:col-span-4 flex flex-col min-h-0 h-full rounded-2xl border border-slate-800 bg-[#070A13] overflow-hidden ${
+            selectedTicket ? 'hidden lg:flex' : 'flex'
+          }`}
+        >
+          {/* Sidebar Header + Action Controls */}
+          <div className="p-3 sm:p-3.5 border-b border-slate-800/80 space-y-2.5 bg-slate-900/40 shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
+                  <Headphones className="w-4 h-4" />
+                </div>
+                <span className="text-xs sm:text-sm font-bold text-white truncate">
+                  {isAdmin ? 'Support Queue' : 'My Tickets'}
+                </span>
+                <span className="px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-mono font-bold">
+                  {filteredTickets.length}
+                </span>
+                {connected && (
+                  <span
+                    className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"
+                    title="WebSocket Live Connected"
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => loadTickets()}
+                  disabled={loading}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all text-xs flex items-center justify-center cursor-pointer"
+                  title="Refresh tickets"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-sm shadow-cyan-500/20 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Ticket</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Search Input */}
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search ticket #, title, user..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
               />
               {searchQuery && (
                 <button
@@ -531,7 +493,7 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
 
             {/* Admin Specific Sub-filter (All / Mine / Unclaimed) */}
             {isAdmin && (
-              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono">
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono">
                 <button
                   onClick={() => setAdminQueueFilter('all')}
                   className={`py-1 rounded-lg transition-all ${
@@ -571,7 +533,7 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
-                  className={`px-2.5 py-1 rounded-lg whitespace-nowrap text-[11px] font-mono transition-all ${
+                  className={`px-2 py-1 rounded-lg whitespace-nowrap text-[10px] font-mono transition-all cursor-pointer ${
                     statusFilter === s
                       ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -584,7 +546,7 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
           </div>
 
           {/* Ticket Cards Stream */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 max-h-[560px]">
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-800/60">
             {loading ? (
               <div className="p-8 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
                 <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />
@@ -668,22 +630,25 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
         </div>
 
         {/* ============================================================== */}
-        {/* RIGHT COLUMN: LIVE CONVERSATION & TICKET DETAIL                */}
+        {/* RIGHT DYNAMIC CONTENT: LIVE CONVERSATION & TICKET DETAIL       */}
         {/* ============================================================== */}
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col rounded-2xl border border-slate-800 bg-[#070A13] overflow-hidden">
-          
+        <div
+          className={`lg:col-span-8 xl:col-span-8 flex flex-col min-h-0 h-full rounded-2xl border border-slate-800 bg-[#070A13] overflow-hidden ${
+            selectedTicket ? 'flex' : 'hidden lg:flex'
+          }`}
+        >
           {!selectedTicket ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-slate-500 space-y-3">
+            <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-8 sm:p-12 text-center text-slate-500 space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600">
                 <LifeBuoy className="w-8 h-8" />
               </div>
               <h3 className="text-base font-bold text-slate-300">No Ticket Selected</h3>
               <p className="text-xs text-slate-500 max-w-sm">
-                Select a support ticket from the queue on the left to start live chatting, or create a new ticket.
+                Select a support ticket from the sidebar on the left to start live chatting, or create a new ticket.
               </p>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs"
+                className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs cursor-pointer"
               >
                 Create Support Ticket
               </button>
@@ -691,9 +656,16 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
           ) : (
             <>
               {/* Ticket Top Bar */}
-              <div className="p-4 border-b border-slate-800 bg-slate-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
+              <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-slate-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+                <div className="space-y-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTicketId(null)}
+                      className="lg:hidden px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono font-bold flex items-center gap-1 transition-colors"
+                    >
+                      <span>← Queue</span>
+                    </button>
                     <button
                       onClick={copyTicketId}
                       className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 text-[11px] font-mono font-bold flex items-center gap-1 transition-colors"
@@ -712,11 +684,11 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
                     </span>
                   </div>
 
-                  <h3 className="text-base sm:text-lg font-black text-white">
+                  <h3 className="text-sm sm:text-base font-black text-white truncate">
                     {selectedTicket.title}
                   </h3>
 
-                  <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-2 truncate">
                     <span>Creator: <strong className="text-slate-200">@{selectedTicket.streamerUsername || 'creator'}</strong> ({selectedTicket.streamerDisplayName})</span>
                     <span>•</span>
                     <span>Opened {new Date(selectedTicket.createdAt).toLocaleDateString()}</span>
@@ -724,7 +696,7 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
                 </div>
 
                 {/* Status Dropdown / Controls */}
-                <div className="flex items-center gap-2 self-start sm:self-auto">
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
                   <select
                     value={selectedTicket.status}
                     onChange={(e) => handleUpdateStatus(e.target.value as any)}
@@ -750,7 +722,7 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
 
               {/* Admin Claim Banner */}
               {isAdmin && (
-                <div className="px-4 py-2.5 bg-gradient-to-r from-purple-950/40 via-purple-900/20 to-slate-900 border-b border-purple-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="px-4 py-2 bg-gradient-to-r from-purple-950/40 via-purple-900/20 to-slate-900 border-b border-purple-500/20 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
                   {selectedTicket.claimedById ? (
                     <div className="flex items-center gap-2 text-purple-300">
                       <UserCheck className="w-4 h-4 text-purple-400" />
@@ -791,7 +763,7 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
 
               {/* Resolved / Closed Banner */}
               {(selectedTicket.status === 'resolved' || selectedTicket.status === 'closed') && (
-                <div className="px-4 py-2 bg-emerald-950/30 border-b border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
+                <div className="px-4 py-2 bg-emerald-950/30 border-b border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     <span>This ticket is marked as <strong>{selectedTicket.status.toUpperCase()}</strong>. Sending a new message will automatically reopen it.</span>
@@ -806,7 +778,7 @@ export const TicketSupportManager: React.FC<TicketSupportManagerProps> = ({ isAd
               )}
 
               {/* Messages Chat Stream */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-4 max-h-[460px] bg-[#060810]/60">
+              <div className="flex-1 min-h-0 p-4 overflow-y-auto space-y-4 bg-[#060810]/60">
                 {loadingMessages ? (
                   <div className="p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
                     <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />

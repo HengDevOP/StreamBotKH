@@ -8,7 +8,7 @@ import { normalizeCurrencyAndSymbols, khmerNumberToWords } from '../../utils/tts
 
 interface AlertBoxOverlayProps {
   overlayToken: string;
-  mode?: 'all' | 'video-only' | 'alert-only';
+  mode?: 'all' | 'video-only' | 'alert-only' | 'subscriber-only';
   boxId?: string;
 }
 
@@ -45,11 +45,16 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
 
   const activeBoxId = boxId || urlBoxId;
 
-  let activeMode: 'all' | 'video-only' | 'alert-only' = mode;
+  let activeMode: 'all' | 'video-only' | 'alert-only' | 'subscriber-only' = mode;
   if (typeof window !== 'undefined') {
     const pathname = window.location.pathname.toLowerCase();
     if (pathname.includes('/overlay/video') || pathname.includes('/widget/video')) {
       activeMode = 'video-only';
+    } else if (
+      pathname.includes('/overlay/subscriber') ||
+      pathname.includes('/widget/subscriber')
+    ) {
+      activeMode = 'subscriber-only';
     } else if (
       pathname.includes('/overlay/alert') ||
       pathname.includes('/widget/alert')
@@ -61,6 +66,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
   }
 
   if (urlMode === 'video') activeMode = 'video-only';
+  else if (urlMode === 'subscriber' || urlMode === 'subscribers') activeMode = 'subscriber-only';
   else if (urlMode === 'alert') activeMode = 'alert-only';
   else if (urlMode === 'combo' || urlMode === 'all') activeMode = 'all';
 
@@ -442,9 +448,13 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
 
     const handleAlert = (payload: any) => {
       if (!payload) return;
-      const alertId = payload.donationId || `${payload.donorName || 'donor'}-${payload.amount}-${payload.createdAt || Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const alertId = payload.donationId || (
+        payload.isTest
+          ? `test-${payload.isSubscription ? 'sub' : 'don'}-${payload.tierId || ''}-${payload.donorName || ''}-${payload.amount || ''}`
+          : `${payload.donorName || 'donor'}-${payload.amount || ''}-${payload.createdAt || ''}`
+      );
 
-      // Deduplicate: ignore if the exact duplicate socket packet was received within 800ms
+      // Deduplicate: ignore if the exact duplicate socket packet was received within 5000ms
       if (processedAlertIdsRef.current.has(alertId)) {
         console.log('⚡ [Overlay] Duplicate socket packet ignored:', alertId);
         return;
@@ -452,7 +462,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       processedAlertIdsRef.current.add(alertId);
       setTimeout(() => {
         processedAlertIdsRef.current.delete(alertId);
-      }, 800);
+      }, 5000);
 
       console.log('⚡ [Overlay] Live donation alert accepted:', alertId, payload);
       const tipAmount = Number(payload.amount) || 0;
@@ -534,49 +544,58 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       const resolvedDonorMessage = isMeaningful ? rawMsg.trim() : '';
 
       const isTestAlert = Boolean(payload.isTest);
-      const rawVoice = (isTestAlert && (payload.ttsType || payload.ttsVoice))
+      const isSubscriptionAlert = Boolean(payload.isSubscription);
+      const isOverrideAlert = isTestAlert || isSubscriptionAlert;
+
+      const rawVoice = (isOverrideAlert && (payload.ttsType || payload.ttsVoice))
         ? (payload.ttsType || payload.ttsVoice)
         : (matchingBox?.ttsType || payload.ttsType || payload.ttsVoice || 'google');
 
       const finalPayload = {
         ...payload,
-        templateStyle: (isTestAlert && payload.templateStyle)
+        templateStyle: (isOverrideAlert && payload.templateStyle)
           ? payload.templateStyle
           : (matchingBox?.templateStyle || payload.templateStyle || overlayConfig?.templateStyle || 'neon-box'),
-        donorColor: (isTestAlert && payload.donorColor)
+        donorColor: (isOverrideAlert && payload.donorColor)
           ? payload.donorColor
           : (matchingBox?.donorColor || payload.donorColor),
-        amountColor: (isTestAlert && payload.amountColor)
+        amountColor: (isOverrideAlert && payload.amountColor)
           ? payload.amountColor
           : (matchingBox?.amountColor || payload.amountColor),
         donorMessage: resolvedDonorMessage,
         donor_message: resolvedDonorMessage,
         message: resolvedDonorMessage,
-        textTemplate: (isTestAlert && payload.textTemplate)
+        textTemplate: (isOverrideAlert && payload.textTemplate)
           ? payload.textTemplate
-          : (matchingBox?.textTemplate || payload.textTemplate || '{donator} donated {amount} through superchat!'),
-        textColor: (isTestAlert && payload.textColor)
+          : (matchingBox?.textTemplate || payload.textTemplate || (isSubscriptionAlert ? '{name} just subscribed to {tier}!' : '{donator} donated {amount} through superchat!')),
+        textColor: (isOverrideAlert && payload.textColor)
           ? payload.textColor
           : (matchingBox?.textColor || payload.textColor || '#FFFFFF'),
-        customGifUrl: matchingBox?.mediaUrl || payload.customGifUrl || payload.mediaUrl || overlayConfig?.mediaUrl,
-        mediaUrl: matchingBox?.mediaUrl || payload.mediaUrl || payload.customGifUrl || overlayConfig?.mediaUrl,
-        showImage: matchingBox ? matchingBox.showImage !== false : (payload.showImage !== undefined ? payload.showImage : true),
-        fontFamily: (isTestAlert && payload.fontFamily)
+        customGifUrl: (isOverrideAlert && (payload.customGifUrl || payload.mediaUrl))
+          ? (payload.customGifUrl || payload.mediaUrl)
+          : (matchingBox?.mediaUrl || payload.customGifUrl || payload.mediaUrl || overlayConfig?.mediaUrl),
+        mediaUrl: (isOverrideAlert && (payload.mediaUrl || payload.customGifUrl))
+          ? (payload.mediaUrl || payload.customGifUrl)
+          : (matchingBox?.mediaUrl || payload.mediaUrl || payload.customGifUrl || overlayConfig?.mediaUrl),
+        showImage: isOverrideAlert && payload.showImage !== undefined
+          ? payload.showImage
+          : (matchingBox ? matchingBox.showImage !== false : (payload.showImage !== undefined ? payload.showImage : true)),
+        fontFamily: (isOverrideAlert && payload.fontFamily)
           ? payload.fontFamily
           : (matchingBox?.fontFamily || payload.fontFamily || 'Chakra Petch'),
-        fontSize: (isTestAlert && payload.fontSize)
+        fontSize: (isOverrideAlert && payload.fontSize)
           ? payload.fontSize
           : (matchingBox?.fontSize || payload.fontSize || 28),
-        layoutMode: (isTestAlert && payload.layoutMode)
+        layoutMode: (isOverrideAlert && payload.layoutMode)
           ? payload.layoutMode
           : (matchingBox?.layoutMode || payload.layoutMode || 'top'),
-        animationStyle: (isTestAlert && payload.animationStyle)
+        animationStyle: (isOverrideAlert && payload.animationStyle)
           ? payload.animationStyle
           : (matchingBox?.animationStyle || payload.animationStyle || 'fade'),
-        glowColor: (isTestAlert && payload.glowColor)
+        glowColor: (isOverrideAlert && payload.glowColor)
           ? payload.glowColor
           : (matchingBox?.glowColor || payload.glowColor || overlayConfig?.glowColor || '#00F0FF'),
-        soundUrl: (isTestAlert && payload.soundUrl && !payload.soundUrl.includes('neon-chime'))
+        soundUrl: (isOverrideAlert && payload.soundUrl && !payload.soundUrl.includes('neon-chime'))
           ? payload.soundUrl
           : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
               ? matchingBox.soundUrl
@@ -585,16 +604,20 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
                   : (overlayConfig?.soundUrl && !overlayConfig.soundUrl.includes('neon-chime')
                       ? overlayConfig.soundUrl
                       : '/sounds/cash-register-kaching.mp3'))),
-        soundVolume: (isTestAlert && payload.soundVolume !== undefined)
+        soundVolume: (isOverrideAlert && payload.soundVolume !== undefined)
           ? payload.soundVolume
           : (matchingBox?.soundVolume ?? payload.soundVolume ?? overlayConfig?.soundVolume ?? 0.85),
         durationSeconds:
-          (isTestAlert && payload.durationSeconds)
+          (isOverrideAlert && payload.durationSeconds)
             ? payload.durationSeconds
             : (matchingBox?.durationSeconds || payload.durationSeconds || overlayConfig?.durationSeconds || 8),
-        ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (payload.ttsEnabled !== undefined ? payload.ttsEnabled : true),
+        ttsEnabled: isOverrideAlert && payload.ttsEnabled !== undefined
+          ? payload.ttsEnabled
+          : (matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : (payload.ttsEnabled !== undefined ? payload.ttsEnabled : true)),
         ttsType: rawVoice,
-        clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || payload.clonedVoiceSampleUrl
+        clonedVoiceSampleUrl: (isOverrideAlert && payload.clonedVoiceSampleUrl)
+          ? payload.clonedVoiceSampleUrl
+          : (matchingBox?.clonedVoiceSampleUrl || payload.clonedVoiceSampleUrl)
       };
 
       // Video alert condition checking ($0.25 to $50 minimum tip and enabled toggle)
@@ -613,12 +636,36 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       const alertDuration = Number(finalPayload.durationSeconds) || 8;
 
       // ==============================================================
+      // 0. DEDICATED SUBSCRIBER ALERT SOURCE (/overlay/subscribers/[token] or ?mode=subscribers):
+      // Displays the subscriber tier alert card, plays subscriber sound, and speaks TTS!
+      // Strictly ignores regular non-subscriber donation alerts.
+      // ==============================================================
+      if (activeMode === 'subscriber-only') {
+        if (!payload.isSubscription) {
+          console.log(`⚡ [Subscriber Overlay] Dedicated subscriber overlay ignoring non-subscription donation from "${payload.donorName}"`);
+          return;
+        }
+
+        console.log(`👑 [Subscriber Overlay] Received subscriber alert for "${finalPayload.donorName}" (${finalPayload.tierName || 'Subscriber'})`);
+        pushAlert({
+          ...finalPayload,
+          isSecondStageVideo: false,
+          upcomingVideo: false,
+          videoUrl: undefined,
+          durationSeconds: alertDuration,
+          soundUrl: finalPayload.soundUrl,
+          ttsEnabled: finalPayload.ttsEnabled
+        });
+        return;
+      }
+
+      // ==============================================================
       // 1. DEDICATED VIDEO ALERT SOURCE (/overlay/video/[token] or ?mode=video):
       // Displays the YouTube video clip only.
       // Queues the video until the donation alert finishes on the donation source URL!
       // ==============================================================
       if (activeMode === 'video-only') {
-        if (!hasValidVideo) {
+        if (payload.isSubscription || !hasValidVideo) {
           // Ignore tips without video on the dedicated video screen
           return;
         }
@@ -660,8 +707,14 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       // If a video is attached, shows "🎬 Media Share Video Queued Next" badge.
       // When this card finishes, it signals the video source to start playing the video,
       // and pauses the donation queue until the video finishes!
+      // Strictly ignores subscriber alerts (which have their own dedicated source URL).
       // ==============================================================
       if (activeMode === 'alert-only') {
+        if (payload.isSubscription) {
+          console.log(`⚡ [Donation Alert Overlay] Ignoring subscriber alert for dedicated subscriber source`);
+          return;
+        }
+
         console.log(`📢 [Donation Overlay] Received donation alert for "${finalPayload.donorName}" ($${finalPayload.amount}). Video attached: ${hasValidVideo ? 'YES' : 'NO'}`);
 
         pushAlert({

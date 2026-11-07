@@ -111,6 +111,18 @@ export const MailboxDropdown: React.FC<MailboxDropdownProps> = ({
     } catch (err) {}
   };
 
+  const handleDeleteMessage = async (messageId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await request(`/mailbox?messageId=${encodeURIComponent(messageId)}`, {
+        method: 'DELETE'
+      });
+      const remaining = messages.filter((m) => m.id !== messageId);
+      setMessages(remaining);
+      onUnreadCountChange?.(remaining.filter((m) => !m.isRead).length);
+    } catch (err) {}
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -187,9 +199,19 @@ export const MailboxDropdown: React.FC<MailboxDropdownProps> = ({
                       {msg.senderName}
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-500 flex-shrink-0">
-                    {new Date(msg.createdAt).toLocaleDateString()}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {new Date(msg.createdAt).toLocaleDateString()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteMessage(msg.id, e)}
+                      className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      title="Delete message"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
 
                 <h4 className={`text-xs font-bold line-clamp-1 ${isUnread ? 'text-white' : 'text-slate-300'}`}>

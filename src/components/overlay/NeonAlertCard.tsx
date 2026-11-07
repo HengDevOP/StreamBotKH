@@ -359,7 +359,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
         <div className={isSideBySide ? 'flex-1 min-w-0 space-y-1' : 'space-y-1.5 w-full'}>
           {/* Primary Headline: Raw text format {donator} donated {amount} through superchat! */}
           <h1
-            className="font-extrabold tracking-wide leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]"
+            className="font-extrabold tracking-wide leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] inline-flex items-center justify-center flex-wrap gap-x-2 gap-y-1"
             style={{
               fontFamily: `"${activeFont}", sans-serif`,
               fontSize: fontSize ? `${fontSize}px` : '28px',
@@ -368,7 +368,19 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
                 : '0 2px 4px rgba(0,0,0,0.95)'
             }}
           >
-            {renderHeadlineElements()}
+            <span>{renderHeadlineElements()}</span>
+            {(alert as any).badgeText && (
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold tracking-wider align-middle drop-shadow-md"
+                style={{
+                  color: (alert as any).badgeColor || '#00F0FF',
+                  backgroundColor: (alert as any).badgeBg || 'rgba(0, 240, 255, 0.15)',
+                  border: `1px solid ${(alert as any).badgeBorder || 'rgba(0, 240, 255, 0.35)'}`
+                }}
+              >
+                [{(alert as any).badgeText}]
+              </span>
+            )}
           </h1>
 
           {/* Sub H2 for {context} where the donator said (only rendered if donor message exists, is non-empty, and meaningful) */}

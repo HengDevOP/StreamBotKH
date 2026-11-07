@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { getUsersCollection, getOverlaysCollection, getAlertSettingsCollection, getPaymentSettingsCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
+import { getUsersCollection, getOverlaysCollection, getAlertSettingsCollection, getPaymentSettingsCollection, restoreMasterKhqrImage, processExpiredAccountDeletions } from '@/server/database/mongo';
 import { getJwtSecret } from '@/server/auth';
 import { generateSecureOverlayToken } from '@/server/utils/crypto';
 
@@ -158,6 +158,8 @@ export async function upsertGoogleStreamer(profile: {
   name?: string;
   picture?: string;
 }) {
+  await processExpiredAccountDeletions();
+
   const email = profile.email.trim().toLowerCase();
   const name = (profile.name || email.split('@')[0] || 'Streamer').trim();
   const avatarUrl = profile.picture || '';
@@ -247,31 +249,58 @@ export async function upsertGoogleStreamer(profile: {
   const existingAvatar = (existingMongoUser?.avatarUrl || '').trim();
   const finalAvatar = existingAvatar || avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${streamerUsername}`;
 
-  // Upsert user into MongoDB
-  await usersCol.updateOne(
-    { userId: streamerId },
-    {
-      $set: {
-        username: streamerUsername,
-        displayName,
-        email,
-        avatarUrl: finalAvatar,
-        overlayToken,
-        telegramPairingCode: pairingCode,
-        updatedAt: new Date()
-      },
-      $setOnInsert: {
-        userId: streamerId,
-        bio,
-        customThanksMessage: customThanks,
-        isVerified,
-        plan,
-        socialLinks,
-        createdAt: new Date()
+  // Upsert user into MongoDB (if existingMongoUser had only { _id, email } from a previous deleted account, recreate on that record)
+  if (existingMongoUser?._id && !existingMongoUser?.userId) {
+    await usersCol.updateOne(
+      { _id: existingMongoUser._id },
+      {
+        $set: {
+          userId: streamerId,
+          username: streamerUsername,
+          displayName,
+          email,
+          avatarUrl: finalAvatar,
+          bio,
+          customThanksMessage: customThanks,
+          isVerified,
+          plan,
+          socialLinks,
+          overlayToken,
+          telegramPairingCode: pairingCode,
+          deletionStatus: null,
+          deletionRequestedAt: null,
+          deletionScheduledAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
       }
-    },
-    { upsert: true }
-  );
+    );
+  } else {
+    await usersCol.updateOne(
+      { userId: streamerId },
+      {
+        $set: {
+          username: streamerUsername,
+          displayName,
+          email,
+          avatarUrl: finalAvatar,
+          overlayToken,
+          telegramPairingCode: pairingCode,
+          updatedAt: new Date()
+        },
+        $setOnInsert: {
+          userId: streamerId,
+          bio,
+          customThanksMessage: customThanks,
+          isVerified,
+          plan,
+          socialLinks,
+          createdAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+  }
 
   // Ensure default overlay
   try {

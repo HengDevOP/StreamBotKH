@@ -21,7 +21,7 @@ const DEFAULT_CHAT_SETTINGS = {
   authorFontFamily: 'Chakra Petch',
   messageFontFamily: 'Inter',
   fontSize: 'base',
-  lineStyle: 'indented' as const, // 'indented' | 'inline' | 'stacked'
+  lineStyle: 'inline' as const, // 'inline' | 'indented' | 'stacked'
   authorColor: '#00F0FF',
   messageColor: '#FFFFFF',
   backgroundColor: '#090D18',

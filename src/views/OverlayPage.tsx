@@ -5,7 +5,7 @@ import { AlertBoxOverlay } from '../components/overlay/AlertBoxOverlay';
 
 interface OverlayPageProps {
   token: string;
-  mode?: 'all' | 'video-only' | 'alert-only';
+  mode?: 'all' | 'video-only' | 'alert-only' | 'subscriber-only';
   boxId?: string;
 }
 

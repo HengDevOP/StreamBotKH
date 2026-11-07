@@ -32,7 +32,9 @@ export async function POST(req: NextRequest) {
       badgeBorder,
       badgeIcon,
       badgeGifUrl,
-      badgeImage
+      badgeImage,
+      isWheelSpin,
+      donationType
     } = body;
 
     if (!streamerId || !donorName) {
@@ -176,6 +178,8 @@ export async function POST(req: NextRequest) {
         videoEndTime: cleanVideoEndTime,
         status: 'PENDING',
         isSubscription: Boolean(isSubscription),
+        isWheelSpin: Boolean(isWheelSpin),
+        donationType: donationType || (isWheelSpin ? 'wheel' : isSubscription ? 'subscribe' : 'tip'),
         tierId: tierId || undefined,
         tierName: tierName || undefined,
         badgeText: badgeText || undefined,
@@ -209,6 +213,8 @@ export async function POST(req: NextRequest) {
         videoStartTime: cleanVideoStartTime,
         videoEndTime: cleanVideoEndTime,
         isSubscription: Boolean(isSubscription),
+        isWheelSpin: Boolean(isWheelSpin),
+        donationType: donationType || (isWheelSpin ? 'wheel' : isSubscription ? 'subscribe' : 'tip'),
         tierId: tierId || undefined,
         tierName: tierName || undefined,
         badgeText: badgeText || undefined,

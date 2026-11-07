@@ -44,6 +44,13 @@ export interface UserDoc {
   telegramPendingPhone?: string;
   telegramPendingHash?: string;
   telegramPendingSession?: string;
+  liveStreamUrl?: string;
+  youtubeLiveUrl?: string;
+  deletionStatus?: 'pending' | 'deleted' | null;
+  deletionRequestedAt?: Date | string | null;
+  deletionScheduledAt?: Date | string | null;
+  accountDeleted?: boolean;
+  deletedAt?: Date | string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,6 +87,8 @@ export interface DonationDoc {
   badgeIcon?: string;
   badgeGifUrl?: string;
   badgeImage?: string;
+  isWheelSpin?: boolean;
+  donationType?: 'tip' | 'subscribe' | 'wheel';
 }
 
 export interface AlertSettingsDoc {
@@ -114,6 +123,11 @@ export interface PaymentSettingsDoc {
   bankAccountName?: string;
   abaPaywayApiKey?: string;
   abaPaywayMerchantId?: string;
+  allowUsd?: boolean;
+  allowKhr?: boolean;
+  usdMinAmount?: number;
+  khrMinAmount?: number;
+  exchangeRate?: number;
   isLiveMode?: boolean;
   masterKhqrImage?: string;
   khqrBase64?: string;
@@ -297,6 +311,25 @@ export interface SubscriberDoc {
   expiresAt: Date;
   donorMessage?: string;
   transactionId?: string;
+}
+
+export interface WheelSliceDoc {
+  id: string;
+  label: string;
+  color: string;
+  percentage?: number;
+}
+
+export interface WheelSettingsDoc {
+  _id?: ObjectId;
+  streamerToken: string;
+  streamerUsername?: string;
+  isEnabled: boolean;
+  minTipAmount: number;
+  spinSoundUrl?: string;
+  slices: WheelSliceDoc[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface StreamSoundboardDoc {
@@ -608,6 +641,8 @@ export interface TemporaryDonationDoc {
   badgeIcon?: string;
   badgeGifUrl?: string;
   badgeImage?: string;
+  isWheelSpin?: boolean;
+  donationType?: 'tip' | 'subscribe' | 'wheel';
 }
 
 export interface TelegramSessionDoc {
@@ -929,6 +964,11 @@ export async function getSubscribersCollection(): Promise<Collection<SubscriberD
   return db.collection<SubscriberDoc>('subscribers');
 }
 
+export async function getWheelSettingsCollection(): Promise<Collection<WheelSettingsDoc>> {
+  const db = await getMongoDb();
+  return db.collection<WheelSettingsDoc>('wheel_settings');
+}
+
 /**
  * Helper to build a flexible MongoDB query matching YouTube usernames / handles
  * Handles:
@@ -1011,6 +1051,19 @@ export async function cleanupOlderDonationsMongo(months = 6) {
 export async function getMongoMailboxMessages(streamerId: string) {
   try {
     const col = await getMailboxMessagesCollection();
+
+    // Ensure legacy starter/seed messages are removed
+    await col.deleteMany({
+      senderName: { $in: ['StreamBotKH Team', 'Payment Gateway Bot', 'StreamBotKH Platform'] },
+      title: {
+        $in: [
+          'Welcome to StreamBotKH! 🎉',
+          'Payment Gateway Ready for Setup 💳',
+          'Pro Streamer Features Available ⚡'
+        ]
+      }
+    });
+
     const docs = await col
       .find({ streamerId: { $in: [streamerId, 'all'] } })
       .sort({ createdAt: -1 })
@@ -1018,7 +1071,7 @@ export async function getMongoMailboxMessages(streamerId: string) {
       .toArray();
 
     return docs.map((d) => ({
-      id: d.id,
+      id: d.id || String(d._id),
       streamerId: d.streamerId,
       title: d.title,
       senderName: d.senderName || 'StreamBotKH System',
@@ -1085,8 +1138,11 @@ export async function markMongoMailboxRead(streamerId: string, messageId?: strin
       { $set: { isRead: true, updatedAt: new Date() } }
     );
   } else if (messageId) {
+    const idFilter: any = ObjectId.isValid(messageId)
+      ? { $or: [{ id: messageId }, { _id: new ObjectId(messageId) }] }
+      : { id: messageId };
     await col.updateOne(
-      { id: messageId },
+      { ...idFilter, streamerId: { $in: [streamerId, 'all'] } },
       { $set: { isRead: true, updatedAt: new Date() } }
     );
   }
@@ -1097,71 +1153,15 @@ export async function deleteMongoMailboxMessage(streamerId: string, messageId?: 
   if (allRead) {
     await col.deleteMany({ streamerId: { $in: [streamerId, 'all'] }, isRead: true });
   } else if (messageId) {
-    await col.deleteOne({ id: messageId, streamerId: { $in: [streamerId, 'all'] } });
+    const idFilter: any = ObjectId.isValid(messageId)
+      ? { $or: [{ id: messageId }, { _id: new ObjectId(messageId) }] }
+      : { id: messageId };
+    await col.deleteOne({ ...idFilter, streamerId: { $in: [streamerId, 'all'] } });
   }
 }
 
-export async function seedDefaultMailboxMessages(streamerId: string) {
-  try {
-    const col = await getMailboxMessagesCollection();
-    const count = await col.countDocuments({ streamerId: { $in: [streamerId, 'all'] } });
-    if (count > 0) return;
-
-    const initialMessages: Array<Omit<MailboxMessageDoc, '_id'>> = [
-      {
-        id: uuidv4(),
-        streamerId,
-        title: 'Welcome to StreamBotKH! 🎉',
-        senderName: 'StreamBotKH Team',
-        senderAvatar: '',
-        category: 'system',
-        content: `Welcome to StreamBotKH! We are thrilled to empower your live streaming journey across Cambodia and beyond.\n\nHere are a few quick tips to get set up:\n1. Payment Gateway: Connect your Telegram bank notification group to receive instant Bakong KHQR alerts with 0% platform fee.\n2. Overlays: Copy your donation alert or goal overlay URL and paste it as a Browser Source in OBS Studio.\n3. Interactive Widgets: Engage your audience with the Subathon Timer, Spinning Wheel, and 2D Pokémon overlays.\n\nIf you ever need help or encounter an issue, visit the Ticket Support tab. Happy Streaming!`,
-        preview: 'Welcome to StreamBotKH! We are thrilled to empower your live streaming journey...',
-        isRead: false,
-        actionUrl: '/dashboard?tab=overview',
-        actionLabel: 'Explore Dashboard',
-        priority: 'high',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: uuidv4(),
-        streamerId,
-        title: 'Payment Gateway Ready for Setup 💳',
-        senderName: 'Payment Gateway Bot',
-        senderAvatar: '',
-        category: 'security',
-        content: `Your automated KHQR payment listener is waiting for activation.\n\nGo to the Payment Gateway tab:\n• Step 1: Input your authentication code.\n• Step 2: Upload your official Bakong KHQR image.\n• Step 3: Connect your Telegram bank notification group.\n\nOnce active, incoming bank transfers will automatically be detected and projected on your OBS overlay within seconds!`,
-        preview: 'Your automated KHQR payment listener is waiting for activation. Complete setup in 3 easy steps...',
-        isRead: false,
-        actionUrl: '/dashboard?tab=payments',
-        actionLabel: 'Configure Gateway',
-        priority: 'normal',
-        createdAt: new Date(Date.now() - 3600000), // 1 hr ago
-        updatedAt: new Date(Date.now() - 3600000)
-      },
-      {
-        id: uuidv4(),
-        streamerId,
-        title: 'Pro Streamer Features Available ⚡',
-        senderName: 'StreamBotKH Platform',
-        senderAvatar: '',
-        category: 'announcement',
-        content: `Looking to level up your broadcast? Pro Plan gives you access to:\n• 100MB Media Storage\n• Leaderboard widget for top donor recognition\n• Dynamic Stream Goals & Subathon Timer\n• Custom Soundboard & Video Media Share\n• 2D Pokémon companion and Spinning Wheel\n\nCheck out Plans & Upgrades anytime in your dashboard!`,
-        preview: 'Looking to level up your broadcast? Unlock Leaderboards, Goals, Timer, Soundboard, and more...',
-        isRead: false,
-        actionUrl: '/dashboard?tab=billing',
-        actionLabel: 'View Plans',
-        priority: 'normal',
-        createdAt: new Date(Date.now() - 86400000), // 1 day ago
-        updatedAt: new Date(Date.now() - 86400000)
-      }
-    ];
-
-    await col.insertMany(initialMessages);
-  } catch (e) {
-    console.warn('[MongoDB] Failed seeding default mailbox messages:', e);
-  }
+export async function seedDefaultMailboxMessages(_streamerId: string) {
+  // No-op: mailbox uses real database messages only without starter seed mail
 }
 
 export async function getMongoMonitoredGroups(streamerId: string) {
@@ -1772,5 +1772,147 @@ export async function restoreAllMediaFiles(): Promise<void> {
     console.log(`⚡ [Media Storage] Verified and synchronized ${restoredCount}/${allMedia.length} media library assets`);
   } catch (err) {
     console.warn('⚠️ [Media Storage] Warning during startup media restoration:', err);
+  }
+}
+
+/**
+ * Permanently deletes all database documents and settings for a streamer across all collections,
+ * while preserving ONLY the user's email address record in the `users` collection.
+ */
+export async function executePermanentAccountDeletion(userDoc: any): Promise<boolean> {
+  if (!userDoc || !userDoc._id) return false;
+
+  const streamerId = String(userDoc.userId || userDoc.id || '').trim();
+  const username = String(userDoc.username || '').trim();
+  const overlayToken = String(userDoc.overlayToken || userDoc.overlay_token || '').trim();
+  const email = String(userDoc.email || '').trim().toLowerCase();
+
+  try {
+    const db = await getMongoDb();
+
+    if (streamerId || username || overlayToken) {
+      const streamerIdOrUsername: any[] = [];
+      if (streamerId) streamerIdOrUsername.push({ streamerId });
+      if (username) streamerIdOrUsername.push({ streamerUsername: username });
+
+      const tokenOrIdOrUsername: any[] = [];
+      if (streamerId) tokenOrIdOrUsername.push({ streamerToken: streamerId }, { streamerId });
+      if (overlayToken) tokenOrIdOrUsername.push({ streamerToken: overlayToken });
+      if (username) tokenOrIdOrUsername.push({ streamerUsername: username });
+
+      // 1. Delete donations & temporary donations
+      if (streamerIdOrUsername.length > 0) {
+        await db.collection('donations').deleteMany({ $or: streamerIdOrUsername }).catch(() => {});
+        await db.collection('temporary_donations').deleteMany({ $or: streamerIdOrUsername }).catch(() => {});
+      }
+
+      // 2. Delete streamer-scoped settings & widgets
+      if (streamerId) {
+        await db.collection('alert_settings').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('payment_settings').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('video_alert_settings').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('alert_boxes').deleteMany({ userId: streamerId }).catch(() => {});
+        await db.collection('overlays').deleteMany({ userId: streamerId }).catch(() => {});
+        await db.collection('overlay_token_history').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('stream_timers').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('stream_leaderboards').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('stream_soundboards').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('stream_soundboard_items').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('pokemon_widget_settings').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('mailbox_messages').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('issue_reports').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('voice_clones').deleteMany({ userId: streamerId }).catch(() => {});
+        await db.collection('telegram_sessions').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('telegram_monitored_groups').deleteMany({ streamerId }).catch(() => {});
+        await db.collection('gateway_settings').deleteMany({
+          $or: [{ _id: `khqr_${streamerId}` as any }, { streamerId }]
+        }).catch(() => {});
+
+        // Delete support tickets and their messages
+        const tickets = await db.collection('support_tickets').find({ streamerId }).toArray().catch(() => []);
+        if (tickets.length > 0) {
+          const ticketIds = tickets.map((t: any) => t.id).filter(Boolean);
+          if (ticketIds.length > 0) {
+            await db.collection('ticket_messages').deleteMany({ ticketId: { $in: ticketIds } }).catch(() => {});
+          }
+          await db.collection('support_tickets').deleteMany({ streamerId }).catch(() => {});
+        }
+      }
+
+      // 3. Delete token/username-scoped widgets (goals, chat, subscribers, wheel)
+      if (tokenOrIdOrUsername.length > 0) {
+        await db.collection('stream_goals').deleteMany({ $or: tokenOrIdOrUsername }).catch(() => {});
+        await db.collection('stream_chat_settings').deleteMany({ $or: tokenOrIdOrUsername }).catch(() => {});
+        await db.collection('subscriber_settings').deleteMany({ $or: tokenOrIdOrUsername }).catch(() => {});
+        await db.collection('subscribers').deleteMany({ $or: tokenOrIdOrUsername }).catch(() => {});
+        await db.collection('wheel_settings').deleteMany({ $or: tokenOrIdOrUsername }).catch(() => {});
+      }
+
+      // 4. Delete media library files from disk and MongoDB
+      const mediaOr: any[] = [];
+      if (streamerId) mediaOr.push({ userId: streamerId });
+      if (email) mediaOr.push({ userEmail: email });
+      if (mediaOr.length > 0) {
+        const userMedia = await db.collection('media').find({ $or: mediaOr }).toArray().catch(() => []);
+        for (const m of userMedia) {
+          if (m.storedFilename) {
+            const diskPath = path.join(process.cwd(), 'public', 'uploads', 'media', m.storedFilename);
+            try {
+              if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
+            } catch (_) {}
+          }
+        }
+        await db.collection('media').deleteMany({ $or: mediaOr }).catch(() => {});
+      }
+    }
+
+    // 5. Replace the user document in `users` so ONLY the email address record remains stored
+    const usersCol = await getUsersCollection();
+    if (email) {
+      await usersCol.replaceOne(
+        { _id: userDoc._id },
+        { email } as any
+      );
+    } else {
+      await usersCol.deleteOne({ _id: userDoc._id });
+    }
+
+    console.log(`🗑️ [Account Deletion] Permanently deleted account data for ${email || streamerId} (retained email record only).`);
+    return true;
+  } catch (err) {
+    console.error('[Account Deletion] Error executing permanent account deletion:', err);
+    return false;
+  }
+}
+
+/**
+ * Checks for any accounts whose 7-day deletion grace period has expired
+ * and executes permanent deletion on them.
+ */
+export async function processExpiredAccountDeletions(): Promise<number> {
+  try {
+    const usersCol = await getUsersCollection();
+    const pendingUsers = await usersCol
+      .find({ deletionStatus: 'pending' })
+      .toArray();
+
+    if (pendingUsers.length === 0) return 0;
+
+    const nowMs = Date.now();
+    let deletedCount = 0;
+
+    for (const u of pendingUsers) {
+      if (!u.deletionScheduledAt) continue;
+      const scheduledMs = new Date(u.deletionScheduledAt).getTime();
+      if (!isNaN(scheduledMs) && scheduledMs <= nowMs) {
+        const ok = await executePermanentAccountDeletion(u);
+        if (ok) deletedCount++;
+      }
+    }
+
+    return deletedCount;
+  } catch (err) {
+    console.warn('[Account Deletion] Warning checking expired account deletions:', err);
+    return 0;
   }
 }

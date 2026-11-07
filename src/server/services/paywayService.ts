@@ -10,6 +10,7 @@ import {
   getPaymentSettingsCollection,
   getSubscribersCollection,
   getSubscriberSettingsCollection,
+  getWheelSettingsCollection,
   buildSubscriberUsernameQuery
 } from '../database/mongo';
 import { broadcastAlertToOverlay, broadcastDonationToDashboard, getIO } from './socketService';
@@ -285,6 +286,66 @@ export async function handleSuccessfulPayment(params: ProcessPaymentSuccessParam
         }
       } catch (subErr) {
         console.error('[Subscriber] Error creating subscriber record in handleSuccessfulPayment:', subErr);
+      }
+    }
+
+    // If donation was for Wheel Spin, trigger live wheel spin on stream overlay
+    if ((donation as any).isWheelSpin || (donation as any).donationType === 'wheel') {
+      try {
+        const wheelCol = await getWheelSettingsCollection();
+        const overlayToken = streamer?.overlayToken || (streamer as any)?.overlay_token;
+        const wheelDoc = await wheelCol.findOne({
+          $or: [
+            ...(overlayToken ? [{ streamerToken: overlayToken }] : []),
+            ...(streamer?.username ? [{ streamerUsername: streamer.username }] : [])
+          ]
+        });
+
+        if (wheelDoc && wheelDoc.isEnabled && Array.isArray(wheelDoc.slices) && wheelDoc.slices.length > 0) {
+          const slices = wheelDoc.slices;
+          const totalWeight = slices.reduce((acc, s) => acc + (Number(s.percentage) || (100 / slices.length)), 0);
+          let rand = Math.random() * totalWeight;
+          let winningSlice = slices[0];
+          for (const s of slices) {
+            const weight = Number(s.percentage) || (100 / slices.length);
+            if (rand <= weight) {
+              winningSlice = s;
+              break;
+            }
+            rand -= weight;
+          }
+
+          const degreesPerSlice = 360 / slices.length;
+          const sliceIndex = slices.findIndex((s) => s.id === winningSlice.id);
+          const targetSliceAngle = (sliceIndex >= 0 ? sliceIndex : 0) * degreesPerSlice + degreesPerSlice / 2;
+          const extraRotations = 5 * 360;
+          const totalRotation = extraRotations + (360 - (targetSliceAngle % 360));
+
+          const io = getIO();
+          if (io && overlayToken) {
+            io.to(`overlay:${overlayToken}`).emit('wheel:spin', {
+              donorName: donation.donorName,
+              amount: donation.amount,
+              totalRotation,
+              slices,
+              winner: winningSlice.label,
+              spinSoundUrl: wheelDoc.spinSoundUrl
+            });
+            if (overlayToken !== 'demo-token') {
+              io.to('overlay:demo-token').emit('wheel:spin', {
+                donorName: donation.donorName,
+                amount: donation.amount,
+                totalRotation,
+                slices,
+                winner: winningSlice.label,
+                spinSoundUrl: wheelDoc.spinSoundUrl
+              });
+            }
+          }
+          console.log(`🎡 [Wheel] Live wheel spin broadcasted for ${donation.donorName}! Winner: "${winningSlice.label}"`);
+        }
+      } catch (wheelErr) {
+        console.error('[Wheel] Error triggering wheel spin in handleSuccessfulPayment:', wheelErr);
       }
     }
 

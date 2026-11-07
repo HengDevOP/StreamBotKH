@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { broadcastAlertToOverlay, getIO } from '@/server/services/socketService';
 import { getAuthenticatedUser } from '@/server/auth';
 import { checkRateLimit, getClientIp } from '@/server/utils/rateLimiter';
+import { getUsersCollection } from '@/server/database/mongo';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +20,34 @@ export async function POST(req: NextRequest) {
 
     // Protect against cross-streamer overlay spoofing
     if (overlayToken !== 'demo-token' && overlayToken !== 'ovl_token_neon_demo_9921') {
-      const authUser = getAuthenticatedUser(req);
+      let authUser = getAuthenticatedUser(req);
+
+      // Fallback: Verify if overlayToken belongs to a registered streamer in MongoDB
+      if (!authUser || !authUser.id) {
+        try {
+          const usersCol = await getUsersCollection();
+          const streamer = await usersCol.findOne({
+            $or: [
+              { overlayToken },
+              { overlay_token: overlayToken }
+            ]
+          });
+          if (streamer) {
+            authUser = {
+              id: String(streamer._id),
+              userId: String(streamer._id),
+              username: streamer.username,
+              email: streamer.email || '',
+              display_name: streamer.displayName || streamer.username,
+              displayName: streamer.displayName || streamer.username,
+              overlayToken: streamer.overlayToken || streamer.overlay_token
+            } as any;
+          }
+        } catch (dbErr) {
+          console.warn('Failed to verify streamer by overlayToken in overlay/test:', dbErr);
+        }
+      }
+
       if (!authUser || !authUser.id) {
         return NextResponse.json(
           { error: 'Unauthorized: Authentication required to test live streamer overlays.' },
@@ -37,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     const testPayload = {
-      donationId: 'test-' + Date.now(),
+      donationId: body.donationId || ('test-' + Date.now()),
       boxId: body.boxId,
       donorName: body.donorName || 'Supporter',
       donorMessage: body.donorMessage || '',
@@ -78,19 +106,17 @@ export async function POST(req: NextRequest) {
       tierId: body.tierId,
       tierName: body.tierName,
       badgeText: body.badgeText,
-      badgeColor: body.badgeColor
+      badgeColor: body.badgeColor,
+      badgeBg: body.badgeBg,
+      badgeBorder: body.badgeBorder,
+      badgeIcon: body.badgeIcon,
+      badgeGifUrl: body.badgeGifUrl,
+      subscriberColor: body.subscriberColor,
+      tierColor: body.tierColor
     };
 
     // Broadcast once through socketService to the target overlay room
     broadcastAlertToOverlay(overlayToken, testPayload as any);
-
-    // If custom token, also broadcast to demo-token room in case preview overlay uses demo-token
-    if (overlayToken !== 'demo-token') {
-      const io = getIO();
-      if (io) {
-        io.to('overlay:demo-token').emit('donation:alert', testPayload);
-      }
-    }
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getUsersCollection } from '@/server/database/mongo';
+import { getUsersCollection, processExpiredAccountDeletions } from '@/server/database/mongo';
 import { isAdminEmail } from '@/server/database/db';
 
 export async function GET(req: NextRequest) {
@@ -8,6 +8,8 @@ export async function GET(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  await processExpiredAccountDeletions();
 
   const usersCol = await getUsersCollection();
   const escapedEmail = (user.email || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -20,8 +22,8 @@ export async function GET(req: NextRequest) {
     ]
   });
 
-  if (!streamer) {
-    return NextResponse.json({ error: 'Streamer not found' }, { status: 404 });
+  if (!streamer || (!streamer.userId && !streamer.username)) {
+    return NextResponse.json({ error: 'Unauthorized: Account not found or permanently deleted' }, { status: 401 });
   }
 
   let currentPlan = (streamer.plan || 'free').toLowerCase();
@@ -114,6 +116,13 @@ export async function GET(req: NextRequest) {
     telegramPairingCode: (streamer as any).telegramPairingCode || (streamer as any).telegram_pairing_code,
     liveStreamUrl: streamer.liveStreamUrl || streamer.youtubeLiveUrl || '',
     socialLinks: Array.isArray(streamer.socialLinks) ? streamer.socialLinks : [],
+    deletionStatus: streamer.deletionStatus || null,
+    deletionRequestedAt: streamer.deletionRequestedAt
+      ? new Date(streamer.deletionRequestedAt).toISOString()
+      : null,
+    deletionScheduledAt: streamer.deletionScheduledAt
+      ? new Date(streamer.deletionScheduledAt).toISOString()
+      : null,
     createdAt: streamer.createdAt,
     isAdmin: isAdminEmail(streamer.email)
   });

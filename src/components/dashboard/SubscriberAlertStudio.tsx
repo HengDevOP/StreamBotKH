@@ -4,11 +4,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ArrowLeft,
   Sliders,
-  Type,
   Image as ImageIcon,
-  Mic,
   Volume2,
-  Sparkles,
   Play,
   Copy,
   Check,
@@ -19,8 +16,6 @@ import {
   Monitor,
   Eye,
   Settings2,
-  ZoomIn,
-  ZoomOut,
   Maximize2,
   AlertCircle,
   Radio,
@@ -60,6 +55,7 @@ interface SubscriberAlertStudioProps {
   onBack: () => void;
   onSaveSuccess: (updatedTier: SubscriberTier) => void;
   allTiers?: SubscriberTier[];
+  onRegenerateToken?: () => void;
 }
 
 const SYSTEM_STREAM_FONTS = [
@@ -134,7 +130,8 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
   streamerUsername,
   onBack,
   onSaveSuccess,
-  allTiers = []
+  allTiers = [],
+  onRegenerateToken
 }) => {
   const token = streamerToken || 'demo-token';
   const username = streamerUsername || 'streamer';
@@ -208,8 +205,7 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
   const [saveSuccessToast, setSaveSuccessToast] = useState(false);
   const [testToast, setTestToast] = useState<string | null>(null);
 
-  // Preview zoom & simulation controls
-  const [previewZoom, setPreviewZoom] = useState<number>(1);
+  // Preview simulation controls
   const [previewAlertKey, setPreviewAlertKey] = useState<number>(1);
   const [previewSampleName, setPreviewSampleName] = useState<string>('SokhaGamer');
   const [previewSampleMsg, setPreviewSampleMsg] = useState<string>('Excited to support your stream!');
@@ -389,48 +385,76 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
       }
     }
 
-    // 3. Broadcast to real OBS overlay via /api/overlays/test if requested
+    // 3. Broadcast to real OBS overlay via socket or fallback API if requested (never both)
     if (broadcastToObs && token) {
-      try {
-        const res = await fetch('/api/overlays/test', {
+      const testDonationId = 'test-sub-' + Date.now();
+      const alertPayload = {
+        donationId: testDonationId,
+        overlayToken: token,
+        donorName: previewSampleName,
+        donorMessage: previewSampleMsg,
+        amount: tier.price,
+        currency: tier.currency || 'USD',
+        templateStyle,
+        textTemplate,
+        textColor,
+        donorColor: subscriberColor,
+        amountColor: tierColor,
+        mediaUrl: mediaUrl || tier.badgeGifUrl || tier.badgeImage,
+        customGifUrl: mediaUrl || tier.badgeGifUrl || tier.badgeImage,
+        showImage,
+        fontFamily,
+        fontSize,
+        layoutMode,
+        animationStyle,
+        glowColor,
+        soundUrl,
+        soundVolume,
+        durationSeconds,
+        ttsEnabled,
+        ttsType,
+        clonedVoiceSampleUrl,
+        isSubscription: true,
+        tierId: tier.id,
+        tierName: tier.name,
+        badgeText: tier.badgeText,
+        badgeColor: tier.badgeColor,
+        badgeBg: tier.badgeBg,
+        badgeBorder: tier.badgeBorder,
+        badgeIcon: tier.badgeIcon,
+        subscriberColor,
+        tierColor,
+        isTest: true
+      };
+
+      // Broadcast to real OBS overlay via WebSocket if connected, otherwise via fallback API
+      if (socket && socket.connected) {
+        socket.emit('trigger:test_alert', alertPayload);
+        setTestToast(`Broadcasted ${tier.name} alert to live OBS Subscribers overlay!`);
+        setTimeout(() => setTestToast(null), 3500);
+      } else {
+        const authToken = typeof window !== 'undefined'
+          ? (localStorage.getItem('streamneon_auth_token') || localStorage.getItem('auth_token') || localStorage.getItem('streamneon_token'))
+          : null;
+
+        fetch('/api/overlays/test', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            overlayToken: token,
-            donorName: previewSampleName,
-            donorMessage: previewSampleMsg,
-            amount: tier.price,
-            currency: tier.currency || 'USD',
-            templateStyle,
-            textTemplate,
-            textColor,
-            donorColor: subscriberColor,
-            amountColor: tierColor,
-            mediaUrl: mediaUrl || tier.badgeGifUrl || tier.badgeImage,
-            showImage,
-            fontFamily,
-            fontSize,
-            layoutMode,
-            animationStyle,
-            glowColor,
-            soundUrl,
-            soundVolume,
-            durationSeconds,
-            ttsEnabled,
-            ttsType,
-            clonedVoiceSampleUrl,
-            isSubscription: true,
-            tierName: tier.name,
-            badgeText: tier.badgeText,
-            badgeColor: tier.badgeColor
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+          },
+          credentials: 'include',
+          body: JSON.stringify(alertPayload)
+        })
+          .then((res) => {
+            if (res.ok) {
+              setTestToast(`Broadcasted ${tier.name} alert to live OBS Subscribers overlay!`);
+              setTimeout(() => setTestToast(null), 3500);
+            }
           })
-        });
-        if (res.ok) {
-          setTestToast(`Broadcasted ${tier.name} alert to live OBS overlay!`);
-          setTimeout(() => setTestToast(null), 3500);
-        }
-      } catch (e) {
-        console.warn('Failed broadcasting test alert to OBS:', e);
+          .catch((e) => {
+            console.warn('Fallback test alert API error:', e);
+          });
       }
     }
 
@@ -568,8 +592,8 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
 
   // Browser Source Overlay URL
   const overlayUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/overlay/alert/${token}`
-    : `/overlay/alert/${token}`;
+    ? `${window.location.origin}/overlay/subscribers/${token}`
+    : `/overlay/subscribers/${token}`;
 
   const otherTiers = allTiers.filter((t) => t.id !== tier.id);
 
@@ -586,30 +610,6 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
             <ArrowLeft size={15} className="text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
             <span className="hidden sm:inline">Back to Dashboard</span>
           </button>
-
-          <div className="h-5 w-[1px] bg-slate-800 hidden sm:block" />
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <span className="text-xs font-mono text-slate-500 uppercase tracking-wider hidden md:inline">Subscriber Studio /</span>
-              <h2 className="text-xs sm:text-base font-bold text-white truncate font-['Chakra_Petch'] max-w-[120px] xs:max-w-[160px] sm:max-w-xs md:max-w-md">
-                {tier.name}
-              </h2>
-              <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex-shrink-0">
-                ${tier.price.toFixed(2)}/mo
-              </span>
-              <span
-                className="px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider flex-shrink-0"
-                style={{
-                  color: tier.badgeColor || '#00F0FF',
-                  backgroundColor: tier.badgeBg || 'rgba(0, 240, 255, 0.15)',
-                  border: `1px solid ${tier.badgeBorder || 'rgba(0, 240, 255, 0.3)'}`
-                }}
-              >
-                [{tier.badgeText || 'SUB'}]
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Action Buttons */}
@@ -642,6 +642,17 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
             >
               <ExternalLink size={15} />
             </a>
+            {onRegenerateToken && (
+              <button
+                type="button"
+                onClick={onRegenerateToken}
+                className="p-1.5 rounded-lg hover:bg-red-950/40 text-slate-400 hover:text-red-400 transition-all cursor-pointer group"
+                title="Regenerate Security Token"
+                aria-label="Regenerate Security Token"
+              >
+                <RefreshCw size={15} className="group-hover:rotate-180 transition-transform duration-500" />
+              </button>
+            )}
           </div>
 
           <Button
@@ -675,27 +686,19 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
       {/* 2. MAIN 2-COLUMN STUDIO WORKBENCH */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative">
         {/* LEFT COLUMN: CUSTOMIZATION ACCORDIONS (SCROLLABLE) */}
-        <div className="w-full lg:w-[480px] xl:w-[540px] flex-shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#090D18] overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div className="w-full lg:w-[320px] xl:w-[340px] flex-shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#090D18] overflow-y-auto p-3 sm:p-3.5 space-y-2.5">
           {/* SECTION 1: TEXT & TYPOGRAPHY */}
-          <div className="rounded-2xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-lg transition-all">
+          <div className="rounded-xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-lg transition-all">
             <button
               type="button"
               onClick={() => setActiveTab(activeTab === 'text' ? null : 'text')}
-              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
+              className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                  <Type className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-['Chakra_Petch']">
-                    Text &amp; Typography Customization
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Headline message, dynamic tokens, colors, layout mode, and stream fonts
-                  </p>
-                </div>
-              </div>
+              <h3 className={`text-xs sm:text-sm font-bold font-['Chakra_Petch'] transition-colors ${
+                activeTab === 'text' ? 'text-cyan-400' : 'text-white'
+              }`}>
+                Text &amp; Typography
+              </h3>
               <ChevronDown
                 className={`w-4 h-4 text-slate-400 transition-transform ${
                   activeTab === 'text' ? 'rotate-180 text-cyan-400' : ''
@@ -879,25 +882,17 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
           </div>
 
           {/* SECTION 2: MEDIA, SOUND & VISUAL STYLE */}
-          <div className="rounded-2xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-lg transition-all">
+          <div className="rounded-xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-lg transition-all">
             <button
               type="button"
               onClick={() => setActiveTab(activeTab === 'image' ? null : 'image')}
-              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
+              className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-['Chakra_Petch']">
-                    Media, Sound &amp; Visual Style
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Template style, alert duration, sound effect, media GIF/image, and neon aura
-                  </p>
-                </div>
-              </div>
+              <h3 className={`text-xs sm:text-sm font-bold font-['Chakra_Petch'] transition-colors ${
+                activeTab === 'image' ? 'text-amber-400' : 'text-white'
+              }`}>
+                Media, Sound &amp; Visual Style
+              </h3>
               <ChevronDown
                 className={`w-4 h-4 text-slate-400 transition-transform ${
                   activeTab === 'image' ? 'rotate-180 text-cyan-400' : ''
@@ -1175,25 +1170,17 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
           </div>
 
           {/* SECTION 3: TEXT-TO-SPEECH (TTS) */}
-          <div className="rounded-2xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-lg transition-all">
+          <div className="rounded-xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-lg transition-all">
             <button
               type="button"
               onClick={() => setActiveTab(activeTab === 'tts' ? null : 'tts')}
-              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
+              className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                  <Mic className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-['Chakra_Petch']">
-                    Text-To-Speech (TTS) Engine
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Voice selection, Khmer neural speech, and custom AI cloned voice
-                  </p>
-                </div>
-              </div>
+              <h3 className={`text-xs sm:text-sm font-bold font-['Chakra_Petch'] transition-colors ${
+                activeTab === 'tts' ? 'text-emerald-400' : 'text-white'
+              }`}>
+                Text-To-Speech (TTS)
+              </h3>
               <ChevronDown
                 className={`w-4 h-4 text-slate-400 transition-transform ${
                   activeTab === 'tts' ? 'rotate-180 text-cyan-400' : ''
@@ -1301,25 +1288,17 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
 
           {/* SECTION 4: COPY FROM ANOTHER TIER */}
           {otherTiers.length > 0 && (
-            <div className="rounded-2xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-lg transition-all">
+            <div className="rounded-xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-lg transition-all">
               <button
                 type="button"
                 onClick={() => setActiveTab(activeTab === 'copy' ? null : 'copy')}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
+                className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                    <Copy className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white font-['Chakra_Petch']">
-                      Copy Alert Settings From Another Tier
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      Quickly mirror template style, sounds, and colors from another tier
-                    </p>
-                  </div>
-                </div>
+                <h3 className={`text-xs sm:text-sm font-bold font-['Chakra_Petch'] transition-colors ${
+                  activeTab === 'copy' ? 'text-blue-400' : 'text-white'
+                }`}>
+                  Copy from Another Tier
+                </h3>
                 <ChevronDown
                   className={`w-4 h-4 text-slate-400 transition-transform ${
                     activeTab === 'copy' ? 'rotate-180 text-cyan-400' : ''
@@ -1367,45 +1346,6 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
         {/* RIGHT COLUMN: INTERACTIVE LIVE PREVIEW CANVAS & SIMULATOR DOCK */}
         <div className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#05070E] p-4 sm:p-6 space-y-4">
           <div className="rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 shadow-xl space-y-4">
-            {/* Preview Header & Controls */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                  Live Alert Preview
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setPreviewZoom((z) => Math.max(0.6, z - 0.1))}
-                  className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center border border-slate-800 text-xs font-mono"
-                  title="Zoom Out"
-                >
-                  <ZoomOut className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-[10px] font-mono text-slate-400 px-1">
-                  {Math.round(previewZoom * 100)}%
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPreviewZoom((z) => Math.min(1.4, z + 0.1))}
-                  className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center border border-slate-800 text-xs font-mono"
-                  title="Zoom In"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewZoom(1)}
-                  className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-[10px] font-mono text-slate-400 hover:text-white border border-slate-800"
-                >
-                  100%
-                </button>
-              </div>
-            </div>
-
             {/* Simulated 16:9 OBS Canvas Stage */}
             <div className="relative aspect-video w-full rounded-xl bg-[#05070D] border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner group">
               {/* Subtle Grid Lines */}
@@ -1418,16 +1358,11 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
                 }}
               />
 
-              {/* Watermark Tag */}
-              <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-slate-950/80 border border-slate-800 text-[9px] font-mono text-slate-400">
-                OBS 1920x1080 Simulated Canvas
-              </div>
-
               {/* The Live NeonAlertCard */}
               <div
                 key={previewAlertKey}
                 style={{
-                  transform: `scale(${previewZoom * 0.72})`,
+                  transform: 'scale(0.72)',
                   transformOrigin: 'center center'
                 }}
                 className="transition-transform duration-150 flex items-center justify-center pointer-events-none"

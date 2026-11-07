@@ -536,6 +536,110 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [newLinkTitle, setNewLinkTitle] = useState<string>('');
   const [linkErrorMsg, setLinkErrorMsg] = useState<string | null>(null);
 
+  // Inline Editing State for Display Name & Description near Profile
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [savingBio, setSavingBio] = useState(false);
+
+  const handleSaveInlineDisplayName = async () => {
+    const trimmed = profileName.trim();
+    if (!trimmed) {
+      setProfileName(user?.displayName || user?.username || '');
+      setIsEditingDisplayName(false);
+      return;
+    }
+    if (trimmed === (user?.displayName || '')) {
+      setIsEditingDisplayName(false);
+      return;
+    }
+    setSavingDisplayName(true);
+    setProfileErrorMsg(null);
+    try {
+      await streamerService.updateProfile({
+        displayName: trimmed
+      });
+      await refreshUser();
+      setIsEditingDisplayName(false);
+      setProfileSavedMsg(true);
+      setTimeout(() => setProfileSavedMsg(false), 2500);
+    } catch (err: any) {
+      setProfileErrorMsg(err?.message || 'Failed to update display name');
+    } finally {
+      setSavingDisplayName(false);
+    }
+  };
+
+  const handleSaveInlineBio = async () => {
+    const trimmed = profileBio.trim();
+    if (trimmed === (user?.bio || '')) {
+      setIsEditingBio(false);
+      return;
+    }
+    setSavingBio(true);
+    setProfileErrorMsg(null);
+    try {
+      await streamerService.updateProfile({
+        bio: trimmed,
+        description: trimmed
+      });
+      await refreshUser();
+      setIsEditingBio(false);
+      setProfileSavedMsg(true);
+      setTimeout(() => setProfileSavedMsg(false), 2500);
+    } catch (err: any) {
+      setProfileErrorMsg(err?.message || 'Failed to update description');
+    } finally {
+      setSavingBio(false);
+    }
+  };
+
+  // Account Deletion (7-Day Grace Period) State
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteTermsAcknowledged, setDeleteTermsAcknowledged] = useState(false);
+  const [requestingAccountDeletion, setRequestingAccountDeletion] = useState(false);
+  const [cancellingAccountDeletion, setCancellingAccountDeletion] = useState(false);
+  const [accountDeletionNotice, setAccountDeletionNotice] = useState<string | null>(null);
+
+  const handleRequestAccountDeletion = async () => {
+    if (!deleteTermsAcknowledged || requestingAccountDeletion) return;
+    setRequestingAccountDeletion(true);
+    setProfileErrorMsg(null);
+    try {
+      await request('/streamer/account/delete', {
+        method: 'POST',
+        body: JSON.stringify({ acknowledgedTerms: true })
+      });
+      await refreshUser();
+      setShowDeleteAccountModal(false);
+      setDeleteTermsAcknowledged(false);
+      setAccountDeletionNotice(
+        `Account deletion scheduled for 7 days from now. A security alert email has been dispatched to ${user?.email}.`
+      );
+    } catch (err: any) {
+      setProfileErrorMsg(err?.message || 'Failed to submit account deletion request');
+    } finally {
+      setRequestingAccountDeletion(false);
+    }
+  };
+
+  const handleCancelAccountDeletion = async () => {
+    if (cancellingAccountDeletion) return;
+    setCancellingAccountDeletion(true);
+    setProfileErrorMsg(null);
+    try {
+      await request('/streamer/account/delete', {
+        method: 'DELETE'
+      });
+      await refreshUser();
+      setAccountDeletionNotice('Your account deletion request has been cancelled. Your account is active and safe.');
+    } catch (err: any) {
+      setProfileErrorMsg(err?.message || 'Failed to cancel account deletion request');
+    } finally {
+      setCancellingAccountDeletion(false);
+    }
+  };
+
   // Donation Ledger Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState<'ALL' | 'USD' | 'KHR'>('ALL');
@@ -607,7 +711,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     try {
       await streamerService.updateProfile({ plan });
       await refreshUser();
-      loadData();
+      loadData(true);
     } catch (e) {
       console.error('Failed to update plan:', e);
     }
@@ -616,7 +720,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Fetch initial streamer data
   const loadData = async (isBackground = false) => {
     try {
-      if (!isBackground) {
+      if (!isBackground && !stats) {
         setLoading(true);
       }
       const [statsData, alertData, paymentData] = await Promise.all([
@@ -649,7 +753,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   };
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       loadData();
     }
     // Fail-safe: ensure loading skeleton never blocks screen indefinitely
@@ -657,7 +761,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setLoading(false);
     }, 7000);
     return () => clearTimeout(failSafe);
-  }, [user]);
+  }, [user?.id]);
 
   // Subscribe to real-time media & storage updates so storage usage bar reflects uploads/deletions immediately
   useEffect(() => {
@@ -796,6 +900,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       'wheel',
       'pokemon',
       'chat',
+      'subscribers',
       'account'
     ] as DashboardTab[]).includes(activeTab);
 
@@ -900,6 +1005,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           color: '#10B981', // Bulbasaur Emerald/Cyan
           bgGlow: 'hover:border-emerald-500/50',
           copyMessage: 'Copied 2D Pokémon OBS URL!'
+        };
+      case 'subscribers':
+        return {
+          featureKey: 'subscribers',
+          label: 'Subscribers OBS',
+          shortLabel: 'Subscribers',
+          url: `${origin}/overlay/subscribers/${effectiveToken}`,
+          icon: Crown,
+          color: '#EC4899',
+          bgGlow: 'hover:border-pink-500/50',
+          copyMessage: 'Copied Subscribers OBS URL!'
         };
       default:
         return null;
@@ -1111,7 +1227,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setUsernameStatusMsg(`Username updated to @${cleanUsername}!`);
       setProfileSavedMsg(true);
       setTimeout(() => setProfileSavedMsg(false), 3000);
-      loadData();
+      loadData(true);
     } catch (err: any) {
       setUsernameStatus('taken');
       setUsernameStatusMsg(err.message || 'Username is already taken.');
@@ -1190,7 +1306,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       await refreshUser();
       setProfileSavedMsg(true);
       setTimeout(() => setProfileSavedMsg(false), 3000);
-      loadData();
+      loadData(true);
     } catch (err: any) {
       setProfileErrorMsg(err.message || 'Failed to update profile');
     } finally {
@@ -1212,7 +1328,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       await refreshUser();
       setProfileSavedMsg(true);
       setTimeout(() => setProfileSavedMsg(false), 3000);
-      loadData();
+      loadData(true);
     } catch (err: any) {
       setProfileErrorMsg(err.message || 'Failed to save live stream URL');
     } finally {
@@ -1663,6 +1779,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
           initialSelectedTierId={selectedSubscriberTierId}
           onSelectTierId={(tierId) => setSelectedSubscriberTierId(tierId)}
+          onRegenerateToken={handleRegenerateToken}
         />
       </div>
     );
@@ -1844,6 +1961,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     <Copy size={16} className="text-slate-400 hover:text-cyan-400 transition-colors" />
                   )}
                 </button>
+
+                {/* Open Source URL in New Tab */}
+                <a
+                  href={currentObsConfig.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative p-1.5 sm:p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-all cursor-pointer"
+                  title={`Open ${currentObsConfig.label} URL in New Tab`}
+                >
+                  <ExternalLink size={16} />
+                </a>
 
                 <button
                   type="button"
@@ -2047,12 +2175,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         </header>
 
         {/* Dynamic Workbench Views (Internally Scrollable Container Only) */}
-        <div className={`flex-1 min-h-0 ${activeTab === 'chat' || activeTab === 'video-alerts' ? 'flex flex-col overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
-        <div className={activeTab === 'chat' || activeTab === 'video-alerts'
-          ? 'w-full h-full p-2.5 sm:p-4 lg:p-5 flex-1 flex flex-col min-h-0'
+        <div className={`flex-1 min-h-0 ${activeTab === 'chat' || activeTab === 'video-alerts' || activeTab === 'support' || activeTab === 'admin-requests' || (activeTab as any) === 'report-issue' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
+        <div className={activeTab === 'chat' || activeTab === 'video-alerts' || activeTab === 'support' || activeTab === 'admin-requests' || (activeTab as any) === 'report-issue'
+          ? 'w-full h-full p-2.5 sm:p-4 lg:p-5 flex-1 flex flex-col min-h-0 overflow-hidden'
           : 'p-3 xs:p-4 sm:p-6 lg:p-7 max-w-7xl 2xl:max-w-[1600px] w-full mx-auto space-y-6 animate-fadeIn pb-16'
         }>
-          {loading ? (
+          {loading && activeTab !== 'account' ? (
             <FeatureTabSkeleton tab={activeTab} />
           ) : (
             <>
@@ -2309,6 +2437,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {activeTab === 'wheel' && (currentPlan !== 'free' || isAdmin) && (
             <SpinningWheelManager
               streamerToken={user?.overlayToken}
+              streamerUsername={user?.username}
               isLocked={false}
               onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
             />
@@ -2341,6 +2470,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
               initialSelectedTierId={selectedSubscriberTierId || undefined}
               onSelectTierId={(tierId) => setSelectedSubscriberTierId(tierId)}
+              onRegenerateToken={handleRegenerateToken}
             />
           )}
 
@@ -2362,15 +2492,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* ============================================================== */}
           {activeTab === 'account' && (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white font-['Chakra_Petch']">
-                  My Account
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Click your profile logo to choose a new one from your Media Library, update your unique @username, and customize your public donation page.
-                </p>
-              </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left 2 cols: Profile Logo, Unique Username, & Channel Details */}
                 <div className="lg:col-span-2 space-y-6">
@@ -2389,8 +2510,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
                   )}
 
-                  {/* 1. Profile Logo Hero Card (Click Logo to Choose New One) */}
-                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col sm:flex-row items-center gap-6">
+                  {/* 1. Profile Logo Hero Card (Click Logo, Display Name, or Description to Edit) */}
+                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col sm:flex-row items-center sm:items-start gap-6">
                     <div
                       onClick={() => setIsMediaPickerOpen(true)}
                       className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-900 border-2 border-cyan-500/50 hover:border-cyan-400 overflow-hidden cursor-pointer group flex-shrink-0 transition-all shadow-[0_0_25px_rgba(0,240,255,0.15)]"
@@ -2413,48 +2534,134 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </div>
                     </div>
 
-                    <div className="flex-1 text-center sm:text-left space-y-2">
+                    <div className="flex-1 w-full text-center sm:text-left space-y-2.5 min-w-0">
+                      {/* Clickable Display Name + Verified Icon Only */}
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        <h3 className="text-lg font-extrabold text-white font-['Chakra_Petch'] flex items-center gap-1.5">
-                          <span>{user.displayName || user.username}</span>
-                          {user.isVerified && (
-                            <span title="Verified Creator Badge" className="inline-flex items-center text-cyan-400">
-                              <BadgeCheck size={18} className="text-cyan-400 fill-cyan-400/20" />
-                            </span>
-                          )}
-                        </h3>
-                        {user.isVerified ? (
-                          <span className="text-[10px] font-mono text-cyan-300 px-2.5 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 font-bold flex items-center gap-1">
-                            <BadgeCheck size={11} className="text-cyan-400" />
-                            <span>Verified Creator</span>
-                          </span>
+                        {isEditingDisplayName ? (
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <input
+                              type="text"
+                              autoFocus
+                              value={profileName}
+                              onChange={(e) => setProfileName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSaveInlineDisplayName();
+                                } else if (e.key === 'Escape') {
+                                  setProfileName(user.displayName || user.username || '');
+                                  setIsEditingDisplayName(false);
+                                }
+                              }}
+                              placeholder="Enter display name..."
+                              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-400 text-white font-bold text-sm font-['Chakra_Petch'] focus:outline-none w-full sm:w-64"
+                            />
+                            <button
+                              type="button"
+                              disabled={savingDisplayName}
+                              onClick={handleSaveInlineDisplayName}
+                              className="p-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50"
+                              title="Save Display Name"
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProfileName(user.displayName || user.username || '');
+                                setIsEditingDisplayName(false);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                              title="Cancel"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
                         ) : (
-                          <span className="text-[10px] font-mono text-slate-500 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800">
-                            Unverified
-                          </span>
+                          <div className="inline-flex items-center gap-1.5">
+                            <h3
+                              onClick={() => {
+                                setProfileName(profileName || user.displayName || user.username || '');
+                                setIsEditingDisplayName(true);
+                              }}
+                              title="Click to edit display name"
+                              className="text-lg font-extrabold text-white hover:text-cyan-300 font-['Chakra_Petch'] cursor-pointer px-2 py-0.5 -mx-2 rounded-lg hover:bg-slate-900/80 border border-transparent hover:border-slate-800 transition-all"
+                            >
+                              {profileName || user.displayName || user.username}
+                            </h3>
+                            {user.isVerified && (
+                              <span title="Verified Creator" className="inline-flex items-center text-cyan-400">
+                                <BadgeCheck size={18} className="text-cyan-400 fill-cyan-400/20" />
+                              </span>
+                            )}
+                          </div>
                         )}
-                        <span className="text-xs font-mono text-cyan-400 px-2.5 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-800/40 font-semibold">
-                          @{user.username}
-                        </span>
                       </div>
-                      <p className="text-xs font-mono text-slate-400">{user.email}</p>
-                      <p className="text-xs text-slate-400">
-                        Click on your profile logo to select an image/GIF from your Media Library or upload a new one.
-                      </p>
-                      <div className="pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setIsMediaPickerOpen(true)}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs transition-colors cursor-pointer"
-                        >
-                          <ImageIcon size={14} />
-                          <span>Click to Choose New Logo</span>
-                        </button>
+
+                      {/* Clickable Description / Bio near Profile */}
+                      <div className="w-full">
+                        {isEditingBio ? (
+                          <div className="space-y-2">
+                            <textarea
+                              rows={3}
+                              autoFocus
+                              value={profileBio}
+                              onChange={(e) => setProfileBio(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                  setProfileBio(user.bio || '');
+                                  setIsEditingBio(false);
+                                }
+                              }}
+                              placeholder="Tell your viewers what you stream, when you go live, and how tips support your channel..."
+                              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-400 text-xs text-white focus:outline-none leading-relaxed resize-none"
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProfileBio(user.bio || '');
+                                  setIsEditingBio(false);
+                                }}
+                                className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingBio}
+                                onClick={handleSaveInlineBio}
+                                className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs font-mono transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                {savingBio ? 'Saving...' : 'Save Description'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => {
+                              setProfileBio(profileBio ?? user.bio ?? '');
+                              setIsEditingBio(true);
+                            }}
+                            title="Click to edit description"
+                            className="group/bio cursor-pointer p-2.5 -mx-2.5 rounded-xl hover:bg-slate-900/70 border border-transparent hover:border-slate-800/80 transition-all"
+                          >
+                            {profileBio || user.bio ? (
+                              <p className="text-xs text-slate-300 group-hover/bio:text-white leading-relaxed whitespace-pre-wrap break-words">
+                                {profileBio || user.bio}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-slate-500 group-hover/bio:text-slate-300 italic">
+                                Click here to add a channel description / bio...
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* 2. Channel Profile Details (Merged with Username) */}
+                  {/* 2. Information Profile */}
                   <form
                     onSubmit={handleSaveProfile}
                     className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-5"
@@ -2462,10 +2669,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
                       <div>
                         <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                          Channel Profile Details
+                          Information Profile
                         </h3>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Configure your unique handle, creator display name, bio, and donor thank you message.
+                          Manage your account email, unique @username handle, thank you message, and social links.
                         </p>
                       </div>
                       <span className="text-[11px] font-mono text-cyan-400 font-semibold self-start sm:self-auto bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-800/40">
@@ -2474,9 +2681,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
 
                     <div className="space-y-4 text-xs">
-                      {/* Unified Row: Username & Display Name */}
+                      {/* Information Profile List: Email Address & Username */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* 1. Streamer Username */}
+                        {/* 1. Email Address */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5 font-mono">
+                            <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                              <Mail size={13} className="text-cyan-400" />
+                              <span>Email Address</span>
+                            </label>
+                            <span className="text-[10px] text-emerald-400 font-mono">Verified</span>
+                          </div>
+                          <div className="flex items-center px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 font-mono text-xs select-all">
+                            {user.email}
+                          </div>
+                          <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                            Linked Google account email address.
+                          </span>
+                        </div>
+
+                        {/* 2. Streamer Username */}
                         <div>
                           <div className="flex items-center justify-between mb-1.5 font-mono">
                             <label className="text-slate-300 font-semibold flex items-center gap-1">
@@ -2526,39 +2750,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             3–24 characters (letters, numbers, underscores). Public URL handle.
                           </span>
                         </div>
-
-                        {/* 2. Streamer Display Name */}
-                        <div>
-                          <label className="block text-slate-300 mb-1.5 font-semibold font-mono">
-                            Display Name <span className="text-cyan-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={profileName}
-                            onChange={(e) => setProfileName(e.target.value)}
-                            placeholder="e.g. Sokha Streamer"
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors"
-                          />
-                          <span className="text-[10px] text-slate-500 mt-1 block font-mono">
-                            Friendly creator name displayed on alerts, receipts, and headers.
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Description / Channel Bio */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5 font-mono">
-                          <label className="text-slate-300 font-semibold">Description / Bio</label>
-                          <span className="text-[10px] text-slate-500">Public Donation Page Bio</span>
-                        </div>
-                        <textarea
-                          rows={4}
-                          value={profileBio}
-                          onChange={(e) => setProfileBio(e.target.value)}
-                          placeholder="Tell your viewers what you stream, when you go live, and how tips support your channel..."
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors leading-relaxed"
-                        />
                       </div>
 
                       {/* Custom Thank You Message for Donors */}
@@ -2775,6 +2966,233 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </Button>
                     </div>
                   </form>
+
+                  {/* 3. Danger Zone — Account Deletion (7-Day Grace Period) */}
+                  <div className="p-6 rounded-2xl bg-gradient-to-br from-red-950/20 via-[#090D18] to-[#090D18] border border-red-500/30 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-500/20 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400">
+                          <AlertCircle size={18} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-red-300 font-['Chakra_Petch'] uppercase tracking-wider">
+                              Danger Zone • Delete Account
+                            </h3>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/15 text-red-400 border border-red-500/30 uppercase">
+                              7-Day Await
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Request permanent deletion of your creator account and all associated platform data.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {accountDeletionNotice && (
+                      <div className="p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/30 text-cyan-300 text-xs flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 size={15} className="text-cyan-400 shrink-0" />
+                          <span>{accountDeletionNotice}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAccountDeletionNotice(null)}
+                          className="text-slate-400 hover:text-white p-1"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    )}
+
+                    {user.deletionStatus === 'pending' && user.deletionScheduledAt ? (
+                      <div className="p-4 rounded-xl bg-red-950/35 border border-red-500/40 space-y-3.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
+                              <span className="text-xs font-mono font-bold text-red-300 uppercase">
+                                Account Scheduled for Permanent Deletion
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                              Your account is currently in the <strong>7-day deletion waiting period</strong>. Unless cancelled, all of your creator data, profile settings, donation history, overlays, and widgets will be permanently deleted on{' '}
+                              <strong className="text-red-300 font-mono">
+                                {new Date(user.deletionScheduledAt).toLocaleString()}
+                              </strong>{' '}
+                              (retaining only your email address record <code className="text-cyan-300">{user.email}</code>).
+                            </p>
+                            {user.deletionRequestedAt && (
+                              <p className="text-[11px] font-mono text-slate-400">
+                                Requested on: {new Date(user.deletionRequestedAt).toLocaleString()} • Days remaining:{' '}
+                                <strong className="text-amber-300">
+                                  {Math.max(
+                                    1,
+                                    Math.ceil(
+                                      (new Date(user.deletionScheduledAt).getTime() - Date.now()) /
+                                        (1000 * 60 * 60 * 24)
+                                    )
+                                  )}{' '}
+                                  day(s)
+                                </strong>
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleCancelAccountDeletion}
+                            disabled={cancellingAccountDeletion}
+                            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs font-mono transition-all shadow-lg shadow-emerald-500/20 shrink-0 cursor-pointer disabled:opacity-50"
+                          >
+                            {cancellingAccountDeletion
+                              ? 'Cancelling...'
+                              : 'Cancel Request Deletion'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+                        <div className="text-xs text-slate-400 leading-relaxed space-y-1 max-w-xl">
+                          <p>
+                            When you request account deletion, your account enters a <strong className="text-slate-200">7-day waiting period</strong> and a security confirmation email is sent to <span className="text-cyan-400 font-mono">{user.email}</span>.
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            After 7 days pass, everything is permanently deleted from our database except your email address record. You can cancel anytime during the 7 days, or recreate a fresh account if you sign in again after deletion.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteTermsAcknowledged(false);
+                            setShowDeleteAccountModal(true);
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-300 hover:text-red-200 font-bold text-xs font-mono transition-all flex items-center gap-2 shrink-0 self-start sm:self-center cursor-pointer"
+                        >
+                          <Trash2 size={14} className="text-red-400" />
+                          <span>Delete Account</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Account Deletion Terms & Acknowledgement Modal */}
+                  {showDeleteAccountModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+                      <div className="w-full max-w-xl rounded-2xl border border-red-500/30 bg-[#090D18] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        {/* Modal Header */}
+                        <div className="p-5 border-b border-slate-800 bg-gradient-to-r from-red-950/40 via-slate-900 to-[#090D18] flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400">
+                              <Trash2 size={18} />
+                            </div>
+                            <div>
+                              <h3 className="text-base font-bold text-white font-['Chakra_Petch']">
+                                Account Deletion Terms &amp; Agreement
+                              </h3>
+                              <p className="text-xs text-red-300 font-mono">
+                                Please read carefully before requesting deletion for @{user.username}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowDeleteAccountModal(false)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+
+                        {/* Readable Terms Scrollable Body */}
+                        <div className="p-5 overflow-y-auto space-y-4 text-xs text-slate-300 leading-relaxed">
+                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                            <h4 className="font-bold text-white font-mono uppercase text-[11px] text-cyan-400">
+                              1. 7-Day Deletion Waiting Period &amp; Cancellation Rights
+                            </h4>
+                            <p className="text-slate-400">
+                              Upon submitting this request, your creator account (<strong className="text-white">@{user.username}</strong>) will be placed into a <strong className="text-white">7-day deletion waiting state</strong>. During these 7 days, your account remains accessible and you may cancel the deletion request at any time by clicking the <strong className="text-emerald-400">"Cancel Request Deletion"</strong> button inside My Account.
+                            </p>
+                          </div>
+
+                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                            <h4 className="font-bold text-white font-mono uppercase text-[11px] text-red-400">
+                              2. Scope of Permanent Database Deletion (Email Retained Only)
+                            </h4>
+                            <p className="text-slate-400">
+                              Once the 7-day grace period expires without cancellation, our system will permanently erase <strong className="text-white">all account data</strong> across our database, including:
+                            </p>
+                            <ul className="list-disc pl-5 space-y-1 text-slate-400">
+                              <li>Your creator profile, display name, bio, social links, and unique <code className="text-cyan-300">@{user.username}</code> handle.</li>
+                              <li>All donation ledger records, payment gateway configurations, and Telegram listener sessions.</li>
+                              <li>All OBS overlay tokens, Alert Box tiers, Soundboard items, Video Alert settings, Subathon Timers, Goals, Leaderboards,Subscriber tiers, and Spinning Wheel slices.</li>
+                              <li>All uploaded Media Library images, GIFs, audio files, support tickets, and mailbox messages.</li>
+                            </ul>
+                            <p className="text-amber-300/90 font-mono text-[11px] pt-1">
+                              Note: Only your email address record ({user.email}) will remain stored in our database.
+                            </p>
+                          </div>
+
+                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                            <h4 className="font-bold text-white font-mono uppercase text-[11px] text-purple-400">
+                              3. Recreating Your Account in the Future
+                            </h4>
+                            <p className="text-slate-400">
+                              After the 7-day permanent deletion is completed, if you sign in again with your Google account (<span className="text-slate-200 font-mono">{user.email}</span>), a brand-new creator account will be freshly created for you. None of your previous data, settings, or history can be recovered once deleted.
+                            </p>
+                          </div>
+
+                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                            <h4 className="font-bold text-white font-mono uppercase text-[11px] text-emerald-400">
+                              4. Security Email Alert Verification
+                            </h4>
+                            <p className="text-slate-400">
+                              For your protection, confirming this request will immediately dispatch a security alert email to <strong className="text-white font-mono">{user.email}</strong> notifying you of the scheduled deletion and providing instructions if the request was unauthorized.
+                            </p>
+                          </div>
+
+                          {/* Final Section: Mandatory Tick / Acknowledgement Checkbox */}
+                          <label className="flex items-start gap-3 p-4 rounded-xl bg-red-950/30 border border-red-500/40 cursor-pointer select-none hover:bg-red-950/40 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={deleteTermsAcknowledged}
+                              onChange={(e) => setDeleteTermsAcknowledged(e.target.checked)}
+                              className="mt-0.5 w-4 h-4 rounded border-red-500/50 bg-slate-950 text-red-500 focus:ring-red-500 cursor-pointer shrink-0"
+                            />
+                            <span className="text-xs text-slate-200 leading-relaxed">
+                              <strong className="text-red-300">I have read, understood, and accept these terms.</strong> I acknowledge that my account will be set into a 7-day deletion wait period, and that after 7 days pass, all of my database records (except my email address <code className="text-cyan-300">{user.email}</code>) will be permanently deleted.
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setShowDeleteAccountModal(false)}
+                            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!deleteTermsAcknowledged || requestingAccountDeletion}
+                            onClick={handleRequestAccountDeletion}
+                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs font-mono shadow-lg shadow-red-600/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer"
+                          >
+                            <Trash2 size={14} />
+                            <span>
+                              {requestingAccountDeletion
+                                ? 'Submitting Request...'
+                                : 'Confirm Request Account Deletion'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right col: Plan Status, Media Storage Quota, and Tip QR Code */}
@@ -3318,7 +3736,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             await refreshUser();
             setProfileSavedMsg(true);
             setTimeout(() => setProfileSavedMsg(false), 3000);
-            loadData();
+            loadData(true);
           } catch (err: any) {
             setProfileErrorMsg(err.message || 'Failed to update profile logo');
           } finally {

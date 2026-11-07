@@ -181,7 +181,9 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         badgeBorder: formData.badgeBorder,
         badgeIcon: formData.badgeIcon,
         badgeGifUrl: formData.badgeGifUrl,
-        badgeImage: formData.badgeImage
+        badgeImage: formData.badgeImage,
+        isWheelSpin: formData.isWheelSpin,
+        donationType: formData.donationType
       });
 
       setCurrentDonorName(formData.donorName);

@@ -11,7 +11,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { NextRequest } from 'next/server';
-import { initMongo, cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo } from '../src/server/database/mongo';
+import { initMongo, cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo, processExpiredAccountDeletions } from '../src/server/database/mongo';
 import { initSocketServer } from '../src/server/services/socketService';
 import { globalRateLimiterMiddleware } from '../src/server/utils/rateLimiter';
 
@@ -233,12 +233,14 @@ initSocketServer(server);
 const apiDirectory = path.resolve(process.cwd(), 'src/app/api');
 scanAndMountRoutes(apiDirectory, '/api');
 
-// 4. Background Expired Pending Donations Cleanup (runs every 30s) & 6-month Retention Cleanup in MongoDB
+// 4. Background Expired Pending Donations Cleanup (runs every 30s), Account Deletion 7-Day Grace Period Check, & 6-month Retention Cleanup in MongoDB
 cleanupExpiredPendingDonationsMongo();
 cleanupOlderDonationsMongo(6);
+processExpiredAccountDeletions();
 setInterval(() => {
   cleanupExpiredPendingDonationsMongo();
   cleanupOlderDonationsMongo(6);
+  processExpiredAccountDeletions();
 }, 30 * 1000);
 
 // Health check endpoint

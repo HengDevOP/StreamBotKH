@@ -57,6 +57,7 @@ interface SubscribersManagerProps {
   onUpgrade?: () => void;
   initialSelectedTierId?: string;
   onSelectTierId?: (tierId: string | null) => void;
+  onRegenerateToken?: () => void;
 }
 
 const PRESET_BADGE_GIFS = [
@@ -131,7 +132,8 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   isLocked = false,
   onUpgrade,
   initialSelectedTierId,
-  onSelectTierId
+  onSelectTierId,
+  onRegenerateToken
 }) => {
   const token = streamerToken || 'demo-token';
   const username = streamerUsername || 'streamer';
@@ -157,6 +159,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   // Loading / saving states
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingTier, setSavingTier] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [testingComment, setTestingComment] = useState(false);
   const [testSuccessToast, setTestSuccessToast] = useState<string | null>(null);
@@ -203,46 +206,12 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   const [tierDescription, setTierDescription] = useState('');
   const [tierEnabled, setTierEnabled] = useState<boolean>(true);
 
-  const hasUnsavedChanges = useMemo(() => {
-    return JSON.stringify(tiers) !== JSON.stringify(savedTiers);
-  }, [tiers, savedTiers]);
-
-  const [isEarthquake, setIsEarthquake] = useState(false);
-  const earthquakeTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Broadcast unsaved changes status to global dashboard
+  // Subscribers auto-persists to MongoDB so navigation is never blocked
   useEffect(() => {
     window.dispatchEvent(
-      new CustomEvent('dashboard-unsaved-changes', { detail: { tab: 'subscribers', hasUnsaved: hasUnsavedChanges } })
+      new CustomEvent('dashboard-unsaved-changes', { detail: { tab: 'subscribers', hasUnsaved: false } })
     );
-    if (!hasUnsavedChanges) {
-      setIsEarthquake(false);
-    }
-  }, [hasUnsavedChanges]);
-
-  // Listen for earthquake trigger when user attempts to navigate away without saving
-  useEffect(() => {
-    const handleEarthquake = (e: any) => {
-      if (e.detail?.tab && e.detail.tab !== 'subscribers') return;
-      if (!hasUnsavedChanges) return;
-
-      setIsEarthquake(false);
-      requestAnimationFrame(() => {
-        setIsEarthquake(true);
-      });
-
-      if (earthquakeTimerRef.current) clearTimeout(earthquakeTimerRef.current);
-      earthquakeTimerRef.current = setTimeout(() => {
-        setIsEarthquake(false);
-      }, 2800);
-    };
-
-    window.addEventListener('dashboard-unsaved-earthquake', handleEarthquake);
-    return () => {
-      window.removeEventListener('dashboard-unsaved-earthquake', handleEarthquake);
-      if (earthquakeTimerRef.current) clearTimeout(earthquakeTimerRef.current);
-    };
-  }, [hasUnsavedChanges]);
+  }, []);
 
   // Sync with initialSelectedTierId or URL search params (?id= or ?tierId=)
   useEffect(() => {
@@ -372,30 +341,38 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     return fetch(url, { ...init, headers });
   };
 
-  const handleSaveSettings = async () => {
+  const persistTiers = async (updatedTiers: SubscriberTier[]) => {
     setSaving(true);
-    setSaveSuccess(false);
     try {
+      const authToken = typeof window !== 'undefined'
+        ? (localStorage.getItem('streamneon_auth_token') || localStorage.getItem('auth_token'))
+        : null;
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
       const res = await fetch('/api/widgets/subscribers/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({
           token,
           username,
           enabled: true,
-          tiers,
+          tiers: updatedTiers,
           telegramOutletGroup
         })
       });
       const data = await res.json();
       if (data.success) {
-        setIsEarthquake(false);
-        setSavedTiers(tiers);
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
+        setSavedTiers(updatedTiers);
+      } else {
+        console.error('Failed to save subscriber tiers to database:', data.error);
       }
     } catch (err) {
-      console.error('Error saving subscriber settings:', err);
+      console.error('Error saving subscriber tiers:', err);
     } finally {
       setSaving(false);
     }
@@ -578,55 +555,75 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     setIsTierModalOpen(true);
   };
 
-  const handleSaveTierForm = () => {
+  const handleSaveTierForm = async () => {
     if (!tierName.trim()) return;
 
-    const parsedPerks = tierPerksInput
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
+    setSavingTier(true);
+    try {
+      const parsedPerks = tierPerksInput
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean);
 
-    const finalGifUrl = badgeMode === 'gif' && tierBadgeGif.trim() ? tierBadgeGif.trim() : undefined;
+      const finalGifUrl = badgeMode === 'gif' && tierBadgeGif.trim() ? tierBadgeGif.trim() : undefined;
 
-    const newTier: SubscriberTier = {
-      id: editingTier ? editingTier.id : 'tier_' + Date.now(),
-      name: tierName.trim(),
-      price: Math.max(0.5, parseFloat(tierPrice) || 1.99),
-      currency: tierCurrency,
-      badgeText: tierBadgeText.trim().toUpperCase().slice(0, 8),
-      badgeIcon: tierBadgeIcon,
-      badgeColor: tierBadgeColor,
-      badgeBg: tierBadgeBg,
-      badgeBorder: tierBadgeBorder,
-      badgeGifUrl: finalGifUrl,
-      badgeImage: finalGifUrl,
-      perks: parsedPerks.length > 0 ? parsedPerks : ['Exclusive Channel Badge'],
-      description: tierDescription.trim(),
-      enabled: tierEnabled
-    };
+      const newTier: SubscriberTier = {
+        id: editingTier ? editingTier.id : 'tier_' + Date.now(),
+        name: tierName.trim(),
+        price: Math.max(0.5, parseFloat(tierPrice) || 1.99),
+        currency: tierCurrency,
+        badgeText: tierBadgeText.trim().toUpperCase().slice(0, 8),
+        badgeIcon: tierBadgeIcon,
+        badgeColor: tierBadgeColor,
+        badgeBg: tierBadgeBg,
+        badgeBorder: tierBadgeBorder,
+        badgeGifUrl: finalGifUrl,
+        badgeImage: finalGifUrl,
+        perks: parsedPerks.length > 0 ? parsedPerks : ['Exclusive Channel Badge'],
+        description: tierDescription.trim(),
+        enabled: tierEnabled,
+        alertSettings: editingTier?.alertSettings
+      };
 
-    if (editingTier) {
-      setTiers((prev) => prev.map((t) => (t.id === editingTier.id ? newTier : t)));
-    } else {
-      setTiers((prev) => [...prev, newTier]);
+      const updatedTiers = editingTier
+        ? tiers.map((t) => (t.id === editingTier.id ? newTier : t))
+        : [...tiers, newTier];
+
+      setTiers(updatedTiers);
+      setSavedTiers(updatedTiers);
+      setIsTierModalOpen(false);
+
+      await persistTiers(updatedTiers);
+    } catch (err) {
+      console.error('Failed to save subscriber tier:', err);
+    } finally {
+      setSavingTier(false);
     }
-    setIsTierModalOpen(false);
   };
 
-  const handleToggleTier = (tierId: string) => {
-    setTiers((prev) =>
-      prev.map((t) => (t.id === tierId ? { ...t, enabled: t.enabled === false ? true : false } : t))
+  const handleToggleTier = async (tierId: string) => {
+    const updatedTiers = tiers.map((t) =>
+      t.id === tierId ? { ...t, enabled: t.enabled === false ? true : false } : t
     );
+    setTiers(updatedTiers);
+    setSavedTiers(updatedTiers);
+    await persistTiers(updatedTiers);
   };
 
-  const handleDeleteTier = (tierId: string) => {
-    setTiers((prev) => prev.filter((t) => t.id !== tierId));
+  const handleDeleteTier = async (tierId: string) => {
+    if (!window.confirm('Delete this subscriber tier?')) return;
+    const updatedTiers = tiers.filter((t) => t.id !== tierId);
+    setTiers(updatedTiers);
+    setSavedTiers(updatedTiers);
+    await persistTiers(updatedTiers);
   };
 
-  const handleClearAllTiers = () => {
+  const handleClearAllTiers = async () => {
     if (tiers.length === 0) return;
     if (window.confirm('Are you sure you want to remove all subscriber tiers?')) {
       setTiers([]);
+      setSavedTiers([]);
+      await persistTiers([]);
     }
   };
 
@@ -780,176 +777,26 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
         allTiers={tiers}
         onBack={handleBackFromAlertStudio}
         onSaveSuccess={handleTierAlertSaved}
+        onRegenerateToken={onRegenerateToken}
       />
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* 1. STATS OVERVIEW CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-[#090d16] border border-slate-800 shadow-md flex items-center justify-between">
-          <div>
-            <p className="text-[11px] text-slate-400 font-medium">Active Subscribers</p>
-            <h3 className="text-2xl font-black text-white font-['Chakra_Petch'] mt-0.5">{stats.totalActive}</h3>
-            <p className="text-[10px] text-slate-500 font-mono mt-0.5">{stats.totalHistorical} total joined</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-            <Users className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#090d16] border border-slate-800 shadow-md flex items-center justify-between">
-          <div>
-            <p className="text-[11px] text-slate-400 font-medium">Monthly Revenue (MRR)</p>
-            <h3 className="text-2xl font-black text-emerald-400 font-['Chakra_Petch'] mt-0.5">
-              ${stats.monthlyRevenueUsd.toFixed(2)}
-            </h3>
-            <p className="text-[10px] text-slate-500 font-mono mt-0.5">Recurring memberships</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-            <DollarSign className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-[#090d16] border border-slate-800 shadow-md flex items-center justify-between">
-          <div>
-            <p className="text-[11px] text-slate-400 font-medium">Configured Tiers</p>
-            <h3 className="text-2xl font-black text-amber-400 font-['Chakra_Petch'] mt-0.5">{tiers.length}</h3>
-            <p className="text-[10px] text-slate-500 font-mono mt-0.5">Custom chat badges</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-            <Layers className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
-
-      {/* 2. DEDICATED TELEGRAM OUTLET GROUP FOR SUBSCRIBERS */}
-      <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0c1425] via-[#090e1a] to-[#070b14] border border-cyan-500/20 shadow-xl relative overflow-hidden">
-        {/* Ambient glow */}
-        <div className="absolute -top-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5 max-w-2xl">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <div className="w-8 h-8 rounded-xl bg-[#24A1DE]/20 border border-[#24A1DE]/40 flex items-center justify-center text-[#24A1DE] shadow-md shadow-[#24A1DE]/20">
-                <Send className="w-4 h-4 transform -rotate-45 translate-x-0.5 -translate-y-0.5" />
-              </div>
-              <h2 className="text-base font-bold text-white font-['Chakra_Petch'] tracking-wide flex items-center gap-2">
-                <span>Subscriber Telegram Outlet Group</span>
-              </h2>
-
-              {telegramOutletGroup ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-sm shadow-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  ACTIVE LISTENER
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  NOT CONNECTED
-                </span>
-              )}
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Connect a dedicated Telegram group to listen for incoming bank &amp; Bakong KHQR transaction receipts for subscriber memberships. Verified receipts automatically activate the viewer&apos;s 30-day VIP badge and broadcast overlay alerts.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {telegramOutletGroup ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleOpenOutletModal}
-                  disabled={loadingOutlet}
-                  className="px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 text-cyan-300 hover:text-white text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingOutlet ? 'animate-spin' : ''}`} />
-                  <span>Change Group</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDisconnectOutletGroup}
-                  disabled={loadingOutlet}
-                  className="px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 hover:border-red-500/60 text-red-300 hover:text-white text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
-                >
-                  <Unlink className="w-3.5 h-3.5" />
-                  <span>Disconnect</span>
-                </button>
-              </>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleOpenOutletModal}
-                disabled={loadingOutlet}
-                className="bg-gradient-to-r from-[#24A1DE] to-cyan-500 hover:from-[#1b8bc2] hover:to-cyan-400 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
-              >
-                <Send className="w-3.5 h-3.5 transform -rotate-45" />
-                <span>Connect Outlet Group</span>
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* If connected: Show live info banner */}
-        {telegramOutletGroup && (
-          <div className="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0">
-                <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-slate-400 font-mono uppercase block">Target Telegram Group</span>
-                <span className="text-xs font-bold text-white truncate block font-['Chakra_Petch']">
-                  {telegramOutletGroup.title}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 flex-shrink-0">
-                <Link2 className="w-4 h-4 text-slate-400" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] text-slate-400 font-mono uppercase block">Chat ID / Handle</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-mono font-semibold text-cyan-300 truncate">
-                    {telegramOutletGroup.chatId}
-                  </span>
-                  {telegramOutletGroup.username && (
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      (@{telegramOutletGroup.username})
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-emerald-400 font-mono uppercase font-bold block">Status</span>
-                <span className="text-xs text-slate-200 block truncate">
-                  Auto-verifying subscriber transactions
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 3. SUBSCRIBER TIERS & BADGE CONFIGURATION */}
+      {/* 1. SUBSCRIBER TIERS & BADGE CONFIGURATION */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-cyan-400" />
               <span>Membership Tiers &amp; Badges</span>
+              {saving && (
+                <span className="text-[11px] font-mono font-normal text-cyan-400 flex items-center gap-1 ml-2">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Saving...</span>
+                </span>
+              )}
             </h2>
             <p className="text-xs text-slate-400">
               Customize tier pricing, badge icons, badge text, and colors displayed in OBS stream chat.
@@ -1157,160 +1004,119 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
         )}
       </div>
 
-      {/* 4. ACTIVE SUBSCRIBERS ROSTER */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-emerald-400" />
-              <span>Active Subscribers Roster</span>
-            </h2>
-            <p className="text-xs text-slate-400">
-              Viewers who subscribed to your channel. Their comments automatically display their badges on OBS.
+      {/* 2. DEDICATED TELEGRAM OUTLET GROUP FOR SUBSCRIBERS */}
+      <div className="p-5 rounded-2xl bg-[#090d16] border border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300">
+                <Send className="w-4 h-4 transform -rotate-45" />
+              </div>
+              <h2 className="text-base font-bold text-white font-['Chakra_Petch'] tracking-wide">
+                Subscriber Telegram Outlet Group
+              </h2>
+
+              {telegramOutletGroup ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  ACTIVE LISTENER
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-800 border border-slate-700 text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                  NOT CONNECTED
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Connect a dedicated Telegram group to listen for incoming bank &amp; Bakong KHQR transaction receipts for subscriber memberships. Verified receipts automatically activate the viewer&apos;s 30-day VIP badge and broadcast overlay alerts.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {/* Filter by Tier */}
-            <select
-              value={selectedTierFilter}
-              onChange={(e) => setSelectedTierFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-400"
-            >
-              <option value="all">All Tiers ({subscribers.length})</option>
-              {tiers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-
-            {/* Grant / Manual Add Subscriber */}
-            <Button
-              onClick={() => setIsManualSubModalOpen(true)}
-              className="bg-slate-800 hover:bg-slate-750 text-white font-semibold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 border border-slate-700 cursor-pointer"
-            >
-              <Gift className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden xs:inline">Gift / Grant</span>
-            </Button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {telegramOutletGroup ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleOpenOutletModal}
+                  disabled={loadingOutlet}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-mono font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingOutlet ? 'animate-spin' : ''}`} />
+                  <span>Change Group</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDisconnectOutletGroup}
+                  disabled={loadingOutlet}
+                  className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-red-500/40 text-slate-400 hover:text-red-400 text-xs font-mono font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Unlink className="w-3.5 h-3.5" />
+                  <span>Disconnect</span>
+                </button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleOpenOutletModal}
+                disabled={loadingOutlet}
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Send className="w-3.5 h-3.5 transform -rotate-45" />
+                <span>Connect Outlet Group</span>
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search subscriber username..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#090d16] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-          />
-        </div>
-
-        {/* Subscribers Table / List */}
-        <div className="rounded-2xl bg-[#090d16] border border-slate-800 overflow-hidden shadow-xl">
-          {filteredSubscribers.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 space-y-2">
-              <Users className="w-8 h-8 mx-auto opacity-40 text-cyan-400" />
-              <p className="text-xs">No subscribers found.</p>
-              <p className="text-[11px] text-slate-600">
-                Viewers who subscribe on your donation page will appear here with active badge overlays.
-              </p>
+        {/* If connected: Show live info banner */}
+        {telegramOutletGroup && (
+          <div className="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-slate-850 border border-slate-800 flex items-center justify-center text-slate-400 flex-shrink-0">
+                <Radio className="w-4 h-4 text-slate-300" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block">Target Telegram Group</span>
+                <span className="text-xs font-semibold text-white truncate block">
+                  {telegramOutletGroup.title}
+                </span>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 text-[10px] text-slate-400 uppercase font-mono border-b border-slate-800">
-                  <tr>
-                    <th className="px-4 py-3">Subscriber</th>
-                    <th className="px-4 py-3">Badge Overlay</th>
-                    <th className="px-4 py-3">Tier</th>
-                    <th className="px-4 py-3">Price</th>
-                    <th className="px-4 py-3">Expires</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {filteredSubscribers.map((sub) => (
-                    <tr key={sub.id} className="hover:bg-slate-900/40 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-white">
-                        <div className="flex items-center gap-2">
-                          <img
-                            src={`https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(sub.subscriberName)}`}
-                            alt=""
-                            className="w-6 h-6 rounded-full bg-slate-800"
-                          />
-                          <span>{sub.subscriberName}</span>
-                        </div>
-                      </td>
 
-                      <td className="px-4 py-3">
-                        <span
-                          className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider"
-                          style={{ color: sub.badgeColor || '#00F0FF' }}
-                        >
-                          {sub.badgeGifUrl || sub.badgeImage ? (
-                            <img
-                              src={sub.badgeGifUrl || sub.badgeImage}
-                              alt={sub.badgeText || 'Badge'}
-                              className="w-3.5 h-3.5 object-contain inline-block flex-shrink-0"
-                            />
-                          ) : (
-                            renderBadgeIconPreview(sub.badgeIcon, sub.badgeColor, 'w-3.5 h-3.5')
-                          )}
-                          {sub.badgeText ? <span>{sub.badgeText}</span> : null}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 text-slate-300 font-medium">{sub.tierName}</td>
-                      <td className="px-4 py-3 text-emerald-400 font-mono font-bold">${sub.price.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-slate-400 font-mono text-[11px]">
-                        {new Date(sub.expiresAt).toLocaleDateString()}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase font-mono ${
-                            sub.status === 'active'
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                          }`}
-                        >
-                          {sub.status}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleTestOverlayComment(sub)}
-                            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-colors"
-                            title="Simulate Comment in OBS Chat"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                          </button>
-                          {sub.status === 'active' && (
-                            <button
-                              type="button"
-                              onClick={() => handleCancelSubscriber(sub.id)}
-                              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
-                              title="Revoke / Cancel Membership"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-slate-850 border border-slate-800 flex items-center justify-center text-slate-400 flex-shrink-0">
+                <Link2 className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] text-slate-400 font-mono uppercase block">Chat ID / Handle</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-medium text-slate-200 truncate">
+                    {telegramOutletGroup.chatId}
+                  </span>
+                  {telegramOutletGroup.username && (
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      (@{telegramOutletGroup.username})
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-slate-850 border border-slate-800 flex items-center justify-center text-slate-400 flex-shrink-0">
+                <ShieldCheck className="w-4 h-4 text-slate-300" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 font-mono uppercase font-semibold block">Status</span>
+                <span className="text-xs text-slate-300 block truncate">
+                  Auto-verifying subscriber transactions
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 5. RESPONSIVE WEB APPLICATION TIER MODAL */}
@@ -1741,9 +1547,17 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
               </Button>
               <Button
                 onClick={handleSaveTierForm}
+                disabled={savingTier}
                 className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-6 py-2.5 rounded-xl shadow-lg shadow-cyan-500/25 flex-1 sm:flex-initial cursor-pointer"
               >
-                {editingTier ? 'Update Tier' : 'Save Tier'}
+                {savingTier ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </span>
+                ) : (
+                  editingTier ? 'Update Tier' : 'Save Tier'
+                )}
               </Button>
             </div>
           </div>
@@ -1858,16 +1672,16 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
       {/* 6. TELEGRAM OUTLET GROUP SELECTION MODAL */}
       {isOutletModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#0A0F1D] border border-cyan-500/30 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.95)] overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-[#0A0F1D] border border-slate-800 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.95)] overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-[#070B14]">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#24A1DE]/20 border border-[#24A1DE]/40 flex items-center justify-center text-[#24A1DE] shadow-md shadow-[#24A1DE]/20">
-                  <Send className="w-4 h-4 transform -rotate-45 translate-x-0.5 -translate-y-0.5" />
+                <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300">
+                  <Send className="w-4 h-4 transform -rotate-45" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
-                    <span>Subscriber Telegram Outlet</span>
+                  <h3 className="text-base font-bold text-white font-['Chakra_Petch']">
+                    Subscriber Telegram Outlet
                   </h3>
                   <p className="text-xs text-slate-400">
                     Select a group to monitor for incoming subscriber bank receipts
@@ -2058,92 +1872,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
         </div>
       )}
 
-      {/* 7. FLOATING UNSAVED CHANGES TOAST BAR */}
-      <div
-        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1.5rem)] max-w-xl transition-all duration-300 ease-in-out ${
-          hasUnsavedChanges
-            ? 'translate-y-0 opacity-100 pointer-events-auto'
-            : 'translate-y-24 opacity-0 pointer-events-none'
-        } ${isEarthquake ? 'animate-toast-earthquake' : ''}`}
-      >
-        <div
-          className={`rounded-2xl px-4 py-3 backdrop-blur-xl transition-all duration-300 flex items-center justify-between gap-3 ${
-            isEarthquake
-              ? 'bg-gradient-to-r from-red-950/95 via-rose-950/95 to-red-950/95 border-2 border-red-500 shadow-[0_0_35px_rgba(239,68,68,0.7),0_14px_45px_rgba(0,0,0,0.95)] animate-toast-red-pulse'
-              : 'bg-[#0B101E]/95 border border-cyan-500/40 shadow-[0_14px_45px_rgba(0,0,0,0.85),0_0_25px_rgba(0,240,255,0.18)]'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            {isEarthquake ? (
-              <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 flex-shrink-0 shadow-[0_0_12px_rgba(239,68,68,0.5)]">
-                <AlertTriangle size={16} className="animate-bounce" />
-              </div>
-            ) : (
-              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse flex-shrink-0 shadow-[0_0_8px_rgba(0,240,255,0.8)]" />
-            )}
-            <div className="min-w-0">
-              <div className={`text-xs font-bold truncate flex items-center gap-1.5 ${isEarthquake ? 'text-red-200' : 'text-slate-100'}`}>
-                {isEarthquake ? (
-                  <>
-                    <span className="font-black text-red-400 uppercase tracking-wider">Unsaved Changes!</span>
-                    <span className="hidden sm:inline text-red-200 font-medium">— Navigation blocked</span>
-                  </>
-                ) : (
-                  <span>Careful — you have unsaved changes!</span>
-                )}
-              </div>
-              <p className={`text-[10px] truncate hidden xs:block ${isEarthquake ? 'text-red-300 font-semibold' : 'text-slate-400'}`}>
-                {isEarthquake
-                  ? 'Please Save or Reset changes before switching to another feature!'
-                  : 'Save your membership tiers to update your channel'}
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => {
-                setIsEarthquake(false);
-                setTiers(savedTiers);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
-                isEarthquake
-                  ? 'bg-red-950/80 border border-red-500/40 text-red-300 hover:bg-red-900/60 hover:text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-              }`}
-            >
-              Reset
-            </button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={handleSaveSettings}
-              loading={saving}
-              className={`font-bold font-mono text-xs px-4 transition-all shadow-md active:scale-95 ${
-                isEarthquake
-                  ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.6)] animate-pulse border-0'
-                  : 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.3)]'
-              }`}
-            >
-              <Save size={13} className={isEarthquake ? 'text-white' : 'text-slate-950'} />
-              <span>Save Changes</span>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* 8. TOP RIGHT SUCCESS TOAST */}
-      {saveSuccess && (
-        <div className="fixed top-6 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
-          <div className="rounded-xl px-4 py-2.5 bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold flex items-center gap-2 shadow-2xl shadow-emerald-950/50">
-            <Check className="w-4 h-4 text-emerald-400" />
-            <span>Subscriber settings saved successfully!</span>
-          </div>
-        </div>
-      )}
 
       {/* 9. TEST MESSAGE BROADCAST TOAST */}
       {testSuccessToast && (

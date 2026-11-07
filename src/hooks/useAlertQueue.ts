@@ -8,6 +8,7 @@ export function useAlertQueue() {
   const [queue, setQueue] = useState<LiveAlertPayload[]>([]);
   const [currentAlert, setCurrentAlert] = useState<LiveAlertPayload | null>(null);
   const queueRef = useRef<LiveAlertPayload[]>([]);
+  const currentAlertRef = useRef<LiveAlertPayload | null>(null);
   const isPlayingRef = useRef<boolean>(false);
   const isPausedRef = useRef<boolean>(false);
   const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -18,10 +19,14 @@ export function useAlertQueue() {
 
   const waitForAlertSound = useCallback(() => soundPromiseRef.current, []);
 
-  // Always keep queueRef in sync with latest state
+  // Always keep queueRef and currentAlertRef in sync with latest state
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
+
+  useEffect(() => {
+    currentAlertRef.current = currentAlert;
+  }, [currentAlert]);
 
   const playNext = useCallback(() => {
     if (isPlayingRef.current || isPausedRef.current) return;
@@ -87,6 +92,21 @@ export function useAlertQueue() {
   }, [playNext, stopSound]);
 
   const pushAlert = useCallback((alert: LiveAlertPayload) => {
+    const alertId = alert.donationId || (alert as any).id;
+    if (alertId) {
+      if (
+        currentAlertRef.current &&
+        (currentAlertRef.current.donationId === alertId || (currentAlertRef.current as any).id === alertId)
+      ) {
+        console.log('⚡ [Alert Queue] Duplicate alert ignored (currently playing):', alertId);
+        return;
+      }
+      if (queueRef.current.some((a) => a.donationId === alertId || (a as any).id === alertId)) {
+        console.log('⚡ [Alert Queue] Duplicate alert ignored (already queued):', alertId);
+        return;
+      }
+    }
+
     setQueue((prev) => {
       const updated = [...prev, alert];
       queueRef.current = updated;

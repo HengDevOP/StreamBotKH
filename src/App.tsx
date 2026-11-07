@@ -104,7 +104,7 @@ function DonateRouteWrapper() {
 }
 
 // Wrapper for Overlay Alert Box
-function OverlayRouteWrapper({ mode = 'all' }: { mode?: 'all' | 'video-only' | 'alert-only' }) {
+function OverlayRouteWrapper({ mode = 'all' }: { mode?: 'all' | 'video-only' | 'alert-only' | 'subscriber-only' }) {
   const { token } = useParams<{ token?: string }>();
   return (
     <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0">
@@ -361,7 +361,11 @@ function AppRoutes() {
         {/* 2. Dedicated Video Alerts Source (video-only: only media share clips) */}
         <Route path="/overlay/video/:token" element={<OverlayRouteWrapper mode="video-only" />} />
 
-        {/* 3. Combined / Legacy Combo Source (explicit mode) */}
+        {/* 3. Dedicated Subscriber Alerts Source (subscriber-only: channel memberships & tier alerts) */}
+        <Route path="/overlay/subscriber/:token" element={<OverlayRouteWrapper mode="subscriber-only" />} />
+        <Route path="/overlay/subscribers/:token" element={<OverlayRouteWrapper mode="subscriber-only" />} />
+
+        {/* 4. Combined / Legacy Combo Source (explicit mode) */}
         <Route path="/overlay/combo/:token" element={<OverlayRouteWrapper mode="all" />} />
         <Route path="/overlay/all/:token" element={<OverlayRouteWrapper mode="all" />} />
 
@@ -383,6 +387,8 @@ function AppRoutes() {
         <Route path="/widget/alert/:token" element={<OverlayRouteWrapper mode="alert-only" />} />
         <Route path="/widget/alerts/:token" element={<OverlayRouteWrapper mode="alert-only" />} />
         <Route path="/widget/video/:token" element={<OverlayRouteWrapper mode="video-only" />} />
+        <Route path="/widget/subscriber/:token" element={<OverlayRouteWrapper mode="subscriber-only" />} />
+        <Route path="/widget/subscribers/:token" element={<OverlayRouteWrapper mode="subscriber-only" />} />
         <Route path="/widget/combo/:token" element={<OverlayRouteWrapper mode="all" />} />
         <Route path="/widget/soundboard/:token" element={<SoundboardOverlayRouteWrapper />} />
         <Route path="/widget/goal/:token" element={<GoalOverlayRouteWrapper />} />

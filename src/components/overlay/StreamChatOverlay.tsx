@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS: StreamChatSettings = {
   authorFontFamily: 'Chakra Petch',
   messageFontFamily: 'Inter',
   fontSize: 'base',
-  lineStyle: 'indented',
+  lineStyle: 'inline',
   authorColor: '#00F0FF',
   messageColor: '#FFFFFF',
   animationStyle: 'slide-left',
@@ -355,9 +355,199 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
     );
   };
 
+  const renderBadgeElement = (item: ChatMessage) => {
+    if (!settings.showBadges || !(item.badge || item.badgeIcon || item.badgeImage || item.badgeGifUrl)) {
+      return null;
+    }
+    return (
+      <span
+        className="inline-flex items-center self-center flex-shrink-0 leading-none align-middle"
+        style={{ color: item.badgeColor || '#00F0FF' }}
+        title={item.badge || 'Subscriber'}
+      >
+        {item.badgeImage || item.badgeGifUrl ? (
+          <img
+            src={item.badgeImage || item.badgeGifUrl}
+            alt="Badge"
+            className="w-3.5 h-3.5 object-contain inline-block flex-shrink-0 align-middle"
+          />
+        ) : (
+          renderBadgeIcon(item.badgeIcon, item.badgeColor || '#00F0FF')
+        )}
+        {item.badge ? (
+          <span
+            className="text-[9px] font-extrabold uppercase tracking-wider ml-1 leading-none align-middle"
+            style={{ color: item.badgeColor || '#00F0FF' }}
+          >
+            {item.badge}
+          </span>
+        ) : null}
+      </span>
+    );
+  };
+
+  const renderMessageContent = (item: ChatMessage) => {
+    const lineStyle = settings.lineStyle || 'inline';
+
+    // 1. STACKED (2-ROW) LAYOUT:
+    // Row 1: Platform Icon + Author + Badges + Timestamp
+    // Row 2: Message text spans the complete configured width (e.g. 600px) and wraps cleanly at that width
+    if (lineStyle === 'stacked') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full p-1 sm:p-1.5 mb-1.5 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)} text-left`}
+        >
+          <div className="w-full flex items-center gap-1.5 mb-0.5 select-none text-left">
+            <span className="inline-flex items-center justify-center flex-shrink-0">
+              {renderPlatformIcon(item.platform || 'youtube')}
+            </span>
+            <span
+              className="font-bold tracking-wide"
+              style={{
+                color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
+                fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
+                WebkitTextStroke: getTextStrokeCSS(),
+                paintOrder: 'stroke fill',
+                textShadow: getTextShadowCSS()
+              }}
+            >
+              {item.author}
+            </span>
+            {renderBadgeElement(item)}
+            {settings.showTimestamp && (
+              <span className="text-[10px] text-slate-400 ml-auto select-none opacity-75 font-mono">
+                {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+          <div
+            className="w-full text-left font-medium text-white leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word]"
+            style={{
+              color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
+              fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
+              WebkitTextStroke: getTextStrokeCSS(),
+              paintOrder: 'stroke fill',
+              textShadow: getTextShadowCSS(),
+              wordBreak: 'break-word',
+              overflowWrap: 'anywhere'
+            }}
+          >
+            {item.message}
+          </div>
+        </div>
+      );
+    }
+
+    // 2. INDENTED (HANGING INDENT) LAYOUT:
+    // Left: Platform Icon + Author + Badges + Colon
+    // Right: Message text column, subsequent lines wrap indented under message
+    if (lineStyle === 'indented') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full p-1 sm:p-1.5 mb-1 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)}`}
+        >
+          <div className="w-full flex items-baseline gap-1.5 select-none text-left break-words [overflow-wrap:anywhere] [word-break:break-word]">
+            <div className="flex-shrink-0 inline-flex items-baseline gap-1 self-baseline select-none whitespace-nowrap">
+              <span className="inline-flex items-center justify-center self-center flex-shrink-0">
+                {renderPlatformIcon(item.platform || 'youtube')}
+              </span>
+              <span
+                className="font-bold tracking-wide"
+                style={{
+                  color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
+                  fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
+                  WebkitTextStroke: getTextStrokeCSS(),
+                  paintOrder: 'stroke fill',
+                  textShadow: getTextShadowCSS()
+                }}
+              >
+                {item.author}
+              </span>
+              {renderBadgeElement(item)}
+              <span className="font-bold text-slate-300">:</span>
+            </div>
+            <div
+              className="flex-1 min-w-0 text-left font-medium text-white leading-relaxed"
+              style={{
+                color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
+                fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
+                WebkitTextStroke: getTextStrokeCSS(),
+                paintOrder: 'stroke fill',
+                textShadow: getTextShadowCSS(),
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere'
+              }}
+            >
+              <span>{item.message}</span>
+              {settings.showTimestamp && (
+                <span className="text-[10px] text-slate-400 ml-2 select-none opacity-75 inline-block font-mono">
+                  {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. INLINE FLOW LAYOUT (DEFAULT):
+    // Author and message flow as a single continuous line across the entire configured width (e.g. 600px).
+    // If there is more context, subsequent lines wrap naturally across the full width!
+    return (
+      <div
+        key={item.id}
+        className={`w-full p-1 sm:p-1.5 mb-1 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)} text-left leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word]`}
+        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+      >
+        <span className="inline-flex items-center gap-1 mr-1.5 align-baseline select-none whitespace-nowrap">
+          <span className="inline-flex items-center justify-center self-center flex-shrink-0">
+            {renderPlatformIcon(item.platform || 'youtube')}
+          </span>
+          <span
+            className="font-bold tracking-wide"
+            style={{
+              color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
+              fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
+              WebkitTextStroke: getTextStrokeCSS(),
+              paintOrder: 'stroke fill',
+              textShadow: getTextShadowCSS()
+            }}
+          >
+            {item.author}
+          </span>
+          {renderBadgeElement(item)}
+          <span className="font-bold text-slate-300">:</span>
+        </span>
+
+        <span
+          className="font-medium text-white inline align-baseline"
+          style={{
+            color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
+            fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
+            WebkitTextStroke: getTextStrokeCSS(),
+            paintOrder: 'stroke fill',
+            textShadow: getTextShadowCSS(),
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere'
+          }}
+        >
+          {item.message}
+        </span>
+
+        {settings.showTimestamp && (
+          <span className="text-[10px] text-slate-400 ml-2 select-none opacity-75 inline-block align-baseline font-mono">
+            {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
-      className="w-full h-full min-h-screen bg-transparent p-4 sm:p-6 flex flex-col justify-end overflow-hidden select-none pointer-events-none"
+      className="w-full h-full min-h-screen bg-transparent p-0 flex flex-col justify-end overflow-hidden select-none pointer-events-none"
       style={{ fontFamily: settings.fontFamily || 'Chakra Petch, sans-serif' }}
     >
       <style>{CHAT_ANIMATIONS_CSS}</style>
@@ -367,82 +557,12 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
         style={{
           width: settings.overlayWidth && settings.overlayWidth > 0 ? `${settings.overlayWidth}px` : '100%',
           maxWidth: settings.overlayWidth && settings.overlayWidth > 0 ? `${settings.overlayWidth}px` : '100%',
-          maxHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '90vh'
+          height: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '100%',
+          maxHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '100%',
+          boxSizing: 'border-box'
         }}
       >
-        {messages.map((item) => (
-          <div
-            key={item.id}
-            className={`w-full p-1 sm:p-1.5 mb-1 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)}`}
-          >
-            {/* Format: [logo] {username} {badges}: {first part of message} */}
-            {/* Wrapped lines wrap indented under message, never under logo */}
-            <div className="w-full flex items-baseline gap-1.5 select-none break-words [overflow-wrap:anywhere] [word-break:break-word] text-left">
-              <div className="flex-shrink-0 inline-flex items-baseline gap-1 self-baseline select-none whitespace-nowrap">
-                <span className="inline-flex items-center justify-center self-center flex-shrink-0">
-                  {renderPlatformIcon(item.platform || 'youtube')}
-                </span>
-                <span
-                  className="font-bold tracking-wide"
-                  style={{
-                    color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
-                    fontFamily: settings.authorFontFamily || settings.fontFamily || 'Chakra Petch',
-                    WebkitTextStroke: getTextStrokeCSS(),
-                    paintOrder: 'stroke fill',
-                    textShadow: getTextShadowCSS()
-                  }}
-                >
-                  {item.author}
-                </span>
-                {settings.showBadges && (item.badge || item.badgeIcon || item.badgeImage || item.badgeGifUrl) && (
-                  <span
-                    className="inline-flex items-center self-center flex-shrink-0 leading-none"
-                    style={{ color: item.badgeColor || '#00F0FF' }}
-                    title={item.badge || 'Subscriber'}
-                  >
-                    {item.badgeImage || item.badgeGifUrl ? (
-                      <img
-                        src={item.badgeImage || item.badgeGifUrl}
-                        alt="Badge"
-                        className="w-3.5 h-3.5 object-contain inline-block flex-shrink-0"
-                      />
-                    ) : (
-                      renderBadgeIcon(item.badgeIcon, item.badgeColor || '#00F0FF')
-                    )}
-                    {item.badge ? (
-                      <span
-                        className="text-[9px] font-extrabold uppercase tracking-wider ml-1 leading-none"
-                        style={{ color: item.badgeColor || '#00F0FF' }}
-                      >
-                        {item.badge}
-                      </span>
-                    ) : null}
-                  </span>
-                )}
-                <span className="font-bold text-slate-300">:</span>
-              </div>
-              <div
-                className="flex-1 min-w-0 text-left font-medium text-white"
-                style={{
-                  color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
-                  fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
-                  WebkitTextStroke: getTextStrokeCSS(),
-                  paintOrder: 'stroke fill',
-                  textShadow: getTextShadowCSS(),
-                  wordBreak: 'break-word',
-                  overflowWrap: 'anywhere'
-                }}
-              >
-                <span>{item.message}</span>
-                {settings.showTimestamp && (
-                  <span className="text-[10px] text-slate-400 ml-2 select-none opacity-75 inline-block">
-                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+        {messages.map((item) => renderMessageContent(item))}
       </div>
     </div>
   );

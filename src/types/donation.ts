@@ -46,6 +46,8 @@ export interface CreateDonationRequest {
   badgeIcon?: string;
   badgeGifUrl?: string;
   badgeImage?: string;
+  isWheelSpin?: boolean;
+  donationType?: 'tip' | 'subscribe' | 'wheel';
 }
 
 export interface CreateDonationResponse {

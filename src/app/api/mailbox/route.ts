@@ -3,8 +3,7 @@ import { getAuthenticatedUser } from '@/server/auth';
 import {
   getMongoMailboxMessages,
   addMongoMailboxMessage,
-  deleteMongoMailboxMessage,
-  seedDefaultMailboxMessages
+  deleteMongoMailboxMessage
 } from '@/server/database/mongo';
 
 function getCallerId(req: NextRequest): string {
@@ -20,11 +19,6 @@ function getCallerId(req: NextRequest): string {
 export async function GET(req: NextRequest) {
   try {
     const streamerId = getCallerId(req);
-
-    // Auto-seed default starter messages if mailbox is fresh
-    try {
-      await seedDefaultMailboxMessages(streamerId);
-    } catch (e) {}
 
     const messages = await getMongoMailboxMessages(streamerId);
     const unreadCount = messages.filter((m: any) => !m.isRead).length;
@@ -77,7 +71,11 @@ export async function DELETE(req: NextRequest) {
   try {
     const streamerId = getCallerId(req);
     const body = await req.json().catch(() => ({}));
-    const { messageId, allRead } = body;
+    const queryMessageId = req.nextUrl.searchParams.get('messageId') || undefined;
+    const queryAllRead = req.nextUrl.searchParams.get('allRead') === 'true';
+
+    const messageId = body?.messageId || queryMessageId;
+    const allRead = Boolean(body?.allRead || queryAllRead);
 
     await deleteMongoMailboxMessage(streamerId, messageId, allRead);
 

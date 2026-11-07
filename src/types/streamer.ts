@@ -32,6 +32,9 @@ export interface Streamer {
   isVerified?: boolean;
   liveStreamUrl?: string;
   youtubeLiveUrl?: string;
+  deletionStatus?: 'pending' | 'deleted' | null;
+  deletionRequestedAt?: string | null;
+  deletionScheduledAt?: string | null;
   createdAt?: string;
 }
 
