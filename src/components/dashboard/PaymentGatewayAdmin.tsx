@@ -1050,15 +1050,15 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
         setIsKhqrModalOpen(false);
         const formattedLabel =
           modalCurrency === 'KHR'
-            ? `${parsedAmount.toLocaleString()} ៛ (KHR)`
-            : `$${parsedAmount.toFixed(2)} (USD)`;
+            ? `${parsedAmount.toLocaleString()} ៛`
+            : `$${parsedAmount.toFixed(2)}`;
         setUploadSuccessToast({
           show: true,
-          message: `${editingKhqrItem ? 'Updated' : 'Created'} KHQR for ${formattedLabel}! Live on your donation page.`
+          message: `${editingKhqrItem ? 'Updated' : 'Added'} ${formattedLabel} KHQR successfully.`
         });
         setTimeout(() => {
           setUploadSuccessToast((prev) => ({ ...prev, show: false }));
-        }, 4500);
+        }, 4000);
       } else {
         setModalError(data.error || 'Failed to save KHQR item.');
       }
@@ -1822,13 +1822,13 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                    <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
                       <QrCode size={17} />
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] tracking-wide">
                       KHQR Payment Amounts
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-cyan-400">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 border border-white/20 text-white">
                       {khqrItems.length} Total
                     </span>
                   </div>
@@ -1842,30 +1842,28 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                     <button
                       type="button"
                       onClick={() => window.open(`/@${currentStreamerUsername}`, '_blank', 'noopener,noreferrer')}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/40 text-slate-200 hover:text-cyan-300 text-xs font-mono font-bold transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-white/40 text-slate-300 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer"
                     >
                       <span>View Tip Page</span>
                       <ExternalLink size={13} />
                     </button>
                   )}
 
-                  <Button
+                  <button
                     type="button"
-                    variant="primary"
-                    size="md"
                     onClick={() => handleOpenCreateKhqrModal('USD')}
-                    className="font-bold shadow-lg shadow-cyan-400/20 whitespace-nowrap cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-bold text-xs sm:text-sm font-mono shadow-md transition-all cursor-pointer shrink-0"
                   >
-                    <Plus size={15} className="mr-1.5" />
+                    <Plus size={15} />
                     <span>Create KHQR</span>
-                  </Button>
+                  </button>
                 </div>
               </div>
 
               {/* Blank Default State when no KHQR items created yet */}
               {khqrItems.length === 0 ? (
                 <div className="py-8 sm:py-10 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)]">
+                  <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shadow-inner">
                     <QrCode size={28} />
                   </div>
                   <div className="space-y-1.5 max-w-md">
@@ -1873,24 +1871,22 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                       No KHQR Data Created Yet
                     </h4>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Your KHQR list is blank by default. Click the button below to create KHQR payment amounts for <strong className="text-cyan-400">USD ($)</strong> or <strong className="text-amber-400">KHR (៛)</strong> and choose the KHQR image from your uploaded media.
+                      Your KHQR list is blank by default. Click the button below to create KHQR payment amounts for <strong className="text-white">USD ($)</strong> or <strong className="text-white">KHR (៛)</strong> and choose the KHQR image from your uploaded media.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-                    <Button
+                    <button
                       type="button"
-                      variant="primary"
-                      size="md"
                       onClick={() => handleOpenCreateKhqrModal('USD')}
-                      className="font-bold px-5 py-2.5 shadow-lg shadow-cyan-400/20 cursor-pointer"
+                      className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-bold text-xs sm:text-sm font-mono shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer"
                     >
-                      <Plus size={15} className="mr-1.5" />
+                      <Plus size={15} />
                       <span>Create USD ($) KHQR</span>
-                    </Button>
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleOpenCreateKhqrModal('KHR')}
-                      className="px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-['Chakra_Petch'] font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                      className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-white/40 text-white font-bold text-xs sm:text-sm font-mono transition-all inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <Plus size={15} />
                       <span>Create KHR (៛) KHQR</span>
@@ -1906,7 +1902,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                   <div className="space-y-3.5">
                     <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
                       <div className="flex items-center gap-2.5">
-                        <span className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-mono font-black text-sm flex items-center justify-center">
+                        <span className="w-7 h-7 rounded-lg bg-white/10 border border-white/20 text-white font-mono font-black text-sm flex items-center justify-center">
                           $
                         </span>
                         <div>
@@ -1914,11 +1910,11 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                             <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
                               USD ($) KHQR Section
                             </h4>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950/60 border border-cyan-500/30 text-cyan-300">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 border border-white/20 text-white">
                               {usdKhqrItems.length} {usdKhqrItems.length === 1 ? 'Item' : 'Items'}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-500 font-mono">
+                          <p className="text-[11px] text-slate-400 font-mono">
                             US Dollar payment QR codes displayed when donor ticks USD ($)
                           </p>
                         </div>
@@ -1927,7 +1923,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                       <button
                         type="button"
                         onClick={() => handleOpenCreateKhqrModal('USD')}
-                        className="px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                        className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-mono font-bold text-xs inline-flex items-center gap-1.5 transition-all shadow-sm cursor-pointer shrink-0"
                       >
                         <Plus size={13} />
                         <span>Add USD ($)</span>
@@ -1935,12 +1931,12 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                     </div>
 
                     {usdKhqrItems.length === 0 ? (
-                      <div className="py-6 px-4 rounded-xl bg-[#090D18] text-center space-y-2">
+                      <div className="py-6 px-4 rounded-xl bg-[#090D18] text-center space-y-2 border border-slate-800/50">
                         <p className="text-xs text-slate-400 font-mono">No USD ($) KHQR amounts created yet.</p>
                         <button
                           type="button"
                           onClick={() => handleOpenCreateKhqrModal('USD')}
-                          className="text-xs font-mono font-bold text-cyan-400 hover:text-cyan-300 inline-flex items-center gap-1 cursor-pointer"
+                          className="text-xs font-mono font-bold text-white hover:underline inline-flex items-center gap-1 cursor-pointer"
                         >
                           <Plus size={13} />
                           <span>Create first USD ($) KHQR</span>
@@ -1951,13 +1947,13 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                         {usdKhqrItems.map((item) => (
                           <div
                             key={item.id}
-                            className="p-3.5 rounded-2xl bg-[#090D18] border border-slate-800/90 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-3 group shadow-md"
+                            className="p-3.5 rounded-2xl bg-[#0B0F19] border border-slate-800/90 hover:border-white/50 transition-all flex flex-col justify-between gap-3 group shadow-md"
                           >
                             {/* Top Row: Amount & Currency Tick Badge + Actions */}
                             <div className="flex items-center justify-between gap-1.5">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 font-mono font-black text-xs">
-                                <span className="w-3.5 h-3.5 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center">
-                                  <Check size={10} className="stroke-[3]" />
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-slate-950 font-mono font-black text-xs shadow-sm">
+                                <span className="w-3.5 h-3.5 rounded-full bg-slate-950 text-white flex items-center justify-center">
+                                  <Check size={9} className="stroke-[3]" />
                                 </span>
                                 <span>${Number(item.amount).toFixed(2)} USD</span>
                               </span>
@@ -1967,7 +1963,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                                   type="button"
                                   onClick={() => handleOpenCreateKhqrModal('USD', item)}
                                   title="Edit KHQR"
-                                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-white hover:text-slate-950 text-slate-400 transition-colors cursor-pointer"
                                 >
                                   <Edit2 size={12} />
                                 </button>
@@ -1985,7 +1981,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                             {/* Center: KHQR Image Preview */}
                             <div
                               onClick={() => handleOpenCreateKhqrModal('USD', item)}
-                              className="w-full aspect-square rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden cursor-pointer"
+                              className="w-full aspect-square rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden cursor-pointer border border-slate-200/20"
                             >
                               <img
                                 src={item.imageUrl}
@@ -1997,7 +1993,9 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                             {/* Bottom: Filename */}
                             <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 truncate">
                               <span className="truncate">{item.filename || 'Media Library KHQR'}</span>
-                              <span className="text-emerald-400 font-bold shrink-0 ml-1">Active</span>
+                              <span className="text-white text-[10px] font-bold shrink-0 ml-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/20">
+                                Active
+                              </span>
                             </div>
                           </div>
                         ))}
@@ -2011,7 +2009,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                   <div className="space-y-3.5">
                     <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
                       <div className="flex items-center gap-2.5">
-                        <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono font-black text-sm flex items-center justify-center">
+                        <span className="w-7 h-7 rounded-lg bg-white/10 border border-white/20 text-white font-mono font-black text-sm flex items-center justify-center">
                           ៛
                         </span>
                         <div>
@@ -2019,11 +2017,11 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                             <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
                               KHR (៛) KHQR Section
                             </h4>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950/60 border border-amber-500/30 text-amber-300">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 border border-white/20 text-white">
                               {khrKhqrItems.length} {khrKhqrItems.length === 1 ? 'Item' : 'Items'}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-500 font-mono">
+                          <p className="text-[11px] text-slate-400 font-mono">
                             Khmer Riel payment QR codes displayed when donor ticks KHR (៛)
                           </p>
                         </div>
@@ -2032,7 +2030,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                       <button
                         type="button"
                         onClick={() => handleOpenCreateKhqrModal('KHR')}
-                        className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-mono font-bold text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                        className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-mono font-bold text-xs inline-flex items-center gap-1.5 transition-all shadow-sm cursor-pointer shrink-0"
                       >
                         <Plus size={13} />
                         <span>Add KHR (៛)</span>
@@ -2040,12 +2038,12 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                     </div>
 
                     {khrKhqrItems.length === 0 ? (
-                      <div className="py-6 px-4 rounded-xl bg-[#090D18] text-center space-y-2">
+                      <div className="py-6 px-4 rounded-xl bg-[#090D18] text-center space-y-2 border border-slate-800/50">
                         <p className="text-xs text-slate-400 font-mono">No KHR (៛) KHQR amounts created yet.</p>
                         <button
                           type="button"
                           onClick={() => handleOpenCreateKhqrModal('KHR')}
-                          className="text-xs font-mono font-bold text-amber-400 hover:text-amber-300 inline-flex items-center gap-1 cursor-pointer"
+                          className="text-xs font-mono font-bold text-white hover:underline inline-flex items-center gap-1 cursor-pointer"
                         >
                           <Plus size={13} />
                           <span>Create first KHR (៛) KHQR</span>
@@ -2056,13 +2054,13 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                         {khrKhqrItems.map((item) => (
                           <div
                             key={item.id}
-                            className="p-3.5 rounded-2xl bg-[#090D18] border border-slate-800/90 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-3 group shadow-md"
+                            className="p-3.5 rounded-2xl bg-[#0B0F19] border border-slate-800/90 hover:border-white/50 transition-all flex flex-col justify-between gap-3 group shadow-md"
                           >
                             {/* Top Row: Amount & Currency Tick Badge + Actions */}
                             <div className="flex items-center justify-between gap-1.5">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 font-mono font-black text-xs">
-                                <span className="w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center">
-                                  <Check size={10} className="stroke-[3]" />
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-slate-950 font-mono font-black text-xs shadow-sm">
+                                <span className="w-3.5 h-3.5 rounded-full bg-slate-950 text-white flex items-center justify-center">
+                                  <Check size={9} className="stroke-[3]" />
                                 </span>
                                 <span>{Number(item.amount).toLocaleString()} ៛ KHR</span>
                               </span>
@@ -2072,7 +2070,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                                   type="button"
                                   onClick={() => handleOpenCreateKhqrModal('KHR', item)}
                                   title="Edit KHQR"
-                                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-white hover:text-slate-950 text-slate-400 transition-colors cursor-pointer"
                                 >
                                   <Edit2 size={12} />
                                 </button>
@@ -2090,7 +2088,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                             {/* Center: KHQR Image Preview */}
                             <div
                               onClick={() => handleOpenCreateKhqrModal('KHR', item)}
-                              className="w-full aspect-square rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden cursor-pointer"
+                              className="w-full aspect-square rounded-xl bg-white p-2 flex items-center justify-center overflow-hidden cursor-pointer border border-slate-200/20"
                             >
                               <img
                                 src={item.imageUrl}
@@ -2102,7 +2100,9 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                             {/* Bottom: Filename */}
                             <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 truncate">
                               <span className="truncate">{item.filename || 'Media Library KHQR'}</span>
-                              <span className="text-emerald-400 font-bold shrink-0 ml-1">Active</span>
+                              <span className="text-white text-[10px] font-bold shrink-0 ml-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/20">
+                                Active
+                              </span>
                             </div>
                           </div>
                         ))}
@@ -2470,31 +2470,29 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
         )}
       </div>
 
-      {/* Upload Succeeded Animated Slide Toast (Slides in from bottom right to left, then slides back) */}
+      {/* Simple Side Animation Success Toast (Clean & Minimalist) */}
       <div
-        className={`fixed bottom-6 right-6 z-50 max-w-sm sm:max-w-md transition-all duration-500 ease-out transform pointer-events-auto ${
+        role="alert"
+        aria-live="polite"
+        className={`fixed z-50 top-4 right-4 sm:top-6 sm:right-6 max-w-[calc(100vw-2rem)] sm:max-w-md transition-all duration-300 ease-out transform pointer-events-auto ${
           uploadSuccessToast.show
-            ? 'translate-x-0 opacity-100 shadow-[0_0_30px_rgba(16,185,129,0.35)]'
-            : 'translate-x-[120%] opacity-0 pointer-events-none'
+            ? 'translate-x-0 opacity-100 shadow-xl shadow-black/50'
+            : 'translate-x-[125%] opacity-0 pointer-events-none'
         }`}
       >
-        <div className="p-4 rounded-2xl bg-[#090D18]/95 border border-emerald-500/50 backdrop-blur-xl shadow-2xl flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-            <CheckCircle2 size={20} />
-          </div>
-          <div className="flex-1 min-w-0 space-y-0.5">
-            <div className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              Upload Succeeded
-            </div>
-            <p className="text-xs text-white font-medium leading-relaxed">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#0C101C]/95 backdrop-blur-md border border-slate-700/80 text-slate-100 shadow-2xl">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <CheckCircle2 size={17} className="shrink-0 text-emerald-400" />
+            <p className="text-xs sm:text-sm font-medium text-white leading-snug">
               {uploadSuccessToast.message}
             </p>
           </div>
+
           <button
             type="button"
             onClick={() => setUploadSuccessToast((prev) => ({ ...prev, show: false }))}
-            className="text-slate-500 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+            title="Dismiss"
           >
             <X size={15} />
           </button>
@@ -2532,7 +2530,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                 onClick={() => handleModalCurrencyChange('USD')}
                 className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2.5 cursor-pointer ${
                   modalCurrency === 'USD'
-                    ? 'bg-cyan-500/15 border-cyan-400 shadow-[0_0_20px_rgba(0,240,255,0.15)]'
+                    ? 'bg-white/10 border-white shadow-sm'
                     : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
                 }`}
               >
@@ -2540,7 +2538,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                   <span
                     className={`w-8 h-8 rounded-lg font-mono font-black text-sm flex items-center justify-center shrink-0 ${
                       modalCurrency === 'USD'
-                        ? 'bg-cyan-400 text-slate-950'
+                        ? 'bg-white text-slate-950'
                         : 'bg-slate-900 border border-slate-800 text-slate-400'
                     }`}
                   >
@@ -2559,7 +2557,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                 <div
                   className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                     modalCurrency === 'USD'
-                      ? 'bg-cyan-400 border-cyan-400 text-slate-950 shadow-sm shadow-cyan-400/50'
+                      ? 'bg-white border-white text-slate-950 shadow-sm'
                       : 'border-slate-700'
                   }`}
                 >
@@ -2573,7 +2571,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                 onClick={() => handleModalCurrencyChange('KHR')}
                 className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2.5 cursor-pointer ${
                   modalCurrency === 'KHR'
-                    ? 'bg-amber-500/15 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                    ? 'bg-white/10 border-white shadow-sm'
                     : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
                 }`}
               >
@@ -2581,7 +2579,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                   <span
                     className={`w-8 h-8 rounded-lg font-mono font-black text-sm flex items-center justify-center shrink-0 ${
                       modalCurrency === 'KHR'
-                        ? 'bg-amber-400 text-slate-950'
+                        ? 'bg-white text-slate-950'
                         : 'bg-slate-900 border border-slate-800 text-slate-400'
                     }`}
                   >
@@ -2600,7 +2598,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                 <div
                   className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                     modalCurrency === 'KHR'
-                      ? 'bg-amber-400 border-amber-400 text-slate-950 shadow-sm shadow-amber-400/50'
+                      ? 'bg-white border-white text-slate-950 shadow-sm'
                       : 'border-slate-700'
                   }`}
                 >
@@ -2629,9 +2627,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                     onClick={() => setModalAmount(String(preset))}
                     className={`py-2 px-2.5 rounded-xl border font-mono text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       isSelected
-                        ? modalCurrency === 'USD'
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-sm'
-                          : 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-sm'
+                        ? 'bg-white border-white text-slate-950 shadow-sm'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
                     }`}
                   >
@@ -2655,9 +2651,9 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                 value={modalAmount}
                 onChange={(e) => setModalAmount(e.target.value)}
                 placeholder={modalCurrency === 'USD' ? 'Enter amount (e.g. 1.00)' : 'Enter amount (e.g. 4000)'}
-                className="w-full pl-9 pr-24 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-400 text-sm font-mono font-bold text-white focus:outline-none"
+                className="w-full pl-9 pr-24 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-white text-sm font-mono font-bold text-white focus:outline-none"
               />
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-cyan-400">
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-slate-300">
                 {modalCurrency}
               </span>
             </div>
@@ -2667,14 +2663,14 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
           <div className="space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <label className="text-xs font-bold uppercase tracking-wider text-white font-['Chakra_Petch'] flex items-center gap-1.5">
-                <ImageIcon size={14} className="text-cyan-400" />
+                <ImageIcon size={14} className="text-white" />
                 <span>3. Choose KHQR Image from Media Library</span>
               </label>
 
               <button
                 type="button"
                 onClick={() => setIsMediaPickerOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-mono text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-mono text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <ImageIcon size={12} />
                 <span>{modalSelectedImageUrl ? 'Change Image' : 'Choose from Media Library'}</span>
@@ -2682,7 +2678,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
             </div>
 
             {modalSelectedImageUrl ? (
-              <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-cyan-500/40 flex items-center justify-between gap-3.5">
+              <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-white/20 flex items-center justify-between gap-3.5">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="w-20 h-20 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0 overflow-hidden shadow-md">
                     <img
@@ -2692,7 +2688,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                     />
                   </div>
                   <div className="min-w-0 space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono font-bold">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white text-[10px] font-mono font-bold">
                       <Check size={11} className="stroke-[3]" />
                       <span>KHQR Image Selected</span>
                     </div>
@@ -2711,7 +2707,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
                   <button
                     type="button"
                     onClick={() => setIsMediaPickerOpen(true)}
-                    className="px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="px-3 py-2 rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <ImageIcon size={13} />
                     <span>Media Library</span>
@@ -2733,20 +2729,20 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
               <button
                 type="button"
                 onClick={() => setIsMediaPickerOpen(true)}
-                className="w-full p-6 rounded-2xl bg-slate-950/80 hover:bg-slate-900/80 border border-dashed border-cyan-500/40 hover:border-cyan-400 transition-all flex flex-col items-center justify-center gap-2.5 text-center cursor-pointer group"
+                className="w-full p-6 rounded-2xl bg-slate-950/80 hover:bg-slate-900/80 border border-dashed border-slate-700 hover:border-white transition-all flex flex-col items-center justify-center gap-2.5 text-center cursor-pointer group"
               >
-                <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white group-hover:scale-105 transition-transform">
                   <ImageIcon size={22} />
                 </div>
                 <div className="space-y-1">
-                  <div className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] group-hover:text-cyan-300 transition-colors">
+                  <div className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] group-hover:text-white transition-colors">
                     Choose KHQR Image from Media Library
                   </div>
                   <p className="text-[11px] text-slate-400 font-mono">
                     Click to open your Media Library and select your uploaded Bakong KHQR image
                   </p>
                 </div>
-                <span className="mt-1 px-4 py-2 rounded-xl bg-cyan-500 group-hover:bg-cyan-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-cyan-500/20">
+                <span className="mt-1 px-4 py-2 rounded-xl bg-white group-hover:bg-slate-200 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-md">
                   <ImageIcon size={14} />
                   <span>Open Media Library</span>
                 </span>
@@ -2758,7 +2754,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
           <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
             <div className="text-xs font-mono text-slate-400 truncate">
               {modalSelectedImageUrl ? (
-                <span className="inline-flex items-center gap-1.5 text-emerald-400 font-bold">
+                <span className="inline-flex items-center gap-1.5 text-white font-bold">
                   <Check size={13} className="stroke-[3]" />
                   <span>
                     Selected:{' '}
@@ -2782,16 +2778,14 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
               >
                 Cancel
               </Button>
-              <Button
+              <button
                 type="submit"
-                variant="primary"
-                size="sm"
-                loading={savingKhqrItem}
-                className="font-bold px-5 shadow-lg shadow-cyan-400/20"
+                disabled={savingKhqrItem}
+                className="px-5 py-2 rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-bold text-xs sm:text-sm font-mono shadow-md inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                <Check size={14} className="mr-1.5" />
+                <Check size={14} className="stroke-[2.5]" />
                 <span>{editingKhqrItem ? 'Update KHQR' : 'Create KHQR'}</span>
-              </Button>
+              </button>
             </div>
           </div>
         </form>

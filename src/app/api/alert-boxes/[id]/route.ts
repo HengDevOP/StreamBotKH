@@ -124,7 +124,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             updateFields[key] = typeof val === 'string' && val.length < 250 ? val : '';
           }
         } else if (key === 'conditions' && Array.isArray(body.conditions)) {
-          const sanitized = body.conditions.map((c: any, idx: number) => ({
+          const sanitized = body.conditions.slice(0, 20).map((c: any, idx: number) => ({
             ...c,
             id: String(c?.id || `cond_${Date.now()}_${idx}`),
             minAmountCondition: Math.max(0.001, Number(c?.minAmountCondition) > 0 ? Number(c.minAmountCondition) : 0.01),

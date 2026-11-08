@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { twMerge } from 'tailwind-merge';
 
 interface ModalProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface ModalProps {
   headerRight?: React.ReactNode;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  rounded?: string;
+  className?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -20,7 +23,9 @@ export const Modal: React.FC<ModalProps> = ({
   showDot = false,
   headerRight,
   children,
-  maxWidth = 'md'
+  maxWidth = 'md',
+  rounded,
+  className
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -52,7 +57,11 @@ export const Modal: React.FC<ModalProps> = ({
         onClick={onClose}
       />
       <div
-        className={`relative w-full ${widthClasses[maxWidth]} bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl z-10 overflow-hidden border-cyan-500/30 max-h-[92vh] overflow-y-auto`}
+        className={twMerge(
+          `relative w-full ${widthClasses[maxWidth]} bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl z-10 overflow-hidden border-cyan-500/30 max-h-[92vh] overflow-y-auto`,
+          rounded,
+          className
+        )}
       >
         <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-800/80 mb-4 sm:mb-5">
           {title && (

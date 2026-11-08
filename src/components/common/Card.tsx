@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 interface CardProps {
   children: React.ReactNode;
@@ -26,10 +27,12 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={clsx(
-        "bg-[#0B0F19] rounded-2xl border transition-colors duration-200 p-4 sm:p-6 relative overflow-hidden",
-        borderStyles[glow],
-        className
+      className={twMerge(
+        clsx(
+          "bg-[#0B0F19] rounded-2xl border transition-colors duration-200 p-4 sm:p-6 relative overflow-hidden",
+          borderStyles[glow],
+          className
+        )
       )}
     >
       {children}

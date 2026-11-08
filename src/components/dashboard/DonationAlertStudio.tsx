@@ -426,6 +426,10 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   };
 
   const handleAddCondition = () => {
+    if (conditions.length >= 20) {
+      alert('Maximum of 20 condition tiers allowed in a donation alert box.');
+      return;
+    }
     const synced = conditions.map((c) => (c.id === activeConditionId ? snapshotCurrentTier(activeConditionId) : c));
     const maxExisting = synced.reduce((max, c) => Math.max(max, Number(c.minAmountCondition) || 0), 0);
     let nextAmount = 1.0;
@@ -1201,8 +1205,9 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
             <button
               type="button"
               onClick={handleAddCondition}
-              title="Add new condition in this donation box"
-              className="w-8 h-8 rounded-xl bg-slate-900/90 hover:bg-cyan-500/20 border border-slate-800 hover:border-cyan-400/60 text-cyan-400 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer active:scale-95"
+              disabled={conditions.length >= 20}
+              title={conditions.length >= 20 ? 'Maximum 20 condition tiers reached' : 'Add new condition in this donation box'}
+              className="w-8 h-8 rounded-xl bg-slate-900/90 hover:bg-cyan-500/20 border border-slate-800 hover:border-cyan-400/60 text-cyan-400 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900/90 disabled:hover:border-slate-800"
             >
               <Plus size={14} />
             </button>

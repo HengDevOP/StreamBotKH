@@ -204,7 +204,7 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
   const clipWidthPct = Math.max(0, endPct - startPct);
 
   return (
-    <div className="p-3.5 rounded-xl bg-slate-950/95 border border-slate-800 space-y-3 font-mono select-none">
+    <div className="p-3.5 rounded-none bg-slate-950/95 border border-slate-800 space-y-3 font-mono select-none">
       {/* Header Info */}
       <div className="flex items-center justify-between text-xs">
         <span className="text-slate-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -222,7 +222,7 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
             <span className="mx-1 text-slate-500">➔</span>
             <span className="text-white font-bold">{formatTime(liveEnd)}</span>
           </span>
-          <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400 font-extrabold text-[11px]">
+          <span className="px-2 py-0.5 rounded-none bg-red-500/10 border border-red-500/30 text-red-400 font-extrabold text-[11px]">
             {currentDuration}s
           </span>
         </div>
@@ -235,12 +235,12 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
         <div
           ref={trackRef}
           onClick={onTrackClick}
-          className="relative w-full h-2.5 rounded-sm bg-slate-800 cursor-pointer overflow-visible flex items-center my-3 touch-none"
+          className="relative w-full h-2.5 rounded-none bg-slate-800 cursor-pointer overflow-visible flex items-center my-3 touch-none"
         >
           {/* Active Highlighted Line Segment Between Start and End */}
           <div
             onPointerDown={(e) => onPointerDown(e, 'middle')}
-            className={`absolute top-0 bottom-0 rounded-sm cursor-grab active:cursor-grabbing transition-colors z-10 ${
+            className={`absolute top-0 bottom-0 rounded-none cursor-grab active:cursor-grabbing transition-colors z-10 ${
               activeHandle === 'middle' ? 'bg-red-500' : 'bg-red-600'
             }`}
             style={{
@@ -253,27 +253,27 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
           {/* HANDLE 1: START (VERTICAL LINE HANDLE) */}
           <div
             onPointerDown={(e) => onPointerDown(e, 'start')}
-            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-7 rounded-sm bg-white border border-slate-300 shadow-md cursor-ew-resize z-30 transition-transform hover:scale-110 active:scale-105 flex items-center justify-center touch-none ${
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-7 rounded-none bg-white border border-slate-300 shadow-md cursor-ew-resize z-30 transition-transform hover:scale-110 active:scale-105 flex items-center justify-center touch-none ${
               activeHandle === 'start' ? 'ring-2 ring-red-500 scale-110' : ''
             }`}
             style={{ left: `${startPct}%` }}
             title={`Start: ${formatTime(safeStart)}`}
           >
             {/* Center line indicator inside handle */}
-            <div className="w-[1.5px] h-3.5 bg-slate-700 rounded-full" />
+            <div className="w-[1.5px] h-3.5 bg-slate-700 rounded-none" />
           </div>
 
           {/* HANDLE 2: END (VERTICAL LINE HANDLE) */}
           <div
             onPointerDown={(e) => onPointerDown(e, 'end')}
-            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-7 rounded-sm bg-white border border-slate-300 shadow-md cursor-ew-resize z-30 transition-transform hover:scale-110 active:scale-105 flex items-center justify-center touch-none ${
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-7 rounded-none bg-white border border-slate-300 shadow-md cursor-ew-resize z-30 transition-transform hover:scale-110 active:scale-105 flex items-center justify-center touch-none ${
               activeHandle === 'end' ? 'ring-2 ring-red-500 scale-110' : ''
             }`}
             style={{ left: `${endPct}%` }}
             title={`End: ${formatTime(safeEnd)}`}
           >
             {/* Center line indicator inside handle */}
-            <div className="w-[1.5px] h-3.5 bg-slate-700 rounded-full" />
+            <div className="w-[1.5px] h-3.5 bg-slate-700 rounded-none" />
           </div>
         </div>
 
@@ -298,14 +298,14 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
           <button
             type="button"
             onClick={() => nudgeStart(-5)}
-            className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-colors"
+            className="px-2 py-0.5 rounded-none bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-colors"
           >
             -5s
           </button>
           <button
             type="button"
             onClick={() => nudgeStart(5)}
-            className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-colors mr-2"
+            className="px-2 py-0.5 rounded-none bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-colors mr-2"
           >
             +5s
           </button>
@@ -314,14 +314,14 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
           <button
             type="button"
             onClick={() => nudgeEnd(-5)}
-            className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-colors"
+            className="px-2 py-0.5 rounded-none bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-colors"
           >
             -5s
           </button>
           <button
             type="button"
             onClick={() => nudgeEnd(5)}
-            className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-colors"
+            className="px-2 py-0.5 rounded-none bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold transition-colors"
           >
             +5s
           </button>
@@ -334,7 +334,7 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
             <button
               type="button"
               onClick={handleSetFullDuration}
-              className={`px-2 py-0.5 rounded font-bold border transition-colors flex items-center gap-1 ${
+              className={`px-2 py-0.5 rounded-none font-bold border transition-colors flex items-center gap-1 ${
                 safeStart === 0 && (safeEnd === videoDuration || safeEnd === maxAllowedDuration)
                   ? 'bg-red-500/20 border-red-500/40 text-red-300'
                   : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-white'
@@ -353,7 +353,7 @@ export const VideoClipScrubberLine: React.FC<VideoClipScrubberLineProps> = ({
                 key={p.sec}
                 type="button"
                 onClick={() => handleSelectPreset(p.sec)}
-                className={`px-2 py-0.5 rounded font-bold border transition-colors ${
+                className={`px-2 py-0.5 rounded-none font-bold border transition-colors ${
                   currentDuration === (isFullDueToLength ? videoDuration : p.sec)
                     ? 'bg-red-500/20 border-red-500/40 text-red-300'
                     : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-white'

@@ -345,7 +345,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
             onClick={handleClose}
             aria-label="Close KHQR session"
             title="Close session"
-            className="absolute -top-3.5 -right-3.5 sm:top-0 sm:-right-11 z-30 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-900/95 hover:bg-red-600 text-white border border-white/25 shadow-xl flex items-center justify-center transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer"
+            className="absolute -top-3.5 -right-3.5 sm:top-0 sm:-right-11 z-30 w-8 h-8 sm:w-9 sm:h-9 rounded-none bg-slate-900/95 hover:bg-red-600 text-white border border-white/25 shadow-xl flex items-center justify-center transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer"
           >
             <X size={18} strokeWidth={2.5} />
           </button>
@@ -355,7 +355,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
         {/* STATE 3: PAYMENT COMPLETED (EXACT MATCH TO 2ND IMAGE)          */}
         {/* ============================================================== */}
         {paid ? (
-          <div className="w-full min-h-[380px] sm:min-h-[420px] bg-white rounded-[20px] shadow-[0_25px_60px_rgba(0,0,0,0.55)] py-28 sm:py-32 px-8 flex flex-col items-center justify-center text-center animate-fadeIn">
+          <div className="w-full min-h-[380px] sm:min-h-[420px] bg-white rounded-none shadow-[0_25px_60px_rgba(0,0,0,0.55)] py-28 sm:py-32 px-8 flex flex-col items-center justify-center text-center animate-fadeIn">
             {/* Animated Turquoise Circle + White Checkmark Icon */}
             <div className="relative w-[72px] h-[72px] flex items-center justify-center">
               {/* Expanding Ripple Ring */}
@@ -398,7 +398,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
           /* ============================================================== */
           /* STATE 1 & 2: GENERATING KHQR / ACTIVE ABA KHQR MODAL (IMAGE 1) */
           /* ============================================================== */
-          <div className="w-full bg-white rounded-[20px] shadow-[0_25px_60px_rgba(0,0,0,0.65)] overflow-hidden text-[#0F1D33]">
+          <div className="w-full bg-white rounded-none shadow-[0_25px_60px_rgba(0,0,0,0.65)] overflow-hidden text-[#0F1D33]">
             {/* Top Red KHQR Header Banner */}
             <div className="bg-[#E2232F] h-[56px] flex flex-col items-center justify-center relative">
               {/* Top White Accent Line above KHQR */}
@@ -523,7 +523,7 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
                   <div className="pt-6 pb-7 px-8 flex flex-col items-center justify-center">
                     <div className="w-[216px] h-[216px] sm:w-[224px] sm:h-[224px] bg-white flex items-center justify-center overflow-hidden">
                       {!resolvedQrImage ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-slate-50 rounded-xl border border-slate-200 text-slate-500">
+                        <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-slate-50 rounded-none border border-slate-200 text-slate-500">
                           <AlertCircle size={26} className="mb-2 text-amber-500" />
                           <span className="text-xs font-semibold text-slate-700">
                             No KHQR Image Found
