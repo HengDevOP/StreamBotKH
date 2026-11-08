@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Target,
@@ -22,9 +22,11 @@ import {
   RotateCcw,
   Palette,
   Layers,
-  Crown
+  Crown,
+  Loader2,
+  ChevronDown,
+  Maximize2
 } from 'lucide-react';
-import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import {
   DateTimeCalendarPicker,
@@ -34,6 +36,7 @@ import {
 import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
 import { GOAL_TEMPLATES, GoalTemplateRenderer, GoalTemplateMeta } from '../overlay/goalTemplates';
+import { GoalSkeleton } from './DashboardSkeleton';
 
 export interface StreamGoal {
   id: string;
@@ -49,6 +52,7 @@ export interface StreamGoal {
   showAnimation?: boolean;
   showGradientShader?: boolean;
   endDate?: string | null;
+  goalWidth?: number;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -91,6 +95,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
   const [formShowBackground, setFormShowBackground] = useState<boolean>(true);
   const [formShowAnimation, setFormShowAnimation] = useState<boolean>(true);
   const [formShowGradientShader, setFormShowGradientShader] = useState<boolean>(true);
+  const [formGoalWidth, setFormGoalWidth] = useState<number>(500);
   const [formEndDate, setFormEndDate] = useState<string>('');
   const [formIsActive, setFormIsActive] = useState<boolean>(true);
   const [formError, setFormError] = useState<string | null>(null);
@@ -101,8 +106,8 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
 
   // Copy & Test status
   const [copiedUrl, setCopiedUrl] = useState(false);
-  const [copiedGoalId, setCopiedGoalId] = useState<string | null>(null);
   const [isTestingGoal, setIsTestingGoal] = useState(false);
+  const [testSimulatedAmount, setTestSimulatedAmount] = useState<number>(0);
 
   const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/goal/${streamerToken || 'streamer-token'}`;
 
@@ -182,13 +187,6 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     setTimeout(() => setCopiedUrl(false), 2000);
   };
 
-  const copySpecificGoalUrl = (goalId: string) => {
-    const specificUrl = `${obsUrl}?goalId=${goalId}`;
-    navigator.clipboard.writeText(specificUrl);
-    setCopiedGoalId(goalId);
-    setTimeout(() => setCopiedGoalId(null), 2000);
-  };
-
   // Open Create Modal
   const openCreateModal = () => {
     setModalMode('create');
@@ -203,6 +201,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     setFormShowBackground(true);
     setFormShowAnimation(true);
     setFormShowGradientShader(true);
+    setFormGoalWidth(500);
     const defaultEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     defaultEnd.setHours(23, 59, 0, 0);
     setFormEndDate(toLocalDateTimeValue(defaultEnd));
@@ -224,6 +223,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     setFormShowBackground(goal.showBackground !== false);
     setFormShowAnimation(goal.showAnimation !== false);
     setFormShowGradientShader(goal.showGradientShader !== false);
+    setFormGoalWidth(goal.goalWidth || 500);
     setFormEndDate(goal.endDate || '');
     setFormIsActive(goal.isActive);
     setIsModalOpen(true);
@@ -260,6 +260,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
             showAnimation: formShowAnimation,
             showGradientShader: formShowGradientShader,
             endDate: formEndDate || null,
+            goalWidth: formGoalWidth,
             isActive: formIsActive
           })
         });
@@ -297,6 +298,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
             showAnimation: formShowAnimation,
             showGradientShader: formShowGradientShader,
             endDate: formEndDate || null,
+            goalWidth: formGoalWidth,
             isActive: formIsActive
           })
         });
@@ -322,110 +324,6 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
       setFormError('Network error while saving goal. Please try again.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  // Quick Toggle Show Balance for Active Goal
-  const handleToggleShowBalance = async () => {
-    if (!activeGoal) return;
-    const newShowBalance = !(activeGoal.showBalance !== false);
-    try {
-      const res = await fetch('/api/widgets/goals', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: activeGoal.id,
-          token: streamerToken || 'demo-token',
-          showBalance: newShowBalance
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.goal) {
-        setGoals((prev) =>
-          prev.map((g) => (g.id === activeGoal.id ? { ...g, showBalance: newShowBalance } : g))
-        );
-        setActiveGoal((prev) => (prev ? { ...prev, showBalance: newShowBalance } : null));
-      }
-    } catch (err) {
-      console.error('[GoalWidgetManager] Error toggling balance:', err);
-    }
-  };
-
-  // Quick Toggle Show Background for Active Goal
-  const handleToggleShowBackground = async () => {
-    if (!activeGoal) return;
-    const newShowBackground = !(activeGoal.showBackground !== false);
-    try {
-      const res = await fetch('/api/widgets/goals', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: activeGoal.id,
-          token: streamerToken || 'demo-token',
-          showBackground: newShowBackground
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.goal) {
-        setGoals((prev) =>
-          prev.map((g) => (g.id === activeGoal.id ? { ...g, showBackground: newShowBackground } : g))
-        );
-        setActiveGoal((prev) => (prev ? { ...prev, showBackground: newShowBackground } : null));
-      }
-    } catch (err) {
-      console.error('[GoalWidgetManager] Error toggling background:', err);
-    }
-  };
-
-  // Quick Toggle Show Animation for Active Goal
-  const handleToggleShowAnimation = async () => {
-    if (!activeGoal) return;
-    const newShowAnimation = !(activeGoal.showAnimation !== false);
-    try {
-      const res = await fetch('/api/widgets/goals', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: activeGoal.id,
-          token: streamerToken || 'demo-token',
-          showAnimation: newShowAnimation
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.goal) {
-        setGoals((prev) =>
-          prev.map((g) => (g.id === activeGoal.id ? { ...g, showAnimation: newShowAnimation } : g))
-        );
-        setActiveGoal((prev) => (prev ? { ...prev, showAnimation: newShowAnimation } : null));
-      }
-    } catch (err) {
-      console.error('[GoalWidgetManager] Error toggling animation:', err);
-    }
-  };
-
-  // Quick Toggle Gradient Animation Shader for Active Goal
-  const handleToggleShowGradientShader = async () => {
-    if (!activeGoal) return;
-    const newShowGradientShader = !(activeGoal.showGradientShader !== false);
-    try {
-      const res = await fetch('/api/widgets/goals', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: activeGoal.id,
-          token: streamerToken || 'demo-token',
-          showGradientShader: newShowGradientShader
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.goal) {
-        setGoals((prev) =>
-          prev.map((g) => (g.id === activeGoal.id ? { ...g, showGradientShader: newShowGradientShader } : g))
-        );
-        setActiveGoal((prev) => (prev ? { ...prev, showGradientShader: newShowGradientShader } : null));
-      }
-    } catch (err) {
-      console.error('[GoalWidgetManager] Error toggling gradient shader:', err);
     }
   };
 
@@ -530,27 +428,36 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     });
   };
 
-  // Trigger Live Test Preview & OBS Overlay Simulation
-  const handleTestGoal = async () => {
+  // Trigger Live Test Preview (local 3-second 0 to target balance animation in preview only)
+  const handleTestGoal = () => {
     if (!activeGoal || isTestingGoal) return;
     setIsTestingGoal(true);
-    try {
-      await fetch('/api/widgets/goals', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: activeGoal.id,
-          token: streamerToken || 'demo-token',
-          simulateTest: true,
-          testAmount: 10
-        })
-      });
-    } catch (err) {
-      console.error('[GoalWidgetManager] Error testing goal:', err);
-    }
-    setTimeout(() => {
-      setIsTestingGoal(false);
-    }, 3500);
+    setTestSimulatedAmount(0);
+
+    // Smoothly animate balance from 0 to targetGoal over 3 seconds (strictly local preview, not posted to source URL)
+    const target = activeGoal.targetAmount || 100;
+    const duration = 3000;
+    let start: number | null = null;
+
+    const frame = (now: number) => {
+      if (start === null) start = now;
+      const elapsed = now - start;
+      const progress = Math.min(1, elapsed / duration);
+      setTestSimulatedAmount(progress * target);
+
+      if (progress < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        setTestSimulatedAmount(target);
+        // Hold at 100% target goal for 1.5 seconds, then finish test
+        setTimeout(() => {
+          setIsTestingGoal(false);
+          setTestSimulatedAmount(0);
+        }, 1500);
+      }
+    };
+
+    requestAnimationFrame(frame);
   };
 
   // Reset Active Goal to 0
@@ -587,49 +494,108 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
     });
   };
 
-  // Filtered list
-  const filteredGoals = goals.filter((g) => {
-    if (filterStatus === 'active') return g.isActive;
-    if (filterStatus === 'completed') return g.currentAmount >= g.targetAmount;
-    return true;
-  });
+  // Activate Goal confirmation handler when clicking anywhere on an inactive card
+  const handleCardClickToActivate = (goal: StreamGoal) => {
+    if (goal.isActive) return;
+    showConfirm({
+      title: 'Set as Active Goal?',
+      message: activeGoal
+        ? `Replace "${activeGoal.title}" with "${goal.title}" as your active goal?`
+        : `Set "${goal.title}" as your active goal?`,
+      type: 'info',
+      confirmText: 'Set Active',
+      onConfirm: async () => {
+        await handleSetActive(goal);
+      }
+    });
+  };
+
+  // Filtered & Sorted list (Active goal always sorted first)
+  const filteredGoals = [...goals]
+    .filter((g) => {
+      if (filterStatus === 'active') return g.isActive;
+      if (filterStatus === 'completed') return g.currentAmount >= g.targetAmount;
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      return 0;
+    });
 
   const filteredTemplates = GOAL_TEMPLATES.filter((t) => {
     if (templateFilter === 'All') return true;
     return t.category === templateFilter;
   });
 
-  const currentTemplate = GOAL_TEMPLATES.find((t) => t.id === (activeGoal?.templateStyle || 'cyber-neon')) || GOAL_TEMPLATES[0];
+  if (isLoading) {
+    return <GoalSkeleton />;
+  }
 
   return (
     <div className="space-y-6">
       {/* ============================================================== */}
-      {/* 1. ACTIVE GOAL LIVE OBS PREVIEW & 20-TEMPLATE SWITCHER         */}
-      {/* ============================================================== */}
+      {/* 1. ACTIVE GOAL LIVE OBS PREVIEW                                */}
       {/* ============================================================== */}
       {activeGoal && (
-        <Card className="p-5 sm:p-6 bg-[#090D18] border border-slate-800 space-y-5">
-          {/* Checkerboard Preview Area */}
-          <div className="w-full rounded-2xl bg-[#040711] border border-slate-800/80 px-5 sm:px-8 pt-14 pb-7 sm:py-10 flex items-center justify-center relative overflow-hidden min-h-[210px]">
-            <div
-              className="absolute inset-0 opacity-15 pointer-events-none"
-              style={{
-                backgroundImage:
-                  'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
-                backgroundSize: '20px 20px',
-                backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-              }}
-            />
+        <div className="w-full rounded-2xl bg-[#040711] border border-slate-800/80 px-5 sm:px-8 py-7 sm:py-10 flex items-center justify-center relative overflow-hidden min-h-[180px]">
+          <div
+            className="absolute inset-0 opacity-15 pointer-events-none"
+            style={{
+              backgroundImage:
+                'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
+              backgroundSize: '20px 20px',
+              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+            }}
+          />
 
-            {/* Top-Right Simple Test Button */}
+          {/* Rendered Template */}
+          <div className="relative z-10 w-full flex justify-center">
+            <GoalTemplateRenderer
+              title={activeGoal.title}
+              targetAmount={activeGoal.targetAmount}
+              currentAmount={isTestingGoal ? testSimulatedAmount : activeGoal.currentAmount}
+              accentColor={activeGoal.accentColor || '#10B981'}
+              templateStyle={activeGoal.templateStyle || 'cyber-neon'}
+              showBalance={activeGoal.showBalance !== false}
+              showBackground={activeGoal.showBackground !== false}
+              showAnimation={activeGoal.showAnimation !== false}
+              showGradientShader={activeGoal.showGradientShader !== false}
+              endDate={activeGoal.endDate}
+              width={activeGoal.goalWidth || 500}
+              isAnimating={isTestingGoal}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 3. GOALS LIST & MANAGEMENT CONTROLS                             */}
+      {/* ============================================================== */}
+      <div className="space-y-4">
+        {/* List Header & Action Toolbar - Strict 1 Row on Mobile & Desktop */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] flex items-center gap-1.5 sm:gap-2 truncate">
+              <span className="truncate">Goal Milestones</span>
+              <span className="text-[10px] sm:text-xs font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 shrink-0">
+                {goals.length}
+              </span>
+            </h3>
+          </div>
+
+          {/* Action Toolbar on flex end */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Test Simulation Button (Moved before filter dropdown - runs 3s 0-to-target animation) */}
             <button
               type="button"
               onClick={handleTestGoal}
-              disabled={isTestingGoal}
-              className={`absolute top-3 right-3 z-20 px-3.5 py-1.5 rounded-xl font-['Chakra_Petch'] font-bold text-xs tracking-wide flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+              disabled={isTestingGoal || !activeGoal}
+              title="Test goal animation (0 to target over 3s)"
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${
                 isTestingGoal
-                  ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.2)]'
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-[0_0_14px_rgba(16,185,129,0.3)]'
+                  ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                  : 'bg-[#090D18] hover:bg-slate-800 text-emerald-400 border border-slate-800 hover:border-emerald-500/40'
               }`}
             >
               <Play
@@ -637,329 +603,94 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                 className={
                   isTestingGoal
                     ? 'text-emerald-300 fill-emerald-300 animate-pulse'
-                    : 'text-slate-950 fill-slate-950'
+                    : 'text-emerald-400 fill-emerald-400'
                 }
               />
-              <span>{isTestingGoal ? 'Testing...' : 'Test'}</span>
+              <span className="hidden xs:inline">{isTestingGoal ? 'Testing...' : 'Test'}</span>
+              <span className="inline xs:hidden">{isTestingGoal ? '...' : 'Test'}</span>
             </button>
 
-            {/* Rendered Template */}
-            <div className="relative z-10 w-full flex justify-center">
-              <GoalTemplateRenderer
-                title={activeGoal.title}
-                targetAmount={activeGoal.targetAmount}
-                currentAmount={isTestingGoal ? activeGoal.currentAmount + 10 : activeGoal.currentAmount}
-                accentColor={activeGoal.accentColor || '#10B981'}
-                templateStyle={activeGoal.templateStyle || 'cyber-neon'}
-                showBalance={activeGoal.showBalance !== false}
-                showBackground={activeGoal.showBackground !== false}
-                showAnimation={activeGoal.showAnimation !== false}
-                showGradientShader={activeGoal.showGradientShader !== false}
-                endDate={activeGoal.endDate}
-                recentDonor={isTestingGoal ? 'Test Supporter' : null}
-                addedAmount={isTestingGoal ? 10 : null}
+            {/* Simple Status Filter Dropdown (like Overview Stats) */}
+            <div className="relative shrink-0">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'completed')}
+                aria-label="Filter by status"
+                className="appearance-none pl-3 sm:pl-3.5 pr-8 sm:pr-9 py-1.5 sm:py-2 rounded-xl bg-[#090D18] border border-slate-800 text-xs font-mono font-bold text-white hover:border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer shadow-sm"
+              >
+                <option value="all" className="bg-slate-950 text-white py-1">
+                  All
+                </option>
+                <option value="active" className="bg-slate-950 text-white py-1">
+                  Active
+                </option>
+                <option value="completed" className="bg-slate-950 text-white py-1">
+                  Completed
+                </option>
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
               />
             </div>
-          </div>
 
-          {/* Quick Settings & Template Trigger Bar */}
-          <div className="flex flex-col gap-3 pt-3 border-t border-slate-800/80">
-            {/* Quick Display & Shader Toggles */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {/* Gradient Animation Shader Quick Toggle */}
-                <button
-                  type="button"
-                  onClick={handleToggleShowGradientShader}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
-                    activeGoal.showGradientShader !== false
-                      ? 'bg-fuchsia-500/20 border-fuchsia-500/50 text-fuchsia-300 shadow-[0_0_12px_rgba(217,70,239,0.25)]'
-                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                  title="Toggle Gradient Animation Shader"
-                >
-                  <Sparkles
-                    size={13}
-                    className={activeGoal.showGradientShader !== false ? 'text-fuchsia-400 animate-pulse' : 'text-slate-500'}
-                  />
-                  <span>Gradient Shader</span>
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      activeGoal.showGradientShader !== false ? 'bg-fuchsia-400 shadow-[0_0_6px_#E879F9]' : 'bg-slate-600'
-                    }`}
-                  />
-                </button>
-
-                {/* Bar Animation Quick Toggle */}
-                <button
-                  type="button"
-                  onClick={handleToggleShowAnimation}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
-                    activeGoal.showAnimation !== false
-                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                  title="Toggle Bar Animation"
-                >
-                  <Sliders
-                    size={12}
-                    className={activeGoal.showAnimation !== false ? 'text-emerald-400' : 'text-slate-500'}
-                  />
-                  <span>Animation</span>
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      activeGoal.showAnimation !== false ? 'bg-emerald-400 shadow-[0_0_6px_#34D399]' : 'bg-slate-600'
-                    }`}
-                  />
-                </button>
-
-                {/* Show Balance Quick Toggle */}
-                <button
-                  type="button"
-                  onClick={handleToggleShowBalance}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
-                    activeGoal.showBalance !== false
-                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
-                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                  title="Toggle Show Balance"
-                >
-                  <DollarSign
-                    size={12}
-                    className={activeGoal.showBalance !== false ? 'text-cyan-400' : 'text-slate-500'}
-                  />
-                  <span>Balance</span>
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      activeGoal.showBalance !== false ? 'bg-cyan-400' : 'bg-slate-600'
-                    }`}
-                  />
-                </button>
-
-                {/* Show Background Quick Toggle */}
-                <button
-                  type="button"
-                  onClick={handleToggleShowBackground}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
-                    activeGoal.showBackground !== false
-                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
-                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                  title="Toggle Container Background"
-                >
-                  <Layers
-                    size={12}
-                    className={activeGoal.showBackground !== false ? 'text-amber-400' : 'text-slate-500'}
-                  />
-                  <span>Background</span>
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      activeGoal.showBackground !== false ? 'bg-amber-400' : 'bg-slate-600'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Edit Active Goal Button */}
-              <button
-                type="button"
-                onClick={() => openEditModal(activeGoal)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer"
-              >
-                <Edit2 size={12} className="text-slate-400" />
-                <span>Edit Goal</span>
-              </button>
-            </div>
-
-            {/* Template Info & Modal Trigger */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-800/40">
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg border border-white/10"
-                  style={{ backgroundColor: `${currentTemplate.previewColor}25`, color: currentTemplate.previewColor }}
-                >
-                  <Palette size={16} />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-white font-['Chakra_Petch'] truncate">
-                      Current Style: {currentTemplate.name}
-                    </span>
-                    <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 font-bold">
-                      {currentTemplate.category}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 line-clamp-1">{currentTemplate.description}</p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setTemplateModalTarget('active');
-                  setIsTemplateModalOpen(true);
-                }}
-                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 hover:text-white font-mono text-xs font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.15)] flex-shrink-0 cursor-pointer"
-              >
-                <Palette size={14} className="text-cyan-400" />
-                <span>Browse Templates (Previews Modal)</span>
-              </button>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* ============================================================== */}
-      {/* 3. GOALS LIST & MANAGEMENT CONTROLS                             */}
-      {/* ============================================================== */}
-      <div className="space-y-4">
-        {/* List Header & Action Toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] flex items-center gap-2">
-              <span>Goal Milestones</span>
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                {goals.length}
-              </span>
-            </h3>
-
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1 ml-2 p-1 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setFilterStatus('all')}
-                className={`px-2.5 py-0.5 rounded-lg transition-colors ${
-                  filterStatus === 'all' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterStatus('active')}
-                className={`px-2.5 py-0.5 rounded-lg transition-colors ${
-                  filterStatus === 'active' ? 'bg-emerald-500/20 text-emerald-400 font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterStatus('completed')}
-                className={`px-2.5 py-0.5 rounded-lg transition-colors ${
-                  filterStatus === 'completed' ? 'bg-amber-500/20 text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Completed
-              </button>
-            </div>
-          </div>
-
-          {/* Create Goal Button */}
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={openCreateModal}
-            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 self-start sm:self-auto"
-            icon={<Plus size={15} />}
-          >
-            Create Goal
-          </Button>
-        </div>
-
-        {/* Goals Grid Cards */}
-        {isLoading ? (
-          <div className="p-8 text-center text-slate-500 font-mono text-xs">
-            Loading goals...
-          </div>
-        ) : filteredGoals.length === 0 ? (
-          <div className="p-10 rounded-2xl bg-[#090D18] border border-slate-800 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
-              <Target size={22} />
-            </div>
-            <h4 className="text-base font-bold text-white font-['Chakra_Petch']">No Goals Found</h4>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto">
-              You haven't created any goals in this category yet. Click Create Goal to start tracking a new milestone for your stream!
-            </p>
+            {/* Create Goal Button */}
             <Button
               variant="primary"
               size="sm"
               onClick={openCreateModal}
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold mt-2"
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-1 sm:gap-1.5 text-xs py-1.5 sm:py-2 px-2.5 sm:px-3.5 whitespace-nowrap shrink-0"
+              icon={<Plus size={14} />}
             >
-              Create First Goal
+              <span className="hidden sm:inline">Create Goal</span>
+              <span className="inline sm:hidden">Create</span>
             </Button>
+          </div>
+        </div>
+
+        {/* Goals Grid Cards */}
+        {filteredGoals.length === 0 ? (
+          <div className="py-12 px-4 rounded-2xl bg-[#090D18] border border-slate-800 text-center space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-slate-800/50 border border-slate-800 text-slate-500 flex items-center justify-center mx-auto">
+              <Target size={20} />
+            </div>
+            <h4 className="text-sm font-bold text-slate-400 font-['Chakra_Petch']">No Goals Found</h4>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredGoals.map((goal) => {
-              const pct = Math.min(100, Math.round((goal.currentAmount / (goal.targetAmount || 1)) * 100));
-              const isDone = goal.currentAmount >= goal.targetAmount;
-              const tpl = GOAL_TEMPLATES.find((t) => t.id === (goal.templateStyle || 'cyber-neon')) || GOAL_TEMPLATES[0];
-
               return (
                 <div
                   key={goal.id}
-                  className={`p-5 rounded-2xl bg-[#090D18] border transition-all space-y-3 relative overflow-hidden ${
+                  onClick={() => handleCardClickToActivate(goal)}
+                  className={`p-4 sm:p-5 rounded-2xl bg-[#090D18] border transition-all space-y-4 relative overflow-hidden flex flex-col justify-between ${
                     goal.isActive
-                      ? 'border-emerald-500/50 shadow-lg shadow-emerald-500/10'
-                      : 'border-slate-800 hover:border-slate-700'
+                      ? 'border-emerald-500 ring-1 ring-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                      : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900/40 cursor-pointer'
                   }`}
                 >
-                  {/* Top Card Row */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {goal.isActive ? (
-                          <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                            ACTIVE ON OBS
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-slate-400">
-                            Inactive
-                          </span>
-                        )}
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 font-bold">
-                          {tpl.name}
-                        </span>
-                        {isDone && (
-                          <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold">
-                            <Trophy size={10} />
-                            Completed
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="text-base font-bold text-white font-['Chakra_Petch'] truncate">
-                        {goal.title}
-                      </h4>
+                  {/* Exact Configured Style Preview */}
+                  <div className="w-full flex items-center justify-center pointer-events-none select-none py-1">
+                    <div className="w-full max-w-full">
+                      <GoalTemplateRenderer
+                        title={goal.title}
+                        targetAmount={goal.targetAmount}
+                        currentAmount={goal.isActive && isTestingGoal ? testSimulatedAmount : goal.currentAmount}
+                        accentColor={goal.accentColor || '#10B981'}
+                        templateStyle={goal.templateStyle || 'cyber-neon'}
+                        showBalance={goal.showBalance !== false}
+                        showBackground={goal.showBackground !== false}
+                        showAnimation={goal.showAnimation !== false}
+                        showGradientShader={goal.showGradientShader !== false}
+                        endDate={goal.endDate}
+                        width={goal.goalWidth || 500}
+                        isAnimating={goal.isActive && isTestingGoal}
+                      />
                     </div>
-
-                    {/* Progress percentage */}
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-base font-mono font-extrabold text-white">
-                        {pct}%
-                      </span>
-                      <div className="text-[10px] font-mono text-slate-400">
-                        ${goal.currentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${goal.targetAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="w-full h-3 rounded-full bg-slate-900 border border-slate-800/80 p-0.5 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.max(4, pct)}%`,
-                        backgroundColor: goal.accentColor || tpl.previewColor || '#10B981',
-                        boxShadow: `0 0 10px ${goal.accentColor || tpl.previewColor || '#10B981'}80`
-                      }}
-                    />
                   </div>
 
                   {/* Metadata and Action Buttons */}
-                  <div className="flex items-center justify-between text-xs font-mono pt-1">
+                  <div className="flex items-center justify-between text-xs font-mono pt-2 border-t border-slate-800/60">
                     <div className="text-[11px] text-slate-400 flex items-center gap-1.5 min-w-0">
                       <Calendar size={12} className="text-slate-500 flex-shrink-0" />
                       <span className="truncate">
@@ -968,40 +699,30 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex items-center gap-1">
-                      {!goal.isActive && (
-                        <button
-                          type="button"
-                          onClick={() => handleSetActive(goal)}
-                          title="Set as Active Goal for OBS"
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-bold border border-emerald-500/30 transition-colors"
-                        >
-                          Set Active
-                        </button>
-                      )}
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => copySpecificGoalUrl(goal.id)}
-                        title="Copy specific OBS link"
-                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-                      >
-                        {copiedGoalId === goal.id ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(goal)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditModal(goal);
+                        }}
                         title="Edit goal & template"
-                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
                       >
                         <Edit2 size={13} />
+                        <span>Manage</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteGoal(goal)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteGoal(goal);
+                        }}
                         title="Delete goal"
-                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-red-500/10 border border-slate-800 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-xs font-semibold transition-colors cursor-pointer"
                       >
                         <Trash2 size={13} />
+                        <span>Delete</span>
                       </button>
                     </div>
                   </div>
@@ -1088,6 +809,7 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                         showAnimation={formShowAnimation}
                         showGradientShader={formShowGradientShader}
                         endDate={formEndDate || null}
+                        width={formGoalWidth}
                       />
                     </div>
                   </div>
@@ -1264,7 +986,80 @@ export const GoalWidgetManager: React.FC<GoalWidgetManagerProps> = ({
                     </div>
                   </div>
 
-                  {/* Row 5: Responsive Display, Shader & OBS Settings Grid */}
+                  {/* Row 5: Goal Width Setting */}
+                  <div className="space-y-2 p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <label className="text-xs font-mono font-bold text-slate-200 flex items-center gap-1.5">
+                          <Maximize2 size={13} className="text-emerald-400 shrink-0" />
+                          <span className="truncate">Goal Width</span>
+                        </label>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Configure widget size for your stream overlay
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <input
+                          type="number"
+                          min={280}
+                          max={1000}
+                          step={10}
+                          value={formGoalWidth}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val)) setFormGoalWidth(val);
+                          }}
+                          onBlur={() => {
+                            const clamped = Math.min(1000, Math.max(280, formGoalWidth || 500));
+                            setFormGoalWidth(clamped);
+                          }}
+                          className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs text-center focus:outline-none focus:border-emerald-400"
+                        />
+                        <span className="text-xs font-mono text-slate-400">px</span>
+                      </div>
+                    </div>
+
+                    {/* Slider */}
+                    <div className="flex items-center gap-3 pt-1">
+                      <span className="text-[10px] font-mono text-slate-500 shrink-0">280px</span>
+                      <input
+                        type="range"
+                        min={280}
+                        max={1000}
+                        step={10}
+                        value={formGoalWidth}
+                        onChange={(e) => setFormGoalWidth(parseInt(e.target.value, 10))}
+                        className="flex-1 accent-emerald-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                      />
+                      <span className="text-[10px] font-mono text-slate-500 shrink-0">1000px</span>
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <span className="text-[10px] font-mono text-slate-500">Presets:</span>
+                      {[
+                        { label: 'Compact', width: 360 },
+                        { label: 'Standard', width: 500 },
+                        { label: 'Wide', width: 640 },
+                        { label: 'Banner', width: 800 }
+                      ].map((preset) => (
+                        <button
+                          key={preset.width}
+                          type="button"
+                          onClick={() => setFormGoalWidth(preset.width)}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold transition-colors cursor-pointer ${
+                            formGoalWidth === preset.width
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          {preset.label} ({preset.width}px)
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Row 6: Responsive Display, Shader & OBS Settings Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
                     {/* Gradient Animation Shader Setting */}
                     <button

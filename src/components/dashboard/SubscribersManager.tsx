@@ -147,7 +147,6 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   }, [token, joinOverlayRoom]);
 
   // Feature Settings
-  const MAX_SUBSCRIBER_TIERS = 10;
   const [tiers, setTiers] = useState<SubscriberTier[]>([]);
   const [savedTiers, setSavedTiers] = useState<SubscriberTier[]>([]);
 
@@ -520,10 +519,6 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
 
   // Open modal to add or edit tier
   const handleOpenTierModal = (tierToEdit?: SubscriberTier) => {
-    if (!tierToEdit && tiers.length >= MAX_SUBSCRIBER_TIERS) {
-      alert(`Maximum of ${MAX_SUBSCRIBER_TIERS} subscriber tiers allowed.`);
-      return;
-    }
     if (tierToEdit) {
       setEditingTier(tierToEdit);
       setTierName(tierToEdit.name);
@@ -562,10 +557,6 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
 
   const handleSaveTierForm = async () => {
     if (!tierName.trim()) return;
-    if (!editingTier && tiers.length >= MAX_SUBSCRIBER_TIERS) {
-      alert(`Maximum of ${MAX_SUBSCRIBER_TIERS} subscriber tiers allowed.`);
-      return;
-    }
 
     setSavingTier(true);
     try {
@@ -813,15 +804,6 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span
-              className={`text-xs font-mono font-bold px-2 py-1 rounded-lg border ${
-                tiers.length >= MAX_SUBSCRIBER_TIERS
-                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                  : 'bg-slate-900 text-cyan-400 border-slate-800'
-              }`}
-            >
-              {tiers.length} / {MAX_SUBSCRIBER_TIERS} Tiers
-            </span>
             {tiers.length > 0 && (
               <button
                 type="button"
@@ -835,8 +817,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
             )}
             <Button
               onClick={() => handleOpenTierModal()}
-              disabled={tiers.length >= MAX_SUBSCRIBER_TIERS}
-              className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-md"
             >
               <Plus className="w-4 h-4" />
               <span>Create New Tier</span>

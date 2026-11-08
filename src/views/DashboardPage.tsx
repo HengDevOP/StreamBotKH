@@ -642,6 +642,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
   // Overview Timeframe Filter (shared between OverviewStats and RecentDonationsTable)
   const [overviewTimeframe, setOverviewTimeframe] = useState<TimeframeOption>('today');
+  const [overviewCustomRange, setOverviewCustomRange] = useState<{ startDate: string; endDate: string }>({
+    startDate: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10),
+    endDate: new Date().toISOString().slice(0, 10)
+  });
 
   // Donation Ledger Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -2210,6 +2214,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 trend={stats?.trend}
                 selectedTimeframe={overviewTimeframe}
                 onTimeframeChange={setOverviewTimeframe}
+                customDateRange={overviewCustomRange}
+                onCustomDateRangeChange={setOverviewCustomRange}
               />
 
               {/* Recent Donations Table Preview */}
@@ -2219,6 +2225,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   limit={10}
                   title="Recent Donations"
                   timeframe={overviewTimeframe}
+                  customRange={overviewCustomRange}
                   onReplayAlert={handleReplayAlert}
                   onDeleteDonation={handleDeleteDonation}
                   deletingId={deletingDonationId}

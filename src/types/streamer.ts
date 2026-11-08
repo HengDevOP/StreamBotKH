@@ -108,12 +108,18 @@ export interface StreamerDashboardStats {
     todayDonationsCount: number;
   };
   timeframeAnalytics?: {
-    today: TimeframeMetrics;
-    '1d': TimeframeMetrics;
-    '3d': TimeframeMetrics;
-    'last_week': TimeframeMetrics;
-    'last_month': TimeframeMetrics;
+    today?: TimeframeMetrics;
+    yesterday?: TimeframeMetrics;
+    '1d'?: TimeframeMetrics;
+    '3d'?: TimeframeMetrics;
+    this_week?: TimeframeMetrics;
+    last_week?: TimeframeMetrics;
+    this_month?: TimeframeMetrics;
+    last_month?: TimeframeMetrics;
+    '3_months'?: TimeframeMetrics;
+    '6_months'?: TimeframeMetrics;
     lifetime?: TimeframeMetrics;
+    [key: string]: TimeframeMetrics | undefined;
   };
   topDonors: Array<{
     donor_name: string;

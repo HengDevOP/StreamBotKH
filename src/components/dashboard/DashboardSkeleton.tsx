@@ -19,8 +19,10 @@ import {
   Gamepad2,
   Plus,
   RefreshCw,
-  Copy
+  Copy,
+  Loader2
 } from 'lucide-react';
+import { Card } from '../common/Card';
 
 export type DashboardTab =
   | 'overview'
@@ -502,42 +504,91 @@ export const SoundboardSkeleton: React.FC = () => {
 // ==============================================================
 export const GoalSkeleton: React.FC = () => {
   return (
-    <div className="space-y-6 animate-pulse select-none">
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="h-6 w-48 bg-slate-800 rounded-lg" />
-          <div className="h-3 w-80 bg-slate-800/50 rounded" />
+    <div className="space-y-6 animate-fadeIn select-none">
+      {/* 1. ACTIVE GOAL LIVE OBS PREVIEW SKELETON */}
+      {/* Checkerboard Preview Area */}
+      <div className="w-full rounded-2xl bg-[#040711] border border-slate-800/80 px-5 sm:px-8 pt-10 pb-7 sm:py-10 flex flex-col items-center justify-center relative overflow-hidden min-h-[220px]">
+        <div
+          className="absolute inset-0 opacity-15 pointer-events-none"
+          style={{
+            backgroundImage:
+              'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
+            backgroundSize: '20px 20px',
+            backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+          }}
+        />
+
+        {/* Top-Right Skeleton Test Button */}
+        <div className="absolute top-3 right-3 z-20 h-7 w-20 rounded-xl bg-slate-800/80 border border-slate-700/60" />
+
+        {/* Center Element of the Page: Animated Loading Icon */}
+        <div className="relative z-10 flex flex-col items-center justify-center gap-3 py-2">
+          <div className="relative flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_24px_rgba(16,185,129,0.3)] animate-pulse">
+              <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-['Chakra_Petch'] font-bold text-xs uppercase tracking-widest text-emerald-400">
+              Loading Goal Tracker...
+            </span>
+          </div>
         </div>
-        <div className="h-9 w-36 bg-cyan-950/40 border border-cyan-500/30 rounded-xl" />
+
+        {/* Rendered Template Skeleton Bar */}
+        <div className="relative z-10 w-full max-w-lg mt-3 p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-xl">
+          <div className="w-full h-8 sm:h-9 rounded-xl bg-slate-950 border border-slate-800 p-0.5 overflow-hidden relative flex items-center justify-between px-3">
+            <div className="h-3.5 w-36 bg-slate-800 rounded animate-pulse z-10" />
+            <div className="h-3.5 w-28 bg-slate-800/80 rounded animate-pulse z-10" />
+            <div className="absolute inset-y-0 left-0 w-2/3 bg-gradient-to-r from-emerald-500/30 via-teal-400/30 to-emerald-500/30 animate-pulse" />
+          </div>
+        </div>
       </div>
 
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-slate-800 flex-shrink-0" />
-          <div className="space-y-1.5">
-            <div className="h-3.5 w-36 bg-slate-800 rounded" />
-            <div className="h-2.5 w-60 bg-slate-800/40 rounded" />
+      {/* 2. GOALS LIST & MANAGEMENT CONTROLS SKELETON */}
+      <div className="space-y-4">
+        {/* List Header & Action Toolbar - Strict 1 Row on Mobile & Desktop */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className="h-6 w-32 sm:w-36 bg-slate-800 rounded-lg animate-pulse" />
+            <div className="h-5 w-6 rounded-full bg-slate-800 animate-pulse shrink-0" />
           </div>
-        </div>
-        <div className="h-8 w-24 bg-slate-800 rounded-lg" />
-      </div>
-
-      {/* Goal Bar Preview Card */}
-      <div className="rounded-2xl bg-[#090D18] border border-slate-800 p-6 space-y-6">
-        <div className="h-4 w-28 bg-slate-800 rounded" />
-        <div className="p-6 rounded-2xl bg-black border border-slate-800 space-y-3">
-          <div className="flex justify-between">
-            <div className="h-4 w-32 bg-slate-800 rounded" />
-            <div className="h-4 w-24 bg-slate-800 rounded" />
-          </div>
-          <div className="w-full h-6 rounded-xl bg-slate-900 overflow-hidden">
-            <div className="h-full w-2/3 bg-cyan-500/40" />
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="h-8 w-14 sm:w-16 rounded-xl bg-[#090D18] border border-slate-800 animate-pulse" />
+            <div className="h-8 w-20 sm:w-24 rounded-xl bg-[#090D18] border border-slate-800 animate-pulse" />
+            <div className="h-8 w-20 sm:w-28 rounded-xl bg-emerald-500/20 border border-emerald-500/30 animate-pulse" />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-          <div className="h-10 rounded-xl bg-slate-950 border border-slate-800" />
-          <div className="h-10 rounded-xl bg-slate-950 border border-slate-800" />
+        {/* Goals Grid Cards Skeleton (2 Cards matching the exact layout) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <div
+              key={i}
+              className={`p-4 sm:p-5 rounded-2xl bg-[#090D18] border space-y-4 relative overflow-hidden flex flex-col justify-between ${
+                i === 1
+                  ? 'border-emerald-500 ring-1 ring-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                  : 'border-slate-800'
+              }`}
+            >
+              {/* Template Style Preview Skeleton */}
+              <div className="w-full rounded-2xl bg-slate-900/60 border border-slate-800/80 p-5 space-y-3">
+                <div className="w-full h-8 sm:h-9 rounded-xl bg-slate-800/80 border border-slate-700/50 p-1 flex items-center justify-between px-3">
+                  <div className="h-4 w-32 bg-slate-700/60 rounded animate-pulse" />
+                  <div className="h-4 w-20 bg-slate-700/60 rounded animate-pulse" />
+                </div>
+              </div>
+
+              {/* Actions footer */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                <div className="h-4 w-24 rounded bg-slate-800/60 animate-pulse" />
+                <div className="flex items-center gap-2">
+                  <div className="h-7 w-20 rounded-lg bg-slate-900 border border-slate-800 animate-pulse" />
+                  <div className="h-7 w-18 rounded-lg bg-slate-900 border border-slate-800 animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

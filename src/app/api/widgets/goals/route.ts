@@ -97,6 +97,7 @@ export async function GET(req: NextRequest) {
       showAnimation: g.showAnimation !== false && g.show_animation !== 0,
       showGradientShader: g.showGradientShader !== false && g.show_gradient_shader !== 0,
       endDate: g.endDate || g.end_date || null,
+      goalWidth: Number(g.goalWidth ?? g.width ?? 500),
       isActive: Boolean(g.isActive || g.is_active === 1),
       createdAt: g.createdAt || g.created_at,
       updatedAt: g.updatedAt || g.updated_at
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
     const showAnimation = body.showAnimation !== undefined ? Boolean(body.showAnimation) : true;
     const showGradientShader = body.showGradientShader !== undefined ? Boolean(body.showGradientShader) : true;
     const endDate = body.endDate || null;
+    const goalWidth = body.goalWidth !== undefined ? Number(body.goalWidth) : (body.width !== undefined ? Number(body.width) : 500);
     const isActive = body.isActive !== undefined ? Boolean(body.isActive) : true;
 
     const goalsCol = await getStreamGoalsCollection();
@@ -185,6 +187,7 @@ export async function POST(req: NextRequest) {
       showAnimation,
       showGradientShader,
       endDate,
+      goalWidth,
       isActive,
       createdAt: now,
       updatedAt: now
@@ -206,6 +209,7 @@ export async function POST(req: NextRequest) {
       showAnimation,
       showGradientShader,
       endDate,
+      goalWidth,
       isActive
     };
 
@@ -262,54 +266,6 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
 
-    // Non-destructive live test simulation for preview & OBS overlay
-    if (body.simulateTest) {
-      const testAmount = Math.max(1, parseFloat(body.testAmount) || 10);
-      const baseCurrent = Number(existing.currentAmount ?? existing.current_amount ?? 0);
-      const goalIdStr = existing.id || String(existing._id);
-      const io = getIO();
-      if (io) {
-        const testPayload = {
-          id: goalIdStr,
-          token,
-          title: existing.title,
-          targetAmount: Number(existing.targetAmount ?? 100),
-          currentAmount: baseCurrent + testAmount,
-          accentColor: existing.accentColor || '#10B981',
-          templateStyle: existing.templateStyle || 'cyber-neon',
-          showBalance: existing.showBalance !== false,
-          showBackground: existing.showBackground !== false,
-          showAnimation: existing.showAnimation !== false,
-          showGradientShader: existing.showGradientShader !== false,
-          endDate: existing.endDate || null,
-          isActive: Boolean(existing.isActive),
-          donorName: 'Test Supporter',
-          addedAmount: testAmount,
-          isTest: true
-        };
-        io.to(`overlay:${token}`).emit('goal:update', testPayload);
-        if (token !== 'demo-token') {
-          io.to('overlay:demo-token').emit('goal:update', testPayload);
-        }
-
-        setTimeout(() => {
-          const revertPayload = {
-            ...testPayload,
-            currentAmount: baseCurrent,
-            donorName: null,
-            addedAmount: null,
-            isTest: true
-          };
-          io.to(`overlay:${token}`).emit('goal:update', revertPayload);
-          if (token !== 'demo-token') {
-            io.to('overlay:demo-token').emit('goal:update', revertPayload);
-          }
-        }, 3500);
-      }
-
-      return NextResponse.json({ success: true, simulated: true });
-    }
-
     const willBeActive = body.isActive !== undefined ? Boolean(body.isActive) : Boolean(existing.isActive);
     if (willBeActive) {
       await goalsCol.updateMany({ streamerToken: token }, { $set: { isActive: false } });
@@ -332,6 +288,7 @@ export async function PUT(req: NextRequest) {
     const showAnimation = body.showAnimation !== undefined ? Boolean(body.showAnimation) : (existing.showAnimation !== undefined ? Boolean(existing.showAnimation) : true);
     const showGradientShader = body.showGradientShader !== undefined ? Boolean(body.showGradientShader) : (existing.showGradientShader !== undefined ? Boolean(existing.showGradientShader) : true);
     const endDate = body.endDate !== undefined ? body.endDate : existing.endDate;
+    const goalWidth = body.goalWidth !== undefined ? Number(body.goalWidth) : (body.width !== undefined ? Number(body.width) : (existing.goalWidth ?? existing.width ?? 500));
 
     await goalsCol.updateOne(
       { _id: existing._id },
@@ -347,6 +304,7 @@ export async function PUT(req: NextRequest) {
           showAnimation,
           showGradientShader,
           endDate,
+          goalWidth,
           isActive: willBeActive,
           updatedAt: new Date()
         }
@@ -366,6 +324,7 @@ export async function PUT(req: NextRequest) {
       showAnimation,
       showGradientShader,
       endDate,
+      goalWidth,
       isActive: willBeActive
     };
 

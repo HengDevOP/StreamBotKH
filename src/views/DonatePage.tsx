@@ -326,7 +326,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
     return (
       <div className="min-h-screen bg-[#070A12] text-slate-100 flex items-center justify-center p-4">
         <div className="text-center py-12 max-w-md mx-auto space-y-4 animate-fadeIn">
-          <div className="w-16 h-16 rounded-none bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-400">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-400">
             <span className="font-mono text-xl font-bold">404</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white font-['Chakra_Petch']">
@@ -357,7 +357,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             cancelToastExiting ? 'animate-cancel-toast-exit' : 'animate-cancel-toast'
           }`}
         >
-          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-none bg-[#0d0910]/95 backdrop-blur-md border border-red-500/40 shadow-2xl shadow-red-950/70 text-slate-100">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#0d0910]/95 backdrop-blur-md border border-red-500/40 shadow-2xl shadow-red-950/70 text-slate-100">
             <div className="flex items-center gap-2.5 min-w-0">
               <XCircle size={17} className="shrink-0 text-red-400" />
               <p className="text-xs sm:text-sm font-medium text-white leading-snug">
@@ -367,7 +367,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
 
             <button
               onClick={dismissCancelToast}
-              className="text-slate-400 hover:text-white p-1 rounded-none hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+              className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
               title="Dismiss"
             >
               <X size={15} />
@@ -385,7 +385,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
             setupToastActive ? 'animate-cancel-toast' : 'animate-cancel-toast-exit'
           }`}
         >
-          <div className="flex items-center gap-2.5 sm:gap-3 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-none bg-red-600 text-white shadow-xl border border-red-500/80">
+          <div className="flex items-center gap-2.5 sm:gap-3 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl bg-red-600 text-white shadow-xl border border-red-500/80">
             <XCircle size={18} className="shrink-0 text-white" />
             <span className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] tracking-wide select-none">
               Payment setup required!
@@ -427,7 +427,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
 
           {/* Second Div: For the Latest Support (right side, plain list) */}
           <div className="w-full md:w-[320px] lg:w-[360px] flex-shrink-0 min-w-0 flex flex-col">
-            <Card className="p-4 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-none shadow-2xl flex flex-col h-full w-full">
+            <Card className="p-4 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl flex flex-col h-full w-full">
               {/* Header */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 flex-shrink-0">
                 <div className="flex items-center gap-2">
@@ -477,7 +477,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         {/* Video Clip Modal Preview for Supporters */}
         {previewingVideoUrl && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#0C101C] border border-slate-800 rounded-none p-5 max-w-lg w-full space-y-3 animate-fadeIn">
+            <div className="bg-[#0C101C] border border-slate-800 rounded-2xl p-5 max-w-lg w-full space-y-3 animate-fadeIn">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
                   <Youtube size={14} className="text-red-500" />
@@ -491,7 +491,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
                   ✕ Close
                 </button>
               </div>
-              <div className="relative aspect-video w-full rounded-none overflow-hidden bg-black">
+              <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-black">
                 <iframe
                   src={`https://www.youtube.com/embed/${(previewingVideoUrl && extractYouTubeId(previewingVideoUrl)) || ''}?autoplay=1`}
                   title="Supporter YouTube Clip"
@@ -533,7 +533,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
               }
             }}
             title="Powered by streambotkh.com"
-            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 group flex items-center gap-2.5 px-3.5 py-2 rounded-none bg-[#0C101C]/95 hover:bg-[#111728] backdrop-blur-md border border-slate-800 hover:border-cyan-500/50 shadow-2xl shadow-black/60 transition-all duration-200 select-none"
+            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 group flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#0C101C]/95 hover:bg-[#111728] backdrop-blur-md border border-slate-800 hover:border-cyan-500/50 shadow-2xl shadow-black/60 transition-all duration-200 select-none"
           >
             <div className="w-7 h-7 flex items-center justify-center">
               <img

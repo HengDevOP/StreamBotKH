@@ -154,18 +154,11 @@ export async function POST(req: NextRequest) {
       ? { $or: orConditions }
       : (token ? { streamerToken: token } : { streamerUsername: effectiveUsername || '' });
 
-    if (Array.isArray(body.tiers) && body.tiers.length > 10) {
-      return NextResponse.json(
-        { error: 'Maximum limit of 10 subscriber tiers allowed' },
-        { status: 400 }
-      );
-    }
-
     const updateDoc: Partial<SubscriberSettingsDoc> = {
       streamerToken: effectiveToken || token || '',
       streamerUsername: effectiveUsername || '',
       enabled: body.enabled !== false,
-      tiers: Array.isArray(body.tiers) ? body.tiers.slice(0, 10) : [],
+      tiers: Array.isArray(body.tiers) ? body.tiers : [],
       updatedAt: new Date()
     };
 

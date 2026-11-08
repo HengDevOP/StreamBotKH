@@ -61,7 +61,7 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
   }
 
   return (
-    <Card className="p-7 sm:p-9 text-center space-y-6 max-w-lg mx-auto bg-[#090D18] border border-emerald-500/30 rounded-none shadow-[0_0_40px_rgba(16,185,129,0.12)] animate-fadeIn relative overflow-hidden">
+    <Card className="p-7 sm:p-9 text-center space-y-6 max-w-lg mx-auto bg-[#090D18] border border-emerald-500/30 rounded-3xl shadow-[0_0_40px_rgba(16,185,129,0.12)] animate-fadeIn relative overflow-hidden">
       <style>{`
         @keyframes drawCircle {
           0% { stroke-dashoffset: 155; opacity: 0; }
@@ -74,12 +74,12 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
       `}</style>
 
       {/* Ambient background glows */}
-      <div className="absolute -top-16 -left-16 w-44 h-44 bg-emerald-500/10 blur-3xl rounded-none pointer-events-none" />
-      <div className="absolute -bottom-16 -right-16 w-44 h-44 bg-cyan-500/10 blur-3xl rounded-none pointer-events-none" />
+      <div className="absolute -top-16 -left-16 w-44 h-44 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none" />
+      <div className="absolute -bottom-16 -right-16 w-44 h-44 bg-cyan-500/10 blur-3xl rounded-full pointer-events-none" />
 
       {/* Sleek Animated SVG Tick / Checkmark */}
       <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
-        <div className="absolute inset-0 rounded-none bg-emerald-500/20 blur-xl animate-pulse" />
+        <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-xl animate-pulse" />
         <svg
           className="w-24 h-24 drop-shadow-[0_0_18px_rgba(16,185,129,0.55)]"
           viewBox="0 0 52 52"
@@ -116,7 +116,7 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
 
       {/* Creator Custom Thank You Section */}
       <div className="space-y-3 relative z-10">
-        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-none text-xs font-mono font-bold tracking-wide border ${
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wide border ${
           isSubscription
             ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
             : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
@@ -130,7 +130,7 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
         </h2>
 
         {/* Custom Thanks Message from Streamer Account Settings */}
-        <div className="p-4 rounded-none bg-slate-950/80 border border-slate-800 text-slate-200 text-sm leading-relaxed font-sans shadow-inner">
+        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-slate-200 text-sm leading-relaxed font-sans shadow-inner">
           <p className="whitespace-pre-line font-medium text-slate-100">
             {isSubscription
               ? `Congratulations, ${donorName || 'Supporter'}! You are now subscribed as ${tierName || 'VIP'}. Your custom subscriber badge is now live in stream chat!`
@@ -149,7 +149,7 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
       </div>
 
       {/* Clean Verified Tip / Subscription Summary */}
-      <div className="p-3.5 rounded-none bg-slate-950/60 border border-slate-800/90 text-xs font-mono flex items-center justify-between px-5 text-slate-400 relative z-10">
+      <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs font-mono flex items-center justify-between px-5 text-slate-400 relative z-10">
         <span>{isSubscription ? 'Membership Dues' : 'Total Tip Amount'}</span>
         <span className="text-sm font-extrabold text-emerald-400 font-mono tracking-tight">
           {formattedAmount} {isSubscription ? '/ month' : ''}
@@ -161,7 +161,7 @@ export const DonationSuccess: React.FC<DonationSuccessProps> = ({
         size="md"
         onClick={onReset}
         icon={<ArrowLeft size={16} />}
-        className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-sm rounded-none shadow-lg shadow-emerald-500/20 cursor-pointer"
+        className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-500/20 cursor-pointer"
       >
         {isSubscription ? 'Return to Stream' : 'Send Another Tip'}
       </Button>

@@ -652,17 +652,17 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       <Card
         className={
           className ||
-          'p-4 xs:p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-none shadow-2xl space-y-4 sm:space-y-5 w-full h-full flex flex-col justify-between'
+          'p-4 xs:p-5 sm:p-6 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-2xl space-y-4 sm:space-y-5 w-full h-full flex flex-col justify-between'
         }
       >
       {/* Embedded mode: compact language switch only (streamer profile is shown by the host page) */}
       {hideHeader && (
         <div className="flex items-center justify-end">
-          <div className="inline-flex items-center p-0.5 rounded-none bg-slate-950 border border-slate-700/80 shadow-sm">
+          <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-sm">
             <button
               type="button"
               onClick={() => handleSwitchLang('en')}
-              className={`px-2.5 py-1 rounded-none text-xs font-bold font-mono transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                 lang === 'en' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
               title="Switch to English"
@@ -672,7 +672,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <button
               type="button"
               onClick={() => handleSwitchLang('kh')}
-              className={`px-2.5 py-1 rounded-none text-xs font-bold font-mono transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                 lang === 'kh' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
               title="ប្តូរទៅភាសាខ្មែរ (Khmer)"
@@ -704,8 +704,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                 />
               </div>
               <div className="absolute -bottom-1.5 inset-x-0 flex justify-center">
-                <span className="px-1.5 py-0.2 rounded-none bg-red-600 group-hover:bg-red-500 text-white font-mono font-bold text-[8px] uppercase tracking-wider flex items-center gap-0.5 shadow transition-colors">
-                  <span className="w-1.5 h-1.5 rounded-none bg-white animate-pulse" />
+                <span className="px-1.5 py-0.2 rounded-full bg-red-600 group-hover:bg-red-500 text-white font-mono font-bold text-[8px] uppercase tracking-wider flex items-center gap-0.5 shadow transition-colors">
+                  <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
                   LIVE
                 </span>
               </div>
@@ -752,12 +752,12 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                       target="_blank"
                       rel="noopener noreferrer"
                       title={link.title || detected.defaultTitle}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-none text-[11px] font-semibold font-mono border transition-all duration-200 hover:scale-105 shadow-sm ${detected.brandColor}`}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold font-mono border transition-all duration-200 hover:scale-105 shadow-sm ${detected.brandColor}`}
                     >
                       <img
                         src={link.icon || detected.iconUrl}
                         alt={link.title || detected.defaultTitle}
-                        className="w-3.5 h-3.5 rounded-none object-contain flex-shrink-0"
+                        className="w-3.5 h-3.5 rounded-sm object-contain flex-shrink-0"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -774,11 +774,11 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
         {/* Top Right: Language Switcher EN / KH */}
         <div className="flex items-center shrink-0 ml-2 self-start">
-          <div className="inline-flex items-center p-0.5 rounded-none bg-slate-950 border border-slate-700/80 shadow-sm">
+          <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-sm">
             <button
               type="button"
               onClick={() => handleSwitchLang('en')}
-              className={`px-2.5 py-1 rounded-none text-xs font-bold font-mono transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                 lang === 'en'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-400 hover:text-white'
@@ -790,7 +790,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <button
               type="button"
               onClick={() => handleSwitchLang('kh')}
-              className={`px-2.5 py-1 rounded-none text-xs font-bold font-mono transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                 lang === 'kh'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-400 hover:text-white'
@@ -807,7 +807,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       {/* Donation Type Switch: Tip vs Subscribe / Membership vs Wheel */}
       {((subscriberSettings?.enabled && subscriberSettings.tiers.length > 0) || wheelSettings?.isEnabled) && (
         <div
-          className={`grid p-1 bg-slate-950/80 border border-slate-800 rounded-none gap-1 ${
+          className={`grid p-1 bg-slate-950/80 border border-slate-800 rounded-xl gap-1 ${
             subscriberSettings?.enabled && subscriberSettings.tiers.length > 0 && wheelSettings?.isEnabled
               ? 'grid-cols-3'
               : 'grid-cols-2'
@@ -816,7 +816,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           <button
             type="button"
             onClick={() => handleModeChange('tip')}
-            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-none text-xs font-bold font-mono transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
               donationType === 'tip'
                 ? 'bg-white text-slate-950 shadow-sm'
                 : 'text-slate-400 hover:text-white'
@@ -830,7 +830,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <button
               type="button"
               onClick={() => handleModeChange('subscribe')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-none text-xs font-bold font-mono transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                 donationType === 'subscribe'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-400 hover:text-white'
@@ -845,7 +845,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <button
               type="button"
               onClick={() => handleModeChange('wheel')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-none text-xs font-bold font-mono transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                 donationType === 'wheel'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-400 hover:text-white'
@@ -867,13 +867,13 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                 <Crown size={15} className="text-amber-400" />
                 <span>{DONOR_TRANSLATIONS[lang].selectTier}</span>
               </label>
-              <span className="text-[10px] font-mono font-semibold text-amber-300/80 bg-amber-500/10 px-2 py-0.5 rounded-none border border-amber-500/20">
+              <span className="text-[10px] font-mono font-semibold text-amber-300/80 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
                 {DONOR_TRANSLATIONS[lang].activeBadge}
               </span>
             </div>
 
             {subscriberSettings.tiers.length === 0 ? (
-              <div className="p-6 rounded-none bg-slate-950/70 border border-dashed border-slate-800 text-center space-y-2">
+              <div className="p-6 rounded-2xl bg-slate-950/70 border border-dashed border-slate-800 text-center space-y-2">
                 <Crown className="w-8 h-8 text-amber-400 mx-auto opacity-50" />
                 <p className="text-xs text-slate-300 font-semibold">No membership tiers available at the moment.</p>
                 <p className="text-[11px] text-slate-500">The streamer has not configured active membership tiers yet.</p>
@@ -899,7 +899,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                     <div
                       key={tier.id}
                       onClick={() => handleSelectTier(tier)}
-                      className={`p-3.5 sm:p-4 rounded-none border cursor-pointer transition-all flex flex-col justify-between text-left relative overflow-hidden group ${
+                      className={`p-3.5 sm:p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between text-left relative overflow-hidden group ${
                         isSelected
                           ? 'bg-gradient-to-b from-amber-500/20 via-[#151122] to-[#0A0E18] border-amber-400 ring-2 ring-amber-400/40 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
                           : 'bg-slate-950/70 border-slate-800/90 hover:border-slate-700 hover:bg-slate-900/40'
@@ -907,7 +907,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                     >
                       {/* Active Corner Glow */}
                       {isSelected && (
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-400/10 blur-2xl pointer-events-none rounded-none" />
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-400/10 blur-2xl pointer-events-none rounded-full" />
                       )}
 
                       <div className="space-y-2.5">
@@ -917,7 +917,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                             {tier.name}
                           </span>
                           <div
-                            className={`w-4 h-4 rounded-none border flex items-center justify-center flex-shrink-0 transition-colors ${
+                            className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${
                               isSelected
                                 ? 'border-amber-400 bg-amber-400 text-slate-950 shadow-sm shadow-amber-400/50'
                                 : 'border-slate-700 group-hover:border-slate-600'
@@ -937,7 +937,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
                         {/* Badge Display Capsule */}
                         <div className="pt-0.5">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-none bg-slate-900/90 border border-slate-800 shadow-inner">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 shadow-inner">
                             <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
                               Badge:
                             </span>
@@ -980,7 +980,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
               </div>
             )}
 
-            <div className="p-3 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 rounded-none flex items-center gap-2.5 text-xs text-amber-300 font-mono">
+            <div className="p-3 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 rounded-xl flex items-center gap-2.5 text-xs text-amber-300 font-mono">
               <Crown size={16} className="text-amber-400 shrink-0" />
               <span className="leading-snug">{DONOR_TRANSLATIONS[lang].vipNotice}</span>
             </div>
@@ -1007,9 +1007,9 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
               {wheelSettings.slices.map((slice) => (
                 <span
                   key={slice.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-950 border border-slate-800 text-xs font-medium text-slate-200 rounded-none"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-950 border border-slate-800 text-xs font-medium text-slate-200"
                 >
-                  <span className="w-2.5 h-2.5 rounded-none shrink-0" style={{ backgroundColor: slice.color }} />
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: slice.color }} />
                   <span>{slice.label}</span>
                 </span>
               ))}
@@ -1033,7 +1033,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                     <span className="text-amber-400">*</span>
                   </span>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[8px] sm:text-[9px] font-mono font-bold text-amber-400 bg-amber-500/15 px-1 sm:px-1.5 py-0.2 rounded-none uppercase">
+                    <span className="text-[8px] sm:text-[9px] font-mono font-bold text-amber-400 bg-amber-500/15 px-1 sm:px-1.5 py-0.2 rounded uppercase">
                       CHAT
                     </span>
                     <span className="text-[9px] sm:text-[10px] font-mono text-slate-400">{donorName.length}/25</span>
@@ -1062,7 +1062,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                     <button
                       type="button"
                       onClick={() => setShowPayerInfoModal(true)}
-                      className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-none border border-rose-500 text-rose-500 hover:text-rose-400 hover:border-rose-400 bg-transparent font-black text-[9px] sm:text-[10px] leading-none inline-flex items-center justify-center shrink-0 cursor-pointer transition-all hover:scale-115 active:scale-95"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-rose-500 text-rose-500 hover:text-rose-400 hover:border-rose-400 bg-transparent font-black text-[9px] sm:text-[10px] leading-none inline-flex items-center justify-center shrink-0 cursor-pointer transition-all hover:scale-115 active:scale-95"
                       title={lang === 'kh' ? 'ចុចដើម្បីអានការណែនាំអំពីឈ្មោះម្ចាស់គណនីធនាគារ' : 'Click to learn why Payer Name is required and how it works'}
                     >
                       !
@@ -1119,12 +1119,12 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                     {lang === 'kh' ? 'ចំនួនទឹកប្រាក់ (TIP AMOUNT)' : 'TIP AMOUNT'}
                   </span>
 
-                  <div className="inline-flex items-center p-0.5 rounded-none bg-slate-950 border border-slate-700/80 shadow-sm">
+                  <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-sm">
                     {usdKhqrList.length > 0 && (
                       <button
                         type="button"
                         onClick={() => handleSelectTipCurrency('USD')}
-                        className={`px-3 py-1 rounded-none text-xs font-mono font-bold transition-all cursor-pointer ${
+                        className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                           currency === 'USD'
                             ? 'bg-white text-slate-950 shadow-sm'
                             : 'text-slate-400 hover:text-white border border-transparent'
@@ -1138,7 +1138,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                       <button
                         type="button"
                         onClick={() => handleSelectTipCurrency('KHR')}
-                        className={`px-3 py-1 rounded-none text-xs font-mono font-bold transition-all cursor-pointer ${
+                        className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                           currency === 'KHR'
                             ? 'bg-white text-slate-950 shadow-sm'
                             : 'text-slate-400 hover:text-white border border-transparent'
@@ -1151,7 +1151,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                 </div>
 
                 {/* Amount Tab Switch Grid for Active Currency */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 p-1 bg-slate-950/90 border border-slate-800 rounded-none">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 p-1 bg-slate-950/90 border border-slate-800 rounded-xl">
                   {(currency === 'USD' ? usdKhqrList : khrKhqrList).map((item, idx) => {
                     const isSelected =
                       selectedKhqrId === item.id ||
@@ -1170,7 +1170,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                           setCurrency(item.currency);
                           setSelectedKhqrId(item.id);
                         }}
-                        className={`py-2 px-2.5 rounded-none font-mono text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                        className={`py-2 px-2.5 rounded-lg font-mono text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-white text-slate-950 shadow-sm'
                             : 'border border-transparent text-slate-400 hover:text-white hover:bg-slate-900/80'
@@ -1216,7 +1216,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                     <button
                       type="button"
                       onClick={() => setShowPayerInfoModal(true)}
-                      className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-none border border-rose-500 text-rose-500 hover:text-rose-400 hover:border-rose-400 bg-transparent font-black text-[9px] sm:text-[10px] leading-none inline-flex items-center justify-center shrink-0 cursor-pointer transition-all hover:scale-115 active:scale-95"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-rose-500 text-rose-500 hover:text-rose-400 hover:border-rose-400 bg-transparent font-black text-[9px] sm:text-[10px] leading-none inline-flex items-center justify-center shrink-0 cursor-pointer transition-all hover:scale-115 active:scale-95"
                       title={lang === 'kh' ? 'ចុចដើម្បីអានការណែនាំអំពីឈ្មោះម្ចាស់គណនីធនាគារ' : 'Click to learn why Payer Name is required and how it works'}
                     >
                       !
@@ -1310,7 +1310,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
             {meetsMinTip && videoTitle && (
               <div className="flex items-center gap-2 p-1.5 bg-slate-950/80 border border-slate-800 text-[11px]">
-                <span className="w-1.5 h-1.5 rounded-none bg-emerald-400 animate-pulse flex-shrink-0" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
                 <span className="text-slate-300 truncate font-medium">{videoTitle}</span>
               </div>
             )}
@@ -1443,7 +1443,6 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         onClose={() => setShowPayerInfoModal(false)}
         title={lang === 'kh' ? 'ការណែនាំអំពីឈ្មោះម្ចាស់គណនីធនាគារ (Payer Name)' : 'Payer Name (Bank Account) Guide'}
         maxWidth="lg"
-        rounded="rounded-none"
       >
         <div className="space-y-4 text-white">
           {/* Section 1: What is Payer Name? */}
@@ -1512,7 +1511,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <button
               type="button"
               onClick={() => setShowPayerInfoModal(false)}
-              className="w-full py-2.5 sm:py-3 px-4 rounded-none bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm font-mono border border-slate-700 hover:border-slate-600 transition-all cursor-pointer active:scale-98 text-center"
+              className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm font-mono border border-slate-700 hover:border-slate-600 transition-all cursor-pointer active:scale-98 text-center"
             >
               {lang === 'kh' ? 'យល់ហើយ បន្តទៅមុខទៀត' : 'Got it, Continue'}
             </button>
@@ -1528,7 +1527,6 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
         onClose={() => setShowTermsModal(false)}
         title={lang === 'kh' ? 'លក្ខខណ្ឌនៃសេវាកម្ម (Terms of Service)' : 'Terms of Service'}
         maxWidth="lg"
-        rounded="rounded-none"
       >
         <div className="space-y-4 text-white">
           {/* Section 1: Voluntary Support */}
@@ -1584,7 +1582,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
             <button
               type="button"
               onClick={() => setShowTermsModal(false)}
-              className="w-full py-2.5 sm:py-3 px-4 rounded-none bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm font-mono border border-slate-700 hover:border-slate-600 transition-all cursor-pointer active:scale-98 text-center"
+              className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm font-mono border border-slate-700 hover:border-slate-600 transition-all cursor-pointer active:scale-98 text-center"
             >
               {lang === 'kh' ? 'យល់ព្រម និងបិទ (I Understand)' : 'I Understand'}
             </button>

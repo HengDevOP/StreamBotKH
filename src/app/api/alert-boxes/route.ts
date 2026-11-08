@@ -105,15 +105,6 @@ export async function POST(req: NextRequest) {
     const sanitizedName = String(name).trim().slice(0, 16);
     const resolvedMinAmount = Math.max(0.001, Number(minAmountCondition) > 0 ? Number(minAmountCondition) : 0.01);
 
-    const col = await getAlertBoxesCollection();
-    const existingCount = await col.countDocuments({ userId });
-    if (existingCount >= 20) {
-      return NextResponse.json(
-        { success: false, error: 'Maximum limit of 20 donation alert boxes reached.' },
-        { status: 400 }
-      );
-    }
-
     const cleanSampleUrl = (url?: string): string | undefined => {
       if (!url) return undefined;
       if (typeof url === 'string' && url.startsWith('data:audio')) {
@@ -138,7 +129,7 @@ export async function POST(req: NextRequest) {
     const sanitizedSampleUrl = cleanSampleUrl(clonedVoiceSampleUrl);
 
     const sanitizedConditions = Array.isArray(conditions) && conditions.length > 0
-      ? conditions.slice(0, 20).map((c: any, idx: number) => ({
+      ? conditions.map((c: any, idx: number) => ({
           id: String(c?.id || `cond_${Date.now()}_${idx}`),
           minAmountCondition: Math.max(0.001, Number(c?.minAmountCondition) > 0 ? Number(c.minAmountCondition) : 0.01),
           isEnabled: true,

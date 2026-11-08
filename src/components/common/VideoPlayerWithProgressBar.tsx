@@ -404,7 +404,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
             title={isPlaying ? 'Pause preview' : 'Play preview with sound'}
           >
             {!isPlaying && (
-              <div className="w-14 h-14 rounded-none bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center shadow-2xl backdrop-blur-sm transform hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center shadow-2xl backdrop-blur-sm transform hover:scale-110 transition-transform">
                 <Play size={24} className="fill-white ml-1" />
               </div>
             )}
@@ -422,7 +422,7 @@ export const VideoPlayerWithProgressBar: React.FC<VideoPlayerWithProgressBarProp
       >
         <div
           ref={barRef}
-          className="h-full rounded-none will-change-[width]"
+          className="h-full rounded-r-sm will-change-[width]"
           style={{
             width: '100%',
             backgroundColor: '#DC2626',

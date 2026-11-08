@@ -46,7 +46,6 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
   const [testingId, setTestingId] = useState<string | null>(null);
 
   // Create Donation Box Modal State
-  const MAX_ALERT_BOXES = 20;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newBoxName, setNewBoxName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
@@ -140,11 +139,6 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
 
   // Open Create New Box Pop-up Modal
   const handleCreateNewBox = () => {
-    if (alertBoxes.length >= MAX_ALERT_BOXES) {
-      setCreateError(`Maximum limit of ${MAX_ALERT_BOXES} donation alert boxes reached.`);
-      setIsCreateModalOpen(true);
-      return;
-    }
     setNewBoxName('');
     setCreateError(null);
     setIsCreateModalOpen(true);
@@ -173,11 +167,6 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     if (!trimmed) {
       setCreateError('Please enter a donation box name.');
       createInputRef.current?.focus();
-      return;
-    }
-
-    if (alertBoxes.length >= MAX_ALERT_BOXES) {
-      setCreateError(`Maximum limit of ${MAX_ALERT_BOXES} donation alert boxes reached.`);
       return;
     }
 
@@ -393,26 +382,13 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     <div className="space-y-6">
       {/* Create Action Header */}
       {!loading && alertBoxes.length > 0 && (
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
-            <span>Alert Boxes:</span>
-            <span
-              className={`px-2 py-0.5 rounded-md font-bold ${
-                alertBoxes.length >= MAX_ALERT_BOXES
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                  : 'bg-slate-900 text-cyan-400 border border-slate-800'
-              }`}
-            >
-              {alertBoxes.length} / {MAX_ALERT_BOXES}
-            </span>
-          </div>
+        <div className="flex items-center justify-end">
           <Button
             variant="primary"
             size="sm"
             onClick={handleCreateNewBox}
-            disabled={alertBoxes.length >= MAX_ALERT_BOXES}
             icon={<Plus size={14} />}
-            className="bg-cyan-400 text-slate-950 font-bold text-xs shadow-[0_0_15px_rgba(0,240,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-cyan-400 text-slate-950 font-bold text-xs shadow-[0_0_15px_rgba(0,240,255,0.3)]"
           >
             Create Standard Box
           </Button>
@@ -636,7 +612,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
                     Create Standard Box
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Enter any name for your donation alert box (up to 20 alert boxes allowed, up to 16 characters).
+                    Enter any name for your donation alert box (up to 16 characters).
                   </p>
                 </div>
               </div>

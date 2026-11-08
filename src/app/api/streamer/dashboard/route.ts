@@ -76,8 +76,25 @@ export async function GET(req: NextRequest) {
       .toArray();
 
     const now = Date.now();
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todayLocalStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+    const nowDate = new Date();
+    const todayStr = nowDate.toISOString().slice(0, 10);
+    const todayLocalStr = nowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+
+    // Yesterday
+    const yesterdayDate = new Date(now - 24 * 60 * 60 * 1000);
+    const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
+    const yesterdayLocalStr = yesterdayDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+
+    // This Week (Monday start)
+    const startOfWeek = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const dayOfWeek = (startOfWeek.getDay() + 6) % 7; // Monday = 0
+    startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfWeekTime = startOfWeek.getTime();
+
+    // This Month (1st of month)
+    const startOfMonth = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1, 0, 0, 0, 0);
+    const startOfMonthTime = startOfMonth.getTime();
 
     let totalUsd = 0;
     let totalUsdCount = 0;
@@ -97,13 +114,20 @@ export async function GET(req: NextRequest) {
     const ms3d = 3 * ms1d;
     const ms7d = 7 * ms1d;
     const ms30d = 30 * ms1d;
+    const ms90d = 90 * ms1d;
+    const ms180d = 180 * ms1d;
 
     const tf = {
       today: { usd: 0, khr: 0, count: 0 },
+      yesterday: { usd: 0, khr: 0, count: 0 },
       '1d': { usd: 0, khr: 0, count: 0 },
       '3d': { usd: 0, khr: 0, count: 0 },
+      this_week: { usd: 0, khr: 0, count: 0 },
       last_week: { usd: 0, khr: 0, count: 0 },
+      this_month: { usd: 0, khr: 0, count: 0 },
       last_month: { usd: 0, khr: 0, count: 0 },
+      '3_months': { usd: 0, khr: 0, count: 0 },
+      '6_months': { usd: 0, khr: 0, count: 0 },
       lifetime: { usd: 0, khr: 0, count: 0 }
     };
 
@@ -147,6 +171,24 @@ export async function GET(req: NextRequest) {
         if (isKhr) tf.today.khr += amt; else tf.today.usd += amt;
       }
 
+      // Yesterday
+      if (paidDateStr === yesterdayStr || paidLocalStr === yesterdayLocalStr) {
+        tf.yesterday.count++;
+        if (isKhr) tf.yesterday.khr += amt; else tf.yesterday.usd += amt;
+      }
+
+      // This Week
+      if (paidTime >= startOfWeekTime && paidTime <= now) {
+        tf.this_week.count++;
+        if (isKhr) tf.this_week.khr += amt; else tf.this_week.usd += amt;
+      }
+
+      // This Month
+      if (paidTime >= startOfMonthTime && paidTime <= now) {
+        tf.this_month.count++;
+        if (isKhr) tf.this_month.khr += amt; else tf.this_month.usd += amt;
+      }
+
       // Timeframe buckets
       const age = now - paidTime;
       if (age <= ms1d) {
@@ -164,6 +206,14 @@ export async function GET(req: NextRequest) {
       if (age <= ms30d) {
         tf.last_month.count++;
         if (isKhr) tf.last_month.khr += amt; else tf.last_month.usd += amt;
+      }
+      if (age <= ms90d) {
+        tf['3_months'].count++;
+        if (isKhr) tf['3_months'].khr += amt; else tf['3_months'].usd += amt;
+      }
+      if (age <= ms180d) {
+        tf['6_months'].count++;
+        if (isKhr) tf['6_months'].khr += amt; else tf['6_months'].usd += amt;
       }
 
       // Top donor
@@ -196,13 +246,20 @@ export async function GET(req: NextRequest) {
     };
 
     const lifetimeDays = Math.max(1, Math.ceil((now - oldestPaidTime) / ms1d));
+    const thisWeekDays = Math.max(1, dayOfWeek + 1);
+    const thisMonthDays = Math.max(1, nowDate.getDate());
 
     const timeframeAnalytics = {
       today: calcTf(tf.today, 1),
+      yesterday: calcTf(tf.yesterday, 1),
       '1d': calcTf(tf['1d'], 1),
       '3d': calcTf(tf['3d'], 3),
+      this_week: calcTf(tf.this_week, thisWeekDays),
       last_week: calcTf(tf.last_week, 7),
+      this_month: calcTf(tf.this_month, thisMonthDays),
       last_month: calcTf(tf.last_month, 30),
+      '3_months': calcTf(tf['3_months'], 90),
+      '6_months': calcTf(tf['6_months'], 180),
       lifetime: calcTf(tf.lifetime, lifetimeDays)
     };
 

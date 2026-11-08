@@ -12,28 +12,32 @@ interface StreamGoalOverlayProps {
 export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goalId }) => {
   const { socket, joinOverlayRoom } = useSocket();
 
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [hasGoal, setHasGoal] = useState<boolean>(false);
   const [title, setTitle] = useState('Livestream Donation Goal');
-  const [targetAmount, setTargetAmount] = useState(200.0);
-  const [currentAmount, setCurrentAmount] = useState(78.5);
+  const [targetAmount, setTargetAmount] = useState(100.0);
+  const [currentAmount, setCurrentAmount] = useState(0.0);
   const [accentColor, setAccentColor] = useState('#10B981');
   const [templateStyle, setTemplateStyle] = useState('cyber-neon');
   const [showBalance, setShowBalance] = useState(true);
   const [showBackground, setShowBackground] = useState(true);
   const [showAnimation, setShowAnimation] = useState(true);
   const [showGradientShader, setShowGradientShader] = useState(true);
+  const [goalWidth, setGoalWidth] = useState<number>(500);
   const [endDate, setEndDate] = useState<string | null>(null);
-  const [recentDonor, setRecentDonor] = useState<string | null>(null);
-  const [addedAmount, setAddedAmount] = useState<number | null>(null);
   const [isLocked, setIsLocked] = useState<boolean>(false);
 
-  // 1. Fetch initial goal data from API
+  // 1. Fetch initial goal data from API - await until verified backend response before rendering
   useEffect(() => {
+    let isMounted = true;
     const url = `/api/widgets/goals?token=${token || 'demo-token'}${goalId ? `&goalId=${goalId}` : ''}`;
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
+        if (!isMounted) return;
         if (data.isLocked || !data.success) {
           setIsLocked(true);
+          setIsLoading(false);
           return;
         }
         setIsLocked(false);
@@ -49,11 +53,26 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
             if (g.showBackground !== undefined) setShowBackground(g.showBackground);
             if (g.showAnimation !== undefined) setShowAnimation(g.showAnimation);
             if (g.showGradientShader !== undefined) setShowGradientShader(g.showGradientShader);
+            if (g.goalWidth !== undefined) setGoalWidth(Number(g.goalWidth));
+            else if (g.width !== undefined) setGoalWidth(Number(g.width));
             setEndDate(g.endDate || null);
+            setHasGoal(true);
+          } else {
+            setHasGoal(false);
           }
         }
+        setIsLoading(false);
       })
-      .catch((e) => console.error('[Goal Overlay] Error fetching goal:', e));
+      .catch((e) => {
+        console.error('[Goal Overlay] Error fetching goal:', e);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [token, goalId]);
 
   // 2. Join Socket.IO overlay room
@@ -71,6 +90,9 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
       if (!payload) return;
       if (goalId && payload.id && payload.id !== goalId) return;
 
+      setHasGoal(true);
+      setIsLoading(false);
+
       if (payload.title !== undefined) setTitle(payload.title);
       if (payload.targetAmount !== undefined) setTargetAmount(Number(payload.targetAmount));
       if (payload.currentAmount !== undefined) setCurrentAmount(Number(payload.currentAmount));
@@ -80,16 +102,9 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
       if (payload.showBackground !== undefined) setShowBackground(payload.showBackground);
       if (payload.showAnimation !== undefined) setShowAnimation(payload.showAnimation);
       if (payload.showGradientShader !== undefined) setShowGradientShader(payload.showGradientShader);
+      if (payload.goalWidth !== undefined) setGoalWidth(Number(payload.goalWidth));
+      else if (payload.width !== undefined) setGoalWidth(Number(payload.width));
       if (payload.endDate !== undefined) setEndDate(payload.endDate);
-
-      if (payload.donorName && payload.addedAmount) {
-        setRecentDonor(payload.donorName);
-        setAddedAmount(Number(payload.addedAmount));
-        setTimeout(() => {
-          setRecentDonor(null);
-          setAddedAmount(null);
-        }, 5000);
-      }
     };
 
     socket.on('goal:update', handleGoalUpdate);
@@ -99,7 +114,8 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
     };
   }, [socket, goalId]);
 
-  if (isLocked) {
+  // Stay transparent while awaiting backend response or if locked/no-goal, preventing flash of default template
+  if (isLoading || isLocked || !hasGoal) {
     return <div className="w-full h-full bg-transparent" />;
   }
 
@@ -116,8 +132,7 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
         showAnimation={showAnimation}
         showGradientShader={showGradientShader}
         endDate={endDate}
-        recentDonor={recentDonor}
-        addedAmount={addedAmount}
+        width={goalWidth}
       />
     </div>
   );

@@ -24,6 +24,7 @@ interface RecentDonationsTableProps {
   title?: string;
   subtitle?: string;
   timeframe?: TimeframeOption;
+  customRange?: { startDate: string; endDate: string };
   onReplayAlert?: (donation: DonationRecord) => void;
   onDeleteDonation?: (donationId: string) => void;
   deletingId?: string | null;
@@ -31,11 +32,17 @@ interface RecentDonationsTableProps {
 
 const TIMEFRAME_LABELS: Record<TimeframeOption, string> = {
   today: 'Today',
-  '1d': '24h',
+  yesterday: 'Yesterday',
+  '1d': 'Yesterday',
   '3d': '3d',
-  last_week: 'Week',
-  last_month: 'Month',
-  lifetime: 'Lifetime'
+  this_week: 'This Week',
+  last_week: 'This Week',
+  this_month: 'This Month',
+  last_month: 'This Month',
+  '3_months': '3 Months',
+  '6_months': '6 Months',
+  lifetime: 'Lifetime',
+  custom: 'Custom'
 };
 
 export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
@@ -44,16 +51,34 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
   title = 'Recent Donations',
   subtitle,
   timeframe,
+  customRange,
   onReplayAlert,
   onDeleteDonation,
   deletingId
 }) => {
   // Filter strictly for PAID status and active timeframe filter, sorted newest first, and sliced to `limit`
   const paidDonations = useMemo(() => {
-    const now = Date.now();
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todayLocalDate = new Date().toDateString();
+    const nowDate = new Date();
+    const now = nowDate.getTime();
+    const todayStr = nowDate.toISOString().slice(0, 10);
+    const todayLocalDate = nowDate.toDateString();
+
+    const yesterdayDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
+    const yesterdayLocalDate = yesterdayDate.toDateString();
+
+    const startOfWeek = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const dayOfWeek = (startOfWeek.getDay() + 6) % 7;
+    startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfWeekTime = startOfWeek.getTime();
+
+    const startOfMonth = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1, 0, 0, 0, 0);
+    const startOfMonthTime = startOfMonth.getTime();
+
     const ms1d = 24 * 60 * 60 * 1000;
+    const ms90d = 90 * ms1d;
+    const ms180d = 180 * ms1d;
 
     const paidOnly = (donations || []).filter((d) => {
       if ((d.status || '').toUpperCase() !== 'PAID') return false;
@@ -66,14 +91,27 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
       switch (timeframe) {
         case 'today':
           return dt.toISOString().slice(0, 10) === todayStr || dt.toDateString() === todayLocalDate;
+        case 'yesterday':
         case '1d':
-          return age <= ms1d;
+          return dt.toISOString().slice(0, 10) === yesterdayStr || dt.toDateString() === yesterdayLocalDate;
+        case 'this_week':
+        case 'last_week':
+          return t >= startOfWeekTime && t <= now;
+        case 'this_month':
+        case 'last_month':
+          return t >= startOfMonthTime && t <= now;
+        case '3_months':
+          return age <= ms90d;
+        case '6_months':
+          return age <= ms180d;
         case '3d':
           return age <= 3 * ms1d;
-        case 'last_week':
-          return age <= 7 * ms1d;
-        case 'last_month':
-          return age <= 30 * ms1d;
+        case 'custom': {
+          if (!customRange?.startDate || !customRange?.endDate) return true;
+          const startT = new Date(`${customRange.startDate}T00:00:00`).getTime();
+          const endT = new Date(`${customRange.endDate}T23:59:59.999`).getTime();
+          return t >= startT && t <= endT;
+        }
         default:
           return true;
       }
@@ -86,7 +124,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
     });
 
     return typeof limit === 'number' && limit > 0 ? sorted.slice(0, limit) : sorted;
-  }, [donations, limit, timeframe]);
+  }, [donations, limit, timeframe, customRange]);
 
   // Visual pulse / highlight for newly arrived realtime donation
   const [newlyArrivedId, setNewlyArrivedId] = useState<string | null>(null);

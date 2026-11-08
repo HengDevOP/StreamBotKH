@@ -4,11 +4,29 @@ import React, { useState, useMemo } from 'react';
 import {
   ChevronDown,
   TrendingUp,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Calendar
 } from 'lucide-react';
 import { TimeframeMetrics } from '../../types/streamer';
 
-export type TimeframeOption = 'today' | '1d' | '3d' | 'last_week' | 'last_month' | 'lifetime';
+export type TimeframeOption =
+  | 'today'
+  | 'yesterday'
+  | '1d'
+  | '3d'
+  | 'this_week'
+  | 'last_week'
+  | 'this_month'
+  | 'last_month'
+  | '3_months'
+  | '6_months'
+  | 'lifetime'
+  | 'custom';
+
+export interface CustomDateRange {
+  startDate: string;
+  endDate: string;
+}
 
 interface OverviewStatsProps {
   stats?: {
@@ -20,12 +38,18 @@ interface OverviewStatsProps {
     todayDonationsCount: number;
   };
   timeframeAnalytics?: {
-    today: TimeframeMetrics;
-    '1d': TimeframeMetrics;
-    '3d': TimeframeMetrics;
-    'last_week': TimeframeMetrics;
-    'last_month': TimeframeMetrics;
+    today?: TimeframeMetrics;
+    yesterday?: TimeframeMetrics;
+    '1d'?: TimeframeMetrics;
+    '3d'?: TimeframeMetrics;
+    this_week?: TimeframeMetrics;
+    last_week?: TimeframeMetrics;
+    this_month?: TimeframeMetrics;
+    last_month?: TimeframeMetrics;
+    '3_months'?: TimeframeMetrics;
+    '6_months'?: TimeframeMetrics;
     lifetime?: TimeframeMetrics;
+    [key: string]: TimeframeMetrics | undefined;
   };
   donations?: Array<{
     id: string;
@@ -45,6 +69,8 @@ interface OverviewStatsProps {
   }>;
   selectedTimeframe?: TimeframeOption;
   onTimeframeChange?: (timeframe: TimeframeOption) => void;
+  customDateRange?: CustomDateRange;
+  onCustomDateRangeChange?: (range: CustomDateRange) => void;
 }
 
 export const OverviewStats: React.FC<OverviewStatsProps> = ({
@@ -52,7 +78,9 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
   timeframeAnalytics,
   donations = [],
   selectedTimeframe: controlledTimeframe,
-  onTimeframeChange
+  onTimeframeChange,
+  customDateRange: controlledCustomRange,
+  onCustomDateRangeChange
 }) => {
   const [internalTimeframe, setInternalTimeframe] = useState<TimeframeOption>('today');
   const selectedTimeframe = controlledTimeframe ?? internalTimeframe;
@@ -61,6 +89,20 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
     onTimeframeChange?.(next);
   };
   const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const weekAgoIso = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+
+  const [internalCustomRange, setInternalCustomRange] = useState<CustomDateRange>({
+    startDate: weekAgoIso,
+    endDate: todayIso
+  });
+
+  const customRange = controlledCustomRange ?? internalCustomRange;
+  const setCustomRange = (next: CustomDateRange) => {
+    setInternalCustomRange(next);
+    onCustomDateRangeChange?.(next);
+  };
 
   // Number & currency locale formatters (e.g. 12,123.60, 4,000 ៛)
   const formatUSD = (val: number) =>
@@ -72,10 +114,27 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
 
   // Filter paid donations for the selected timeframe
   const filteredDonations = useMemo(() => {
-    const now = Date.now();
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todayLocalDate = new Date().toDateString();
+    const nowDate = new Date();
+    const now = nowDate.getTime();
+    const todayStr = nowDate.toISOString().slice(0, 10);
+    const todayLocalDate = nowDate.toDateString();
+
+    const yesterdayDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
+    const yesterdayLocalDate = yesterdayDate.toDateString();
+
+    const startOfWeek = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const dayOfWeek = (startOfWeek.getDay() + 6) % 7; // Monday = 0
+    startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfWeekTime = startOfWeek.getTime();
+
+    const startOfMonth = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1, 0, 0, 0, 0);
+    const startOfMonthTime = startOfMonth.getTime();
+
     const ms1d = 24 * 60 * 60 * 1000;
+    const ms90d = 90 * ms1d;
+    const ms180d = 180 * ms1d;
 
     return (donations || []).filter((d) => {
       if ((d.status || '').toUpperCase() !== 'PAID') return false;
@@ -86,20 +145,32 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
       switch (selectedTimeframe) {
         case 'today':
           return dt.toISOString().slice(0, 10) === todayStr || dt.toDateString() === todayLocalDate;
+        case 'yesterday':
         case '1d':
-          return age <= ms1d;
+          return dt.toISOString().slice(0, 10) === yesterdayStr || dt.toDateString() === yesterdayLocalDate;
+        case 'this_week':
+        case 'last_week':
+          return t >= startOfWeekTime && t <= now;
+        case 'this_month':
+        case 'last_month':
+          return t >= startOfMonthTime && t <= now;
+        case '3_months':
+          return age <= ms90d;
+        case '6_months':
+          return age <= ms180d;
+        case 'custom': {
+          const startT = new Date(`${customRange.startDate}T00:00:00`).getTime();
+          const endT = new Date(`${customRange.endDate}T23:59:59.999`).getTime();
+          return t >= startT && t <= endT;
+        }
         case '3d':
           return age <= 3 * ms1d;
-        case 'last_week':
-          return age <= 7 * ms1d;
-        case 'last_month':
-          return age <= 30 * ms1d;
         case 'lifetime':
         default:
           return true;
       }
     });
-  }, [donations, selectedTimeframe]);
+  }, [donations, selectedTimeframe, customRange]);
 
   // Active metrics based on selected timeframe (merging server timeframeAnalytics with filteredDonations)
   const activeMetrics: TimeframeMetrics = useMemo(() => {
@@ -111,16 +182,35 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
       else calcUsd += amt;
     }
     const calcCount = filteredDonations.length;
+
+    const nowDate = new Date();
+    const dayOfWeek = (nowDate.getDay() + 6) % 7;
+    const startT = new Date(`${customRange.startDate}T00:00:00`).getTime();
+    const endT = new Date(`${customRange.endDate}T23:59:59.999`).getTime();
+    const customDays = Math.max(1, Math.ceil((endT - startT) / (24 * 60 * 60 * 1000)));
+
     const daysFactor =
-      selectedTimeframe === 'today' || selectedTimeframe === '1d'
+      selectedTimeframe === 'today' || selectedTimeframe === 'yesterday' || selectedTimeframe === '1d'
         ? 1
         : selectedTimeframe === '3d'
         ? 3
-        : selectedTimeframe === 'last_week'
-        ? 7
+        : selectedTimeframe === 'this_week' || selectedTimeframe === 'last_week'
+        ? Math.max(1, dayOfWeek + 1)
+        : selectedTimeframe === 'this_month' || selectedTimeframe === 'last_month'
+        ? Math.max(1, nowDate.getDate())
+        : selectedTimeframe === '3_months'
+        ? 90
+        : selectedTimeframe === '6_months'
+        ? 180
+        : selectedTimeframe === 'custom'
+        ? customDays
         : 30;
 
-    const serverMetrics = timeframeAnalytics?.[selectedTimeframe];
+    const serverMetrics = timeframeAnalytics?.[selectedTimeframe] || (
+      selectedTimeframe === 'yesterday' ? timeframeAnalytics?.['1d'] :
+      selectedTimeframe === 'this_week' ? timeframeAnalytics?.last_week :
+      selectedTimeframe === 'this_month' ? timeframeAnalytics?.last_month : undefined
+    );
     const usd = Math.max(serverMetrics?.usd ?? 0, calcUsd);
     const khr = Math.max(serverMetrics?.khr ?? 0, calcKhr);
     const count = Math.max(serverMetrics?.count ?? 0, calcCount);
@@ -134,15 +224,17 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
       potentialMonthlyUsd: serverMetrics?.potentialMonthlyUsd ?? Number(((usd / daysFactor) * 30).toFixed(2)),
       potentialMonthlyKhr: serverMetrics?.potentialMonthlyKhr ?? Math.round((khr / daysFactor) * 30)
     };
-  }, [timeframeAnalytics, selectedTimeframe, filteredDonations]);
+  }, [timeframeAnalytics, selectedTimeframe, filteredDonations, customRange]);
 
   const timeframeTabs: Array<{ key: TimeframeOption; label: string; periodLabel: string }> = [
     { key: 'today', label: 'Today', periodLabel: "Today's stream" },
-    { key: '1d', label: '24h', periodLabel: 'Past 24 hours' },
-    { key: '3d', label: '3d', periodLabel: 'Past 3 days' },
-    { key: 'last_week', label: 'Week', periodLabel: 'Past 7 days' },
-    { key: 'last_month', label: 'Month', periodLabel: 'Past 30 days' },
-    { key: 'lifetime', label: 'Lifetime', periodLabel: 'All-time lifetime' }
+    { key: 'yesterday', label: 'Yesterday', periodLabel: "Yesterday's stream" },
+    { key: 'this_week', label: 'This Week', periodLabel: 'This week' },
+    { key: 'this_month', label: 'This Month', periodLabel: 'This month' },
+    { key: '3_months', label: '3 Months', periodLabel: 'Past 3 months' },
+    { key: '6_months', label: '6 Months', periodLabel: 'Past 6 months' },
+    { key: 'lifetime', label: 'Lifetime', periodLabel: 'All-time lifetime' },
+    { key: 'custom', label: 'Custom', periodLabel: `${customRange.startDate} to ${customRange.endDate}` }
   ];
 
   const currentTab = timeframeTabs.find((t) => t.key === selectedTimeframe) || timeframeTabs[0];
@@ -156,7 +248,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
     const now = new Date();
     const buckets: Array<{ label: string; usdEquiv: number; count: number }> = [];
 
-    if (selectedTimeframe === 'today' || selectedTimeframe === '1d') {
+    if (selectedTimeframe === 'today') {
       // 8 x 3-hour buckets over the last 24h
       for (let i = 7; i >= 0; i--) {
         const end = new Date(now.getTime() - i * 3 * 3600 * 1000);
@@ -167,6 +259,86 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
         for (const d of filteredDonations) {
           const t = new Date(d.paid_at || d.created_at).getTime();
           if (t > start.getTime() && t <= end.getTime()) {
+            const amt = Number(d.amount) || 0;
+            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+            count++;
+          }
+        }
+        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+      }
+    } else if (selectedTimeframe === 'yesterday' || selectedTimeframe === '1d') {
+      // 8 x 3-hour buckets across yesterday
+      const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+      for (let i = 0; i < 8; i++) {
+        const start = new Date(startOfYesterday.getTime() + i * 3 * 3600 * 1000);
+        const end = new Date(start.getTime() + 3 * 3600 * 1000);
+        const label = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        let usdEquiv = 0;
+        let count = 0;
+        for (const d of filteredDonations) {
+          const t = new Date(d.paid_at || d.created_at).getTime();
+          if (t >= start.getTime() && t < end.getTime()) {
+            const amt = Number(d.amount) || 0;
+            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+            count++;
+          }
+        }
+        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+      }
+    } else if (selectedTimeframe === 'this_week' || selectedTimeframe === 'last_week') {
+      // 7 daily buckets for the week (Mon to Sun)
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dayOfWeek = (startOfWeek.getDay() + 6) % 7; // Monday = 0
+      startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(startOfWeek.getTime() + i * 86400000);
+        const dateStr = day.toISOString().slice(0, 10);
+        const label = day.toLocaleDateString([], { weekday: 'short' });
+        let usdEquiv = 0;
+        let count = 0;
+        for (const d of filteredDonations) {
+          const dDate = new Date(d.paid_at || d.created_at);
+          const dStr = dDate.toISOString().slice(0, 10);
+          if (dStr === dateStr) {
+            const amt = Number(d.amount) || 0;
+            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+            count++;
+          }
+        }
+        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+      }
+    } else if (selectedTimeframe === '3_months') {
+      // 6 x 15-day buckets across past 90 days
+      for (let i = 5; i >= 0; i--) {
+        const end = new Date(now.getTime() - i * 15 * 86400000);
+        const start = new Date(end.getTime() - 15 * 86400000);
+        const label = end.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        let usdEquiv = 0;
+        let count = 0;
+        for (const d of filteredDonations) {
+          const t = new Date(d.paid_at || d.created_at).getTime();
+          if (t > start.getTime() && t <= end.getTime()) {
+            const amt = Number(d.amount) || 0;
+            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+            count++;
+          }
+        }
+        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+      }
+    } else if (selectedTimeframe === '6_months') {
+      // 6 monthly buckets (one per month)
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const start = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 0, 0, 0, 0);
+        const end = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999);
+        const label = monthDate.toLocaleDateString([], { month: 'short' });
+        let usdEquiv = 0;
+        let count = 0;
+        for (const d of filteredDonations) {
+          const t = new Date(d.paid_at || d.created_at).getTime();
+          if (t >= start.getTime() && t <= end.getTime()) {
             const amt = Number(d.amount) || 0;
             usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
             count++;
@@ -191,25 +363,74 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
         }
         buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
       }
-    } else if (selectedTimeframe === 'last_week') {
-      for (let i = 6; i >= 0; i--) {
-        const day = new Date(now.getTime() - i * 86400000);
-        const dateStr = day.toISOString().slice(0, 10);
-        const label = day.toLocaleDateString([], { weekday: 'short' });
-        let usdEquiv = 0;
-        let count = 0;
-        for (const d of filteredDonations) {
-          const dStr = new Date(d.paid_at || d.created_at).toISOString().slice(0, 10);
-          if (dStr === dateStr) {
-            const amt = Number(d.amount) || 0;
-            usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
-            count++;
+    } else if (selectedTimeframe === 'custom') {
+      const startT = new Date(`${customRange.startDate}T00:00:00`).getTime();
+      const endT = new Date(`${customRange.endDate}T23:59:59.999`).getTime();
+      const safeStart = Math.min(startT, endT);
+      const safeEnd = Math.max(startT, endT);
+      const diffMs = Math.max(86400000, safeEnd - safeStart);
+      const totalDays = Math.max(1, Math.round(diffMs / 86400000));
+
+      if (totalDays <= 1) {
+        // 8 x 3-hour buckets across the single custom day
+        for (let i = 0; i < 8; i++) {
+          const bStart = safeStart + i * (diffMs / 8);
+          const bEnd = safeStart + (i + 1) * (diffMs / 8);
+          const label = new Date(bEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+          let usdEquiv = 0;
+          let count = 0;
+          for (const d of filteredDonations) {
+            const t = new Date(d.paid_at || d.created_at).getTime();
+            if (t >= bStart && t <= bEnd) {
+              const amt = Number(d.amount) || 0;
+              usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+              count++;
+            }
           }
+          buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
         }
-        buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+      } else if (totalDays <= 8) {
+        // 1 bucket per day
+        for (let i = 0; i < totalDays; i++) {
+          const dTime = safeStart + i * 86400000;
+          const dayDate = new Date(dTime);
+          const dateStr = dayDate.toISOString().slice(0, 10);
+          const label = dayDate.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric' });
+          let usdEquiv = 0;
+          let count = 0;
+          for (const d of filteredDonations) {
+            const dStr = new Date(d.paid_at || d.created_at).toISOString().slice(0, 10);
+            if (dStr === dateStr) {
+              const amt = Number(d.amount) || 0;
+              usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+              count++;
+            }
+          }
+          buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+        }
+      } else {
+        // 6 evenly distributed intervals
+        const numBuckets = 6;
+        const bucketDuration = diffMs / numBuckets;
+        for (let i = 0; i < numBuckets; i++) {
+          const bStart = safeStart + i * bucketDuration;
+          const bEnd = safeStart + (i + 1) * bucketDuration;
+          const label = new Date(bEnd).toLocaleDateString([], { month: 'short', day: 'numeric' });
+          let usdEquiv = 0;
+          let count = 0;
+          for (const d of filteredDonations) {
+            const t = new Date(d.paid_at || d.created_at).getTime();
+            if (t >= bStart && t <= bEnd) {
+              const amt = Number(d.amount) || 0;
+              usdEquiv += d.currency === 'KHR' ? amt / 4000 : amt;
+              count++;
+            }
+          }
+          buckets.push({ label, usdEquiv: Number(usdEquiv.toFixed(2)), count });
+        }
       }
     } else {
-      // Month / Lifetime: 6 x 5-day buckets (last 30 days)
+      // this_month / last_month / lifetime: 6 buckets
       for (let i = 5; i >= 0; i--) {
         const end = new Date(now.getTime() - i * 5 * 86400000);
         const start = new Date(end.getTime() - 5 * 86400000);
@@ -229,7 +450,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
     }
 
     return buckets;
-  }, [filteredDonations, selectedTimeframe]);
+  }, [filteredDonations, selectedTimeframe, customRange]);
 
   // Build Pie / Donut Chart slices
   const pieSlices = useMemo(() => {
@@ -268,26 +489,51 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Header Bar & Timeframe Filter */}
-      <div className="flex items-center justify-between gap-3 pb-0.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-0.5">
         <h2 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] tracking-wide truncate">
           Performance &amp; Earning Revenue
         </h2>
 
-        {/* Timeframe Filter Dropdown */}
-        <div className="relative self-end sm:self-auto ml-auto shrink-0">
-          <select
-            value={selectedTimeframe}
-            onChange={(e) => setSelectedTimeframe(e.target.value as TimeframeOption)}
-            aria-label="Filter timeframe"
-            className="appearance-none pl-3.5 pr-9 py-2 rounded-xl bg-[#090D18] border border-slate-800 text-xs font-mono font-bold text-white hover:border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer shadow-sm"
-          >
-            {timeframeTabs.map((tab) => (
-              <option key={tab.key} value={tab.key} className="bg-slate-950 text-white py-1">
-                {tab.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        {/* Timeframe Filter Dropdown & Custom Range Picker */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto sm:ml-auto">
+          {selectedTimeframe === 'custom' && (
+            <div className="flex items-center gap-1.5 bg-[#090D18] border border-slate-800 rounded-xl px-2.5 py-1.5 shadow-sm text-xs font-mono">
+              <Calendar size={13} className="text-cyan-400 shrink-0" />
+              <input
+                type="date"
+                value={customRange.startDate}
+                onChange={(e) => setCustomRange({ ...customRange, startDate: e.target.value })}
+                className="bg-transparent text-white border-0 p-0 text-[11px] sm:text-xs font-mono focus:outline-none [color-scheme:dark] cursor-pointer"
+                title="Start Date"
+                aria-label="Start Date"
+              />
+              <span className="text-slate-500 text-xs font-mono">→</span>
+              <input
+                type="date"
+                value={customRange.endDate}
+                onChange={(e) => setCustomRange({ ...customRange, endDate: e.target.value })}
+                className="bg-transparent text-white border-0 p-0 text-[11px] sm:text-xs font-mono focus:outline-none [color-scheme:dark] cursor-pointer"
+                title="End Date"
+                aria-label="End Date"
+              />
+            </div>
+          )}
+
+          <div className="relative shrink-0">
+            <select
+              value={selectedTimeframe}
+              onChange={(e) => setSelectedTimeframe(e.target.value as TimeframeOption)}
+              aria-label="Filter timeframe"
+              className="appearance-none pl-3.5 pr-9 py-2 rounded-xl bg-[#090D18] border border-slate-800 text-xs font-mono font-bold text-white hover:border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer shadow-sm"
+            >
+              {timeframeTabs.map((tab) => (
+                <option key={tab.key} value={tab.key} className="bg-slate-950 text-white py-1">
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
         </div>
       </div>
 
@@ -541,9 +787,9 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
             </div>
           </div>
 
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4 flex-1">
+          <div className="pt-4 flex flex-col sm:flex-row lg:flex-col 2xl:flex-row items-center justify-center sm:justify-between lg:justify-center 2xl:justify-between gap-4 flex-1 min-w-0">
             {/* SVG Donut Pie Chart */}
-            <div className="relative w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center shrink-0">
+            <div className="relative w-28 h-28 xs:w-32 xs:h-32 sm:w-36 sm:h-36 lg:w-32 lg:h-32 xl:w-36 xl:h-36 flex items-center justify-center shrink-0">
               {(() => {
                 const size = 136;
                 const strokeWidth = 18;
@@ -555,7 +801,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
 
                 return (
                   <>
-                    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+                    <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
                       <circle
                         cx={size / 2}
                         cy={size / 2}
@@ -586,9 +832,9 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
                           );
                         })}
                     </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-2">
                       <span className="text-[10px] font-mono text-slate-400 uppercase">Total</span>
-                      <span className="text-xs sm:text-sm font-black font-mono text-white">
+                      <span className="text-xs sm:text-sm font-black font-mono text-white truncate max-w-[85px] sm:max-w-[100px]">
                         ${formatUSD(activeMetrics.usd + (activeMetrics.khr || 0) / 4000)}
                       </span>
                     </div>
@@ -598,22 +844,27 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
             </div>
 
             {/* Pie Legend List */}
-            <div className="flex-1 w-full space-y-2">
+            <div className="w-full flex-1 space-y-2.5 min-w-0">
               {pieSlices.map((slice, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono"
+                  className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono min-w-0 shadow-sm"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 shrink">
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: slice.color }}
+                      style={{ backgroundColor: slice.color, boxShadow: `0 0 8px ${slice.color}66` }}
                     />
-                    <span className="text-slate-200 font-bold truncate">{slice.label}</span>
+                    <span className="text-slate-200 font-bold text-xs truncate">{slice.label}</span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-slate-400 text-[11px]">{slice.displayAmount}</span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-bold text-white">
+                  <div className="flex items-center gap-2 shrink-0 ml-auto">
+                    <span className="text-slate-300 font-mono font-medium text-xs whitespace-nowrap">
+                      {slice.displayAmount}
+                    </span>
+                    <span
+                      className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[11px] font-bold text-white min-w-[38px] text-center shrink-0"
+                      style={{ borderColor: `${slice.color}40` }}
+                    >
                       {slice.percent}%
                     </span>
                   </div>

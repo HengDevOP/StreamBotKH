@@ -195,6 +195,7 @@ export interface StreamGoalDoc {
   showAnimation?: boolean;
   showGradientShader?: boolean;
   endDate?: string | null;
+  goalWidth?: number;
   currency?: string;
   theme?: string;
   fontFamily?: string;

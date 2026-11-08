@@ -1,26 +1,7 @@
 'use client';
 
 import React from 'react';
-import {
-  Target,
-  Sparkles,
-  Trophy,
-  Flame,
-  Crown,
-  Zap,
-  Terminal,
-  Moon,
-  Compass,
-  Gamepad2,
-  Heart,
-  Palette,
-  Shield,
-  Star,
-  Cpu,
-  Sun,
-  Coins,
-  Crosshair
-} from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 export interface GoalTemplateMeta {
   id: string;
@@ -193,6 +174,9 @@ export interface GoalRenderProps {
   endDate?: string | null;
   recentDonor?: string | null;
   addedAmount?: number | null;
+  width?: number | string;
+  goalWidth?: number | string;
+  isAnimating?: boolean;
 }
 
 export const ProgressBarGradientShader: React.FC<{
@@ -266,9 +250,16 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   showGradientShader = true,
   endDate,
   recentDonor,
-  addedAmount
+  addedAmount,
+  width,
+  goalWidth,
+  isAnimating = false
 }) => {
-  const percent = Math.min(100, Math.round((currentAmount / (targetAmount || 1)) * 100));
+  const exactPercent = Math.min(100, Math.max(0, (currentAmount / (targetAmount || 1)) * 100));
+  const percent = Math.round(exactPercent);
+  // At 0%, use only 1 bit (1%) of progress bar; at 100%, exactly 100% width and balance
+  const barWidthPercent = exactPercent <= 0 ? 1 : Math.max(1, exactPercent);
+  const fillTransition = isAnimating ? 'none' : 'width 400ms cubic-bezier(0.16, 1, 0.3, 1)';
 
   // Shared CSS keyframes for unique progress bar animations
   const animationStyles = (
@@ -386,22 +377,12 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
     `}</style>
   );
 
-  // Floating bonus tip popup
-  const bonusPopup = recentDonor && addedAmount && (
-    <div
-      className="absolute -top-12 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-slate-900 border text-xs font-mono font-bold flex items-center gap-1.5 shadow-2xl animate-bounce z-30"
-      style={{ borderColor: accentColor, color: accentColor }}
-    >
-      <Sparkles size={13} />
-      <span>+{recentDonor} contributed ${addedAmount.toFixed(2)}!</span>
-    </div>
-  );
-
   // 0. LIQUID GRADIENT SHADER (Special Dedicated Shader Template)
-  if (templateStyle === 'liquid-gradient-shader') {
+  const renderTemplate = () => {
+    if (templateStyle === 'liquid-gradient-shader') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl p-5 sm:p-6 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-2xl p-5 sm:p-6 relative transition-all duration-300 ${
           showBackground
             ? 'bg-slate-950/90 backdrop-blur-2xl border border-white/20 shadow-[0_0_40px_rgba(236,72,153,0.3)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -409,32 +390,28 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor={accentColor} borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3 relative z-10">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles size={16} className="text-pink-400 animate-pulse flex-shrink-0" />
-            <h3 className="text-base font-extrabold font-['Chakra_Petch'] truncate bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
-              {title}
-            </h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-extrabold font-mono text-cyan-300 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-xl bg-slate-950 border border-white/20 p-0.5 overflow-hidden relative shadow-inner">
+        <div className="w-full h-8 sm:h-9 rounded-xl bg-slate-950 border border-white/20 p-0.5 overflow-hidden relative shadow-inner">
           <div
-            className="h-full rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 transition-all duration-700 ease-out relative flex items-center justify-end pr-2 overflow-hidden shadow-[0_0_20px_rgba(236,72,153,0.6)]"
-            style={{ width: `${Math.max(5, percent)}%` }}
+            className="h-full rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 relative flex items-center justify-end pr-2 overflow-hidden shadow-[0_0_20px_rgba(236,72,153,0.6)]"
+            style={{ width: `${barWidthPercent}%`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor={accentColor} roundedClass="rounded-lg" />
-            {percent >= 12 && (
-              <span className="relative z-10 text-[10px] font-mono font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                {percent}%
-              </span>
-            )}
+          </div>
+          <div className="absolute inset-0 px-3 sm:px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-extrabold font-['Chakra_Petch'] truncate bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-extrabold font-mono text-cyan-300 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="text-white font-black">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -445,7 +422,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'cyber-neon') {
     return (
       <div
-        className={`w-full max-w-lg p-5 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full p-5 relative transition-all duration-300 ${
           showBackground ? 'bg-[#070B14]/95 border-2 shadow-2xl' : 'bg-transparent border-transparent shadow-none'
         }`}
         style={{
@@ -456,23 +433,10 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor={accentColor} borderRadius="0.5rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Crosshair size={16} style={{ color: accentColor }} className="flex-shrink-0" />
-            <h3 className="text-base font-bold text-white font-['Chakra_Petch'] truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-extrabold font-mono text-white text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-slate-500 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded bg-slate-900/90 border border-slate-800 p-0.5 relative overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded bg-slate-900/90 border border-slate-800 p-0.5 relative overflow-hidden">
           <div
-            className="h-full rounded-sm transition-all duration-700 ease-out relative flex items-center justify-end pr-2 overflow-hidden"
-            style={{ width: `${Math.max(4, percent)}%`, backgroundColor: accentColor, boxShadow: `0 0 15px ${accentColor}80` }}
+            className="h-full rounded-sm relative flex items-center justify-end pr-2 overflow-hidden"
+            style={{ width: `${barWidthPercent}%`, backgroundColor: accentColor, boxShadow: `0 0 15px ${accentColor}80`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor={accentColor} roundedClass="rounded-sm" />
             <div
@@ -483,7 +447,22 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
                 animation: showAnimation ? 'cyberStripesMove 1.5s linear infinite' : 'none'
               }}
             />
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 sm:px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-extrabold font-mono text-white flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="text-cyan-300 font-black">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -494,7 +473,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'golden-luxury') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl p-5 sm:p-6 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-2xl p-5 sm:p-6 relative transition-all duration-300 ${
           showBackground
             ? 'bg-gradient-to-br from-amber-950/70 via-slate-950/95 to-slate-950 border-2 border-amber-400/80 shadow-[0_0_40px_rgba(245,158,11,0.25)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -502,23 +481,10 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#F59E0B" borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Crown size={16} className="text-amber-400 flex-shrink-0" />
-            <h3 className="text-base font-bold text-amber-100 font-serif tracking-wide truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-extrabold font-mono text-amber-300 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-amber-600 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-xl bg-amber-950/40 border border-amber-500/30 p-1 relative overflow-hidden shadow-inner">
+        <div className="w-full h-8 sm:h-9 rounded-xl bg-amber-950/40 border border-amber-500/30 p-1 relative overflow-hidden shadow-inner">
           <div
-            className="h-full rounded-lg bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 transition-all duration-700 ease-out relative flex items-center justify-end pr-2 overflow-hidden shadow-[0_0_15px_rgba(251,191,36,0.6)]"
-            style={{ width: `${Math.max(5, percent)}%` }}
+            className="h-full rounded-lg bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 relative flex items-center justify-end pr-2 overflow-hidden shadow-[0_0_15px_rgba(251,191,36,0.6)]"
+            style={{ width: `${barWidthPercent}%`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#F59E0B" roundedClass="rounded-lg" />
             {showAnimation && (
@@ -527,7 +493,22 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
                 style={{ animation: 'goldSweepLight 2.2s ease-in-out infinite' }}
               />
             )}
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 sm:px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-amber-100 font-serif tracking-wide truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-extrabold font-mono text-amber-300 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-amber-500/80 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="text-amber-100 font-black">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -538,7 +519,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'retro-arcade') {
     return (
       <div
-        className={`w-full max-w-lg p-5 space-y-3 relative font-mono transition-all duration-300 ${
+        className={`w-full p-5 relative font-mono transition-all duration-300 ${
           showBackground
             ? 'bg-[#0F172A] border-4 border-black shadow-[6px_6px_0px_#000000]'
             : 'bg-transparent border-transparent shadow-none'
@@ -546,28 +527,17 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#10B981" borderRadius="0" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Gamepad2 size={16} className="text-yellow-400 flex-shrink-0" />
-            <h3 className="text-sm font-black text-yellow-300 uppercase tracking-wider truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm font-black text-white text-right flex-shrink-0">
-              ${currentAmount.toFixed(0)} <span className="text-slate-500 font-normal">/ ${targetAmount.toFixed(0)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-7 bg-black border-2 border-slate-700 p-1 flex gap-1">
+        <div className="w-full h-8 sm:h-9 bg-black border-2 border-slate-700 p-1 flex gap-1 relative overflow-hidden">
           {Array.from({ length: 10 }).map((_, idx) => {
-            const filled = (idx + 1) * 10 <= percent;
+            const filled = exactPercent <= 0 ? idx === 0 : (idx + 1) * 10 <= exactPercent;
             return (
               <div
                 key={idx}
-                className={`flex-1 h-full transition-all duration-300 relative overflow-hidden ${
+                className={`flex-1 h-full relative overflow-hidden ${
                   filled ? 'bg-emerald-400 shadow-[0_0_6px_#10B981]' : 'bg-slate-900 border border-slate-800'
                 }`}
                 style={{
+                  transition: fillTransition,
                   animation: showAnimation && filled ? 'arcadeStrobeFlash 1.2s steps(2, start) infinite' : 'none'
                 }}
               >
@@ -575,6 +545,21 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
               </div>
             );
           })}
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-black text-yellow-300 uppercase tracking-wider truncate drop-shadow-[0_1px_3px_#000000]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-black text-white flex-shrink-0 drop-shadow-[0_1px_3px_#000000]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(0)} <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(0)}</span>{' '}
+                  <span className="text-yellow-400">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -584,7 +569,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'glass-frost') {
     return (
       <div
-        className={`w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-3xl p-5 sm:p-6 relative transition-all duration-300 ${
           showBackground
             ? 'bg-white/[0.08] backdrop-blur-2xl border border-white/25 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -592,30 +577,34 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#A855F7" borderRadius="1.5rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles size={16} className="text-purple-300 flex-shrink-0" />
-            <h3 className="text-base font-semibold text-white truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-white text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-white/40 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-5 rounded-full bg-black/30 border border-white/10 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded-full bg-black/30 border border-white/10 p-0.5 overflow-hidden relative">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-300 transition-all duration-700 ease-out shadow-[0_0_15px_rgba(216,180,254,0.5)] flex items-center justify-end pr-2 overflow-hidden relative"
+            className="h-full rounded-full bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-300 shadow-[0_0_15px_rgba(216,180,254,0.5)] overflow-hidden relative"
             style={{
-              width: `${Math.max(4, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               backgroundSize: '200% 200%',
               animation: showAnimation ? 'frostAuroraFlow 3.5s ease infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#A855F7" roundedClass="rounded-full" />
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-bold text-slate-950">{percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-semibold text-white truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-white flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-white/60 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-extrabold text-pink-200">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -626,7 +615,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'mecha-hud') {
     return (
       <div
-        className={`w-full max-w-lg p-5 space-y-3 relative transition-all duration-300 ${
+        className={`w-full p-5 relative transition-all duration-300 ${
           showBackground
             ? 'bg-[#0B0F19] border-2 border-orange-500/80 shadow-[0_0_25px_rgba(249,115,22,0.2)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -634,23 +623,10 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#F97316" borderRadius="0" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Cpu size={16} className="text-orange-400 flex-shrink-0" />
-            <h3 className="text-base font-black text-white font-['Chakra_Petch'] uppercase truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-orange-400 text-right flex-shrink-0">
-              ${currentAmount.toFixed(1)}{' '}
-              <span className="text-slate-500 font-normal">/ ${targetAmount.toFixed(1)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 bg-slate-950 border border-orange-500/40 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 bg-slate-950 border border-orange-500/40 p-0.5 overflow-hidden relative">
           <div
-            className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500 flex items-center justify-end pr-1.5 shadow-[0_0_12px_rgba(249,115,22,0.7)] relative overflow-hidden"
-            style={{ width: `${Math.max(4, percent)}%` }}
+            className="h-full bg-gradient-to-r from-amber-500 to-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.7)] relative overflow-hidden"
+            style={{ width: `${barWidthPercent}%`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#F97316" roundedClass="rounded-none" />
             {showAnimation && (
@@ -659,7 +635,22 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
                 style={{ animation: 'mechaRadarBeam 1.8s ease-in-out infinite' }}
               />
             )}
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-black text-white font-['Chakra_Petch'] uppercase truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-orange-400 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(1)}{' '}
+                  <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(1)}</span>{' '}
+                  <span className="font-black text-white">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -670,7 +661,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'kawaii-pastel') {
     return (
       <div
-        className={`w-full max-w-lg rounded-3xl p-5 sm:p-6 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-3xl p-5 sm:p-6 relative transition-all duration-300 ${
           showBackground
             ? 'bg-pink-950/30 backdrop-blur-xl border-2 border-pink-300/40 shadow-[0_0_30px_rgba(244,114,182,0.25)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -678,29 +669,33 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#EC4899" borderRadius="1.5rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Heart size={16} className="text-pink-400 fill-pink-400 flex-shrink-0 animate-pulse" />
-            <h3 className="text-base font-extrabold text-white truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-pink-300 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-pink-500/60 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-full bg-pink-950/60 border border-pink-300/30 p-1 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded-full bg-pink-950/60 border border-pink-300/30 p-1 overflow-hidden relative">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-pink-400 via-rose-300 to-purple-400 transition-all duration-700 flex items-center justify-end pr-2 relative overflow-hidden"
+            className="h-full rounded-full bg-gradient-to-r from-pink-400 via-rose-300 to-purple-400 relative overflow-hidden"
             style={{
-              width: `${Math.max(6, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               animation: showAnimation ? 'kawaiiGlowOscillate 2s ease-in-out infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#EC4899" roundedClass="rounded-full" />
-            {percent >= 15 && <span className="text-[10px] font-bold text-pink-950">💖 {percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-extrabold text-white truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-pink-300 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-pink-400/70 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-extrabold text-white">💖 {percent}%</span>
+                </>
+              ) : (
+                `💖 ${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -711,7 +706,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'synthwave-midnight') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl p-5 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-2xl p-5 relative transition-all duration-300 ${
           showBackground
             ? 'bg-gradient-to-b from-[#1E0B36] via-[#120422] to-[#090212] border-2 border-fuchsia-500/70 shadow-[0_0_35px_rgba(217,70,239,0.3)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -719,30 +714,34 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#D946EF" borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sun size={16} className="text-amber-400 flex-shrink-0" />
-            <h3 className="text-base font-extrabold text-white font-['Chakra_Petch'] truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-extrabold font-mono text-cyan-300 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-fuchsia-500/70 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-lg bg-slate-950 border border-fuchsia-500/40 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded-lg bg-slate-950 border border-fuchsia-500/40 p-0.5 overflow-hidden relative">
           <div
-            className="h-full rounded-md bg-gradient-to-r from-fuchsia-500 via-pink-500 to-amber-400 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#D946EF] relative overflow-hidden"
+            className="h-full rounded-md bg-gradient-to-r from-fuchsia-500 via-pink-500 to-amber-400 shadow-[0_0_15px_#D946EF] relative overflow-hidden"
             style={{
-              width: `${Math.max(5, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               backgroundSize: '200% 200%',
               animation: showAnimation ? 'synthwaveGradientFlow 3s ease infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#D946EF" roundedClass="rounded-md" />
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-extrabold text-white font-['Chakra_Petch'] truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-extrabold font-mono text-cyan-300 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-fuchsia-400/70 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-black text-amber-300">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -753,34 +752,40 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'minimal-studio') {
     return (
       <div
-        className={`w-full max-w-lg rounded-xl p-5 space-y-3.5 relative font-sans transition-all duration-300 ${
+        className={`w-full rounded-xl p-5 relative font-sans transition-all duration-300 ${
           showBackground ? 'bg-black/95 border border-slate-800 shadow-xl' : 'bg-transparent border-transparent shadow-none'
         }`}
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor={accentColor} borderRadius="0.75rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">{title}</h3>
-          {showBalance && (
-            <div className="text-xs sm:text-sm font-mono text-slate-400 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-slate-600 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-2.5 rounded-full bg-slate-900 overflow-hidden relative">
+        <div className="w-full h-8 sm:h-9 rounded-lg bg-slate-900 border border-slate-800 p-0.5 overflow-hidden relative">
           <div
-            className="h-full rounded-full bg-white transition-all duration-500 relative overflow-hidden"
-            style={{ width: `${percent}%` }}
+            className="h-full rounded-md bg-white relative overflow-hidden"
+            style={{ width: `${barWidthPercent}%`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
           >
-            <ProgressBarGradientShader show={showGradientShader} accentColor={accentColor} roundedClass="rounded-full" />
+            <ProgressBarGradientShader show={showGradientShader} accentColor={accentColor} roundedClass="rounded-md" />
             {showAnimation && (
               <div
                 className="absolute right-0 top-0 bottom-0 w-2 bg-cyan-300 rounded-full"
                 style={{ animation: 'minimalEdgeGlow 1.4s ease-in-out infinite' }}
               />
             )}
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-white tracking-tight truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono text-slate-300 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-slate-500 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-bold text-white">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -791,7 +796,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'chroma-rgb') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl relative transition-all duration-300 ${
+        className={`w-full rounded-2xl relative transition-all duration-300 ${
           showBackground
             ? 'p-[2px] bg-gradient-to-r from-red-500 via-yellow-400 via-green-400 via-cyan-400 via-blue-500 to-purple-500 shadow-[0_0_30px_rgba(16,185,129,0.3)]'
             : 'p-0 bg-transparent shadow-none'
@@ -799,30 +804,34 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#10B981" borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className={`w-full rounded-2xl p-5 space-y-3.5 ${showBackground ? 'bg-[#090D18]' : 'bg-transparent'}`}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <Zap size={16} className="text-emerald-400 flex-shrink-0" />
-              <h3 className="text-base font-bold text-white font-['Chakra_Petch'] truncate">{title}</h3>
-            </div>
-            {showBalance && (
-              <div className="text-sm sm:text-base font-mono font-bold text-white text-right flex-shrink-0">
-                ${currentAmount.toFixed(2)}{' '}
-                <span className="text-slate-500 font-normal">/ ${targetAmount.toFixed(2)}</span>
-              </div>
-            )}
-          </div>
-          <div className="w-full h-6 rounded-lg bg-slate-950 border border-slate-800 p-0.5 overflow-hidden">
+        <div className={`w-full rounded-2xl p-5 ${showBackground ? 'bg-[#090D18]' : 'bg-transparent'}`}>
+          <div className="w-full h-8 sm:h-9 rounded-lg bg-slate-950 border border-slate-800 p-0.5 overflow-hidden relative">
             <div
-              className="h-full rounded bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 transition-all duration-500 flex items-center justify-end pr-2 relative overflow-hidden"
+              className="h-full rounded bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 relative overflow-hidden"
               style={{
-                width: `${Math.max(5, percent)}%`,
+                width: `${barWidthPercent}%`,
+                transition: fillTransition,
+                willChange: isAnimating ? 'width' : 'auto',
                 animation: showAnimation ? 'chromaHueRotation 3s linear infinite' : 'none'
               }}
             >
               <ProgressBarGradientShader show={showGradientShader} accentColor="#10B981" roundedClass="rounded" />
-              {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+            </div>
+            <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+              <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+                {title}
+              </span>
+              <span className="text-xs sm:text-sm font-mono font-bold text-white flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+                {showBalance ? (
+                  <>
+                    ${currentAmount.toFixed(2)}{' '}
+                    <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                    <span className="font-black text-emerald-300">({percent}%)</span>
+                  </>
+                ) : (
+                  `${percent}%`
+                )}
+              </span>
             </div>
           </div>
         </div>
@@ -834,7 +843,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'matrix-terminal') {
     return (
       <div
-        className={`w-full max-w-lg p-5 space-y-3 relative font-mono text-emerald-400 transition-all duration-300 ${
+        className={`w-full p-5 relative font-mono text-emerald-400 transition-all duration-300 ${
           showBackground
             ? 'bg-black border-2 border-emerald-500/80 shadow-[0_0_30px_rgba(16,185,129,0.3)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -842,23 +851,10 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#10B981" borderRadius="0" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Terminal size={14} className="text-emerald-400 flex-shrink-0" />
-            <h3 className="text-sm sm:text-base font-bold text-emerald-300 truncate">&gt; {title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-xs sm:text-sm font-bold text-emerald-400 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-emerald-700 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 bg-slate-950 border border-emerald-500/40 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 bg-slate-950 border border-emerald-500/40 p-0.5 overflow-hidden relative">
           <div
-            className="h-full bg-emerald-500 transition-all duration-500 flex items-center justify-end pr-1 text-slate-950 font-black text-[10px] shadow-[0_0_10px_#10B981] relative overflow-hidden"
-            style={{ width: `${Math.max(5, percent)}%` }}
+            className="h-full bg-emerald-500 relative overflow-hidden"
+            style={{ width: `${barWidthPercent}%`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#10B981" roundedClass="rounded-none" />
             {showAnimation && (
@@ -867,7 +863,22 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
                 style={{ animation: 'matrixPhosphorSweep 1.6s linear infinite' }}
               />
             )}
-            <span className="relative z-10">{percent >= 12 && `${percent}%`}</span>
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-emerald-300 truncate drop-shadow-[0_1px_3px_#000000]">
+              &gt; {title}
+            </span>
+            <span className="text-xs sm:text-sm font-bold text-emerald-400 flex-shrink-0 drop-shadow-[0_1px_3px_#000000]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-emerald-700 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="text-white font-black">[{percent}%]</span>
+                </>
+              ) : (
+                `[${percent}%]`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -878,7 +889,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'lava-core') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl p-5 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-2xl p-5 relative transition-all duration-300 ${
           showBackground
             ? 'bg-gradient-to-br from-red-950/80 via-black to-slate-950 border-2 border-orange-500/70 shadow-[0_0_35px_rgba(234,88,12,0.3)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -886,30 +897,34 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#EA580C" borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Flame size={16} className="text-orange-500 animate-pulse flex-shrink-0" />
-            <h3 className="text-base font-extrabold text-white font-['Chakra_Petch'] truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-orange-300 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-orange-600 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-xl bg-black border border-orange-500/40 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded-xl bg-black border border-orange-500/40 p-0.5 overflow-hidden relative">
           <div
-            className="h-full rounded-lg bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 transition-all duration-500 flex items-center justify-end pr-2 shadow-[0_0_15px_#EA580C] relative overflow-hidden"
+            className="h-full rounded-lg bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 relative overflow-hidden"
             style={{
-              width: `${Math.max(5, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               backgroundSize: '200% 200%',
               animation: showAnimation ? 'lavaSurgeWave 2.5s ease-in-out infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#EA580C" roundedClass="rounded-lg" />
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">🔥 {percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-extrabold text-white font-['Chakra_Petch'] truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-orange-300 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-orange-500 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-black text-amber-200">🔥 {percent}%</span>
+                </>
+              ) : (
+                `🔥 ${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -920,7 +935,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'cosmic-galaxy') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl p-5 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-2xl p-5 relative transition-all duration-300 ${
           showBackground
             ? 'bg-gradient-to-br from-[#1E1138] via-[#0F0826] to-[#040112] border-2 border-purple-400/60 shadow-[0_0_35px_rgba(139,92,246,0.3)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -928,29 +943,33 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#8B5CF6" borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Star size={16} className="text-yellow-300 flex-shrink-0" />
-            <h3 className="text-base font-bold text-white font-['Chakra_Petch'] truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-purple-200 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-purple-500 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-full bg-slate-950 border border-purple-500/30 p-1 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded-full bg-slate-950 border border-purple-500/30 p-1 overflow-hidden relative">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-400 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#8B5CF6] relative overflow-hidden"
+            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-400 relative overflow-hidden"
             style={{
-              width: `${Math.max(6, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               animation: showAnimation ? 'cosmicStarTwinkle 2.5s ease-in-out infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#8B5CF6" roundedClass="rounded-full" />
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">✨ {percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-purple-200 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-purple-400 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-black text-pink-200">✨ {percent}%</span>
+                </>
+              ) : (
+                `✨ ${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -961,7 +980,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'vaporwave-90s') {
     return (
       <div
-        className={`w-full max-w-lg p-2 relative font-sans text-slate-950 transition-all duration-300 ${
+        className={`w-full p-2 relative font-sans text-slate-950 transition-all duration-300 ${
           showBackground
             ? 'bg-[#C0C0C0] border-4 border-t-white border-l-white border-r-gray-700 border-b-gray-700 shadow-2xl'
             : 'bg-transparent border-transparent shadow-none'
@@ -969,24 +988,20 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#06B6D4" borderRadius="0.25rem" />
         {animationStyles}
-        {bonusPopup}
         <div className="bg-gradient-to-r from-blue-900 to-teal-700 text-white px-2.5 py-1 flex items-center justify-between text-xs font-bold mb-2.5 select-none rounded-t-sm">
-          <span className="truncate">💾 {title}</span>
-          {showBalance && (
-            <span className="font-mono text-cyan-200 font-bold ml-2">
-              ${currentAmount.toFixed(2)} / ${targetAmount.toFixed(2)}
-            </span>
-          )}
+          <span className="truncate">Goal Tracker.exe</span>
+          <span className="font-mono text-cyan-200 font-bold ml-2">[{percent}%]</span>
         </div>
-        <div className="p-2.5 space-y-2 bg-gray-100 border-2 border-t-gray-700 border-l-gray-700 border-r-white border-b-white rounded-b-sm">
-          <div className="w-full h-6 bg-white border-2 border-t-gray-700 border-l-gray-700 border-r-white border-b-white p-0.5 flex gap-1">
+        <div className="p-2.5 bg-gray-100 border-2 border-t-gray-700 border-l-gray-700 border-r-white border-b-white rounded-b-sm">
+          <div className="w-full h-8 sm:h-9 bg-white border-2 border-t-gray-700 border-l-gray-700 border-r-white border-b-white p-0.5 flex gap-1 relative overflow-hidden">
             {Array.from({ length: 12 }).map((_, i) => {
-              const active = (i + 1) * 8.33 <= percent;
+              const active = exactPercent <= 0 ? i === 0 : (i + 1) * 8.33 <= exactPercent;
               return (
                 <div
                   key={i}
                   className={`flex-1 h-full relative overflow-hidden ${active ? 'bg-teal-600' : 'bg-transparent'}`}
                   style={{
+                    transition: fillTransition,
                     animation: showAnimation && active ? 'win95BlockPulse 1.2s ease-in-out infinite' : 'none'
                   }}
                 >
@@ -994,6 +1009,22 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
                 </div>
               );
             })}
+            <div className="absolute inset-0 px-2.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+              <span className="text-xs font-bold text-slate-900 truncate drop-shadow-[0_1px_1px_#ffffff]">
+                {title}
+              </span>
+              <span className="text-xs font-mono font-bold text-slate-900 flex-shrink-0 drop-shadow-[0_1px_1px_#ffffff]">
+                {showBalance ? (
+                  <>
+                    ${currentAmount.toFixed(2)}{' '}
+                    <span className="text-slate-600 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                    <span>({percent}%)</span>
+                  </>
+                ) : (
+                  `${percent}%`
+                )}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1004,7 +1035,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'glitch-anarchy') {
     return (
       <div
-        className={`w-full max-w-lg p-5 space-y-3 relative transition-all duration-300 ${
+        className={`w-full p-5 relative transition-all duration-300 ${
           showBackground
             ? 'bg-[#080808] border-2 border-lime-400 shadow-[5px_5px_0px_#EF4444]'
             : 'bg-transparent border-transparent shadow-none'
@@ -1012,26 +1043,33 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#84CC16" borderRadius="0" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-base font-black text-white uppercase tracking-wider truncate">{title}</h3>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-lime-400 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-red-400 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 bg-black border border-lime-400 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 bg-black border border-lime-400 p-0.5 overflow-hidden relative">
           <div
-            className="h-full bg-lime-400 transition-all duration-300 flex items-center justify-end pr-2 text-black font-mono font-black text-[10px] relative overflow-hidden"
+            className="h-full bg-lime-400 relative overflow-hidden"
             style={{
-              width: `${Math.max(5, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               animation: showAnimation ? 'glitchTwitchStatic 2.5s steps(1) infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#84CC16" roundedClass="rounded-sm" />
-            <span className="relative z-10">{percent >= 10 && `${percent}%`}</span>
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-black text-white uppercase tracking-wider truncate drop-shadow-[0_1px_3px_#000000]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-lime-400 flex-shrink-0 drop-shadow-[0_1px_3px_#000000]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-red-400 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="text-white font-black">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -1042,7 +1080,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'aqua-ocean') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl p-5 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-2xl p-5 relative transition-all duration-300 ${
           showBackground
             ? 'bg-gradient-to-br from-[#041F38] via-[#021324] to-[#010912] border-2 border-cyan-400/60 shadow-[0_0_35px_rgba(6,182,212,0.3)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -1050,30 +1088,34 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#0EA5E9" borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Compass size={16} className="text-cyan-400 flex-shrink-0" />
-            <h3 className="text-base font-bold text-white font-['Chakra_Petch'] truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-cyan-200 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-cyan-600 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-xl bg-slate-950 border border-cyan-500/40 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded-xl bg-slate-950 border border-cyan-500/40 p-0.5 overflow-hidden relative">
           <div
-            className="h-full rounded-lg bg-gradient-to-r from-teal-400 via-cyan-400 to-sky-300 transition-all duration-700 flex items-center justify-end pr-2 shadow-[0_0_15px_#06B6D4] relative overflow-hidden"
+            className="h-full rounded-lg bg-gradient-to-r from-teal-400 via-cyan-400 to-sky-300 relative overflow-hidden"
             style={{
-              width: `${Math.max(5, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               backgroundSize: '200% 200%',
               animation: showAnimation ? 'oceanSwellDrift 3.5s ease-in-out infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#0EA5E9" roundedClass="rounded-lg" />
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">🌊 {percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 sm:px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-cyan-200 flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-cyan-500 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="text-white font-black">🌊 {percent}%</span>
+                </>
+              ) : (
+                `🌊 ${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -1084,7 +1126,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'blood-moon') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl p-5 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-2xl p-5 relative transition-all duration-300 ${
           showBackground
             ? 'bg-gradient-to-br from-[#240306] via-[#120103] to-black border-2 border-red-600/70 shadow-[0_0_35px_rgba(220,38,38,0.35)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -1092,29 +1134,33 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#DC2626" borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Moon size={16} className="text-red-500 flex-shrink-0" />
-            <h3 className="text-base font-bold text-white font-serif tracking-wider uppercase truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-red-300 text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-red-600 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-5 rounded bg-black border border-red-800 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded bg-black border border-red-800 p-0.5 overflow-hidden relative">
           <div
-            className="h-full rounded-sm bg-gradient-to-r from-red-700 via-red-600 to-rose-500 transition-all duration-500 flex items-center justify-end pr-1 shadow-[0_0_12px_#DC2626] relative overflow-hidden"
+            className="h-full rounded-sm bg-gradient-to-r from-red-700 via-red-600 to-rose-500 relative overflow-hidden"
             style={{
-              width: `${Math.max(5, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               animation: showAnimation ? 'bloodMoonSurge 1.8s ease-in-out infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#DC2626" roundedClass="rounded-sm" />
-            {percent >= 12 && <span className="relative z-10 text-[9px] font-mono font-black text-white">{percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-white font-serif tracking-wider uppercase truncate drop-shadow-[0_1px_3px_#000000]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-red-300 flex-shrink-0 drop-shadow-[0_1px_3px_#000000]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-red-500 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="text-white font-black">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -1125,7 +1171,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'steampunk-brass') {
     return (
       <div
-        className={`w-full max-w-lg rounded-xl p-5 space-y-3.5 relative font-serif transition-all duration-300 ${
+        className={`w-full rounded-xl p-5 relative font-serif transition-all duration-300 ${
           showBackground
             ? 'bg-[#1C140C] border-4 border-[#B47B36] shadow-[0_0_25px_rgba(180,123,54,0.3)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -1133,23 +1179,10 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#D97706" borderRadius="0.75rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Coins size={16} className="text-[#E5B869] flex-shrink-0" />
-            <h3 className="text-base font-bold text-white tracking-wide truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-[#F3D79B] text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-[#8C5D23] font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-lg bg-black border-2 border-[#8C5D23] p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded-lg bg-black border-2 border-[#8C5D23] p-0.5 overflow-hidden relative">
           <div
-            className="h-full rounded bg-gradient-to-r from-[#8C5D23] via-[#B47B36] to-[#E5B869] transition-all duration-700 flex items-center justify-end pr-2 relative overflow-hidden"
-            style={{ width: `${Math.max(5, percent)}%` }}
+            className="h-full rounded bg-gradient-to-r from-[#8C5D23] via-[#B47B36] to-[#E5B869] relative overflow-hidden"
+            style={{ width: `${barWidthPercent}%`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#D97706" roundedClass="rounded" />
             {showAnimation && (
@@ -1158,7 +1191,22 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
                 style={{ animation: 'brassSweepTick 2.4s ease-in-out infinite' }}
               />
             )}
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-black">{percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-[#F3D79B] tracking-wide truncate drop-shadow-[0_1px_3px_#000000]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-[#F3D79B] flex-shrink-0 drop-shadow-[0_1px_3px_#000000]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-[#8C5D23] font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-bold text-white">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -1169,7 +1217,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'prismatic-holo') {
     return (
       <div
-        className={`w-full max-w-lg rounded-2xl p-5 sm:p-6 space-y-3.5 relative transition-all duration-300 ${
+        className={`w-full rounded-2xl p-5 sm:p-6 relative transition-all duration-300 ${
           showBackground
             ? 'bg-slate-900/80 backdrop-blur-xl border border-slate-400/50 shadow-[0_0_35px_rgba(255,255,255,0.2)]'
             : 'bg-transparent border-transparent shadow-none'
@@ -1177,29 +1225,33 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#E0E7FF" borderRadius="1rem" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Sparkles size={16} className="text-sky-300 flex-shrink-0" />
-            <h3 className="text-base font-bold text-white font-['Chakra_Petch'] truncate">{title}</h3>
-          </div>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-bold text-white text-right flex-shrink-0">
-              ${currentAmount.toFixed(2)}{' '}
-              <span className="text-slate-500 font-normal">/ ${targetAmount.toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-6 rounded-xl bg-slate-950 border border-white/20 p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 rounded-xl bg-slate-950 border border-white/20 p-0.5 overflow-hidden relative">
           <div
-            className="h-full rounded-lg bg-gradient-to-r from-sky-300 via-indigo-300 via-pink-300 to-yellow-200 transition-all duration-500 flex items-center justify-end pr-2 shadow-[0_0_15px_rgba(255,255,255,0.7)] relative overflow-hidden"
+            className="h-full rounded-lg bg-gradient-to-r from-sky-300 via-indigo-300 via-pink-300 to-yellow-200 relative overflow-hidden"
             style={{
-              width: `${Math.max(5, percent)}%`,
+              width: `${barWidthPercent}%`,
+              transition: fillTransition,
+              willChange: isAnimating ? 'width' : 'auto',
               animation: showAnimation ? 'holoDiffractionFlow 3s ease-in-out infinite' : 'none'
             }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#E0E7FF" roundedClass="rounded-lg" />
-            {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
+          </div>
+          <div className="absolute inset-0 px-3 sm:px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-white flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-bold text-yellow-200">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -1210,7 +1262,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
   if (templateStyle === 'comic-manga') {
     return (
       <div
-        className={`w-full max-w-lg p-5 space-y-3 relative text-black transition-all duration-300 ${
+        className={`w-full p-5 relative text-black transition-all duration-300 ${
           showBackground
             ? 'bg-[#FFFBEB] border-4 border-black shadow-[6px_6px_0px_#000000]'
             : 'bg-transparent border-transparent shadow-none'
@@ -1218,19 +1270,10 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
       >
         <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#FBBF24" borderRadius="0" />
         {animationStyles}
-        {bonusPopup}
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-base font-black uppercase tracking-tight truncate">{title}</h3>
-          {showBalance && (
-            <div className="text-sm sm:text-base font-mono font-black text-right flex-shrink-0">
-              ${currentAmount.toFixed(0)} <span className="text-slate-500 font-normal">/ ${targetAmount.toFixed(0)}</span>
-            </div>
-          )}
-        </div>
-        <div className="w-full h-7 bg-white border-4 border-black p-0.5 overflow-hidden">
+        <div className="w-full h-8 sm:h-9 bg-white border-4 border-black p-0.5 overflow-hidden relative">
           <div
-            className="h-full bg-yellow-400 border-r-2 border-black transition-all duration-500 flex items-center justify-end pr-1 text-black font-black text-xs relative overflow-hidden"
-            style={{ width: `${Math.max(5, percent)}%` }}
+            className="h-full bg-yellow-400 border-r-2 border-black relative overflow-hidden"
+            style={{ width: `${barWidthPercent}%`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
           >
             <ProgressBarGradientShader show={showGradientShader} accentColor="#FBBF24" roundedClass="rounded-none" />
             <div
@@ -1241,52 +1284,81 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
                 animation: showAnimation ? 'mangaSpeedlinePan 1.2s linear infinite' : 'none'
               }}
             />
-            <span className="relative z-10">{percent >= 12 && `${percent}%`}</span>
+          </div>
+          <div className="absolute inset-0 px-3 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-black uppercase tracking-tight truncate drop-shadow-[0_1px_2px_#ffffff]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-black flex-shrink-0 drop-shadow-[0_1px_2px_#ffffff]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(0)} <span className="text-slate-600 font-normal">/ ${targetAmount.toFixed(0)}</span>{' '}
+                  <span className="text-black font-black">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
           </div>
         </div>
       </div>
     );
   }
 
-  // 20. CARBON TACTICAL ESPORTS (DEFAULT / FALLBACK)
+    // 20. CARBON TACTICAL ESPORTS (DEFAULT / FALLBACK)
+    return (
+      <div
+        className={`w-full rounded-2xl p-5 relative transition-all duration-300 ${
+          showBackground
+            ? 'bg-[#090D18] border-2 border-slate-800 shadow-2xl'
+            : 'bg-transparent border-transparent shadow-none'
+        }`}
+      >
+        <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#84CC16" borderRadius="1rem" />
+        {animationStyles}
+        <div className="w-full h-8 sm:h-9 rounded-xl bg-slate-950 border border-slate-800 p-0.5 overflow-hidden relative">
+          <div
+            className="h-full rounded-lg bg-gradient-to-r from-lime-500 to-emerald-400 relative overflow-hidden"
+            style={{ width: `${barWidthPercent}%`, transition: fillTransition, willChange: isAnimating ? 'width' : 'auto' }}
+          >
+            <ProgressBarGradientShader show={showGradientShader} accentColor="#84CC16" roundedClass="rounded-lg" />
+            {showAnimation && (
+              <div
+                className="absolute inset-y-0 w-8 bg-gradient-to-r from-transparent via-lime-200/90 to-transparent pointer-events-none"
+                style={{ animation: 'tachometerTracerScan 1.6s ease-in-out infinite' }}
+              />
+            )}
+          </div>
+          <div className="absolute inset-0 px-3 sm:px-3.5 flex items-center justify-between z-10 pointer-events-none select-none gap-2">
+            <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {title}
+            </span>
+            <span className="text-xs sm:text-sm font-mono font-bold text-white flex-shrink-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+              {showBalance ? (
+                <>
+                  ${currentAmount.toFixed(2)}{' '}
+                  <span className="text-slate-400 font-normal">/ ${targetAmount.toFixed(2)}</span>{' '}
+                  <span className="font-black text-lime-300">({percent}%)</span>
+                </>
+              ) : (
+                `${percent}%`
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const resolvedWidth = width || goalWidth || 500;
+  const maxWidthValue = typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth;
+
   return (
     <div
-      className={`w-full max-w-lg rounded-2xl p-5 space-y-3.5 relative transition-all duration-300 ${
-        showBackground
-          ? 'bg-[#090D18] border-2 border-slate-800 shadow-2xl'
-          : 'bg-transparent border-transparent shadow-none'
-      }`}
+      className="w-full flex justify-center mx-auto transition-all duration-300"
+      style={{ maxWidth: maxWidthValue }}
     >
-      <ContainerGradientShaderAura show={showGradientShader} showBackground={showBackground} accentColor="#84CC16" borderRadius="1rem" />
-      {animationStyles}
-      {bonusPopup}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <Shield size={16} className="text-lime-400 flex-shrink-0" />
-          <h3 className="text-base font-bold text-white font-['Chakra_Petch'] truncate">{title}</h3>
-        </div>
-        {showBalance && (
-          <div className="text-sm sm:text-base font-mono font-bold text-white text-right flex-shrink-0">
-            ${currentAmount.toFixed(2)}{' '}
-            <span className="text-slate-500 font-normal">/ ${targetAmount.toFixed(2)}</span>
-          </div>
-        )}
-      </div>
-      <div className="w-full h-6 rounded-xl bg-slate-950 border border-slate-800 p-0.5 overflow-hidden">
-        <div
-          className="h-full rounded-lg bg-gradient-to-r from-lime-500 to-emerald-400 transition-all duration-500 flex items-center justify-end pr-2 shadow-[0_0_15px_#84CC16] relative overflow-hidden"
-          style={{ width: `${Math.max(5, percent)}%` }}
-        >
-          <ProgressBarGradientShader show={showGradientShader} accentColor="#84CC16" roundedClass="rounded-lg" />
-          {showAnimation && (
-            <div
-              className="absolute inset-y-0 w-8 bg-gradient-to-r from-transparent via-lime-200/90 to-transparent pointer-events-none"
-              style={{ animation: 'tachometerTracerScan 1.6s ease-in-out infinite' }}
-            />
-          )}
-          {percent >= 12 && <span className="relative z-10 text-[10px] font-mono font-black text-slate-950">{percent}%</span>}
-        </div>
-      </div>
+      {renderTemplate()}
     </div>
   );
 };
