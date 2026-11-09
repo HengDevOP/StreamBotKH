@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
     const rate = searchParams.get('rate') || undefined;
     const volume = searchParams.get('volume') || undefined;
 
+    const token = searchParams.get('token') || undefined;
+
     const result = await synthesizeTTSWithBuffer({
       text,
       type,
@@ -42,7 +44,8 @@ export async function GET(req: NextRequest) {
       clonedVoiceName,
       pitch,
       rate,
-      volume
+      volume,
+      token
     });
 
     // Stream raw audio/mpeg bytes directly from /api/tts in-memory (no files stored on disk)
@@ -94,6 +97,12 @@ export async function POST(req: NextRequest) {
     const rate = body.rate || undefined;
     const volume = body.volume || undefined;
 
+    const token =
+      body.token ||
+      body.overlayToken ||
+      new URL(req.url).searchParams.get('token') ||
+      undefined;
+
     const result = await synthesizeTTSWithBuffer({
       text,
       type,
@@ -101,7 +110,8 @@ export async function POST(req: NextRequest) {
       clonedVoiceName,
       pitch,
       rate,
-      volume
+      volume,
+      token
     });
 
     const safeSampleUrl =

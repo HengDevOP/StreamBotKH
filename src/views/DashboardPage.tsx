@@ -68,7 +68,9 @@ import {
   Crown,
   Gift,
   PartyPopper,
-  Pickaxe
+  Pickaxe,
+  Mic,
+  Upload
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -102,6 +104,7 @@ import { PokemonWidgetManager } from '../components/dashboard/PokemonWidgetManag
 import { LiveChatWidgetManager } from '../components/dashboard/LiveChatWidgetManager';
 import { BroadcastStreamManager } from '../components/dashboard/BroadcastStreamManager';
 import { SubscribersManager } from '../components/dashboard/SubscribersManager';
+import { CloneTtsManager } from '../components/dashboard/CloneTtsManager';
 import { ProUpgradeModal } from '../components/dashboard/ProUpgradeModal';
 import { TimerWidgetManager } from '../components/dashboard/TimerWidgetManager';
 import { SoundboardManager } from '../components/dashboard/SoundboardManager';
@@ -142,6 +145,7 @@ export type DashboardTab =
   | 'pokemon'
   | 'fireworks'
   | 'minecraft'
+  | 'clone-tts'
   | 'payments'
   | 'telegram'
   | 'account'
@@ -523,6 +527,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [profileBio, setProfileBio] = useState(user?.bio || '');
   const [profileThanksMessage, setProfileThanksMessage] = useState(user?.customThanksMessage || '');
   const [profileAvatar, setProfileAvatar] = useState(user?.avatarUrl || '');
+  const [profileBanner, setProfileBanner] = useState(user?.bannerUrl || '');
+  const [isBannerMediaPickerOpen, setIsBannerMediaPickerOpen] = useState(false);
   const [profileLiveStreamUrl, setProfileLiveStreamUrl] = useState(user?.liveStreamUrl || '');
   const [savingLiveStreamUrl, setSavingLiveStreamUrl] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -591,6 +597,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setProfileErrorMsg(err?.message || 'Failed to update description');
     } finally {
       setSavingBio(false);
+    }
+  };
+
+  const handleRemoveBanner = async () => {
+    setProfileBanner('');
+    setSavingProfile(true);
+    setProfileErrorMsg(null);
+    try {
+      await streamerService.updateProfile({
+        bannerUrl: ''
+      });
+      await refreshUser();
+      setProfileSavedMsg(true);
+      setTimeout(() => setProfileSavedMsg(false), 2500);
+    } catch (err: any) {
+      setProfileErrorMsg(err?.message || 'Failed to remove banner');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -688,6 +712,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       setProfileBio(user.bio || '');
       setProfileThanksMessage(user.customThanksMessage || '');
       setProfileAvatar(user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`);
+      setProfileBanner(user.bannerUrl || '');
       setProfileLiveStreamUrl(user.liveStreamUrl || '');
       const incomingLinks = (user as any).socialLinks || (user as any).links || [];
       setProfileLinks(Array.isArray(incomingLinks) ? incomingLinks : []);
@@ -1030,13 +1055,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       case 'subscribers':
         return {
           featureKey: 'subscribers',
-          label: 'Subscribers OBS',
-          shortLabel: 'Subscribers',
+          label: 'Membership OBS',
+          shortLabel: 'Membership',
           url: `${origin}/overlay/subscribers/${effectiveToken}`,
           icon: Crown,
           color: '#EC4899',
           bgGlow: 'hover:border-pink-500/50',
-          copyMessage: 'Copied Subscribers OBS URL!'
+          copyMessage: 'Copied Membership OBS URL!'
         };
       default:
         return null;
@@ -1318,6 +1343,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         description: profileBio.trim(),
         customThanksMessage: profileThanksMessage.trim(),
         avatarUrl: profileAvatar.trim(),
+        bannerUrl: profileBanner.trim(),
         liveStreamUrl: profileLiveStreamUrl.trim(),
         socialLinks: profileLinks
       });
@@ -1517,7 +1543,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       items: [
         {
           id: 'broadcast' as DashboardTab,
-          label: 'Broadcast Stream',
+          label: 'Broadcast',
           icon: Radio,
           badge: 'LIVE',
           isLocked: false
@@ -1531,7 +1557,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         },
         {
           id: 'subscribers' as DashboardTab,
-          label: 'Subscribers',
+          label: 'Membership',
           icon: Crown,
           badge: 'NEW',
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
@@ -1603,6 +1629,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           label: 'Minecraft',
           icon: Pickaxe,
           badge: 'NEW',
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+        },
+        {
+          id: 'clone-tts' as DashboardTab,
+          label: 'Clone TTS',
+          icon: Mic,
+          badge: 'PRO',
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         }
       ]
@@ -2371,7 +2404,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* ============================================================== */}
           {/* PRO PLAN STREAM ASSETS (LEADERBOARD, GOALS, TIMER, SOUNDBOARD, VIDEO ALERTS, WHEELS, LIVE CHAT, SUBSCRIBERS) */}
           {/* ============================================================== */}
-          {(['leaderboard', 'goal', 'timer', 'soundboard', 'video-alerts', 'wheel', 'chat', 'subscribers', 'pokemon'] as DashboardTab[]).includes(activeTab) &&
+          {(['leaderboard', 'goal', 'timer', 'soundboard', 'video-alerts', 'wheel', 'chat', 'subscribers', 'pokemon', 'clone-tts'] as DashboardTab[]).includes(activeTab) &&
             currentPlan === 'free' &&
             !isAdmin &&
             !isTrialActive && (
@@ -2508,6 +2541,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <PokemonWidgetManager streamerToken={user?.overlayToken} />
           )}
 
+          {activeTab === 'clone-tts' && (currentPlan !== 'free' || isAdmin) && (
+            <CloneTtsManager
+              user={user}
+              currentPlan={currentPlan}
+              isAdmin={isAdmin}
+              onUpgrade={() => {
+                setUpgradeFeatureName('Clone TTS');
+                setIsVideoUpgradeModalOpen(true);
+              }}
+            />
+          )}
+
           {/* ============================================================== */}
           {/* TAB 6: PAYMENT GATEWAY (AVAILABLE FOR ALL PLANS)               */}
           {/* ============================================================== */}
@@ -2540,96 +2585,159 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
                   )}
 
-                  {/* 1. Profile Logo Hero Card (Click Logo, Display Name, or Description to Edit) */}
-                  <div className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                    <div
-                      onClick={() => setIsMediaPickerOpen(true)}
-                      className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-900 border-2 border-cyan-500/50 hover:border-cyan-400 overflow-hidden cursor-pointer group flex-shrink-0 transition-all shadow-[0_0_25px_rgba(0,240,255,0.15)]"
-                      title="Click to choose a new Profile Logo from Media Library"
-                    >
-                      <img
-                        src={
-                          profileAvatar ||
-                          user.avatarUrl ||
-                          `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
-                        }
-                        alt="Profile Logo"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      />
-                      <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-center p-2">
-                        <ImageIcon size={20} className="text-cyan-400" />
-                        <span className="text-[10px] font-mono font-bold text-white uppercase leading-tight">
-                          Change Logo
+                  {/* 1. Profile Banner & Creator Hero Card */}
+                  <div className="rounded-2xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-sm">
+                    {/* Banner Background Container */}
+                    <div className="relative w-full h-36 sm:h-48 bg-slate-950 overflow-hidden group/banner border-b border-slate-800/80">
+                      {profileBanner ? (
+                        <>
+                          <img
+                            src={profileBanner}
+                            alt="Donation Page Banner"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover/banner:scale-[1.01]"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#090D18] via-[#090D18]/30 to-transparent pointer-events-none" />
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-[#0B0F1E] to-slate-950 text-slate-500 p-4">
+                          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                            <ImageIcon size={16} className="text-slate-500" />
+                            <span>No Banner Image Set</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 text-center mt-1 max-w-sm">
+                            Add a custom banner image to serve as wallpaper and header on your public donation page.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Top Badges & Banner Actions */}
+                      <div className="absolute top-3 inset-x-3 sm:inset-x-4 flex items-center justify-between pointer-events-none">
+                        <span className="pointer-events-auto px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-[10px] font-mono text-slate-300 flex items-center gap-1.5 shadow-sm">
+                          <ImageIcon size={12} className="text-cyan-400" />
+                          <span>Donation Page Banner</span>
                         </span>
+
+                        <div className="pointer-events-auto flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setIsBannerMediaPickerOpen(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/75 hover:bg-black/90 backdrop-blur-md border border-white/15 text-white hover:text-cyan-300 text-xs font-mono font-bold transition-all shadow-md cursor-pointer hover:border-cyan-500/50"
+                            title="Choose or upload a custom banner image"
+                          >
+                            <Upload size={13} className="text-cyan-400" />
+                            <span>{profileBanner ? 'Change Banner' : 'Upload Banner'}</span>
+                          </button>
+                          {profileBanner && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveBanner}
+                              className="p-1.5 rounded-lg bg-black/75 hover:bg-red-950/80 backdrop-blur-md border border-white/15 hover:border-red-500/40 text-slate-300 hover:text-red-400 transition-all shadow-md cursor-pointer"
+                              title="Remove banner image"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex-1 w-full text-center sm:text-left space-y-2.5 min-w-0">
-                      {/* Clickable Display Name + Verified Icon Only */}
-                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        {isEditingDisplayName ? (
-                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <input
-                              type="text"
-                              autoFocus
-                              value={profileName}
-                              onChange={(e) => setProfileName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleSaveInlineDisplayName();
-                                } else if (e.key === 'Escape') {
-                                  setProfileName(user.displayName || user.username || '');
-                                  setIsEditingDisplayName(false);
-                                }
-                              }}
-                              placeholder="Enter display name..."
-                              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-400 text-white font-bold text-sm font-['Chakra_Petch'] focus:outline-none w-full sm:w-64"
-                            />
-                            <button
-                              type="button"
-                              disabled={savingDisplayName}
-                              onClick={handleSaveInlineDisplayName}
-                              className="p-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50"
-                              title="Save Display Name"
-                            >
-                              <Check size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setProfileName(user.displayName || user.username || '');
-                                setIsEditingDisplayName(false);
-                              }}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
-                              title="Cancel"
-                            >
-                              <X size={14} />
-                            </button>
+                    {/* Profile Information Below Banner */}
+                    <div className="p-6 pt-0 relative">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-12 sm:-mt-14 mb-4">
+                        {/* Profile Avatar / Logo overlapping banner */}
+                        <div
+                          onClick={() => setIsMediaPickerOpen(true)}
+                          className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-900 border-4 border-[#090D18] hover:border-cyan-400 overflow-hidden cursor-pointer group flex-shrink-0 transition-all shadow-[0_4px_25px_rgba(0,0,0,0.6)]"
+                          title="Click to choose a new Profile Logo from Media Library"
+                        >
+                          <img
+                            src={
+                              profileAvatar ||
+                              user.avatarUrl ||
+                              `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
+                            }
+                            alt="Profile Logo"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                          <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-center p-2">
+                            <ImageIcon size={20} className="text-cyan-400" />
+                            <span className="text-[10px] font-mono font-bold text-white uppercase leading-tight">
+                              Change Logo
+                            </span>
                           </div>
-                        ) : (
-                          <div className="inline-flex items-center gap-1.5">
-                            <h3
-                              onClick={() => {
-                                setProfileName(profileName || user.displayName || user.username || '');
-                                setIsEditingDisplayName(true);
-                              }}
-                              title="Click to edit display name"
-                              className="text-lg font-extrabold text-white hover:text-cyan-300 font-['Chakra_Petch'] cursor-pointer px-2 py-0.5 -mx-2 rounded-lg hover:bg-slate-900/80 border border-transparent hover:border-slate-800 transition-all"
-                            >
-                              {profileName || user.displayName || user.username}
-                            </h3>
-                            {user.isVerified && (
-                              <span title="Verified Creator" className="inline-flex items-center text-cyan-400">
-                                <BadgeCheck size={18} className="text-cyan-400 fill-cyan-400/20" />
-                              </span>
+                        </div>
+
+                        {/* Streamer Name & Public URL */}
+                        <div className="flex-1 w-full text-center sm:text-left min-w-0 pb-1">
+                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                            {isEditingDisplayName ? (
+                              <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  value={profileName}
+                                  onChange={(e) => setProfileName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveInlineDisplayName();
+                                    } else if (e.key === 'Escape') {
+                                      setProfileName(user.displayName || user.username || '');
+                                      setIsEditingDisplayName(false);
+                                    }
+                                  }}
+                                  placeholder="Enter display name..."
+                                  className="px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-400 text-white font-bold text-sm font-['Chakra_Petch'] focus:outline-none w-full sm:w-64"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={savingDisplayName}
+                                  onClick={handleSaveInlineDisplayName}
+                                  className="p-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50"
+                                  title="Save Display Name"
+                                >
+                                  <Check size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProfileName(user.displayName || user.username || '');
+                                    setIsEditingDisplayName(false);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                                  title="Cancel"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1.5">
+                                <h3
+                                  onClick={() => {
+                                    setProfileName(profileName || user.displayName || user.username || '');
+                                    setIsEditingDisplayName(true);
+                                  }}
+                                  title="Click to edit display name"
+                                  className="text-lg font-extrabold text-white hover:text-cyan-300 font-['Chakra_Petch'] cursor-pointer px-2 py-0.5 -mx-2 rounded-lg hover:bg-slate-900/80 border border-transparent hover:border-slate-800 transition-all"
+                                >
+                                  {profileName || user.displayName || user.username}
+                                </h3>
+                                {user.isVerified && (
+                                  <span title="Verified Creator" className="inline-flex items-center text-cyan-400">
+                                    <BadgeCheck size={18} className="text-cyan-400 fill-cyan-400/20" />
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
+                          <p className="text-xs text-cyan-400 font-mono mt-0.5">
+                            @{user.username || profileUsername}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Clickable Description / Bio near Profile */}
-                      <div className="w-full">
+                      {/* Clickable Description / Bio */}
+                      <div className="w-full pt-2 border-t border-slate-800/60">
                         {isEditingBio ? (
                           <div className="space-y-2">
                             <textarea
@@ -2779,6 +2887,70 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           <span className="text-[10px] text-slate-500 mt-1 block font-mono">
                             3–24 characters (letters, numbers, underscores). Public URL handle.
                           </span>
+                        </div>
+                      </div>
+
+                      {/* Donation Page Banner Background */}
+                      <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                          <label className="text-slate-300 font-semibold font-mono flex items-center gap-1.5">
+                            <ImageIcon size={13} className="text-cyan-400" />
+                            <span>Donation Page Banner Background</span>
+                          </label>
+                          <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40 w-fit">
+                            Wallpaper &amp; Page Header
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          Your custom banner image appears as the background wallpaper and top header on your public donation page (<span className="text-cyan-300 font-mono font-semibold">{origin}/@{profileUsername || user.username}</span>).
+                        </p>
+
+                        {/* Banner Preview if present */}
+                        {profileBanner && (
+                          <div className="relative rounded-xl overflow-hidden border border-slate-800 group h-28 sm:h-36 w-full bg-slate-900">
+                            <img
+                              src={profileBanner}
+                              alt="Banner Preview"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">
+                              <button
+                                type="button"
+                                onClick={() => setIsBannerMediaPickerOpen(true)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-900 text-white font-mono text-xs font-bold border border-slate-700 hover:border-cyan-400 transition-all cursor-pointer flex items-center gap-1.5 shadow"
+                              >
+                                <Upload size={13} className="text-cyan-400" />
+                                <span>Change Banner</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setProfileBanner('')}
+                                className="px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900/90 text-red-300 font-mono text-xs font-bold border border-red-700/50 transition-all cursor-pointer flex items-center gap-1.5 shadow"
+                              >
+                                <Trash2 size={13} />
+                                <span>Remove</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Direct URL input and Media picker button */}
+                        <div className="flex flex-col sm:flex-row items-center gap-2">
+                          <input
+                            type="url"
+                            value={profileBanner}
+                            onChange={(e) => setProfileBanner(e.target.value)}
+                            placeholder="Paste banner image URL (or choose from media library)..."
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 transition-colors placeholder-slate-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setIsBannerMediaPickerOpen(true)}
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs font-mono transition-colors cursor-pointer flex-shrink-0"
+                          >
+                            <Upload size={13} />
+                            <span>Browse / Upload</span>
+                          </button>
                         </div>
                       </div>
 
@@ -3707,6 +3879,42 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             loadData(true);
           } catch (err: any) {
             setProfileErrorMsg(err.message || 'Failed to update profile logo');
+          } finally {
+            setSavingProfile(false);
+          }
+        }}
+      />
+
+      {/* Donation Page Banner Background Media Library Picker Modal */}
+      <MediaPickerModal
+        isOpen={isBannerMediaPickerOpen}
+        onClose={() => setIsBannerMediaPickerOpen(false)}
+        currentUrl={profileBanner}
+        currentPlan={currentPlan}
+        isTrialActive={isTrialActive}
+        isAdmin={isAdmin}
+        onUpgrade={() => setIsVideoUpgradeModalOpen(true)}
+        filterMode="image"
+        title="Choose Donation Page Banner Background"
+        subtitle="Select a high-resolution wallpaper or upload your custom stream banner."
+        onSelect={async (selectedUrl) => {
+          setProfileBanner(selectedUrl);
+          try {
+            setSavingProfile(true);
+            await streamerService.updateProfile({
+              username: profileUsername.trim().replace(/^@/, '').toLowerCase() || user.username,
+              displayName: profileName.trim() || user.displayName,
+              bio: profileBio.trim(),
+              description: profileBio.trim(),
+              avatarUrl: profileAvatar,
+              bannerUrl: selectedUrl
+            });
+            await refreshUser();
+            setProfileSavedMsg(true);
+            setTimeout(() => setProfileSavedMsg(false), 3000);
+            loadData(true);
+          } catch (err: any) {
+            setProfileErrorMsg(err.message || 'Failed to update banner background');
           } finally {
             setSavingProfile(false);
           }

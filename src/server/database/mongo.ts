@@ -14,6 +14,7 @@ export interface UserDoc {
   displayName: string;
   email?: string;
   avatarUrl?: string;
+  bannerUrl?: string;
   bio?: string;
   customThanksMessage?: string;
   isVerified?: boolean;
@@ -46,6 +47,12 @@ export interface UserDoc {
   telegramPendingSession?: string;
   liveStreamUrl?: string;
   youtubeLiveUrl?: string;
+  broadcastUrls?: {
+    youtube?: string;
+    twitch?: string;
+    tiktok?: string;
+    facebook?: string;
+  };
   deletionStatus?: 'pending' | 'deleted' | null;
   deletionRequestedAt?: Date | string | null;
   deletionScheduledAt?: Date | string | null;
@@ -592,13 +599,22 @@ export interface VoiceCloneDoc {
   voiceName: string;
   sampleUrl: string;
   sampleDurationSeconds: number;
-  baseModel?: 'kiritts-male' | 'kiritts-female';
+  baseModel?: 'neural-male' | 'neural-female' | string;
   pitch?: string; // e.g. "+5Hz" or "-6Hz"
   rate?: string;  // e.g. "+0%" or "+4%"
   volume?: string;
   detectedGender?: 'male' | 'female';
   averagePitchHz?: number;
+  soundStyle?: string; // e.g. "Energetic Streamer", "Warm & Conversational", "Deep & Resonant"
+  pacingLabel?: string; // e.g. "Brisk (+6%)", "Natural (1.0x)"
   timbre?: string;
+  tau?: number;
+  f0Std?: number;
+  spectralBrightnessHz?: number;
+  speakingTempoRatio?: number;
+  chestGainDb?: number;
+  presenceGainDb?: number;
+  airGainDb?: number;
   clonedAt: Date;
 }
 

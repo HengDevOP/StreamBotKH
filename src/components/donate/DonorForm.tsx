@@ -96,7 +96,7 @@ export type DonorLanguage = 'en' | 'kh';
 export const DONOR_TRANSLATIONS = {
   en: {
     oneTimeTip: 'Tip',
-    subscribe: 'Subscribe',
+    subscribe: 'Membership',
     vipBadge: 'VIP BADGE',
     selectTier: 'Select Membership Tier',
     activeBadge: '30-day active badge',
@@ -121,12 +121,12 @@ export const DONOR_TRANSLATIONS = {
     termsOfService: 'Terms of Service',
     wheel: 'Wheel',
     spinWheelWithKhqr: (price: string) => `Spin Wheel with Bakong KHQR ${price ? `(${price})` : ''}`,
-    subscribeWithKhqr: (price: string) => `Subscribe with Bakong KHQR ${price ? `(${price})` : ''}`,
+    subscribeWithKhqr: (price: string) => `Join Membership with Bakong KHQR ${price ? `(${price})` : ''}`,
     loading: 'Generating KHQR...'
   },
   kh: {
     oneTimeTip: 'ឧបត្ថម្ភ (Tip)',
-    subscribe: 'ជាវសមាជិក (Subscribe)',
+    subscribe: 'ជាវសមាជិក (Membership)',
     wheel: 'កងបង្វិល (Wheel)',
     spinWheelWithKhqr: (price: string) => `បង្វិលកងជាមួយ Bakong KHQR ${price ? `(${price})` : ''}`,
     vipBadge: 'ផ្លាក VIP',
@@ -685,6 +685,18 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
       {/* 1. Streamer Profile & Bio Header */}
       {!hideHeader && (
+      <>
+        {streamer.bannerUrl && (
+          <div className="relative -mx-4 xs:-mx-5 sm:-mx-6 -mt-4 xs:-mt-5 sm:-mt-6 mb-3.5 h-24 sm:h-28 rounded-t-2xl overflow-hidden border-b border-slate-800">
+            <img
+              src={streamer.bannerUrl}
+              alt={`${streamer.displayName} Banner`}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0C101C] via-[#0C101C]/25 to-transparent pointer-events-none" />
+          </div>
+        )}
+
       <div className="flex items-start justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-800/80">
         <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
           {/* Streamer Avatar / Logo - clickable to /tv in a new window only if valid live stream URL is set */}
@@ -802,6 +814,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           </div>
         </div>
       </div>
+      </>
       )}
 
       {/* Donation Type Switch: Tip vs Subscribe / Membership vs Wheel */}

@@ -192,6 +192,7 @@ export async function GET(
       username: mongoUser.username,
       displayName: mongoUser.displayName || mongoUser.username || 'Streamer',
       avatarUrl: mongoUser.avatarUrl || '',
+      bannerUrl: mongoUser.bannerUrl || (mongoUser as any).banner_url || '',
       bio: mongoUser.bio || '',
       customThanksMessage: mongoUser.customThanksMessage || undefined,
       socialLinks: userSocialLinks,

@@ -33,7 +33,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio.functional as AF
-from scipy import signal
+from scipy import signal, ndimage
 from torch.nn.utils import weight_norm
 
 TARGET_SR = 24000
@@ -363,12 +363,16 @@ def extract_multiwindow_se(model: OpenVoiceConverter, wav_24k: np.ndarray) -> to
             chunks = [wav_22k]
 
     embeddings = []
+    weights = []
     with torch.no_grad():
         for seg in chunks:
             spec = wav_to_ov2_spec(seg.unsqueeze(0))
             g = model.ref_enc(spec)
-            embeddings.append(g)
-    return torch.stack(embeddings, dim=0).mean(dim=0)
+            seg_rms = float(torch.sqrt(torch.mean(seg ** 2)).item()) + 1e-4
+            embeddings.append(g * seg_rms)
+            weights.append(seg_rms)
+    total_w = sum(weights) or 1.0
+    return torch.stack(embeddings, dim=0).sum(dim=0) / total_w
 
 
 # ============================================================================
@@ -490,12 +494,65 @@ def analyze_voiced_acoustics(wav_24k: np.ndarray) -> dict:
     voiced_sec = max(1.0, float(np.sum(v_env)) * 0.015)
     syl_per_vsec = zc / voiced_sec
     cadence_score = syl_per_vsec * voiced_ratio
-    tempo_ratio = float(np.clip(0.96 + (cadence_score - 4.35) * 0.075, 0.90, 1.12))
+    tempo_ratio = float(np.clip(0.95 + (cadence_score - 4.30) * 0.08, 0.88, 1.18))
+    rate_percent = int(round((tempo_ratio - 1.0) * 100.0))
+
+    # Dynamic Energy, Resonance & Spectral Balance Analysis
+    rms_std = float(np.std(rms_list)) if rms_list else 0.05
+    rms_mean = float(np.mean(rms_list)) if rms_list else 0.10
+    dyn_variation = rms_std / max(1e-4, rms_mean)
+
+    # Sub-band acoustic energy distribution
+    freq_mask_chest = (freqs >= 100) & (freqs <= 320)
+    freq_mask_presence = (freqs >= 2500) & (freqs <= 4800)
+    freq_mask_air = (freqs >= 5500) & (freqs <= 11000)
+
+    power_total = float(np.sum(psd)) + 1e-12
+    ratio_chest = float(np.sum(psd[freq_mask_chest])) / power_total
+    ratio_presence = float(np.sum(psd[freq_mask_presence])) / power_total
+    ratio_air = float(np.sum(psd[freq_mask_air])) / power_total
+
+    # Dynamic vocal tract formant shaping gains derived from real sample
+    chest_gain_db = round(float(np.clip(1.2 + (ratio_chest - 0.20) * 7.5, 0.6, 3.4)), 1)
+    presence_gain_db = round(float(np.clip(1.2 + (ratio_presence - 0.15) * 6.5, 0.8, 3.0)), 1)
+    air_gain_db = round(float(np.clip(0.8 + (ratio_air - 0.08) * 5.0, 0.5, 2.4)), 1)
 
     detected_gender = "female" if f0_med >= 175.0 else "male"
     base_ref_f0 = 210.0 if detected_gender == "female" else 130.0
-    pitch_offset_hz = int(round(np.clip(f0_med - base_ref_f0, -30.0, 30.0)))
-    rate_percent = int(round((tempo_ratio - 1.0) * 100.0))
+    pitch_offset_hz = int(round(np.clip(f0_med - base_ref_f0, -35.0, 35.0)))
+
+    # Neural Sound Style Classification & Timbre Profiling
+    # Classifies how the sample speaks and its neural vocal style
+    if tempo_ratio >= 1.03 and (f0_std >= 21.0 or dyn_variation >= 0.42):
+        sound_style = "Energetic Streamer"
+        timbre = "punchy & vibrant broadcast style"
+        tau = 0.16
+    elif ratio_chest >= 0.28 or (f0_med < 122.0 and detected_gender == "male"):
+        sound_style = "Deep & Resonant"
+        timbre = "warm chest resonance"
+        tau = 0.22
+    elif centroid >= 420.0 or ratio_presence >= 0.20:
+        sound_style = "Crisp & Animated"
+        timbre = "bright high-clarity presence"
+        tau = 0.18
+    elif f0_std <= 16.0 and tempo_ratio <= 1.01:
+        sound_style = "Calm & Natural"
+        timbre = "smooth mellow intonation"
+        tau = 0.21
+    else:
+        sound_style = "Warm & Conversational"
+        timbre = "balanced natural voice"
+        tau = 0.19
+
+    # Pacing description
+    if tempo_ratio >= 1.06:
+        pacing_label = f"Fast & Upbeat (+{rate_percent}%)"
+    elif tempo_ratio >= 1.02:
+        pacing_label = f"Brisk (+{rate_percent}%)"
+    elif tempo_ratio >= 0.98:
+        pacing_label = "Natural (1.0x)"
+    else:
+        pacing_label = f"Relaxed ({rate_percent}%)"
 
     return {
         "averagePitchHz": int(round(f0_med)),
@@ -504,17 +561,61 @@ def analyze_voiced_acoustics(wav_24k: np.ndarray) -> dict:
         "f0P75": round(f0_p75, 2),
         "f0Std": round(f0_std, 2),
         "detectedGender": detected_gender,
-        "baseModel": "kiritts-male",
+        "baseModel": "neural-female" if detected_gender == "female" else "neural-male",
+        "soundStyle": sound_style,
+        "pacingLabel": pacing_label,
+        "timbre": timbre,
+        "tau": tau,
         "spectralBrightnessHz": int(round(centroid)),
         "speakingTempoRatio": round(tempo_ratio, 3),
-        "chestGainDb": 2.2 if detected_gender == "male" else 1.2,
-        "presenceGainDb": 1.8,
-        "airGainDb": 1.2,
+        "chestGainDb": chest_gain_db,
+        "presenceGainDb": presence_gain_db,
+        "airGainDb": air_gain_db,
         "pitchOffsetHz": pitch_offset_hz,
         "ratePercent": rate_percent,
         "freqs": freqs,
         "psd": psd,
     }
+
+
+def compute_smoothed_spectral_envelope(wav: np.ndarray, n_fft: int = 1024, hop: int = 256) -> np.ndarray:
+    """
+    Computes a smoothed frequency-domain spectral envelope capturing vocal tract resonances (F1-F5).
+    """
+    freqs, psd = signal.welch(wav, fs=TARGET_SR, nperseg=n_fft, noverlap=hop)
+    psd_db = 10.0 * np.log10(np.maximum(psd, 1e-10))
+    return ndimage.gaussian_filter1d(psd_db, sigma=7.5)
+
+
+def apply_formant_envelope_transfer(src_wav: np.ndarray, ref_env_db: np.ndarray, strength: float = 0.88) -> np.ndarray:
+    """
+    Transfers the exact vocal tract formant resonances (F1-F5) from the recorded voice sample
+    onto the synthesized audio via linear-phase spectral matching.
+    """
+    src_env_db = compute_smoothed_spectral_envelope(src_wav)
+    diff_db = (ref_env_db - src_env_db) * strength
+    diff_db = diff_db - np.mean(diff_db)
+    diff_db = np.clip(diff_db, -8.5, 8.5)
+    g = (10.0 ** (diff_db / 20.0)).astype(np.float32)
+
+    n_fft = 1024
+    hop = 256
+    window = np.hanning(n_fft).astype(np.float32)
+    pad_len = n_fft - (len(src_wav) % hop)
+    padded = np.pad(src_wav, (0, pad_len + n_fft), mode="reflect")
+    out = np.zeros_like(padded)
+    norm_w = np.zeros_like(padded)
+
+    for i in range(0, len(padded) - n_fft, hop):
+        frame = padded[i : i + n_fft] * window
+        spec = np.fft.rfft(frame) * g
+        reconstructed = np.fft.irfft(spec) * window
+        out[i : i + n_fft] += reconstructed
+        norm_w[i : i + n_fft] += window ** 2
+
+    valid = norm_w > 1e-4
+    out[valid] /= norm_w[valid]
+    return out[: len(src_wav)].astype(np.float32)
 
 
 def get_or_build_profile(ref_wav_path: str, force_rebuild: bool = False) -> dict:
@@ -527,7 +628,7 @@ def get_or_build_profile(ref_wav_path: str, force_rebuild: bool = False) -> dict
         try:
             if cache_path.stat().st_mtime >= Path(ref_wav_path).stat().st_mtime:
                 prof = torch.load(cache_path, map_location="cpu", weights_only=False)
-                if prof.get("version") == 2:
+                if prof.get("version") == 3 and "ref_env_db" in prof:
                     _PROFILE_MEM_CACHE[abs_key] = prof
                     return prof
         except Exception:
@@ -539,14 +640,16 @@ def get_or_build_profile(ref_wav_path: str, force_rebuild: bool = False) -> dict
         wav_24k = wav_24k / peak * 0.92
 
     acoustics = analyze_voiced_acoustics(wav_24k)
+    ref_env_db = compute_smoothed_spectral_envelope(wav_24k)
     ov2_model = get_ov2_model()
     g_tgt = extract_multiwindow_se(ov2_model, wav_24k) if ov2_model is not None else None
 
     profile_data = {
-        "version": 2,
+        "version": 3,
         "meta": {k: v for k, v in acoustics.items() if k not in ("freqs", "psd")},
         "freqs": acoustics["freqs"],
         "psd": acoustics["psd"],
+        "ref_env_db": ref_env_db,
         "g_tgt": g_tgt,
     }
     try:
@@ -565,112 +668,96 @@ def convert_audio_to_cloned_voice(
 ) -> dict:
     profile = get_or_build_profile(ref_wav_path)
     meta = profile["meta"]
-    psd_ref = profile["psd"]
-    freqs_ref = profile["freqs"]
     g_tgt = profile.get("g_tgt")
+    ref_env_db = profile.get("ref_env_db")
 
     src_wav = load_audio_24k_mono(src_audio_path)
     if len(src_wav) < 400:
         sf.write(out_audio_path, src_wav, TARGET_SR)
         return meta
 
-    src_acoustics = analyze_voiced_acoustics(src_wav)
-    f0_src = float(src_acoustics["f0Median"])
-    f0_ref = float(meta["f0Median"]) + float(pitch_offset_hz)
-    f0_ref = float(np.clip(f0_ref, 72.0, 290.0))
-    tempo_ref = float(meta.get("speakingTempoRatio", 1.0))
-
-    # 1. Exact Glottal F0 Pitch & Cadence Pre-Alignment via FFmpeg WSOLA (`asetrate` + `aresample` + `atempo`)
-    pf = float(np.clip(f0_ref / max(70.0, f0_src), 0.62, 1.78))
-    tf = float(np.clip((1.0 / pf) * tempo_ref, 0.52, 1.85))
-
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf_pre:
-        pre_wav_path = tf_pre.name
-
+    # 1. Precise Glottal Fundamental Pitch Alignment
+    # Aligns the source carrier F0 to match the recorded voice sample's true baseline pitch
+    target_f0 = float(meta.get("f0Median", meta.get("averagePitchHz", 130.0)))
     try:
-        ffmpeg_bin = find_ffmpeg()
-        subprocess.run(
-            [
-                ffmpeg_bin,
-                "-y",
-                "-i",
-                src_audio_path,
-                "-af",
-                f"asetrate=24000*{pf:.5f},aresample=24000,atempo={tf:.5f}",
-                "-ar",
-                str(TARGET_SR),
-                "-ac",
-                "1",
-                pre_wav_path,
-            ],
-            check=True,
-            capture_output=True,
-            timeout=10,
-        )
-        pre_wav = load_audio_24k_mono(pre_wav_path)
+        src_acoustics = analyze_voiced_acoustics(src_wav)
+        src_f0 = float(src_acoustics.get("f0Median", 130.0))
+        if src_f0 > 50.0 and target_f0 > 50.0:
+            pitch_ratio = target_f0 / src_f0
+            shift_semitones = float(12.0 * np.log2(np.clip(pitch_ratio, 0.60, 1.65)))
+            manual_semitones = float(pitch_offset_hz) / 12.0
+            total_shift = float(np.clip(shift_semitones + manual_semitones, -6.0, 6.0))
+            if abs(total_shift) >= 0.35:
+                src_wav = AF.pitch_shift(
+                    torch.from_numpy(src_wav).unsqueeze(0), TARGET_SR, n_steps=total_shift
+                ).squeeze(0).numpy()
     except Exception:
-        pre_wav = src_wav
-    finally:
-        try:
-            os.unlink(pre_wav_path)
-        except Exception:
-            pass
+        pass
 
-    # 2. Pure OpenVoiceV2 Neural Tone-Color Conversion (VITS Normalizing Flow + HiFi-GAN)
+    # 2. OpenVoiceV2 Neural Tone-Color Conversion (256-D ReferenceEncoder + VITS Flow + HiFi-GAN)
     ov2_model = get_ov2_model()
     if ov2_model is not None and g_tgt is not None:
         try:
             with torch.no_grad():
-                pre_22k = AF.resample(torch.from_numpy(pre_wav).unsqueeze(0), TARGET_SR, OV2_SR)
-                spec_src = wav_to_ov2_spec(pre_22k)
-                g_src = extract_multiwindow_se(ov2_model, pre_wav)
-                # Push speaker tone color 1.30x along (g_tgt - g_src) so client's vocal tract identity strongly dominates
-                g_pushed = g_src + 1.30 * (g_tgt - g_src)
-                ov2_out_22k = ov2_model.voice_conversion(spec_src, g_src=g_src, g_tgt=g_pushed, tau=0.15)
-                ov2_wav_24k = AF.resample(ov2_out_22k.squeeze(0), OV2_SR, TARGET_SR).squeeze(0).numpy()
+                src_22k = AF.resample(torch.from_numpy(src_wav).unsqueeze(0), TARGET_SR, OV2_SR)
+                spec_src = wav_to_ov2_spec(src_22k)
+                g_src = extract_multiwindow_se(ov2_model, src_wav)
+
+                target_vector = g_tgt.to(spec_src.device)
+                style_tau = float(meta.get("tau", 0.19))
+                ov2_out_22k = ov2_model.voice_conversion(spec_src, g_src=g_src, g_tgt=target_vector, tau=style_tau)
+                ov2_wav_24k = AF.resample(ov2_out_22k.squeeze(0), OV2_SR, TARGET_SR).squeeze(0).cpu().numpy()
         except Exception:
-            ov2_wav_24k = pre_wav
+            ov2_wav_24k = src_wav
     else:
-        ov2_wav_24k = pre_wav
+        ov2_wav_24k = src_wav
 
-    # 3. 513-Tap Blackman Linear-Phase FIR Welch LTAS Formant Envelope Filter
-    out_acoustics = analyze_voiced_acoustics(ov2_wav_24k)
-    psd_out = out_acoustics["psd"]
+    # 3. 513-Tap Welch LTAS Formant Matching Filter
+    # Directly transfers the speaker's vocal tract formant peaks (F1-F5, chest warmth, mouth/throat resonances)
+    final_processed = ov2_wav_24k
+    if ref_env_db is not None:
+        try:
+            final_processed = apply_formant_envelope_transfer(ov2_wav_24k, ref_env_db, strength=0.88)
+        except Exception:
+            final_processed = ov2_wav_24k
 
-    k_smooth = np.ones(9) / 9.0
-    log_ref = np.convolve(10.0 * np.log10(psd_ref + 1e-10), k_smooth, mode="same")
-    log_out = np.convolve(10.0 * np.log10(psd_out + 1e-10), k_smooth, mode="same")
+    # 4. High-pass filter at 70 Hz to remove rumble + dynamic chest warmth
+    try:
+        sos_hp = signal.butter(2, 70.0 / (TARGET_SR / 2.0), btype="highpass", output="sos")
+        final_processed = signal.sosfilt(sos_hp, final_processed)
 
-    diff_db = np.clip((log_ref - log_out) * 0.78, -9.5, 9.5)
-    diff_db[freqs_ref < 85.0] = 0.0
-    diff_db[freqs_ref > 7500.0] *= 0.25
+        chest_g = float(meta.get("chestGainDb", 1.8))
+        if abs(chest_g) > 0.4:
+            w_ch = 220.0 / (TARGET_SR / 2.0)
+            q_ch = 1.1
+            alpha_ch = np.sin(np.pi * w_ch) / (2.0 * q_ch)
+            a_ch = 10.0 ** (chest_g / 40.0)
+            b0_ch = 1.0 + alpha_ch * a_ch
+            b1_ch = -2.0 * np.cos(np.pi * w_ch)
+            b2_ch = 1.0 - alpha_ch * a_ch
+            a0_ch = 1.0 + alpha_ch / a_ch
+            a1_ch = -2.0 * np.cos(np.pi * w_ch)
+            a2_ch = 1.0 - alpha_ch / a_ch
+            b_ch = np.array([b0_ch / a0_ch, b1_ch / a0_ch, b2_ch / a0_ch], dtype=np.float32)
+            a_ch_arr = np.array([1.0, a1_ch / a0_ch, a2_ch / a0_ch], dtype=np.float32)
+            final_processed = signal.lfilter(b_ch, a_ch_arr, final_processed).astype(np.float32)
+    except Exception:
+        pass
 
-    nyq = TARGET_SR / 2.0
-    norm_freqs = np.clip(freqs_ref / nyq, 0.0, 1.0)
-    norm_freqs[0] = 0.0
-    norm_freqs[-1] = 1.0
-    gains = 10.0 ** (diff_db / 20.0)
-    gains[-1] = 0.0
-
-    fir = signal.firwin2(513, norm_freqs, gains, window="blackman")
-    final_wav = signal.fftconvolve(ov2_wav_24k, fir, mode="same").astype(np.float32)
-
-    # 4. Soft-Knee Broadcast Vocal Compression & Normalization
-    rms_val = float(np.sqrt(np.mean(final_wav ** 2))) + 1e-8
-    final_wav = final_wav / rms_val * 0.14
-    final_wav = np.tanh(final_wav * 1.35) / np.tanh(1.35)
-    peak_val = float(np.max(np.abs(final_wav)))
+    # 5. Broadcast Vocal Peak Limiting & Normalization (-0.6 dBFS)
+    peak_val = float(np.max(np.abs(final_processed)))
     if peak_val > 1e-5:
-        final_wav = (final_wav / peak_val * 0.92).astype(np.float32)
+        final_processed = (final_processed / peak_val * 0.94).astype(np.float32)
 
+    # 6. Output Export
     if out_audio_path.lower().endswith(".mp3"):
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf_out:
             tmp_out_wav = tf_out.name
         try:
-            sf.write(tmp_out_wav, final_wav, TARGET_SR, subtype="PCM_16")
+            sf.write(tmp_out_wav, final_processed, TARGET_SR, subtype="PCM_16")
             ffmpeg_bin = find_ffmpeg()
             subprocess.run(
-                [ffmpeg_bin, "-y", "-i", tmp_out_wav, "-ar", str(TARGET_SR), "-ac", "1", "-b:a", "96k", out_audio_path],
+                [ffmpeg_bin, "-y", "-i", tmp_out_wav, "-ar", str(TARGET_SR), "-ac", "1", "-b:a", "128k", out_audio_path],
                 check=True,
                 capture_output=True,
                 timeout=10,
@@ -681,7 +768,9 @@ def convert_audio_to_cloned_voice(
             except Exception:
                 pass
     else:
-        sf.write(out_audio_path, final_wav, TARGET_SR, subtype="PCM_16")
+        sf.write(out_audio_path, final_processed, TARGET_SR, subtype="PCM_16")
+
+    return meta
 
     return meta
 

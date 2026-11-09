@@ -101,20 +101,115 @@ export function khmerNumberToWords(num: number | string): string {
 
 export function isKhmerText(text?: string): boolean {
   if (!text) return false;
-  return /[\u1780-\u17FF]/.test(text);
+  const khmerChars = (text.match(/[\u1780-\u17FF]/g) || []).length;
+  const latinChars = (text.match(/[a-zA-Z]/g) || []).length;
+  if (khmerChars === 0) return false;
+  if (latinChars === 0) return true;
+  // If mixed, only treat as Khmer if Khmer characters make up at least 28% of total letters
+  return khmerChars / (khmerChars + latinChars) >= 0.28;
+}
+
+/**
+ * Pre-cleans raw donor text to prevent TTS from reading out loud code symbols,
+ * underscores, brackets, and awkward punctuation, and expands common stream acronyms.
+ */
+export function cleanSpokenText(text: string, isKhmer: boolean): string {
+  if (!text) return '';
+  let str = text;
+
+  // 1. Remove URLs and links (e.g. https://... or www....)
+  str = str.replace(/https?:\/\/\S+/gi, '');
+  str = str.replace(/www\.\S+/gi, '');
+
+  // 2. Remove emoji & surrogate pairs
+  str = str.replace(
+    /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g,
+    ' '
+  );
+
+  // 3. Remove outer/inner brackets and punctuation that Edge-TTS literally speaks aloud:
+  // e.g. [VIP] -> VIP, (pro) -> pro, @streamer -> streamer, gamer_99 -> gamer 99
+  str = str.replace(/[@#]/g, ' ');
+  str = str.replace(/[\[\]\(\)\{\}<>]/g, ' ');
+  str = str.replace(/[_|\\\/~^*+=]/g, ' ');
+
+  // 4. Clean repeated punctuation: ??? -> ?, !!! -> !, ... -> .
+  str = str.replace(/\?+/g, '?');
+  str = str.replace(/!+/g, '!');
+  str = str.replace(/\.{2,}/g, '.');
+
+  // 5. Clean repeated letters/spam (e.g. sooooo -> soo, yesssss -> yes)
+  str = str.replace(/([a-zA-Z])\1{2,}/g, '$1$1');
+
+  // 6. Split CamelCase usernames so TTS pronounces words distinctly (e.g. CyberSamurai -> Cyber Samurai)
+  str = str.replace(/([a-z])([A-Z])/g, '$1 $2');
+
+  // 7. Expand common stream abbreviations & slang to crystal-clear spoken words
+  if (!isKhmer) {
+    str = str.replace(/\b555+\b/g, 'haha');
+    str = str.replace(/\bgg\b/gi, 'good game');
+    str = str.replace(/\bwp\b/gi, 'well played');
+    str = str.replace(/\bggwp\b/gi, 'good game well played');
+    str = str.replace(/\bglhf\b/gi, 'good luck have fun');
+    str = str.replace(/\bthx\b/gi, 'thank you');
+    str = str.replace(/\bty\b/gi, 'thank you');
+    str = str.replace(/\btysm\b/gi, 'thank you so much');
+    str = str.replace(/\bpls\b/gi, 'please');
+    str = str.replace(/\bplz\b/gi, 'please');
+    str = str.replace(/\bidk\b/gi, "I don't know");
+    str = str.replace(/\bomg\b/gi, 'oh my god');
+    str = str.replace(/\bbtw\b/gi, 'by the way');
+    str = str.replace(/\bngl\b/gi, 'not gonna lie');
+    str = str.replace(/\btbh\b/gi, 'to be honest');
+    str = str.replace(/\bfr\b/gi, 'for real');
+    str = str.replace(/\brip\b/gi, 'R I P');
+    str = str.replace(/\bop\b/gi, 'O P');
+    str = str.replace(/\bmvp\b/gi, 'M V P');
+    str = str.replace(/\bsub\b/gi, 'subscriber');
+    str = str.replace(/\bsubs\b/gi, 'subscribers');
+
+    // Transliterated Karaoke Khmer in English text
+    str = str.replace(/\b(orkun|arkun|or kun|ar kun)\s*(chran|chrn|der)?\b/gi, 'thank you');
+    str = str.replace(/\b(susdey|sursdey|sur sdey)\b/gi, 'hello');
+    str = str.replace(/\b(soksabay|sok sabay)\b/gi, 'how are you');
+    str = str.replace(/\b(som sl|som slanh)\b/gi, 'love you');
+    str = str.replace(/\b(sl|slanh)\b/gi, 'love');
+    str = str.replace(/\b(bong)\b/gi, 'bro');
+    str = str.replace(/\b(oun)\b/gi, 'sister');
+    str = str.replace(/\b(klang|klang klang)\b/gi, 'very much');
+    str = str.replace(/\b(ot te)\b/gi, 'no');
+  } else {
+    // In Khmer context: expand loanwords to proper Khmer script so Piseth/Sreymom pronounces them properly
+    str = str.replace(/\b555+\b/g, ' ហា ហា ');
+    str = str.replace(/\b(bro|Bro|BRO)\b/g, 'ប្រូ');
+    str = str.replace(/\b(sis|Sis|SIS)\b/g, 'ស៊ីស');
+    str = str.replace(/\b(stream|streamer|Stream|Streamer)\b/g, 'ស្ទ្រីម');
+    str = str.replace(/\b(game|Game)\b/g, 'ហ្គេម');
+    str = str.replace(/\b(donate|donation|Donate|Donation)\b/g, 'ដូណេត');
+    str = str.replace(/\b(tip|Tip)\b/g, 'ធីប');
+    str = str.replace(/\b(pro|Pro)\b/g, 'ប្រូ');
+    str = str.replace(/\b(vip|VIP)\b/g, 'វីអាយភី');
+    str = str.replace(/\b(live|Live)\b/g, 'ឡាយ');
+    str = str.replace(/\b(hello|hi|Hello|Hi)\b/g, 'សួស្តី');
+    str = str.replace(/\b(thank you|thanks|thx|ty)\b/gi, 'អរគុណ');
+    str = str.replace(/\b(gg|GG)\b/g, 'ជីជី');
+  }
+
+  return str.replace(/\s+/g, ' ').trim();
 }
 
 export function normalizeCurrencyAndSymbols(text: string, isKhmer?: boolean): string {
   if (!text) return '';
-  let result = text;
 
-  // If isKhmer is not explicitly specified, auto-detect from text
+  // Auto-detect language if not explicitly provided
   const khmerMode = isKhmer !== undefined ? isKhmer : isKhmerText(text);
 
-  // 1. Chat symbols & SSML XML character cleanup
+  // 1. Clean speech text (symbols, brackets, acronyms)
+  let result = cleanSpokenText(text, khmerMode);
+
+  // 2. Chat symbols & SSML XML character cleanup
   result = result.replace(/<3/g, khmerMode ? 'បេះដូង' : 'love');
   result = result.replace(/&/g, khmerMode ? ' និង ' : ' and ');
-  result = result.replace(/[<>]/g, ' ');
 
   if (khmerMode) {
     // -------------------------------------------------------------------------

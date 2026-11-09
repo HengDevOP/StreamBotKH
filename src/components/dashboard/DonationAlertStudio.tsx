@@ -42,7 +42,8 @@ import {
   ChevronUp,
   Plus,
   Menu,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Switch } from '../common/Switch';
@@ -50,7 +51,6 @@ import { AlertBox, AlertConditionTier } from '../../types/alert';
 import { useAudio } from '../../hooks/useAudio';
 import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
-import { VoiceClonerModal } from './VoiceClonerModal';
 import { AlertPresetModal } from './AlertPresetModal';
 import { MediaPickerModal } from './MediaPickerModal';
 import { useAuth } from '../../context/AuthContext';
@@ -264,7 +264,38 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
-  const [isVoiceClonerOpen, setIsVoiceClonerOpen] = useState(false);
+  // Cloned Voices List from server & Pro Status
+  const [clonedVoices, setClonedVoices] = useState<any[]>([]);
+  const [loadingClonedVoices, setLoadingClonedVoices] = useState(false);
+
+  const isPro =
+    String(user?.plan || '').toLowerCase() === 'pro' ||
+    Boolean(user?.isAdmin || user?.is_admin || user?.role === 'admin');
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchClonedVoices = async () => {
+      try {
+        setLoadingClonedVoices(true);
+        const token = streamerToken || user?.overlayToken || user?.id || '';
+        const query = token ? `?token=${encodeURIComponent(token)}` : '';
+        const res = await fetch(`/api/voice-clone${query}`);
+        const data = await res.json();
+        if (isMounted && data.success && Array.isArray(data.voices)) {
+          setClonedVoices(data.voices);
+        }
+      } catch (e) {
+        console.warn('Error loading cloned voices for alert studio:', e);
+      } finally {
+        if (isMounted) setLoadingClonedVoices(false);
+      }
+    };
+    fetchClonedVoices();
+    return () => {
+      isMounted = false;
+    };
+  }, [streamerToken, user?.overlayToken, user?.id]);
+
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
 
   const handleApplyPreset = (preset: AlertPreset | null) => {
@@ -883,19 +914,25 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
 
         let ttsAudioUrl = '';
         if (ttsType === 'cloned') {
-          // High quality Neural KiriTTS Voice Clone matching streamer's exact voice
-          const safeSamplePath =
-            clonedVoiceSampleUrl &&
-            !clonedVoiceSampleUrl.startsWith('data:') &&
-            clonedVoiceSampleUrl.length < 250
-              ? clonedVoiceSampleUrl
-              : '';
+          // High quality Neural AI Voice Clone (or free tier fallback to default voice)
+          if (!isPro) {
+            ttsAudioUrl = `/api/tts?type=google&text=${encodeURIComponent(fullSpeech.slice(0, 250))}`;
+          } else {
+            const safeSamplePath =
+              clonedVoiceSampleUrl &&
+              !clonedVoiceSampleUrl.startsWith('data:') &&
+              clonedVoiceSampleUrl.length < 250
+                ? clonedVoiceSampleUrl
+                : '';
 
-          ttsAudioUrl = `/api/tts?type=cloned&clonedVoiceName=${encodeURIComponent(
-            clonedVoiceName || ''
-          )}&clonedVoiceSampleUrl=${encodeURIComponent(
-            safeSamplePath
-          )}&text=${encodeURIComponent(fullSpeech.slice(0, 250))}`;
+            ttsAudioUrl = `/api/tts?type=cloned&token=${encodeURIComponent(
+              streamerToken || user?.overlayToken || user?.id || ''
+            )}&clonedVoiceName=${encodeURIComponent(
+              clonedVoiceName || ''
+            )}&clonedVoiceSampleUrl=${encodeURIComponent(
+              safeSamplePath
+            )}&text=${encodeURIComponent(fullSpeech.slice(0, 250))}`;
+          }
         } else {
           // High quality Neural TTS synthesizing Piseth, Sreymom, Jenny, Christopher voices
           ttsAudioUrl = `/api/tts?type=${encodeURIComponent(ttsType)}&text=${encodeURIComponent(
@@ -2026,10 +2063,19 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                     <>
                       {/* Voice Model Selection */}
                       <div className="space-y-2">
-                        <label className="text-xs font-mono font-bold text-slate-300 block">
-                          TTS Engine / Voice Model
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-mono font-bold text-slate-300 block">
+                            TTS Engine / Voice Model
+                          </label>
+                          {clonedVoices.length > 0 && (
+                            <span className="text-[10px] font-mono text-cyan-400">
+                              {clonedVoices.length} custom {clonedVoices.length === 1 ? 'voice' : 'voices'} available
+                            </span>
+                          )}
+                        </div>
+
                         <div className="space-y-2">
+                          {/* Standard Built-in Neural Voices */}
                           {[
                             {
                               id: 'google',
@@ -2050,11 +2096,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                               id: 'kiritts-female',
                               name: 'KiriTTS Female (Sreymom Neural Khmer / EN)',
                               desc: 'Natural Cambodian female voice for ABA tips & alerts'
-                            },
-                            {
-                              id: 'cloned',
-                              name: 'Streamer Custom Voice Clone',
-                              desc: 'AI neural cloned voice from your own audio speech'
                             }
                           ].map((v) => {
                             const isSelected = ttsType === v.id;
@@ -2082,7 +2123,108 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                               </div>
                             );
                           })}
+
+                          {/* Cloned Voices Section */}
+                          {clonedVoices.length > 0 ? (
+                            clonedVoices.map((cv, idx) => {
+                              const isSelected =
+                                ttsType === 'cloned' &&
+                                (clonedVoiceName === cv.voiceName || (!clonedVoiceName && idx === 0));
+
+                              return (
+                                <div
+                                  key={cv._id || `cloned-${idx}`}
+                                  onClick={() => {
+                                    setTtsType('cloned');
+                                    setClonedVoiceName(cv.voiceName);
+                                    setClonedVoiceSampleUrl(cv.sampleUrl || '');
+                                  }}
+                                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                                    isSelected
+                                      ? 'bg-cyan-500/10 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.15)]'
+                                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="font-mono font-bold text-xs truncate text-white">
+                                        {cv.voiceName}
+                                      </span>
+                                      {isPro ? (
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+                                          <Sparkles size={9} /> CLONED
+                                        </span>
+                                      ) : (
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 shrink-0">
+                                          <Lock size={9} /> PRO PLAN
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div
+                                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                        isSelected ? 'border-cyan-400 bg-cyan-400' : 'border-slate-700'
+                                      }`}
+                                    >
+                                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                                    </div>
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">
+                                    AI Neural Voice Clone • {cv.soundStyle || 'Custom Neural Style'} • {cv.sampleDurationSeconds ? `${cv.sampleDurationSeconds}s sample` : 'Trained'}
+                                  </p>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div
+                              onClick={() => setTtsType('cloned')}
+                              className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                                ttsType === 'cloned'
+                                  ? 'bg-cyan-500/10 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.15)]'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-mono font-bold text-xs truncate">
+                                    Streamer Custom Voice Clone
+                                  </span>
+                                  {isPro ? (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium text-slate-400 border border-slate-800">
+                                      Clone TTS
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 shrink-0">
+                                      <Lock size={9} /> PRO PLAN
+                                    </span>
+                                  )}
+                                </div>
+                                <div
+                                  className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                    ttsType === 'cloned' ? 'border-cyan-400 bg-cyan-400' : 'border-slate-700'
+                                  }`}
+                                >
+                                  {ttsType === 'cloned' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                No custom voices cloned yet. Train your voice in the &quot;Clone TTS&quot; section.
+                              </p>
+                            </div>
+                          )}
                         </div>
+
+                        {/* Free Tier Fallback Warning Notice */}
+                        {ttsType === 'cloned' && !isPro && (
+                          <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5 mt-2">
+                            <Lock size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5">
+                              <span className="font-semibold text-white block">Pro Plan Voice Feature</span>
+                              <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                                AI Voice Cloning is an exclusive Pro Plan feature. Live stream alerts will automatically fallback to the default neural voice (Jenny / Piseth) until your account is upgraded to Pro.
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Smart Currency Pronunciation Feature Card */}
@@ -2098,61 +2240,10 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-300 leading-relaxed">
-                            TTS automatically speaks <span className="text-cyan-300 font-mono font-bold">$</span> as <span className="text-white font-medium">"dollars" / "ដុល្លារ"</span> and <span className="text-cyan-300 font-mono font-bold">៛</span> as <span className="text-white font-medium">"riel" / "រៀល"</span> across donation amounts and messages.
+                            TTS automatically speaks <span className="text-cyan-300 font-mono font-bold">$</span> as <span className="text-white font-medium">&quot;dollars&quot; / &quot;ដុល្លារ&quot;</span> and <span className="text-cyan-300 font-mono font-bold">៛</span> as <span className="text-white font-medium">&quot;riel&quot; / &quot;រៀល&quot;</span> across donation amounts and messages.
                           </p>
                         </div>
                       </div>
-
-                      {/* If Custom Voice Clone is Selected: Show Cloner Button */}
-                      {ttsType === 'cloned' && (
-                        <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono font-bold text-cyan-300 flex items-center gap-1.5">
-                              <Mic size={14} className="text-cyan-400" />
-                              AI Cloned Voice Profile
-                            </span>
-                            {clonedVoiceName && (
-                              <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[10px] font-bold">
-                                Ready
-                              </span>
-                            )}
-                          </div>
-
-                          {clonedVoiceName ? (
-                            <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                              <div>
-                                <div className="font-mono font-bold text-xs text-white">{clonedVoiceName}</div>
-                                <div className="text-[10px] text-cyan-300 font-mono">KiriTTS Neural Cloned Voice Model</div>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setIsVoiceClonerOpen(true)}
-                                className="text-[10px] font-mono"
-                              >
-                                Re-record (15s)
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <p className="text-[11px] text-slate-400">
-                                Record 15 seconds of clean voice to calibrate your Neural KiriTTS voice clone for stream donation announcements!
-                              </p>
-                              <Button
-                                type="button"
-                                variant="primary"
-                                size="sm"
-                                onClick={() => setIsVoiceClonerOpen(true)}
-                                className="w-full bg-cyan-400 text-slate-950 font-bold font-mono text-xs"
-                              >
-                                <Mic size={13} />
-                                <span>Record 15s Clean Voice &amp; Clone Voice</span>
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )}
 
                       {/* Test TTS Audio Button */}
                       <Button
@@ -2475,19 +2566,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         isTrialActive={Boolean(user?.trialActive)}
       />
 
-      {/* ============================================================== */}
-      {/* VOICE CLONER MODAL (SPEECH RECORDING >= 10 SECONDS)             */}
-      {/* ============================================================== */}
-      <VoiceClonerModal
-        isOpen={isVoiceClonerOpen}
-        onClose={() => setIsVoiceClonerOpen(false)}
-        onCloned={(clonedVoice) => {
-          setClonedVoiceName(clonedVoice.name);
-          setClonedVoiceSampleUrl(clonedVoice.sampleUrl);
-          setTtsType('cloned');
-          setIsVoiceClonerOpen(false);
-        }}
-      />
 
       {/* ============================================================== */}
       {/* 100 UNIQUE STYLE PRESETS GALLERY MODAL                         */}

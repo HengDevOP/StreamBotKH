@@ -252,6 +252,11 @@ async function fetchGoogleTranslateTtsToBuffer(lang: string, text: string): Prom
 export interface ClonedVocalProfile {
   averagePitchHz: number;
   detectedGender: 'male' | 'female';
+  soundStyle?: string;
+  pacingLabel?: string;
+  timbre?: string;
+  tau?: number;
+  f0Std?: number;
   spectralBrightnessHz: number;
   speakingTempoRatio: number;
   chestGainDb: number;
@@ -404,6 +409,7 @@ async function callNeuralCloneEngine(payload: {
 // Pre-warm the OpenVoiceV2 neural worker on startup
 ensureNeuralCloneWorker();
 
+
 /**
  * Analyzes a recorded client voice sample (.wav / .webm / .mp3) to extract its acoustic vocal fingerprint
  * and pre-build the 256-D OpenVoiceV2 speaker tone-color embedding + Welch LTAS spectrum.
@@ -412,13 +418,17 @@ export async function analyzeVoiceSampleFile(inputPath: string): Promise<ClonedV
   const defaultProfile: ClonedVocalProfile = {
     averagePitchHz: 130,
     detectedGender: 'male',
+    soundStyle: 'Warm & Conversational',
+    pacingLabel: 'Natural (1.0x)',
+    timbre: 'balanced natural voice',
     spectralBrightnessHz: 420,
     speakingTempoRatio: 1.0,
     chestGainDb: 2.0,
-    presenceGainDb: 1.5,
-    airGainDb: 1.0,
+    presenceGainDb: 1.8,
+    airGainDb: 1.2,
     pitchOffsetHz: 0,
-    ratePercent: 0
+    ratePercent: 0,
+    tau: 0.19
   };
 
   if (!inputPath || !fs.existsSync(inputPath)) {
@@ -435,6 +445,11 @@ export async function analyzeVoiceSampleFile(inputPath: string): Promise<ClonedV
     return {
       averagePitchHz: neuralMeta.averagePitchHz,
       detectedGender: neuralMeta.detectedGender === 'female' ? 'female' : 'male',
+      soundStyle: neuralMeta.soundStyle || 'Warm & Conversational',
+      pacingLabel: neuralMeta.pacingLabel || 'Natural (1.0x)',
+      timbre: neuralMeta.timbre || 'balanced natural voice',
+      tau: neuralMeta.tau ?? 0.19,
+      f0Std: neuralMeta.f0Std ?? 18,
       spectralBrightnessHz: neuralMeta.spectralBrightnessHz ?? 420,
       speakingTempoRatio: neuralMeta.speakingTempoRatio ?? 1.0,
       chestGainDb: neuralMeta.chestGainDb ?? 2.0,
@@ -477,27 +492,17 @@ async function morphAudioBufferToClonedVoice(
       }
     }
 
-    // 2. Fallback FFmpeg WSOLA + EQ if reference WAV was not found on disk
-    const baseF0 = 131;
-    const targetF0 = Math.max(75, Math.min(285, profile.averagePitchHz || 131));
-    const rawPitchRatio = targetF0 / baseF0;
-    const pitchRatio = Number(Math.max(0.65, Math.min(1.75, rawPitchRatio)).toFixed(4));
-    const tempoRatio = Number(
-      Math.max(0.55, Math.min(1.75, (1.0 / pitchRatio) * (profile.speakingTempoRatio || 1.0))).toFixed(4)
-    );
-
-    const chestG = Number(profile.chestGainDb ?? 2.0).toFixed(1);
-    const presG = Number(profile.presenceGainDb ?? 1.8).toFixed(1);
+    // 2. Fallback gentle broadcast EQ if reference WAV was not found on disk
+    const chestG = Number(profile.chestGainDb ?? 1.5).toFixed(1);
+    const presG = Number(profile.presenceGainDb ?? 1.5).toFixed(1);
     const airG = Number(profile.airGainDb ?? 1.2).toFixed(1);
 
     const afChain = [
-      `asetrate=24000*${pitchRatio}`,
-      `aresample=24000`,
-      `atempo=${tempoRatio}`,
-      `equalizer=f=220:t=q:w=1.1:g=${chestG}`,
-      `equalizer=f=1350:t=q:w=1.3:g=${presG}`,
-      `equalizer=f=3500:t=q:w=1.4:g=${airG}`,
-      `acompressor=threshold=-18dB:ratio=2.4:attack=12:release=160:makeup=2`
+      `highpass=f=75`,
+      `equalizer=f=220:t=q:w=1.2:g=${chestG}`,
+      `equalizer=f=3500:t=q:w=1.4:g=${presG}`,
+      `equalizer=f=8000:t=q:w=1.4:g=${airG}`,
+      `acompressor=threshold=-18dB:ratio=2.2:attack=15:release=140:makeup=2`
     ].join(',');
 
     const ffmpegCandidates = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg', 'ffmpeg'];
@@ -505,7 +510,7 @@ async function morphAudioBufferToClonedVoice(
       try {
         await execFileAsync(
           cmd,
-          ['-y', '-i', inFile, '-af', afChain, '-ar', '24000', '-ac', '1', '-b:a', '96k', outFile],
+          ['-y', '-i', inFile, '-af', afChain, '-ar', '24000', '-ac', '1', '-b:a', '128k', outFile],
           { timeout: 8000 }
         );
         if (fs.existsSync(outFile) && fs.statSync(outFile).size > 200) {
@@ -538,6 +543,7 @@ export async function synthesizeTTSWithBuffer(params: {
   pitch?: string;
   rate?: string;
   volume?: string;
+  token?: string;
 }): Promise<SynthesizedTtsResult> {
   const { text, type = 'google', clonedVoiceUrl, clonedVoiceName } = params;
 
@@ -556,7 +562,7 @@ export async function synthesizeTTSWithBuffer(params: {
     };
   }
 
-  const isCloned = type === 'cloned' || type === 'kiritts-clone';
+  let isCloned = type === 'cloned' || type === 'neural-clone' || type === 'neural' || type === 'kiritts-clone';
   let activeVoice = 'km-KH-PisethNeural';
   let isKhmer = isKhmerText(rawClean);
   let prosodyOptions = {
@@ -598,66 +604,145 @@ export async function synthesizeTTSWithBuffer(params: {
       console.warn('[TTS Service] Cloned voice DB lookup error:', e);
     }
 
-    const relSample =
-      clonedVoiceUrl && clonedVoiceUrl.startsWith('/uploads/voices/')
-        ? clonedVoiceUrl
-        : cloneDoc?.sampleUrl;
-
-    if (relSample && typeof relSample === 'string' && relSample.startsWith('/uploads/voices/')) {
-      const candidatePath = path.join(process.cwd(), 'public', relSample);
-      if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).size > 500) {
-        resolvedSampleDiskPath = candidatePath;
-      }
-    }
-
-    // Fallback: if no valid sample path was resolved yet, pick the newest .wav in /public/uploads/voices/
-    if (!resolvedSampleDiskPath) {
+    // -------------------------------------------------------------
+    // Pro Plan Enforcement for Neural Voice Cloning
+    // Free plan users fallback to default neural voice (Jenny / Piseth)
+    // -------------------------------------------------------------
+    if (params.token || cloneDoc?.userId) {
       try {
-        const voicesDir = path.join(process.cwd(), 'public', 'uploads', 'voices');
-        if (fs.existsSync(voicesDir)) {
-          const wavFiles = fs
-            .readdirSync(voicesDir)
-            .filter((f) => f.endsWith('.wav'))
-            .map((f) => ({
-              full: path.join(voicesDir, f),
-              mtime: fs.statSync(path.join(voicesDir, f)).mtimeMs
-            }))
-            .sort((a, b) => b.mtime - a.mtime);
-          if (wavFiles.length > 0) {
-            resolvedSampleDiskPath = wavFiles[0].full;
-          }
+        const { getUsersCollection } = await import('@/server/database/mongo');
+        const usersCol = await getUsersCollection();
+        const lookupQueries: any[] = [];
+        if (params.token) {
+          lookupQueries.push(
+            { overlayToken: params.token },
+            { id: params.token },
+            { userId: params.token }
+          );
         }
-      } catch {}
+        if (cloneDoc?.userId) {
+          lookupQueries.push(
+            { userId: cloneDoc.userId },
+            { id: cloneDoc.userId },
+            { overlayToken: cloneDoc.userId }
+          );
+        }
+        const streamer = (await usersCol.findOne({
+          $or: lookupQueries
+        })) as any;
+        const streamerPlan = String(streamer?.plan || 'free').toLowerCase();
+        const isAdmin = Boolean(streamer?.isAdmin || streamer?.is_admin || streamer?.role === 'admin');
+        if (streamer && streamerPlan !== 'pro' && !isAdmin) {
+          console.log('[TTS Service] User is on Free plan. Falling back cloned voice to default standard voice.');
+          isCloned = false;
+        }
+      } catch (e) {}
     }
 
-    const parsedManualPitch = parseInt(String(params.pitch || '0').replace(/[^0-9-]/g, ''), 10) || 0;
-    const parsedManualRate = parseInt(String(params.rate || '0').replace(/[^0-9-]/g, ''), 10) || 0;
+    if (isCloned) {
+      const relSample =
+        clonedVoiceUrl && clonedVoiceUrl.startsWith('/uploads/voices/')
+          ? clonedVoiceUrl
+          : cloneDoc?.sampleUrl;
 
-    // Use neutral phoneme carriers (Piseth for Khmer, Guy for English) so OpenVoiceV2 + Glottal F0 + Welch LTAS
-    // transfers the exact target speaker's vocal tract tone color, pitch, and cadence without Sreymom/Piseth prosody artifacts!
-    activeVoice = isKhmer ? 'km-KH-PisethNeural' : 'en-US-GuyNeural';
+      if (relSample && typeof relSample === 'string' && relSample.startsWith('/uploads/voices/')) {
+        const candidatePath = path.join(process.cwd(), 'public', relSample);
+        if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).size > 500) {
+          resolvedSampleDiskPath = candidatePath;
+        }
+      }
 
-    const effectivePitchHz = Number(cloneDoc?.averagePitchHz) || 130;
-    clonedProfile = {
-      averagePitchHz: effectivePitchHz,
-      detectedGender: cloneDoc?.detectedGender === 'female' ? 'female' : 'male',
-      spectralBrightnessHz: Number(cloneDoc?.spectralBrightnessHz) || 400,
-      speakingTempoRatio: Number(cloneDoc?.speakingTempoRatio) || 1.0,
-      chestGainDb: Number(cloneDoc?.chestGainDb ?? 2.0),
-      presenceGainDb: Number(cloneDoc?.presenceGainDb ?? 1.8),
-      airGainDb: Number(cloneDoc?.airGainDb ?? 1.2),
-      pitchOffsetHz: parsedManualPitch,
-      ratePercent: parsedManualRate
-    };
+      // Fallback: if no valid sample path was resolved yet, pick the newest .wav in /public/uploads/voices/
+      if (!resolvedSampleDiskPath) {
+        try {
+          const voicesDir = path.join(process.cwd(), 'public', 'uploads', 'voices');
+          if (fs.existsSync(voicesDir)) {
+            const wavFiles = fs
+              .readdirSync(voicesDir)
+              .filter((f) => f.endsWith('.wav'))
+              .map((f) => ({
+                full: path.join(voicesDir, f),
+                mtime: fs.statSync(path.join(voicesDir, f)).mtimeMs
+              }))
+              .sort((a, b) => b.mtime - a.mtime);
+            if (wavFiles.length > 0) {
+              resolvedSampleDiskPath = wavFiles[0].full;
+            }
+          }
+        } catch {}
+      }
 
-    prosodyOptions = {
-      pitch: '+0Hz',
-      rate: '+0%',
-      volume: params.volume || cloneDoc?.volume || '+0%'
-    };
-  } else {
-    // Standard voice resolution
-    const resolved = resolveVoice(type, rawClean);
+      const parsedManualPitch = parseInt(String(params.pitch || '0').replace(/[^0-9-]/g, ''), 10) || 0;
+      const parsedManualRate = parseInt(String(params.rate || '0').replace(/[^0-9-]/g, ''), 10) || 0;
+
+      // Use crystal-clear carrier matching the streamer's acoustic gender & language
+      const isFemale =
+        cloneDoc?.detectedGender === 'female' ||
+        cloneDoc?.baseModel === 'neural-female' ||
+        cloneDoc?.baseModel === 'female' ||
+        cloneDoc?.baseModel === 'kiritts-female' ||
+        Number(cloneDoc?.averagePitchHz) > 175;
+
+      // Carrier voice matching language, acoustic gender, and sound style
+      if (isKhmer) {
+        activeVoice = isFemale ? 'km-KH-SreymomNeural' : 'km-KH-PisethNeural';
+      } else {
+        if (isFemale) {
+          activeVoice = 'en-US-JennyNeural';
+        } else {
+          const soundStyle = cloneDoc?.soundStyle;
+          const avgPitch = Number(cloneDoc?.averagePitchHz || 130);
+          activeVoice =
+            soundStyle === 'Deep & Resonant' || avgPitch < 122
+              ? 'en-US-ChristopherNeural'
+              : 'en-US-GuyNeural';
+        }
+      }
+
+      const effectivePitchHz = Number(cloneDoc?.averagePitchHz) || 130;
+      clonedProfile = {
+        averagePitchHz: effectivePitchHz,
+        detectedGender: isFemale ? 'female' : 'male',
+        soundStyle: cloneDoc?.soundStyle || 'Warm & Conversational',
+        pacingLabel: cloneDoc?.pacingLabel || 'Natural (1.0x)',
+        timbre: cloneDoc?.timbre || 'balanced natural voice',
+        tau: cloneDoc?.tau ?? 0.19,
+        f0Std: cloneDoc?.f0Std ?? 18,
+        spectralBrightnessHz: Number(cloneDoc?.spectralBrightnessHz) || 400,
+        speakingTempoRatio: Number(cloneDoc?.speakingTempoRatio) || 1.0,
+        chestGainDb: Number(cloneDoc?.chestGainDb ?? 2.0),
+        presenceGainDb: Number(cloneDoc?.presenceGainDb ?? 1.8),
+        airGainDb: Number(cloneDoc?.airGainDb ?? 1.2),
+        pitchOffsetHz: parsedManualPitch,
+        ratePercent: parsedManualRate
+      };
+
+      // Apply the trained neural speaking rate & pitch offset from the voice sample
+      const trainedPitch =
+        cloneDoc?.pitch && cloneDoc.pitch !== '+0Hz'
+          ? cloneDoc.pitch
+          : (parsedManualPitch !== 0
+              ? `${parsedManualPitch > 0 ? '+' : ''}${parsedManualPitch}Hz`
+              : '+0Hz');
+
+      const trainedRate =
+        cloneDoc?.rate && cloneDoc.rate !== '+0%'
+          ? cloneDoc.rate
+          : (parsedManualRate !== 0
+              ? `${parsedManualRate > 0 ? '+' : ''}${parsedManualRate}%`
+              : '+0%');
+
+      prosodyOptions = {
+        pitch: params.pitch && params.pitch !== '+0Hz' ? params.pitch : trainedPitch,
+        rate: params.rate && params.rate !== '+0%' ? params.rate : trainedRate,
+        volume: params.volume || cloneDoc?.volume || '+0%'
+      };
+    }
+  }
+
+  if (!isCloned) {
+    // Standard voice resolution (or free tier fallback)
+    const resolved = resolveVoice(type === 'cloned' ? 'google' : type, rawClean);
     activeVoice = resolved.voice;
     isKhmer = resolved.isKhmer;
   }
@@ -692,7 +777,7 @@ export async function synthesizeTTSWithBuffer(params: {
     };
   }
 
-  // 2. Pure Node.js Edge-TTS direct synthesis
+  // 3. Pure Node.js Edge-TTS direct synthesis
   let rawBuffer = await tryNodeEdgeTtsToBuffer(activeVoice, cleanedText, prosodyOptions);
 
   // 3. Fallback to Python edge-tts CLI
@@ -738,6 +823,7 @@ export async function synthesizeTTS(params: {
   pitch?: string;
   rate?: string;
   volume?: string;
+  token?: string;
 }): Promise<string> {
   const result = await synthesizeTTSWithBuffer(params);
   return result.audioUrl;

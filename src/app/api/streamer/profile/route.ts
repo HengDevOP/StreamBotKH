@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
       username: streamer.username,
       displayName: streamer.displayName || streamer.username,
       avatarUrl: streamer.avatarUrl,
+      bannerUrl: (streamer as any).bannerUrl || (streamer as any).banner_url || '',
       bio: streamer.bio,
       customThanksMessage: streamer.customThanksMessage || '',
       socialLinks: userSocialLinks,
@@ -103,7 +104,13 @@ export async function GET(req: NextRequest) {
       overlayToken: streamer.overlayToken || streamer.overlay_token,
       telegramChatId: (streamer as any).telegramChatId || (streamer as any).telegram_chat_id,
       telegramPairingCode: streamer.telegramPairingCode || (streamer as any).telegram_pairing_code,
-      liveStreamUrl: streamer.liveStreamUrl || streamer.youtubeLiveUrl || ''
+      liveStreamUrl: streamer.liveStreamUrl || streamer.youtubeLiveUrl || '',
+      broadcastUrls: (streamer as any).broadcastUrls || {
+        youtube: streamer.liveStreamUrl || streamer.youtubeLiveUrl || '',
+        twitch: '',
+        tiktok: '',
+        facebook: ''
+      }
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -118,7 +125,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { username, description, bio, displayName, avatarUrl, plan, customThanksMessage } = body;
+    const { username, description, bio, displayName, avatarUrl, bannerUrl, plan, customThanksMessage } = body;
     const incomingLinks = body.socialLinks !== undefined ? body.socialLinks : body.links;
 
     const usersCol = await getUsersCollection();
@@ -153,10 +160,31 @@ export async function PUT(req: NextRequest) {
 
     const newDisplayName = displayName !== undefined ? String(displayName).trim() : current.displayName;
     const newAvatarUrl = avatarUrl !== undefined ? String(avatarUrl).trim() : current.avatarUrl;
+    const newBannerUrl = bannerUrl !== undefined ? String(bannerUrl).trim() : ((current as any).bannerUrl || '');
     const newPlan = plan !== undefined ? String(plan).toLowerCase() : (current.plan || 'free');
     const newThanks = customThanksMessage !== undefined ? String(customThanksMessage).trim() : (current.customThanksMessage || '');
     const rawLiveUrl = body.liveStreamUrl !== undefined ? body.liveStreamUrl : body.youtubeLiveUrl;
-    const newLiveStreamUrl = rawLiveUrl !== undefined ? String(rawLiveUrl).trim() : (current.liveStreamUrl || '');
+    let newLiveStreamUrl = rawLiveUrl !== undefined ? String(rawLiveUrl).trim() : (current.liveStreamUrl || '');
+
+    // Process multi-platform broadcast URLs (YouTube, Twitch, TikTok, Facebook)
+    const incomingBroadcastUrls = body.broadcastUrls;
+    let finalBroadcastUrls = (current as any).broadcastUrls || {};
+    if (incomingBroadcastUrls && typeof incomingBroadcastUrls === 'object') {
+      finalBroadcastUrls = {
+        youtube: incomingBroadcastUrls.youtube !== undefined ? String(incomingBroadcastUrls.youtube).trim() : (finalBroadcastUrls.youtube || ''),
+        twitch: incomingBroadcastUrls.twitch !== undefined ? String(incomingBroadcastUrls.twitch).trim() : (finalBroadcastUrls.twitch || ''),
+        tiktok: incomingBroadcastUrls.tiktok !== undefined ? String(incomingBroadcastUrls.tiktok).trim() : (finalBroadcastUrls.tiktok || ''),
+        facebook: incomingBroadcastUrls.facebook !== undefined ? String(incomingBroadcastUrls.facebook).trim() : (finalBroadcastUrls.facebook || '')
+      };
+      if (finalBroadcastUrls.youtube !== undefined) {
+        newLiveStreamUrl = finalBroadcastUrls.youtube;
+      }
+    } else if (rawLiveUrl !== undefined) {
+      finalBroadcastUrls = {
+        ...finalBroadcastUrls,
+        youtube: newLiveStreamUrl
+      };
+    }
 
     // 3. Process social links with plan limits: Free (1 link), Pro (5 links)
     const isPro = newPlan === 'pro';
@@ -191,9 +219,11 @@ export async function PUT(req: NextRequest) {
           displayName: newDisplayName,
           bio: newBio,
           avatarUrl: newAvatarUrl,
+          bannerUrl: newBannerUrl,
           plan: newPlan,
           customThanksMessage: newThanks,
           liveStreamUrl: newLiveStreamUrl,
+          broadcastUrls: finalBroadcastUrls,
           socialLinks: finalLinks,
           updatedAt: now
         }
@@ -294,7 +324,8 @@ export async function PUT(req: NextRequest) {
         overlayToken: updated?.overlayToken || updated?.overlay_token,
         telegramChatId: (updated as any)?.telegramChatId || (updated as any)?.telegram_chat_id,
         telegramPairingCode: updated?.telegramPairingCode || (updated as any)?.telegram_pairing_code,
-        liveStreamUrl: updated?.liveStreamUrl || newLiveStreamUrl || ''
+        liveStreamUrl: updated?.liveStreamUrl || newLiveStreamUrl || '',
+        broadcastUrls: updated?.broadcastUrls || finalBroadcastUrls
       }
     });
   } catch (err: any) {

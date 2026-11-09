@@ -12,6 +12,7 @@ export interface Streamer {
   username: string;
   displayName: string;
   avatarUrl?: string;
+  bannerUrl?: string;
   bio?: string;
   socialLinks?: SocialLink[];
   links?: SocialLink[];
@@ -32,6 +33,12 @@ export interface Streamer {
   isVerified?: boolean;
   liveStreamUrl?: string;
   youtubeLiveUrl?: string;
+  broadcastUrls?: {
+    youtube?: string;
+    twitch?: string;
+    tiktok?: string;
+    facebook?: string;
+  };
   deletionStatus?: 'pending' | 'deleted' | null;
   deletionRequestedAt?: string | null;
   deletionScheduledAt?: string | null;

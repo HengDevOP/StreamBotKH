@@ -227,13 +227,15 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
 
       let audioUrl = '';
       if (type === 'cloned') {
-        // High quality Neural KiriTTS Voice Clone matching streamer's exact voice
+        // High quality Neural AI Voice Clone matching streamer's exact voice
         const safeSamplePath =
           clonedUrl && !clonedUrl.startsWith('data:') && clonedUrl.length < 250
             ? clonedUrl
             : '';
 
-        audioUrl = `/api/tts?type=cloned&clonedVoiceName=${encodeURIComponent(
+        audioUrl = `/api/tts?type=cloned&token=${encodeURIComponent(
+          overlayToken || ''
+        )}&clonedVoiceName=${encodeURIComponent(
           clonedVoiceName || ''
         )}&clonedVoiceSampleUrl=${encodeURIComponent(
           safeSamplePath

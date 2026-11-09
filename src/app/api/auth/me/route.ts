@@ -111,6 +111,7 @@ export async function GET(req: NextRequest) {
     username: streamer.username,
     displayName: streamer.displayName,
     avatarUrl: streamer.avatarUrl,
+    bannerUrl: (streamer as any).bannerUrl || (streamer as any).banner_url || '',
     bio: streamer.bio,
     customThanksMessage: streamer.customThanksMessage,
     isVerified: Boolean(streamer.isVerified),
@@ -127,6 +128,12 @@ export async function GET(req: NextRequest) {
     telegramChatId: (streamer as any).telegramChatId || (streamer as any).telegram_chat_id,
     telegramPairingCode: (streamer as any).telegramPairingCode || (streamer as any).telegram_pairing_code,
     liveStreamUrl: streamer.liveStreamUrl || streamer.youtubeLiveUrl || '',
+    broadcastUrls: (streamer as any).broadcastUrls || {
+      youtube: streamer.liveStreamUrl || streamer.youtubeLiveUrl || '',
+      twitch: '',
+      tiktok: '',
+      facebook: ''
+    },
     socialLinks: Array.isArray(streamer.socialLinks) ? streamer.socialLinks : [],
     deletionStatus: streamer.deletionStatus || null,
     deletionRequestedAt: streamer.deletionRequestedAt

@@ -426,7 +426,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
       if (data.success) {
         setTelegramOutletGroup(group);
         setIsOutletModalOpen(false);
-        setOutletToast({ type: 'success', message: `Connected "${group.title}" as Subscriber Telegram Outlet!` });
+        setOutletToast({ type: 'success', message: `Connected "${group.title}" as Membership Telegram Outlet!` });
         setTimeout(() => setOutletToast(null), 3500);
       } else {
         setOutletToast({ type: 'error', message: data.error || 'Failed to connect Telegram outlet group.' });
@@ -441,7 +441,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   };
 
   const handleDisconnectOutletGroup = async () => {
-    if (!window.confirm('Disconnect this Telegram outlet group? GramJS will stop listening for subscriber transactions from this group.')) {
+    if (!window.confirm('Disconnect this Telegram outlet group? GramJS will stop listening for membership transactions from this group.')) {
       return;
     }
     setLoadingOutlet(true);
@@ -459,7 +459,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
       const data = await res.json();
       if (data.success) {
         setTelegramOutletGroup(null);
-        setOutletToast({ type: 'success', message: 'Subscriber Telegram Outlet Group disconnected.' });
+        setOutletToast({ type: 'success', message: 'Membership Telegram Outlet Group disconnected.' });
         setTimeout(() => setOutletToast(null), 3500);
       } else {
         setOutletToast({ type: 'error', message: data.error || 'Failed to disconnect outlet group.' });
@@ -611,7 +611,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   };
 
   const handleDeleteTier = async (tierId: string) => {
-    if (!window.confirm('Delete this subscriber tier?')) return;
+    if (!window.confirm('Delete this membership tier?')) return;
     const updatedTiers = tiers.filter((t) => t.id !== tierId);
     setTiers(updatedTiers);
     setSavedTiers(updatedTiers);
@@ -620,7 +620,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
 
   const handleClearAllTiers = async () => {
     if (tiers.length === 0) return;
-    if (window.confirm('Are you sure you want to remove all subscriber tiers?')) {
+    if (window.confirm('Are you sure you want to remove all membership tiers?')) {
       setTiers([]);
       setSavedTiers([]);
       await persistTiers([]);
@@ -754,9 +754,9 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
         <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-4 text-amber-400">
           <Lock className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-bold text-white mb-2 font-['Chakra_Petch']">Subscribers Feature is Pro Only</h2>
+        <h2 className="text-xl font-bold text-white mb-2 font-['Chakra_Petch']">Membership Feature is Pro Only</h2>
         <p className="text-slate-400 max-w-md mx-auto mb-6 text-sm">
-          Upgrade to unlock Channel Memberships &amp; Subscriber Badges. Allow viewers to pay monthly support and display exclusive badges in your OBS chat overlay.
+          Upgrade to unlock Channel Memberships &amp; Badges. Allow viewers to pay monthly support and display exclusive badges in your OBS chat overlay.
         </p>
         {onUpgrade && (
           <Button onClick={onUpgrade} className="bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold">
@@ -809,7 +809,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                 type="button"
                 onClick={handleClearAllTiers}
                 className="text-xs text-slate-500 hover:text-red-400 px-2.5 py-1.5 rounded-xl border border-slate-800 hover:border-red-500/30 transition-colors flex items-center gap-1 cursor-pointer font-mono"
-                title="Remove all subscriber tiers"
+                title="Remove all membership tiers"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Remove All</span>
@@ -833,7 +833,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
             </div>
             <div className="space-y-1">
               <h3 className="text-base font-bold text-white font-['Chakra_Petch']">
-                No Subscription Tiers Created Yet
+                No Membership Tiers Created Yet
               </h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 All pre-set tiers have been removed. You can now create your own custom tiers from scratch with your preferred pricing, badge icon, badge text, colors, and perks!
@@ -1013,7 +1013,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                 <Send className="w-4 h-4 transform -rotate-45" />
               </div>
               <h2 className="text-base font-bold text-white font-['Chakra_Petch'] tracking-wide">
-                Subscriber Telegram Outlet Group
+                Membership Telegram Outlet Group
               </h2>
 
               {telegramOutletGroup ? (
@@ -1030,7 +1030,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed">
-              Connect a dedicated Telegram group to listen for incoming bank &amp; Bakong KHQR transaction receipts for subscriber memberships. Verified receipts automatically activate the viewer&apos;s 30-day VIP badge and broadcast overlay alerts.
+              Connect a dedicated Telegram group to listen for incoming bank &amp; Bakong KHQR transaction receipts for channel memberships. Verified receipts automatically activate the member&apos;s 30-day VIP badge and broadcast overlay alerts.
             </p>
           </div>
 
@@ -1111,7 +1111,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
               <div className="min-w-0">
                 <span className="text-[10px] text-slate-400 font-mono uppercase font-semibold block">Status</span>
                 <span className="text-xs text-slate-300 block truncate">
-                  Auto-verifying subscriber transactions
+                  Auto-verifying membership transactions
                 </span>
               </div>
             </div>
@@ -1131,7 +1131,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-white font-['Chakra_Petch'] leading-tight">
-                    {editingTier ? 'Edit Subscriber Tier' : 'Configure New Subscriber Tier'}
+                    {editingTier ? 'Edit Membership Tier' : 'Configure New Membership Tier'}
                   </h3>
                   <p className="text-[11px] text-slate-400 font-sans hidden sm:block">
                     Set up tier pricing, choose your channel vector badge, and customize live overlay styles
@@ -1194,7 +1194,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                       <div>
                         <label className="text-xs font-bold text-white uppercase tracking-wider font-['Chakra_Petch'] flex items-center gap-1.5">
                           <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>Subscriber Vector Badge</span>
+                          <span>Membership Vector Badge</span>
                         </label>
                         <p className="text-[11px] text-slate-400">
                           Select the vector icon displayed next to usernames on stream
@@ -1457,7 +1457,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                           </span>
                         </div>
                         <span className="text-slate-100 flex-1">
-                          Proud {tierName || 'subscriber'}! Let’s go! 🔥✨
+                          Proud {tierName || 'member'}! Let’s go! 🔥✨
                         </span>
                       </div>
                     </div>
@@ -1576,7 +1576,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
         currentUrl={tierBadgeGif}
         currentPlan={isLocked ? 'free' : 'pro'}
         onUpgrade={onUpgrade}
-        title="Choose Subscriber Badge GIF / Image"
+        title="Choose Membership Badge GIF / Image"
         subtitle="Pick an animated GIF, sticker, or image from your library"
       />
 
@@ -1631,7 +1631,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                 <label className="text-xs text-slate-400 font-medium block mb-1">Select Tier</label>
                 {tiers.length === 0 ? (
                   <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl font-mono">
-                    Please create at least one subscription tier first.
+                    Please create at least one membership tier first.
                   </p>
                 ) : (
                   <select
@@ -1681,10 +1681,10 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white font-['Chakra_Petch']">
-                    Subscriber Telegram Outlet
+                    Membership Telegram Outlet
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Select a group to monitor for incoming subscriber bank receipts
+                    Select a group to monitor for incoming membership bank receipts
                   </p>
                 </div>
               </div>
@@ -1830,7 +1830,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. VIP Subscriber Alerts"
+                      placeholder="e.g. VIP Membership Alerts"
                       value={customOutletTitle}
                       onChange={(e) => setCustomOutletTitle(e.target.value)}
                       className="w-full px-3 py-2 bg-slate-900 border border-slate-800 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-lg text-xs text-white placeholder-slate-600 outline-none"

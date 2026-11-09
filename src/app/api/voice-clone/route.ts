@@ -4,7 +4,14 @@ import path from 'path';
 import crypto from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { getVoiceClonesCollection, VoiceCloneDoc } from '@/server/database/mongo';
+import { ObjectId } from 'mongodb';
+import {
+  getVoiceClonesCollection,
+  VoiceCloneDoc,
+  getAlertSettingsCollection,
+  getAlertBoxesCollection,
+  getUsersCollection
+} from '@/server/database/mongo';
 import { getAuthenticatedUser } from '@/server/auth';
 import { analyzeVoiceSampleFile } from '@/server/services/ttsService';
 
@@ -17,14 +24,60 @@ const DEMO_USER_ID = 'demo-streamer-id-1001';
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthenticatedUser(req);
-    const userId = user?.id || DEMO_USER_ID;
+    const queryToken = req.nextUrl?.searchParams?.get('token') || req.nextUrl?.searchParams?.get('userId');
+    let userId = user?.id;
+
+    if (!userId && queryToken) {
+      try {
+        const usersCol = await getUsersCollection();
+        const streamer = (await usersCol.findOne({
+          $or: [
+            { overlayToken: queryToken },
+            { overlay_token: queryToken },
+            { userId: queryToken },
+            { id: queryToken },
+            { username: queryToken }
+          ]
+        })) as any;
+        if (streamer?.userId || streamer?.id) {
+          userId = streamer.userId || streamer.id;
+        }
+      } catch (e) {}
+    }
+
+    if (!userId) {
+      userId = DEMO_USER_ID;
+    }
 
     const col = await getVoiceClonesCollection();
     const clones = await col.find({
       $or: [{ userId }, { userId: DEMO_USER_ID }]
     }).sort({ clonedAt: -1 }).toArray();
 
-    return NextResponse.json({ success: true, voices: clones });
+    // Check active alert TTS voice configuration
+    let activeClonedVoiceName: string | null = null;
+    let isClonedActive = false;
+
+    try {
+      const alertCol = await getAlertSettingsCollection();
+      const settings = (await alertCol.findOne({
+        $or: [{ streamerId: userId }, { streamer_id: userId as any }]
+      })) as any;
+
+      if (settings?.ttsType === 'cloned' || settings?.ttsVoice === 'cloned') {
+        isClonedActive = true;
+        activeClonedVoiceName = settings?.clonedVoiceName || (clones[0]?.voiceName ?? null);
+      }
+    } catch (e) {}
+
+    return NextResponse.json({
+      success: true,
+      voices: clones,
+      activeClonedVoiceName,
+      isClonedActive,
+      maxAllowedVoices: 3,
+      count: clones.length
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -32,21 +85,175 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json().catch(() => ({}));
     const user = getAuthenticatedUser(req);
-    if (!user || !user.id) {
+    let userId = user?.id;
+
+    if (!userId) {
+      const token =
+        body.token ||
+        body.overlayToken ||
+        body.userId ||
+        req.headers.get('x-streamer-token') ||
+        req.nextUrl?.searchParams?.get('token') ||
+        '';
+
+      if (token) {
+        try {
+          const usersCol = await getUsersCollection();
+          const streamer = (await usersCol.findOne({
+            $or: [
+              { overlayToken: token },
+              { overlay_token: token },
+              { userId: token },
+              { id: token },
+              { username: token }
+            ]
+          })) as any;
+          if (streamer?.userId || streamer?.id) {
+            userId = streamer.userId || streamer.id;
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!userId) {
+      userId = DEMO_USER_ID;
+    }
+
+    // ACTION: Set this cloned voice as the active TTS voice for all donation alerts
+    if (body.action === 'set_active_alert_voice') {
+      const { voiceName, sampleUrl } = body;
+      if (!voiceName) {
+        return NextResponse.json({ success: false, error: 'Voice name is required' }, { status: 400 });
+      }
+
+      const alertCol = await getAlertSettingsCollection();
+      await alertCol.updateOne(
+        { $or: [{ streamerId: userId }, { streamer_id: userId as any }] },
+        {
+          $set: {
+            ttsEnabled: true,
+            tts_enabled: 1,
+            ttsType: 'cloned',
+            ttsVoice: 'cloned',
+            tts_voice: 'cloned',
+            clonedVoiceName: voiceName,
+            clonedVoiceSampleUrl: sampleUrl || null,
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+
+      // Also propagate to all active alert boxes for this streamer
+      try {
+        const boxesCol = await getAlertBoxesCollection();
+        await boxesCol.updateMany(
+          { userId },
+          {
+            $set: {
+              ttsEnabled: true,
+              ttsType: 'cloned',
+              clonedVoiceName: voiceName,
+              clonedVoiceSampleUrl: sampleUrl || null
+            }
+          }
+        );
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: `"${voiceName}" is now set as the active voice for live donation alerts!`
+      });
+    }
+
+    // ACTION: Reset alert TTS to standard voice
+    if (body.action === 'reset_default_voice') {
+      const alertCol = await getAlertSettingsCollection();
+      await alertCol.updateOne(
+        { $or: [{ streamerId: userId }, { streamer_id: userId as any }] },
+        {
+          $set: {
+            ttsType: 'google',
+            ttsVoice: 'Google US English',
+            clonedVoiceName: null,
+            clonedVoiceSampleUrl: null,
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      try {
+        const boxesCol = await getAlertBoxesCollection();
+        await boxesCol.updateMany(
+          { userId },
+          {
+            $set: {
+              ttsType: 'google',
+              clonedVoiceName: null,
+              clonedVoiceSampleUrl: null
+            }
+          }
+        );
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'Donation alerts TTS reset to standard voice.'
+      });
+    }
+
+    // DEFAULT ACTION: TRAIN AND CLONE NEW VOICE
+    // 1. Enforce Pro Plan check
+    if (userId && userId !== DEMO_USER_ID) {
+      try {
+        const usersCol = await getUsersCollection();
+        const streamer = (await usersCol.findOne({
+          $or: [
+            { userId },
+            { id: userId },
+            { _id: ObjectId.isValid(userId) ? new ObjectId(userId) : null }
+          ].filter(Boolean) as any
+        })) as any;
+
+        const currentPlan = String(streamer?.plan || 'free').toLowerCase();
+        const isAdminUser = Boolean(streamer?.isAdmin || streamer?.is_admin || streamer?.role === 'admin');
+
+        if (streamer && currentPlan !== 'pro' && !isAdminUser) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Clone TTS is an exclusive feature for Pro Plan users only. Please upgrade to Pro to clone your voice.'
+            },
+            { status: 403 }
+          );
+        }
+      } catch (e) {}
+    }
+
+    // 2. Enforce 3 Cloned Voices maximum limit
+    const MAX_CLONED_VOICES = 3;
+    const voiceCol = await getVoiceClonesCollection();
+    const existingCount = await voiceCol.countDocuments({
+      $or: [{ userId }, ...(userId === DEMO_USER_ID ? [{ userId: DEMO_USER_ID }] : [])]
+    });
+
+    if (existingCount >= MAX_CLONED_VOICES) {
       return NextResponse.json(
-        { success: false, error: 'Authentication required. Please sign in to clone an AI voice.' },
-        { status: 401 }
+        {
+          success: false,
+          error: `Pro plan allows up to ${MAX_CLONED_VOICES} cloned voices. You have already reached the limit (${existingCount}/${MAX_CLONED_VOICES}). Please delete an existing voice model before creating a new one.`
+        },
+        { status: 400 }
       );
     }
-    const userId = user.id;
 
-    const body = await req.json();
     const {
       voiceName = 'My Streamer AI Voice',
       sampleUrl,
       sampleDurationSeconds = 0,
-      baseModel = 'kiritts-male',
+      baseModel = 'neural-male',
       pitch = '+0Hz',
       rate = '+0%',
       volume = '+0%',
@@ -62,12 +269,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Require at least 15 seconds clean speech recording
-    if (Number(sampleDurationSeconds) < 14.5) {
+    // Require at least 5 seconds clean speech recording (supports 5s - 15s or longer)
+    if (Number(sampleDurationSeconds) < 4.8) {
       return NextResponse.json(
         {
           success: false,
-          error: `Audio recording is ${Number(sampleDurationSeconds).toFixed(1)}s. AI Voice Cloning requires at least 15 seconds of clean speech for accurate KiriTTS acoustic modeling.`
+          error: `Audio recording is ${Number(sampleDurationSeconds).toFixed(1)}s. AI Voice Cloning requires at least 5 seconds of clean speech (5s - 15s or longer).`
         },
         { status: 400 }
       );
@@ -135,23 +342,42 @@ export async function POST(req: NextRequest) {
       Number(averagePitchHz) ||
       (resolvedGender === 'female' ? 210 : 130);
 
+    const finalBaseModel =
+      baseModel && baseModel !== 'auto'
+        ? String(baseModel).toLowerCase().trim()
+        : resolvedGender === 'female'
+        ? 'neural-female'
+        : 'neural-male';
+
+    const derivedPitch = analyzedProfile?.pitchOffsetHz !== undefined && analyzedProfile.pitchOffsetHz !== 0
+      ? `${analyzedProfile.pitchOffsetHz > 0 ? '+' : ''}${analyzedProfile.pitchOffsetHz}Hz`
+      : String(pitch || '+0Hz').trim();
+
+    const derivedRate = analyzedProfile?.ratePercent !== undefined && analyzedProfile.ratePercent !== 0
+      ? `${analyzedProfile.ratePercent > 0 ? '+' : ''}${analyzedProfile.ratePercent}%`
+      : String(rate || '+0%').trim();
+
     const newDoc: VoiceCloneDoc & Record<string, any> = {
       userId,
       voiceName: voiceName.trim() || 'My Streamer AI Voice',
       sampleUrl: storedSampleUrl,
       sampleDurationSeconds: Number(sampleDurationSeconds),
-      baseModel: resolvedGender === 'female' ? 'kiritts-female' : 'kiritts-male',
-      pitch: String(pitch || '+0Hz').trim(),
-      rate: String(rate || `${analyzedProfile?.ratePercent && analyzedProfile.ratePercent >= 0 ? '+' : ''}${analyzedProfile?.ratePercent || 0}%`).trim(),
+      baseModel: finalBaseModel,
+      pitch: derivedPitch,
+      rate: derivedRate,
       volume: String(volume || '+0%').trim(),
       detectedGender: resolvedGender,
       averagePitchHz: resolvedPitchHz,
+      soundStyle: analyzedProfile?.soundStyle || 'Warm & Conversational',
+      pacingLabel: analyzedProfile?.pacingLabel || 'Natural (1.0x)',
+      timbre: analyzedProfile?.timbre || String(timbre || 'natural voice'),
+      tau: analyzedProfile?.tau ?? 0.19,
+      f0Std: analyzedProfile?.f0Std ?? 18,
       spectralBrightnessHz: analyzedProfile?.spectralBrightnessHz ?? 380,
       speakingTempoRatio: analyzedProfile?.speakingTempoRatio ?? 1.0,
-      chestGainDb: analyzedProfile?.chestGainDb ?? 2.2,
+      chestGainDb: analyzedProfile?.chestGainDb ?? 2.0,
       presenceGainDb: analyzedProfile?.presenceGainDb ?? 1.8,
       airGainDb: analyzedProfile?.airGainDb ?? 1.2,
-      timbre: String(timbre || 'natural'),
       clonedAt: new Date()
     };
 
@@ -160,11 +386,65 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'AI Voice Model trained and cloned with KiriTTS neural engine! Ready for Donation TTS.',
+      message: 'AI Voice Model trained and cloned with Neural Voice engine! Ready for Donation TTS.',
       voice: created
     });
   } catch (err: any) {
     console.error('Error in POST /api/voice-clone:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = getAuthenticatedUser(req);
+    let userId = user?.id;
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    const queryToken =
+      searchParams.get('token') ||
+      searchParams.get('userId') ||
+      req.headers.get('x-streamer-token');
+
+    if (!userId && queryToken) {
+      try {
+        const usersCol = await getUsersCollection();
+        const streamer = (await usersCol.findOne({
+          $or: [
+            { overlayToken: queryToken },
+            { overlay_token: queryToken },
+            { userId: queryToken },
+            { id: queryToken },
+            { username: queryToken }
+          ]
+        })) as any;
+        if (streamer?.userId || streamer?.id) {
+          userId = streamer.userId || streamer.id;
+        }
+      } catch (e) {}
+    }
+
+    if (!userId) {
+      userId = DEMO_USER_ID;
+    }
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Voice ID is required' }, { status: 400 });
+    }
+
+    const col = await getVoiceClonesCollection();
+    let query: any = {
+      $or: [{ userId }, { userId: DEMO_USER_ID }]
+    };
+    if (ObjectId.isValid(id)) {
+      query._id = new ObjectId(id);
+    } else {
+      query.id = id;
+    }
+
+    const result = await col.deleteOne(query);
+    return NextResponse.json({ success: true, deletedCount: result.deletedCount });
+  } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

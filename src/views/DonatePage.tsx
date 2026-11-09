@@ -347,7 +347,21 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
   }
 
   return (
-    <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col items-center justify-center py-4 xs:py-6 sm:py-12 px-2.5 xs:px-4 sm:px-6">
+    <div className="relative min-h-screen bg-[#070A12] text-slate-100 flex flex-col items-center justify-center py-4 xs:py-6 sm:py-12 px-2.5 xs:px-4 sm:px-6 overflow-x-hidden">
+      {/* Streamer Custom Banner Background Wallpaper */}
+      {streamer?.bannerUrl && (
+        <div
+          className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat transition-all duration-700"
+          style={{
+            backgroundImage: `url("${streamer.bannerUrl}")`
+          }}
+        >
+          {/* Deep dark gradient overlay so forms, cards, and text maintain high contrast */}
+          <div className="absolute inset-0 bg-[#070A12]/85 backdrop-blur-[6px]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#070A12] via-[#070A12]/80 to-transparent" />
+        </div>
+      )}
+
       {/* Simple Session Expired / Cancelled Toast (Slides in from right side on all screens) */}
       {cancelMessage && !isSuccess && (
         <div
@@ -412,7 +426,7 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
         </div>
       ) : (
         /* Main Centered Container Div: not full width and not full height, side-by-side equal height on desktop */
-        <div className="w-full max-w-4xl mx-auto flex flex-col md:flex-row md:items-stretch justify-center gap-4 sm:gap-6 animate-fadeIn">
+        <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col md:flex-row md:items-stretch justify-center gap-4 sm:gap-6 animate-fadeIn">
           
           {/* First Div: For the Content (left side) */}
           <div className="w-full md:w-[460px] lg:w-[480px] flex-shrink-0 min-w-0 flex flex-col">

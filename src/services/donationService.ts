@@ -15,6 +15,7 @@ export interface PublicStreamerInfo {
   username: string;
   displayName: string;
   avatarUrl?: string;
+  bannerUrl?: string;
   bio?: string;
   plan?: 'free' | 'pro' | string;
   glowColor: string;

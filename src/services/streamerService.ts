@@ -54,9 +54,16 @@ export const streamerService = {
     bio?: string;
     displayName?: string;
     avatarUrl?: string;
+    bannerUrl?: string;
     customThanksMessage?: string;
     liveStreamUrl?: string;
     youtubeLiveUrl?: string;
+    broadcastUrls?: {
+      youtube?: string;
+      twitch?: string;
+      tiktok?: string;
+      facebook?: string;
+    };
     plan?: string;
     socialLinks?: any[];
     links?: any[];

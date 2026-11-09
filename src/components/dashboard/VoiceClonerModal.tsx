@@ -130,10 +130,10 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [scriptLanguage, setScriptLanguage] = useState<'khmer' | 'english'>('khmer');
 
-  // Neural KiriTTS Acoustic Calibrations
+  // Neural Voice Acoustic Calibrations
   const [detectedGender, setDetectedGender] = useState<'male' | 'female'>('male');
   const [averagePitchHz, setAveragePitchHz] = useState<number>(125);
-  const [baseModel, setBaseModel] = useState<'kiritts-male' | 'kiritts-female'>('kiritts-male');
+  const [baseModel, setBaseModel] = useState<'neural-male' | 'neural-female'>('neural-male');
   const [pitchOffsetHz, setPitchOffsetHz] = useState<number>(0);
   const [speechRatePercent, setSpeechRatePercent] = useState<number>(0);
 
@@ -294,10 +294,10 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
 
           if (avgPitch < 175) {
             setDetectedGender('male');
-            setBaseModel('kiritts-male');
+            setBaseModel('neural-male');
           } else {
             setDetectedGender('female');
-            setBaseModel('kiritts-female');
+            setBaseModel('neural-female');
           }
         }
       };
@@ -353,10 +353,10 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
     }
   };
 
-  // Clone voice and calibrate KiriTTS neural engine
+  // Clone voice and calibrate neural engine
   const handleCloneVoice = async () => {
-    if (!audioUrl || recordingDuration < 14.5) {
-      setErrorMessage('Please record a clean voice sample for the full 15 seconds first.');
+    if (!audioUrl || recordingDuration < 4.8) {
+      setErrorMessage('Please record at least 5 seconds of clean speech (5s - 15s or longer).');
       return;
     }
 
@@ -380,16 +380,22 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
 
       const authToken =
         typeof window !== 'undefined'
-          ? localStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_token')
+          ? localStorage.getItem('streamneon_auth_token') ||
+            localStorage.getItem('auth_token') ||
+            localStorage.getItem('streamneon_token')
           : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (authToken) {
         headers.Authorization = `Bearer ${authToken}`;
       }
+      if (streamerToken) {
+        headers['x-streamer-token'] = streamerToken;
+      }
 
       const res = await fetch('/api/voice-clone', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({
           voiceName: voiceName.trim() || 'My Streamer AI Voice',
           sampleUrl: audioUrl,
@@ -399,7 +405,8 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
           rate: rateString,
           volume: '+0%',
           detectedGender,
-          averagePitchHz
+          averagePitchHz,
+          token: streamerToken || undefined
         })
       });
 
@@ -503,7 +510,7 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
     onClose();
   };
 
-  const hasMetFullDuration = recordingDuration >= 14.5;
+  const hasMetFullDuration = recordingDuration >= 4.8;
   const progressPercent = Math.min(100, (recordingDuration / TARGET_SECONDS) * 100);
 
   return (
@@ -524,7 +531,7 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
                   Streamer AI Voice Cloner
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-mono text-[10px] font-bold">
-                  Neural KiriTTS
+                  Neural Flow
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-400">
@@ -558,7 +565,7 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
             type="text"
             value={voiceName}
             onChange={(e) => setVoiceName(e.target.value)}
-            placeholder="e.g. Piseth Gaming Voice (KiriTTS Clone)"
+            placeholder="e.g. My Gaming Voice (Neural Clone)"
             disabled={cloning || isRecording || Boolean(clonedSuccessData)}
             className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 transition-colors"
           />
@@ -638,7 +645,7 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
             ) : hasMetFullDuration ? (
               <span className="text-emerald-400 font-bold flex items-center justify-center gap-1.5">
                 <CheckCircle2 size={14} />
-                15.0s Clean Speech Captured (Ready for KiriTTS Cloning)
+                15.0s Clean Speech Captured (Ready for Neural Voice Cloning)
               </span>
             ) : (
               <span className="text-slate-400">
@@ -761,7 +768,7 @@ export const VoiceClonerModal: React.FC<VoiceClonerModalProps> = ({
           <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 space-y-3 animate-fadeIn">
             <div className="flex items-center gap-2 text-emerald-300 text-xs font-mono font-bold">
               <CheckCircle2 size={16} />
-              <span>Neural KiriTTS Voice Clone Trained Successfully!</span>
+              <span>Neural AI Voice Clone Trained Successfully!</span>
             </div>
             <p className="text-[11px] text-slate-300 leading-relaxed font-mono">
               Model calibrated with 15s clean speech. Donation alerts will now speak using your exact neural voice clone!
