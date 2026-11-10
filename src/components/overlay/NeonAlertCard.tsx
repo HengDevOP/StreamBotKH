@@ -327,7 +327,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded, cl
   // ==============================================================
   return (
     <div
-      className={`relative flex flex-col items-center justify-center p-4 text-center ${animClass} ${className}`}
+      className={`relative flex flex-col items-center justify-center p-2 sm:p-4 text-center ${animClass} ${className}`}
       style={{
         maxWidth: isSideBySide ? '650px' : '560px',
         width: '100%',
@@ -337,7 +337,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded, cl
     >
       {/* 100% Transparent Backgroundless Outer Container */}
       <div
-        className={`w-full relative p-4 bg-transparent ${
+        className={`w-full relative p-2 sm:p-4 bg-transparent ${
           isSideBySide
             ? `flex ${isRightLayout ? 'flex-row-reverse' : 'flex-row'} items-center gap-5 text-left`
             : isBottomLayout
@@ -347,8 +347,8 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded, cl
       >
         {/* Reaction Mascot GIF */}
         {shouldShowImage && displayGif ? (
-          <div className={`relative flex justify-center ${isSideBySide ? 'flex-shrink-0' : isBottomLayout ? 'mt-3' : 'mb-3'}`}>
-            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden drop-shadow-2xl">
+          <div className={`relative flex justify-center ${isSideBySide ? 'flex-shrink-0' : isBottomLayout ? 'mt-3' : 'mb-2 sm:mb-3'}`}>
+            <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-2xl overflow-hidden drop-shadow-2xl">
               <img
                 src={displayGif}
                 alt="Reaction Mascot"
@@ -359,13 +359,13 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded, cl
         ) : null}
 
         {/* Text Content Block */}
-        <div className={isSideBySide ? 'flex-1 min-w-0 space-y-1' : 'space-y-1.5 w-full'}>
+        <div className={isSideBySide ? 'flex-1 min-w-0 space-y-1' : 'space-y-1 sm:space-y-1.5 w-full min-w-0'}>
           {/* Primary Headline: Raw text format {donator} donated {amount} through superchat! */}
           <h1
-            className="font-extrabold tracking-wide leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] inline-flex items-center justify-center flex-wrap gap-x-2 gap-y-1"
+            className="font-extrabold tracking-wide leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] inline-flex items-center justify-center flex-wrap gap-x-1.5 sm:gap-x-2 gap-y-1 max-w-full"
             style={{
               fontFamily: `"${activeFont}", sans-serif`,
-              fontSize: fontSize ? `${fontSize}px` : '28px',
+              fontSize: fontSize ? `clamp(16px, 4.2vw, ${fontSize}px)` : 'clamp(17px, 4.5vw, 28px)',
               textShadow: glowColor
                 ? `0 0 20px ${glowColor}aa, 0 2px 4px rgba(0,0,0,0.95)`
                 : '0 2px 4px rgba(0,0,0,0.95)'
@@ -389,7 +389,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded, cl
           {/* Sub H2 for {context} where the donator said (only rendered if donor message exists, is non-empty, and meaningful) */}
           {hasMeaningfulMessage && !hasContextInHeadline && (
             <h2
-              className="text-lg sm:text-xl font-bold tracking-normal leading-snug drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] text-slate-100 italic mt-1.5"
+              className="text-sm sm:text-base md:text-xl font-bold tracking-normal leading-snug drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] text-slate-100 italic mt-1 sm:mt-1.5"
               style={{ fontFamily: `"${activeFont}", sans-serif` }}
             >
               "{cleanDonorMessage}"

@@ -1355,7 +1355,7 @@ export const GoalTemplateRenderer: React.FC<GoalRenderProps> = ({
 
   return (
     <div
-      className="w-full flex justify-center mx-auto transition-all duration-300"
+      className="w-full max-w-full min-w-0 flex justify-center mx-auto transition-all duration-300 overflow-hidden"
       style={{ maxWidth: maxWidthValue }}
     >
       {renderTemplate()}

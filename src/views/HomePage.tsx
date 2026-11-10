@@ -474,10 +474,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         )}
 
       {/* Subsequent Landing Page Sections Container */}
-      <div className="space-y-28 sm:space-y-36 pt-16 sm:pt-24 relative z-10">
+      <div className="w-full max-w-full min-w-0 space-y-28 sm:space-y-36 pt-16 sm:pt-24 relative z-10 overflow-hidden">
 
       {/* ===================== STAGE 4: FOURTH SCROLL (INTERACTIVE 60 FPS OVERLAY SHOWCASE) ===================== */}
-      <div id="features" className="scroll-mt-24 min-h-[85dvh] flex flex-col justify-center">
+      <div id="features" className="w-full max-w-full min-w-0 scroll-mt-24 min-h-[85dvh] flex flex-col justify-center overflow-hidden">
         <HomeFeatureShowcase />
       </div>
 

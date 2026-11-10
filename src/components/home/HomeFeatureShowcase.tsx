@@ -409,7 +409,7 @@ const ScrollSwipeSection: React.FC<{
   return (
     <div
       ref={sectionRef}
-      className={`transition-all duration-1000 ease-out transform ${
+      className={`w-full max-w-full min-w-0 transition-all duration-1000 ease-out transform ${
         isVisible
           ? 'opacity-100 translate-y-0 filter-none'
           : 'opacity-0 translate-y-20 blur-[2px]'
@@ -559,7 +559,7 @@ export const HomeFeatureShowcase: React.FC = () => {
   }, [isSectionVisible]);
 
   return (
-    <section ref={showcaseSectionRef} className="max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-6 sm:px-10 lg:px-12 xl:px-16 2xl:px-20 space-y-28 sm:space-y-36 relative">
+    <section ref={showcaseSectionRef} className="w-full max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-4 xs:px-5 sm:px-10 lg:px-12 xl:px-16 2xl:px-20 space-y-20 sm:space-y-36 relative overflow-hidden min-w-0">
       {/* Background Ambient Glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-cyan-500/5 blur-[160px] pointer-events-none rounded-full" />
       <div className="absolute top-2/3 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-purple-500/5 blur-[160px] pointer-events-none rounded-full" />
@@ -569,15 +569,15 @@ export const HomeFeatureShowcase: React.FC = () => {
       {/* 100% Transparent, No Background & No Border: Exact img, title, message    */}
       {/* Positions: Top, Left, Right, Bottom with dynamic names, amounts & colors  */}
       {/* ========================================================================= */}
-      <ScrollSwipeSection className="flex flex-col lg:flex-row items-center gap-10 lg:gap-14 relative z-10">
+      <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
         {/* Left Side: Rich Detailed Donation Alert Overview */}
-        <div className="w-full lg:w-1/2 space-y-4">
+        <div className="w-full lg:w-1/2 space-y-4 min-w-0">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 font-mono text-xs font-bold tracking-wider uppercase">
             <Bell size={13} className="text-cyan-400" />
             <span>LIVE DONATION ALERTS ENGINE</span>
           </div>
 
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
+          <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Fully Customizable 60 FPS Live Donation Alerts
           </h3>
 
@@ -590,64 +590,58 @@ export const HomeFeatureShowcase: React.FC = () => {
           </p>
 
           {/* Feature Highlights Grid - No element outlines */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 w-full min-w-0">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0 text-cyan-400 mt-0.5">
                 <Zap size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">&lt; 150ms Instant</span>
-                <span className="text-[11px] text-slate-400">Zero latency popups</span>
+                <span className="text-xs font-bold text-white block truncate">&lt; 150ms Instant</span>
+                <span className="text-[11px] text-slate-400 truncate block">Zero latency popups</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
                 <CheckCircle2 size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">0% Platform Cut</span>
-                <span className="text-[11px] text-slate-400">Direct bank payout</span>
+                <span className="text-xs font-bold text-white block truncate">0% Platform Cut</span>
+                <span className="text-[11px] text-slate-400 truncate block">Direct bank payout</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-rose-500/15 flex items-center justify-center shrink-0 text-rose-400 mt-0.5">
                 <Volume2 size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">Khmer AI Voice TTS</span>
-                <span className="text-[11px] text-slate-400">Automated cheers</span>
+                <span className="text-xs font-bold text-white block truncate">Khmer AI Voice TTS</span>
+                <span className="text-[11px] text-slate-400 truncate block">Automated cheers</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 text-amber-400 mt-0.5">
                 <Star size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">USD &amp; KHR Dual</span>
-                <span className="text-[11px] text-slate-400">Bakong KHQR sync</span>
+                <span className="text-xs font-bold text-white block truncate">USD &amp; KHR Dual</span>
+                <span className="text-[11px] text-slate-400 truncate block">Bakong KHQR sync</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Side: Clean Default Flat Preview (No 3D rotation, strict fixed width & height) */}
-        <div className="w-full lg:w-1/2 flex justify-center">
-          <div className="w-full max-w-[480px] h-[360px] sm:h-[380px] bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center overflow-hidden">
-            {/* Exact Dashboard Alert Component: Image, Title, and Messages (Remounts on key change for fresh animations) */}
-            <div className="w-full h-full relative z-10 flex items-center justify-center p-2">
-              <div className="w-full max-w-[440px] h-[340px] sm:h-[360px] flex items-center justify-center overflow-hidden">
+        {/* Right Side: Clean Default Flat Preview (Responsive width & height, no overflow clip) */}
+        <div className="w-full lg:w-1/2 flex justify-center min-w-0">
+          <div className="w-full max-w-[460px] min-h-[290px] sm:min-h-[340px] bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center min-w-0">
+            {/* Exact Dashboard Alert Component: Image, Title, and Messages */}
+            <div className="w-full h-full relative z-10 flex items-center justify-center p-1 sm:p-2 min-w-0">
+              <div className="w-full max-w-[440px] flex items-center justify-center min-w-0">
                 <NeonAlertCard
                   key={`alert-preview-${alertCycleKey}-${currentAlert.id}`}
-                  className="w-full max-w-[440px] h-[340px] sm:h-[360px] flex flex-col items-center justify-center"
-                  style={{
-                    width: '100%',
-                    maxWidth: '440px',
-                    height: '100%',
-                    maxHeight: '360px'
-                  }}
+                  className="w-full max-w-full flex flex-col items-center justify-center"
                   alert={{
                     donationId: `preview-${alertCycleKey}`,
                     donorName: currentAlert.donorName,
@@ -662,7 +656,7 @@ export const HomeFeatureShowcase: React.FC = () => {
                     customGifUrl: currentAlert.mediaUrl,
                     showImage: true,
                     fontFamily: currentAlert.fontFamily,
-                    fontSize: 24,
+                    fontSize: 22,
                     layoutMode: 'top',
                     animationStyle: currentAlert.animationStyle,
                     glowColor: currentAlert.glowColor
@@ -679,15 +673,15 @@ export const HomeFeatureShowcase: React.FC = () => {
       {/* Smoothly rotates 15° when video clip changes                              */}
       {/* Zero element outline: clean border-0 with soft translucent glass          */}
       {/* ========================================================================= */}
-      <ScrollSwipeSection className="flex flex-col lg:flex-row-reverse items-center gap-10 lg:gap-14 relative z-10">
+      <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row-reverse items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
         {/* Right Side: Title & Description */}
-        <div className="w-full lg:w-1/2 space-y-4">
+        <div className="w-full lg:w-1/2 space-y-4 min-w-0">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 font-mono text-xs font-bold tracking-wider uppercase">
             <Video size={13} className="text-cyan-400" />
             <span>YOUTUBE &amp; MEDIA SHARE ENGINE</span>
           </div>
 
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
+          <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Media Share &amp; Video Alerts with Live Scrubber
           </h3>
 
@@ -696,56 +690,56 @@ export const HomeFeatureShowcase: React.FC = () => {
           </p>
 
           {/* Feature Highlights Grid - No outlines */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 w-full min-w-0">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0 text-cyan-400 mt-0.5">
                 <Tv size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">OBS Studio 60 FPS</span>
-                <span className="text-[11px] text-slate-400">Zero CPU browser overlay</span>
+                <span className="text-xs font-bold text-white block truncate">OBS Studio 60 FPS</span>
+                <span className="text-[11px] text-slate-400 truncate block">Zero CPU browser overlay</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
                 <Volume2 size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">Auto-Ducking 85%</span>
-                <span className="text-[11px] text-slate-400">Protects voice &amp; gameplay</span>
+                <span className="text-xs font-bold text-white block truncate">Auto-Ducking 85%</span>
+                <span className="text-[11px] text-slate-400 truncate block">Protects voice &amp; gameplay</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-rose-500/15 flex items-center justify-center shrink-0 text-rose-400 mt-0.5">
                 <Flame size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">Live Scrubber</span>
-                <span className="text-[11px] text-slate-400">Red duration bar sync</span>
+                <span className="text-xs font-bold text-white block truncate">Live Scrubber</span>
+                <span className="text-[11px] text-slate-400 truncate block">Red duration bar sync</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0 text-purple-400 mt-0.5">
                 <ShieldCheck size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">Safety Moderation</span>
-                <span className="text-[11px] text-slate-400">Instant skip hotkeys</span>
+                <span className="text-xs font-bold text-white block truncate">Safety Moderation</span>
+                <span className="text-[11px] text-slate-400 truncate block">Instant skip hotkeys</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Left Side: Clean Default Flat Preview (No 3D rotation) */}
-        <div className="w-full lg:w-1/2 flex justify-center">
-          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center min-h-[360px]">
+        {/* Left Side: Clean Default Flat Preview (No 3D rotation, responsive) */}
+        <div className="w-full lg:w-1/2 flex justify-center min-w-0">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center min-w-0">
             {/* Animated Wrapper remounting on each 5s cycle key for change animation - No element outline */}
             <div
               key={`media-share-${videoClipCycleKey}-${currentMediaClip.id}`}
-              className={`w-full relative flex flex-col rounded-3xl overflow-hidden border-0 shadow-[0_0_50px_rgba(0,0,0,0.85)] ${currentMediaClip.animationStyle} select-none`}
+              className={`w-full relative flex flex-col rounded-2xl sm:rounded-3xl overflow-hidden border-0 shadow-[0_0_50px_rgba(0,0,0,0.85)] ${currentMediaClip.animationStyle} select-none min-w-0`}
               style={{
                 filter: `drop-shadow(0 0 25px ${currentMediaClip.glowColor}25)`
               }}
@@ -754,10 +748,10 @@ export const HomeFeatureShowcase: React.FC = () => {
               {/* 1. TOP SECTION: THE DONOR (NAME & AMOUNT)                     */}
               {/* Zero element outline, translucent obsidian glass              */}
               {/* ============================================================== */}
-              <div className="w-full px-4 py-3 flex items-center justify-between text-xs font-mono bg-[#0A0F1E]/95 backdrop-blur-xl">
-                <div className="flex items-center gap-2 min-w-0">
+              <div className="w-full px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between text-xs font-mono bg-[#0A0F1E]/95 backdrop-blur-xl gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
                   <span
-                    className="text-sm sm:text-base font-bold font-['Chakra_Petch'] tracking-wide truncate"
+                    className="text-xs sm:text-base font-bold font-['Chakra_Petch'] tracking-wide truncate"
                     style={{
                       ...getGradientOrColorStyle(currentMediaClip.donorColor),
                       textShadow: `0 0 12px ${currentMediaClip.glowColor}99, 0 2px 4px rgba(0,0,0,0.95)`
@@ -765,18 +759,18 @@ export const HomeFeatureShowcase: React.FC = () => {
                   >
                     {currentMediaClip.donorName}
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 font-mono font-bold flex-shrink-0">
+                  <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 font-mono font-bold flex-shrink-0">
                     MEDIA SHARE
                   </span>
                 </div>
-                <div className="text-right flex-shrink-0 pl-2">
+                <div className="text-right flex-shrink-0 pl-1">
                   <span
-                    className="text-xs sm:text-sm font-black font-mono"
+                    className="text-xs sm:text-sm font-black font-mono whitespace-nowrap"
                     style={getGradientOrColorStyle(currentMediaClip.amountColor)}
                   >
                     {currentMediaClip.currency === 'KHR'
                       ? `${currentMediaClip.amount.toLocaleString()} ៛`
-                      : `$${currentMediaClip.amount.toFixed(2)} Superchat`}
+                      : `$${currentMediaClip.amount.toFixed(2)}`}
                   </span>
                 </div>
               </div>
@@ -871,13 +865,12 @@ export const HomeFeatureShowcase: React.FC = () => {
       </ScrollSwipeSection>
 
       {/* ========================================================================= */}
-      {/* FEATURE 3: LEADERBOARD (LEFT: TEXT, RIGHT: 3D CARD)                       */}
-      {/* Smoothly rotates 15° when leaderboard cycles                              */}
+      {/* FEATURE 3: LEADERBOARD (LEFT: TEXT, RIGHT: CARD)                          */}
       {/* ========================================================================= */}
-      <ScrollSwipeSection className="flex flex-col lg:flex-row items-center gap-10 lg:gap-14 relative z-10">
+      <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
         {/* Left Side: Title & Description */}
-        <div className="w-full lg:w-1/2 space-y-4">
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
+        <div className="w-full lg:w-1/2 space-y-4 min-w-0">
+          <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Real-Time Stream Leaderboard &amp; Top Supporters
           </h3>
 
@@ -887,20 +880,20 @@ export const HomeFeatureShowcase: React.FC = () => {
         </div>
 
         {/* Right Side: Clean Default Flat Preview (No 3D rotation) */}
-        <div className="w-full lg:w-1/2 flex justify-center">
-          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative">
+        <div className="w-full lg:w-1/2 flex justify-center min-w-0">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative min-w-0">
             {/* Header */}
-            <div className="flex items-center justify-between pb-2 mb-3">
-              <div className="flex items-center gap-2">
-                <Trophy size={16} className="text-yellow-400 animate-pulse" />
-                <span className="text-sm font-bold text-white font-['Chakra_Petch']">
+            <div className="flex items-center justify-between pb-2 mb-3 gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <Trophy size={16} className="text-yellow-400 animate-pulse shrink-0" />
+                <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
                   STREAM LEADERBOARD
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 text-[10px] font-mono font-bold">
+                <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 text-[9px] sm:text-[10px] font-mono font-bold shrink-0">
                   {leaderboardCycleKey % 2 === 0 ? 'ALL-TIME' : 'MONTHLY'}
                 </span>
               </div>
-              <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
+              <div className="text-[10px] sm:text-[11px] font-mono text-slate-400 flex items-center gap-1.5 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                 <span>Real-Time Sync</span>
               </div>
@@ -909,103 +902,102 @@ export const HomeFeatureShowcase: React.FC = () => {
             {/* Podium Donor Rows */}
             <div className="space-y-2.5">
               {/* Rank 1: Gold - No element outline */}
-              <div className="p-3 rounded-xl bg-gradient-to-r from-yellow-500/15 via-amber-500/10 to-slate-950/80 border-0 flex items-center justify-between shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-yellow-500 to-amber-300 p-0.5 flex items-center justify-center shadow-md">
+              <div className="p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-yellow-500/15 via-amber-500/10 to-slate-950/80 border-0 flex items-center justify-between shadow-lg gap-2 min-w-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-yellow-500 to-amber-300 p-0.5 flex items-center justify-center shadow-md shrink-0">
                     <div className="w-full h-full rounded-[10px] bg-slate-950 flex items-center justify-center text-yellow-400">
                       <Crown size={18} className="fill-yellow-400/20" />
                     </div>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white font-['Chakra_Petch']">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
                         Vannak_Pro
                       </span>
-                      <span className="px-1.5 py-0.2 rounded bg-yellow-400/20 text-yellow-300 font-mono text-[9px] font-bold">
+                      <span className="px-1.5 py-0.2 rounded bg-yellow-400/20 text-yellow-300 font-mono text-[9px] font-bold shrink-0">
                         RANK #1
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-400 font-mono">18 Superchats • MLBB Team</span>
+                    <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono truncate block">18 Superchats • MLBB Team</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-base font-black text-yellow-400 font-mono drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]">
+                <div className="text-right shrink-0 pl-1">
+                  <div className="text-sm sm:text-base font-black text-yellow-400 font-mono drop-shadow-[0_0_10px_rgba(234,179,8,0.5)] whitespace-nowrap">
                     $150.00
                   </div>
-                  <div className="text-[10px] text-slate-400 font-mono">(600,000 ៛)</div>
+                  <div className="text-[9px] sm:text-[10px] text-slate-400 font-mono whitespace-nowrap">(600,000 ៛)</div>
                 </div>
               </div>
 
               {/* Rank 2: Silver - No element outline */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border-0 flex items-center justify-between transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-slate-800 border-0 flex items-center justify-center text-slate-300">
+              <div className="p-2.5 sm:p-3 rounded-xl bg-slate-950/80 border-0 flex items-center justify-between transition-all gap-2 min-w-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-800 border-0 flex items-center justify-center text-slate-300 shrink-0">
                     <Medal size={16} />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white font-['Chakra_Petch']">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
                         DaraEsports
                       </span>
-                      <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono text-[9px]">
+                      <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono text-[9px] shrink-0">
                         RANK #2
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-400 font-mono">11 Superchats</span>
+                    <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono truncate block">11 Superchats</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold text-slate-200 font-mono">
+                <div className="text-right shrink-0 pl-1">
+                  <div className="text-xs sm:text-sm font-bold text-slate-200 font-mono whitespace-nowrap">
                     $85.00
                   </div>
-                  <div className="text-[10px] text-slate-400 font-mono">(340,000 ៛)</div>
+                  <div className="text-[9px] sm:text-[10px] text-slate-400 font-mono whitespace-nowrap">(340,000 ៛)</div>
                 </div>
               </div>
 
               {/* Rank 3: Bronze - No element outline */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border-0 flex items-center justify-between transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-950/40 border-0 flex items-center justify-center text-amber-500">
+              <div className="p-2.5 sm:p-3 rounded-xl bg-slate-950/80 border-0 flex items-center justify-between transition-all gap-2 min-w-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-950/40 border-0 flex items-center justify-center text-amber-500 shrink-0">
                     <Award size={16} />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white font-['Chakra_Petch']">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
                         Sreypov_Live
                       </span>
-                      <span className="px-1.5 py-0.2 rounded bg-amber-950 text-amber-400 font-mono text-[9px]">
+                      <span className="px-1.5 py-0.2 rounded bg-amber-950 text-amber-400 font-mono text-[9px] shrink-0">
                         RANK #3
                       </span>
                     </div>
-                    <span className="text-[11px] text-slate-400 font-mono">7 Superchats</span>
+                    <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono truncate block">7 Superchats</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold text-amber-300 font-mono">
+                <div className="text-right shrink-0 pl-1">
+                  <div className="text-xs sm:text-sm font-bold text-amber-300 font-mono whitespace-nowrap">
                     $50.00
                   </div>
-                  <div className="text-[10px] text-slate-400 font-mono">(200,000 ៛)</div>
+                  <div className="text-[9px] sm:text-[10px] text-slate-400 font-mono whitespace-nowrap">(200,000 ៛)</div>
                 </div>
               </div>
             </div>
 
             {/* Total Volume Footer */}
-            <div className="mt-3 pt-2.5 flex items-center justify-between text-xs font-mono text-slate-400">
-              <span className="text-slate-300">Total Stream Season:</span>
-              <span className="text-yellow-400 font-bold">$2,850.00 (11,400,000 ៛)</span>
+            <div className="mt-3 pt-2.5 flex items-center justify-between text-[11px] sm:text-xs font-mono text-slate-400 gap-2 min-w-0">
+              <span className="text-slate-300 truncate">Total Stream Season:</span>
+              <span className="text-yellow-400 font-bold shrink-0 whitespace-nowrap">$2,850.00 (11,400,000 ៛)</span>
             </div>
           </div>
         </div>
       </ScrollSwipeSection>
 
       {/* ========================================================================= */}
-      {/* FEATURE 4: STREAM GOAL (LEFT: 3D CARD, RIGHT: TEXT)                       */}
-      {/* Smoothly rotates 15° when goal milestone / celebration cycles             */}
+      {/* FEATURE 4: STREAM GOAL (LEFT: CARD, RIGHT: TEXT)                          */}
       {/* ========================================================================= */}
-      <ScrollSwipeSection className="flex flex-col lg:flex-row-reverse items-center gap-10 lg:gap-14 relative z-10">
+      <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row-reverse items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
         {/* Right Side: Title & Description */}
-        <div className="w-full lg:w-1/2 space-y-4">
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
+        <div className="w-full lg:w-1/2 space-y-4 min-w-0">
+          <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Dynamic Stream Goals with 0% to 100% Progress
           </h3>
 
@@ -1015,12 +1007,12 @@ export const HomeFeatureShowcase: React.FC = () => {
         </div>
 
         {/* Left Side: Clean Default Flat Preview (No 3D rotation) */}
-        <div className="w-full lg:w-1/2 flex justify-center">
-          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative">
+        <div className="w-full lg:w-1/2 flex justify-center min-w-0">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative min-w-0">
             {/* Real Dashboard & Overlay Goal Asset (Template Renderer with isAnimating=true for synchronized progress) */}
             <div
               key={`goal-preview-${goalCycleKey}-${currentGoal.id}`}
-              className="w-full relative z-10 animate-fade-in flex justify-center select-none"
+              className="w-full max-w-full relative z-10 animate-fade-in flex justify-center select-none min-w-0 overflow-hidden"
             >
               <GoalTemplateRenderer
                 title={currentGoal.title}
@@ -1041,13 +1033,12 @@ export const HomeFeatureShowcase: React.FC = () => {
       </ScrollSwipeSection>
 
       {/* ========================================================================= */}
-      {/* FEATURE 5: LIVE CHAT (LEFT: TEXT, RIGHT: 3D CARD)                         */}
-      {/* Smoothly rotates 15° when chat cycles                                     */}
+      {/* FEATURE 5: LIVE CHAT (LEFT: TEXT, RIGHT: CARD)                            */}
       {/* ========================================================================= */}
-      <ScrollSwipeSection className="flex flex-col lg:flex-row items-center gap-10 lg:gap-14 relative z-10">
+      <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
         {/* Left Side: Title & Description */}
-        <div className="w-full lg:w-1/2 space-y-4">
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
+        <div className="w-full lg:w-1/2 space-y-4 min-w-0">
+          <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Live Stream Chat with Swipe Animations
           </h3>
 
@@ -1057,44 +1048,44 @@ export const HomeFeatureShowcase: React.FC = () => {
         </div>
 
         {/* Right Side: Clean Default Flat Preview (No 3D rotation) */}
-        <div className="w-full lg:w-1/2 flex justify-center">
-          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative">
+        <div className="w-full lg:w-1/2 flex justify-center min-w-0">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative min-w-0">
             {/* Chat Header */}
-            <div className="flex items-center justify-between pb-2 mb-3 relative z-10">
-              <div className="flex items-center gap-2">
-                <MessageSquare size={16} className="text-pink-400 animate-pulse" />
-                <span className="text-sm font-bold text-white font-['Chakra_Petch']">
+            <div className="flex items-center justify-between pb-2 mb-3 relative z-10 gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <MessageSquare size={16} className="text-pink-400 animate-pulse shrink-0" />
+                <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
                   LIVE STREAM CHAT OVERLAY
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[10px] font-mono font-bold">
+                <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[9px] sm:text-[10px] font-mono font-bold shrink-0">
                   1,420 VIEWERS
                 </span>
               </div>
-              <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+              <div className="text-[10px] sm:text-[11px] font-mono text-slate-400 flex items-center gap-1 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 <span>Real-Time Sync</span>
               </div>
             </div>
 
             {/* Pinned Superchat Banner - No element outline */}
-            <div className="mb-3.5 p-3 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 border-0 flex items-center justify-between shadow-lg relative z-10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-pink-500 flex items-center justify-center text-white font-black text-xs font-mono">
+            <div className="mb-3.5 p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 border-0 flex items-center justify-between shadow-lg relative z-10 gap-2 min-w-0">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-pink-500 flex items-center justify-center text-white font-black text-xs font-mono shrink-0">
                   $25
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-white font-['Chakra_Petch'] flex items-center gap-1.5">
-                    <span>Piseth_Pro</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-pink-400/20 text-pink-300 font-mono">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-white font-['Chakra_Petch'] flex items-center gap-1.5 min-w-0">
+                    <span className="truncate">Piseth_Pro</span>
+                    <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded bg-pink-400/20 text-pink-300 font-mono shrink-0">
                       SUPERCHAT
                     </span>
                   </div>
-                  <div className="text-[11px] text-pink-200">
+                  <div className="text-[10px] sm:text-[11px] text-pink-200 truncate">
                     &ldquo;Coffee on me bro! Best streamer in town ☕🔥&rdquo;
                   </div>
                 </div>
               </div>
-              <div className="text-xs font-black text-pink-300 font-mono">$25.00</div>
+              <div className="text-xs font-black text-pink-300 font-mono shrink-0 pl-1 whitespace-nowrap">$25.00</div>
             </div>
 
             {/* Chat Message Rows - No element outlines */}
@@ -1137,17 +1128,17 @@ export const HomeFeatureShowcase: React.FC = () => {
                 return (
                   <div
                     key={i}
-                    className="p-2.5 rounded-xl bg-slate-950/70 border-0 flex items-start gap-2.5 transition-all text-xs"
+                    className="p-2 sm:p-2.5 rounded-xl bg-slate-950/70 border-0 flex items-start gap-2 sm:gap-2.5 transition-all text-xs min-w-0"
                   >
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold flex items-center gap-1 ${msg.badgeBg}`}>
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-mono font-bold flex items-center gap-1 shrink-0 ${msg.badgeBg}`}>
                       <Icon size={10} />
                       <span>{msg.badge}</span>
                     </span>
-                    <div className="flex-1">
-                      <span className={`font-bold font-['Chakra_Petch'] mr-2 ${msg.color}`}>
+                    <div className="flex-1 min-w-0 break-words">
+                      <span className={`font-bold font-['Chakra_Petch'] mr-1.5 ${msg.color}`}>
                         {msg.author}:
                       </span>
-                      <span className="text-slate-300 leading-relaxed">{msg.text}</span>
+                      <span className="text-slate-300 leading-relaxed text-[11px] sm:text-xs">{msg.text}</span>
                     </div>
                   </div>
                 );
@@ -1157,7 +1148,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             {/* Floating Emojis */}
             <div className="absolute bottom-4 right-4 flex items-center gap-1.5 pointer-events-none z-10">
               {['🔥', '⚡', '💖', '🎉'].map((emoji, i) => (
-                <span key={i} className="text-lg animate-bounce" style={{ animationDelay: `${i * 150}ms` }}>
+                <span key={i} className="text-base sm:text-lg animate-bounce" style={{ animationDelay: `${i * 150}ms` }}>
                   {emoji}
                 </span>
               ))}
