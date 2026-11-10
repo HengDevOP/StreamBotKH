@@ -1083,6 +1083,16 @@ body:has(.app-viewport-lock),
   animation: radiantHeroFlow 18s ease-in-out infinite;
 }
 
+/* Conserve mobile phone CPU and battery by disabling full-page continuous background-position repaint */
+@media (max-width: 1024px), (prefers-reduced-motion: reduce) {
+  .hero-radiant-page-flow,
+  .hero-radiant-wrapper,
+  .hero-radiant-bg {
+    animation: none !important;
+    background-size: 100% 100% !important;
+  }
+}
+
 /* Radiant Animated Aurora Light Layers for Hero */
 @keyframes radiantLightPulse {
   0%, 100% {

@@ -22,14 +22,17 @@ export const MatrixBackground: React.FC<MatrixBackgroundProps> = ({
 
     let animationFrameId: number;
     let lastDrawTime = 0;
-    const targetFps = 28; // Cinematic, smooth Matrix falling speed (low CPU impact)
+    const isMobileDevice = typeof window !== 'undefined' && window.innerWidth < 768;
+    // Lower FPS and disable expensive canvas Gaussian blur on mobile to conserve phone battery & CPU
+    const targetFps = isMobileDevice ? 18 : 28;
     const frameInterval = 1000 / targetFps;
+    let isCanvasVisible = true;
 
     // Characters: Tech symbols, numbers, letters & StreamBotKH easter eggs ($, ៛, K, H, Q, R)
     const characters = '0123456789ABCDEF$៛KHQROBS><:;~*#+={}%';
     const charArray = characters.split('');
 
-    const fontSize = 14;
+    const fontSize = isMobileDevice ? 16 : 14;
     let columns = 0;
     let drops: number[] = [];
 
@@ -37,8 +40,9 @@ export const MatrixBackground: React.FC<MatrixBackgroundProps> = ({
       // Use parent container dimensions
       const parent = canvas.parentElement;
       const width = parent ? parent.offsetWidth : window.innerWidth;
-      // Cap height to viewport or upper 2400px so memory stays lightweight
-      const height = parent ? Math.min(parent.offsetHeight, 3200) : window.innerHeight;
+      // Cap height to 1200px on mobile or 2400px on desktop to keep GPU memory & CPU usage ultra-light
+      const maxH = isMobileDevice ? 1200 : 2400;
+      const height = parent ? Math.min(parent.offsetHeight, maxH) : window.innerHeight;
 
       canvas.width = width;
       canvas.height = height;
@@ -58,8 +62,19 @@ export const MatrixBackground: React.FC<MatrixBackgroundProps> = ({
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
+    // Pause matrix animation when scrolled out of view to avoid battery drain
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isCanvasVisible = entry.isIntersecting;
+      },
+      { threshold: 0.02 }
+    );
+    observer.observe(canvas);
+
     const draw = (currentTime: number) => {
       animationFrameId = requestAnimationFrame(draw);
+
+      if (!isCanvasVisible) return;
 
       // Frame rate throttling for optimal battery and silky performance
       const elapsed = currentTime - lastDrawTime;
@@ -69,7 +84,7 @@ export const MatrixBackground: React.FC<MatrixBackgroundProps> = ({
       if (!canvas || !ctx) return;
 
       // Semi-transparent overlay to produce iconic fading Matrix trails
-      ctx.fillStyle = 'rgba(7, 10, 18, 0.12)';
+      ctx.fillStyle = 'rgba(7, 10, 18, 0.14)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.font = `${fontSize}px "Chakra Petch", "Courier New", monospace`;
@@ -83,12 +98,17 @@ export const MatrixBackground: React.FC<MatrixBackgroundProps> = ({
           // Leading drop: bright white / electric cyan highlight
           if (Math.random() > 0.88) {
             ctx.fillStyle = '#FFFFFF';
-            ctx.shadowColor = 'rgba(0, 240, 255, 0.8)';
-            ctx.shadowBlur = 8;
+            // Disable expensive software shadowBlur on mobile CPU
+            if (!isMobileDevice) {
+              ctx.shadowColor = 'rgba(0, 240, 255, 0.8)';
+              ctx.shadowBlur = 8;
+            }
           } else {
             // Trail character: Cyber Cyan (#00F0FF) / Sky Blue (#0284C7)
             ctx.fillStyle = 'rgba(0, 240, 255, 0.75)';
-            ctx.shadowBlur = 0;
+            if (!isMobileDevice) {
+              ctx.shadowBlur = 0;
+            }
           }
 
           ctx.fillText(text, x, y);
@@ -107,6 +127,7 @@ export const MatrixBackground: React.FC<MatrixBackgroundProps> = ({
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
       window.removeEventListener('resize', resizeCanvas);
     };
   }, []);

@@ -37,9 +37,9 @@ interface NavbarProps {
   currentPage?: string;
 }
 
-// Official 4-color Google Icon
+// Official 4-color Google Icon (Properly sized 20x20 matching Google Identity specifications)
 const GoogleIcon = () => (
-  <svg className="w-4.5 h-4.5 flex-shrink-0" viewBox="0 0 24 24">
+  <svg className="w-5 h-5 flex-shrink-0" width="20" height="20" viewBox="0 0 24 24">
     <path
       fill="#4285F4"
       d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"

@@ -297,45 +297,80 @@ const SHOWCASE_GOAL_PRESETS: ShowcaseGoalPreset[] = [
   },
   {
     id: 'goal-2',
+    title: '🌊 Liquid Water Cooling Loop & Custom Rig',
+    targetAmount: 750,
+    accentColor: '#00F0FF',
+    templateStyle: 'liquid-gradient-shader'
+  },
+  {
+    id: 'goal-3',
     title: '👑 Cambodia MLBB Bootcamp Tournament Fund',
     targetAmount: 1200,
     accentColor: '#F59E0B',
     templateStyle: 'golden-luxury'
   },
   {
-    id: 'goal-3',
-    title: '🎧 Shure SM7B Studio Mic & GoXLR Mixer',
-    targetAmount: 350,
-    accentColor: '#00F0FF',
-    templateStyle: 'glass-frost'
-  },
-  {
     id: 'goal-4',
-    title: '⚡ 24-Hour Non-Stop Subathon Stream Marathon',
-    targetAmount: 800,
-    accentColor: '#D946EF',
-    templateStyle: 'synthwave-midnight'
-  },
-  {
-    id: 'goal-5',
-    title: '🏆 Pro Gaming RTX 4090 GPU Live Upgrade',
-    targetAmount: 1500,
-    accentColor: '#10B981',
-    templateStyle: 'chroma-rgb'
-  },
-  {
-    id: 'goal-6',
     title: '🎮 Retro Arcade Cabinet & Fighting Stick',
     targetAmount: 400,
     accentColor: '#EF4444',
     templateStyle: 'retro-arcade'
   },
   {
+    id: 'goal-5',
+    title: '🎧 Shure SM7B Studio Mic & GoXLR Mixer',
+    targetAmount: 350,
+    accentColor: '#38BDF8',
+    templateStyle: 'glass-frost'
+  },
+  {
+    id: 'goal-6',
+    title: '⚡ 24-Hour Non-Stop Subathon Stream Marathon',
+    targetAmount: 800,
+    accentColor: '#D946EF',
+    templateStyle: 'synthwave-midnight'
+  },
+  {
     id: 'goal-7',
+    title: '🌋 Hardcore 24-Hour PUBG Rank Push Challenge',
+    targetAmount: 600,
+    accentColor: '#FF4500',
+    templateStyle: 'lava-core'
+  },
+  {
+    id: 'goal-8',
+    title: '🏆 Pro Gaming RTX 4090 GPU Live Upgrade',
+    targetAmount: 1500,
+    accentColor: '#10B981',
+    templateStyle: 'chroma-rgb'
+  },
+  {
+    id: 'goal-9',
     title: '🔥 Full RGB Studio Lighting & Soundproofing',
     targetAmount: 600,
     accentColor: '#F97316',
     templateStyle: 'mecha-hud'
+  },
+  {
+    id: 'goal-10',
+    title: '💻 Matrix Terminal Soundboard & OBS Setup',
+    targetAmount: 450,
+    accentColor: '#00FF66',
+    templateStyle: 'matrix-terminal'
+  },
+  {
+    id: 'goal-11',
+    title: '🌌 Deep Space Galaxy Broadcast Overlay',
+    targetAmount: 900,
+    accentColor: '#8B5CF6',
+    templateStyle: 'cosmic-galaxy'
+  },
+  {
+    id: 'goal-12',
+    title: '💖 Streamer Setup Cat-Ear Headset & Aesthetic Cam',
+    targetAmount: 300,
+    accentColor: '#F472B6',
+    templateStyle: 'kawaii-pastel'
   }
 ];
 
@@ -386,16 +421,22 @@ const ScrollSwipeSection: React.FC<{
 };
 
 export const HomeFeatureShowcase: React.FC = () => {
-  // Mobile Screen Detector (window width < 1024px)
-  const [isMobile, setIsMobile] = useState<boolean>(false);
+  // Section visibility observer: pauses heavy requestAnimationFrame loops when scrolled out of view (saves mobile CPU)
+  const showcaseSectionRef = useRef<HTMLElement | null>(null);
+  const [isSectionVisible, setIsSectionVisible] = useState<boolean>(true);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(typeof window !== 'undefined' && window.innerWidth < 1024);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsSectionVisible(entry.isIntersecting);
+      },
+      { threshold: 0.05 }
+    );
+    const el = showcaseSectionRef.current;
+    if (el) observer.observe(el);
+    return () => {
+      if (el) observer.unobserve(el);
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // 1. Dynamic Donation Alert Cycling Simulation
@@ -404,12 +445,13 @@ export const HomeFeatureShowcase: React.FC = () => {
 
   useEffect(() => {
     const cycleTimer = setInterval(() => {
+      if (!isSectionVisible) return;
       setAlertIndex((prev) => (prev + 1) % DONATION_SHOWCASE_COMBOS.length);
       setAlertCycleKey((prev) => prev + 1);
     }, 3200);
 
     return () => clearInterval(cycleTimer);
-  }, []);
+  }, [isSectionVisible]);
 
   const currentAlert = DONATION_SHOWCASE_COMBOS[alertIndex];
 
@@ -424,6 +466,11 @@ export const HomeFeatureShowcase: React.FC = () => {
     let startTime = performance.now();
 
     const loop = (now: number) => {
+      if (!isSectionVisible) {
+        animId = requestAnimationFrame(loop);
+        return;
+      }
+
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / durationMs);
       const remaining = Math.max(0, (1 - progress) * 100);
@@ -440,7 +487,7 @@ export const HomeFeatureShowcase: React.FC = () => {
 
     animId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animId);
-  }, []);
+  }, [isSectionVisible]);
 
   const currentMediaClip = MEDIA_SHARE_SHOWCASE_CLIPS[videoClipIndex];
 
@@ -448,12 +495,13 @@ export const HomeFeatureShowcase: React.FC = () => {
   const [leaderboardCycleKey, setLeaderboardCycleKey] = useState<number>(0);
   useEffect(() => {
     const lbTimer = setInterval(() => {
+      if (!isSectionVisible) return;
       setLeaderboardCycleKey((k) => k + 1);
     }, 4000);
     return () => clearInterval(lbTimer);
-  }, []);
+  }, [isSectionVisible]);
 
-  // 4. Goal Progress Continuous Loop (0% -> 100%) - Resets seamlessly with no complete label
+  // 4. Goal Progress Continuous Loop (0% -> 100%) - Resets seamlessly with celebration hold
   const [goalIndex, setGoalIndex] = useState<number>(0);
   const [goalProgress, setGoalProgress] = useState<number>(0);
   const [goalCycleKey, setGoalCycleKey] = useState<number>(0);
@@ -461,12 +509,12 @@ export const HomeFeatureShowcase: React.FC = () => {
   useEffect(() => {
     let animId: number;
     let holdTimeout: NodeJS.Timeout;
-    const durationMs = 4500; // 4.5 seconds to progress from 0% to 100%
+    const durationMs = 4200; // 4.2 seconds to smoothly progress from 0% to 100%
     let startTime = performance.now();
     let isHolding = false;
 
     const loop = (now: number) => {
-      if (isHolding) {
+      if (!isSectionVisible || isHolding) {
         animId = requestAnimationFrame(loop);
         return;
       }
@@ -477,14 +525,14 @@ export const HomeFeatureShowcase: React.FC = () => {
 
       if (progress >= 100) {
         isHolding = true;
-        // When it hits 100, hold for brief 300ms then reset to another goal randomly name and amount
+        // Hold for 750ms so viewers see the celebration glow and completed 100% bar before rotating style
         holdTimeout = setTimeout(() => {
           setGoalIndex((prev) => (prev + 1) % SHOWCASE_GOAL_PRESETS.length);
           setGoalCycleKey((k) => k + 1);
           setGoalProgress(0);
           startTime = performance.now();
           isHolding = false;
-        }, 300);
+        }, 750);
       }
 
       animId = requestAnimationFrame(loop);
@@ -495,7 +543,7 @@ export const HomeFeatureShowcase: React.FC = () => {
       cancelAnimationFrame(animId);
       clearTimeout(holdTimeout);
     };
-  }, []);
+  }, [isSectionVisible]);
 
   const currentGoal = SHOWCASE_GOAL_PRESETS[goalIndex];
   const currentGoalAmount = Number(((goalProgress / 100) * currentGoal.targetAmount).toFixed(2));
@@ -504,27 +552,14 @@ export const HomeFeatureShowcase: React.FC = () => {
   const [chatCycleKey, setChatCycleKey] = useState<number>(0);
   useEffect(() => {
     const chatTimer = setInterval(() => {
+      if (!isSectionVisible) return;
       setChatCycleKey((k) => k + 1);
     }, 3800);
     return () => clearInterval(chatTimer);
-  }, []);
-
-  /**
-   * Helper to compute dynamic 3D rotation:
-   * - On mobile: smoothly changes between -15deg and +15deg on each update with CSS transition
-   * - On desktop: sits inward at -15deg or +15deg facing the paired text description
-   */
-  const getCardTransform = (isRightColumnOnDesktop: boolean, cycleKey: number) => {
-    if (isMobile) {
-      const angle = cycleKey % 2 === 0 ? -15 : 15;
-      return `perspective(900px) rotateY(${angle}deg) rotateX(2deg)`;
-    }
-    const desktopAngle = isRightColumnOnDesktop ? -15 : 15;
-    return `perspective(1400px) rotateY(${desktopAngle}deg) rotateX(2deg)`;
-  };
+  }, [isSectionVisible]);
 
   return (
-    <section className="max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-6 sm:px-10 lg:px-12 xl:px-16 2xl:px-20 space-y-28 sm:space-y-36 relative">
+    <section ref={showcaseSectionRef} className="max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-6 sm:px-10 lg:px-12 xl:px-16 2xl:px-20 space-y-28 sm:space-y-36 relative">
       {/* Background Ambient Glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-cyan-500/5 blur-[160px] pointer-events-none rounded-full" />
       <div className="absolute top-2/3 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-purple-500/5 blur-[160px] pointer-events-none rounded-full" />
@@ -598,17 +633,9 @@ export const HomeFeatureShowcase: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: 3D Preview (Locked fixed width & height frame, smoothly rotates 15° left / 15° right on mobile) */}
-        <div className="perspective-container w-full lg:w-1/2 flex justify-center">
-          <div
-            className="w-full max-w-[480px] h-[360px] sm:h-[380px] bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center overflow-hidden"
-            style={{
-              transform: getCardTransform(true, alertCycleKey),
-              transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-              transformStyle: 'preserve-3d',
-              willChange: 'transform'
-            }}
-          >
+        {/* Right Side: Clean Default Flat Preview (No 3D rotation, strict fixed width & height) */}
+        <div className="w-full lg:w-1/2 flex justify-center">
+          <div className="w-full max-w-[480px] h-[360px] sm:h-[380px] bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center overflow-hidden">
             {/* Exact Dashboard Alert Component: Image, Title, and Messages (Remounts on key change for fresh animations) */}
             <div className="w-full h-full relative z-10 flex items-center justify-center p-2">
               <div className="w-full max-w-[440px] h-[340px] sm:h-[360px] flex items-center justify-center overflow-hidden">
@@ -712,17 +739,9 @@ export const HomeFeatureShowcase: React.FC = () => {
           </div>
         </div>
 
-        {/* Left Side: 3D Preview (Smoothly rotates 15° left / 15° right when clip updates on mobile) */}
-        <div className="perspective-container w-full lg:w-1/2 flex justify-center">
-          <div
-            className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center min-h-[360px]"
-            style={{
-              transform: getCardTransform(false, videoClipCycleKey),
-              transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-              transformStyle: 'preserve-3d',
-              willChange: 'transform'
-            }}
-          >
+        {/* Left Side: Clean Default Flat Preview (No 3D rotation) */}
+        <div className="w-full lg:w-1/2 flex justify-center">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center min-h-[360px]">
             {/* Animated Wrapper remounting on each 5s cycle key for change animation - No element outline */}
             <div
               key={`media-share-${videoClipCycleKey}-${currentMediaClip.id}`}
@@ -867,17 +886,9 @@ export const HomeFeatureShowcase: React.FC = () => {
           </p>
         </div>
 
-        {/* Right Side: 3D Preview (Smoothly rotates 15° left / 15° right when it changes on mobile) */}
-        <div className="perspective-container w-full lg:w-1/2 flex justify-center">
-          <div
-            className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative"
-            style={{
-              transform: getCardTransform(true, leaderboardCycleKey),
-              transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-              transformStyle: 'preserve-3d',
-              willChange: 'transform'
-            }}
-          >
+        {/* Right Side: Clean Default Flat Preview (No 3D rotation) */}
+        <div className="w-full lg:w-1/2 flex justify-center">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative">
             {/* Header */}
             <div className="flex items-center justify-between pb-2 mb-3">
               <div className="flex items-center gap-2">
@@ -1003,18 +1014,10 @@ export const HomeFeatureShowcase: React.FC = () => {
           </p>
         </div>
 
-        {/* Left Side: 3D Preview (Smoothly rotates 15° left / 15° right when goal updates on mobile) */}
-        <div className="perspective-container w-full lg:w-1/2 flex justify-center">
-          <div
-            className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative"
-            style={{
-              transform: getCardTransform(false, goalCycleKey),
-              transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-              transformStyle: 'preserve-3d',
-              willChange: 'transform'
-            }}
-          >
-            {/* Real Dashboard & Overlay Goal Asset (Template Renderer) */}
+        {/* Left Side: Clean Default Flat Preview (No 3D rotation) */}
+        <div className="w-full lg:w-1/2 flex justify-center">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative">
+            {/* Real Dashboard & Overlay Goal Asset (Template Renderer with isAnimating=true for synchronized progress) */}
             <div
               key={`goal-preview-${goalCycleKey}-${currentGoal.id}`}
               className="w-full relative z-10 animate-fade-in flex justify-center select-none"
@@ -1029,6 +1032,7 @@ export const HomeFeatureShowcase: React.FC = () => {
                 showBackground={true}
                 showAnimation={true}
                 showGradientShader={true}
+                isAnimating={true}
                 endDate={null}
               />
             </div>
@@ -1052,17 +1056,9 @@ export const HomeFeatureShowcase: React.FC = () => {
           </p>
         </div>
 
-        {/* Right Side: 3D Preview (Smoothly rotates 15° left / 15° right when it changes on mobile) */}
-        <div className="perspective-container w-full lg:w-1/2 flex justify-center">
-          <div
-            className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative"
-            style={{
-              transform: getCardTransform(true, chatCycleKey),
-              transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-              transformStyle: 'preserve-3d',
-              willChange: 'transform'
-            }}
-          >
+        {/* Right Side: Clean Default Flat Preview (No 3D rotation) */}
+        <div className="w-full lg:w-1/2 flex justify-center">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative">
             {/* Chat Header */}
             <div className="flex items-center justify-between pb-2 mb-3 relative z-10">
               <div className="flex items-center gap-2">
