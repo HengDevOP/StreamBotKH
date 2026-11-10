@@ -1172,7 +1172,7 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
                       }`}
                     >
                       <Check size={13} className={isCurrentActive ? 'text-emerald-400' : 'text-slate-500'} />
-                      <span>{isCurrentActive ? 'Active for Alerts' : 'Use for Donation Alerts'}</span>
+                      <span>{isCurrentActive ? 'Active for Alerts' : 'Use for Alertbox'}</span>
                     </button>
                   </div>
                 </div>

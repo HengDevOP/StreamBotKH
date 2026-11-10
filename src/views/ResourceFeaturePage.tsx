@@ -57,7 +57,7 @@ export interface ResourceFeatureDefinition {
 export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
   {
     slug: 'donations-alerts',
-    title: 'Donations Alerts',
+    title: 'Alertbox',
     headline: 'Live ABA PayWay & Bakong KHQR Tip Alerts with AI Voice Clone',
     badge: 'REAL-TIME STREAM OVERLAY',
     planBadge: 'ALL PLANS',
@@ -88,7 +88,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
       }
     ],
     steps: [
-      'Open your StreamBotKH Dashboard and select Donations Alerts from the sidebar.',
+      'Open your StreamBotKH Dashboard and select Alertbox from the sidebar.',
       'Click on any Donation Category in the list to expand its configuration studio inline (or click Create Donation Category).',
       'Customize your Headline Message, Reaction GIF, Custom Font, Sound Chime, TTS Voice Model, and Condition Threshold.',
       'Copy your OBS Studio Browser Source URL and paste it into an OBS Browser Source (1920x1080, 60 FPS).'
@@ -135,11 +135,11 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
   },
   {
     slug: 'video-alerts',
-    title: 'Video Alerts',
+    title: 'Video Share',
     headline: 'YouTube Media Share & Donor Video Clips on Stream',
     badge: 'INTERACTIVE MEDIA SHARE',
     planBadge: 'PRO PLAN',
-    shortSub: 'YouTube media share video alerts',
+    shortSub: 'YouTube media share clips',
     description:
       'Let your supporters attach YouTube links to their donations and watch their favorite clips play automatically on your OBS stream! Configure minimum tip thresholds, price-per-second rules, and maximum clip duration.',
     dashboardTab: 'video-alerts',
@@ -166,7 +166,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
       }
     ],
     steps: [
-      'Open Dashboard → Video Alerts (Available on Pro Plan).',
+      'Open Dashboard → Video Share (Available on Pro Plan).',
       'Enable YouTube Video Media Share and configure your Minimum Donation Amount and Max Duration Seconds.',
       'Copy the dedicated Video Overlay URL (/overlay/video/:token) into OBS Studio.',
       'Test a sample YouTube alert from the dashboard to verify video and audio framing.'
@@ -593,7 +593,7 @@ export const ResourceFeaturePage: React.FC<ResourceFeaturePageProps> = ({ onNavi
 
   const handleLaunchFeature = () => {
     if (user) {
-      navigate(`/dashboard?tab=${feature.dashboardTab}`);
+      navigate(`/creator?tab=${feature.dashboardTab}`);
     } else {
       loginWithGoogleRedirect();
     }

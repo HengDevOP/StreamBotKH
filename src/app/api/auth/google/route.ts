@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getUsersCollection, getOverlaysCollection, getAlertSettingsCollection, getPaymentSettingsCollection, restoreMasterKhqrImage, processExpiredAccountDeletions } from '@/server/database/mongo';
 import { getJwtSecret } from '@/server/auth';
 import { generateSecureOverlayToken } from '@/server/utils/crypto';
+import { getRandomTemplateGif } from '@/data/presetsData';
 
 function reloadEnv() {
   const savedPort = process.env.PORT;
@@ -311,7 +312,7 @@ export async function upsertGoogleStreamer(profile: {
         userId: streamerId,
         name: 'Default Neon Alert Overlay',
         overlayToken,
-        mediaUrl: 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+        mediaUrl: getRandomTemplateGif(),
         soundUrl: '/sounds/neon-chime.mp3',
         soundVolume: 0.85,
         glowColor: '#00F0FF',

@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { getAlertBoxesCollection, AlertBoxDoc, getUsersCollection, getAlertSettingsCollection } from '@/server/database/mongo';
 import { getAuthenticatedUser } from '@/server/auth';
+import { getRandomTemplateGif } from '@/data/presetsData';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
       isEnabled = true,
       templateStyle = 'neon-box',
       showImage = true,
-      mediaUrl = 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+      mediaUrl,
       soundUrl = '/sounds/cash-register-kaching.mp3',
       soundVolume = 0.85,
       durationSeconds = 8,
@@ -104,6 +105,10 @@ export async function POST(req: NextRequest) {
 
     const sanitizedName = String(name).trim().slice(0, 16);
     const resolvedMinAmount = Math.max(0.001, Number(minAmountCondition) > 0 ? Number(minAmountCondition) : 0.01);
+    const defaultTemplateGif = getRandomTemplateGif();
+    const resolvedMediaUrl = (mediaUrl && typeof mediaUrl === 'string' && !mediaUrl.includes('l41lT4n6ylgW2hh04'))
+      ? mediaUrl
+      : defaultTemplateGif;
 
     const cleanSampleUrl = (url?: string): string | undefined => {
       if (!url) return undefined;
@@ -135,7 +140,9 @@ export async function POST(req: NextRequest) {
           isEnabled: true,
           templateStyle: c?.templateStyle || templateStyle || 'neon-box',
           showImage: c?.showImage !== false,
-          mediaUrl: c?.mediaUrl ?? mediaUrl ?? 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+          mediaUrl: (c?.mediaUrl && typeof c.mediaUrl === 'string' && !c.mediaUrl.includes('l41lT4n6ylgW2hh04'))
+            ? c.mediaUrl
+            : resolvedMediaUrl,
           soundUrl: c?.soundUrl || soundUrl || '/sounds/cash-register-kaching.mp3',
           soundVolume: Math.min(1, Math.max(0, Number(c?.soundVolume ?? soundVolume ?? 0.85))),
           durationSeconds: Math.min(30, Math.max(3, Number(c?.durationSeconds || durationSeconds || 8))),
@@ -163,7 +170,7 @@ export async function POST(req: NextRequest) {
             isEnabled: true,
             templateStyle: templateStyle || 'neon-box',
             showImage: showImage !== false,
-            mediaUrl: mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+            mediaUrl: resolvedMediaUrl,
             soundUrl: soundUrl || '/sounds/cash-register-kaching.mp3',
             soundVolume: Math.min(1, Math.max(0, Number(soundVolume) ?? 0.85)),
             durationSeconds: Math.min(30, Math.max(3, Number(durationSeconds) || 8)),
@@ -196,7 +203,7 @@ export async function POST(req: NextRequest) {
       isEnabled: true,
       templateStyle: templateStyle || 'neon-box',
       showImage: showImage !== false,
-      mediaUrl: mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+      mediaUrl: resolvedMediaUrl,
       soundUrl: soundUrl || '/sounds/cash-register-kaching.mp3',
       soundVolume: Math.min(1, Math.max(0, Number(soundVolume) ?? 0.85)),
       durationSeconds: Math.min(30, Math.max(3, Number(durationSeconds) || 8)),

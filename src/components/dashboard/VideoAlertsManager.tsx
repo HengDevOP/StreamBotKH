@@ -470,10 +470,10 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
                   </span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white font-['Chakra_Petch']">
-                  Unlock YouTube Video Alerts on Stream
+                  Unlock YouTube Video Share on Stream
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Video Alerts allows fans to share high-energy YouTube clips, music videos, and meme reactions directly onto your live broadcast screen when they donate. Upgrade to any paid plan to enable Media Share with full moderation and timestamp trimming controls.
+                  Video Share allows fans to share high-energy YouTube clips, music videos, and meme reactions directly onto your live broadcast screen when they donate. Upgrade to any paid plan to enable Media Share with full moderation and timestamp trimming controls.
                 </p>
               </div>
 

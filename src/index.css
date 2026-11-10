@@ -13,6 +13,9 @@
   body {
     color: #F8FAFC;
     font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #0C1222 0%, #070A14 50%, #090E1D 100%);
+    background-color: #070A14;
+    min-height: 100vh;
   }
   h1, h2, h3, h4, h5, h6 {
     letter-spacing: 0.02em;
@@ -51,6 +54,13 @@ body:has(.app-viewport-lock),
   background-image: 
     linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* OBS Studio Dot-Matrix Canvas Pattern (Alertbox Preview Screen Background) */
+.obs-studio-dot-grid {
+  background-color: transparent;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
 }
 
 .cyber-grid-dense {
@@ -1006,6 +1016,113 @@ body:has(.app-viewport-lock),
   will-change: transform;
 }
 
+/* Hero Radiant Animated Gradient Background (Flows behind navbar through Hero into Streamers section) */
+@keyframes radiantHeroFlow {
+  0% {
+    background-position: 50% 0%;
+  }
+  50% {
+    background-position: 50% 100%;
+  }
+  100% {
+    background-position: 50% 0%;
+  }
+}
+
+/* Continuous Radiant Animated Flow spanning Navbar, Hero, Streamers, and All Features */
+.hero-radiant-page-flow {
+  background: linear-gradient(
+    180deg,
+    #080D1A 0%,
+    #09132C 5%,
+    #0C1B3E 12%,
+    #10173A 20%,
+    #161340 30%,
+    #131036 40%,
+    #0F1538 50%,
+    #141036 60%,
+    #171242 70%,
+    #0E1434 80%,
+    #121034 90%,
+    #080D1A 100%
+  );
+  background-size: 100% 220%;
+  animation: radiantHeroFlow 26s ease-in-out infinite;
+}
+
+.hero-radiant-wrapper {
+  background: linear-gradient(
+    180deg,
+    #080D1A 0%,
+    #09132C 5%,
+    #0C1B3E 12%,
+    #10173A 20%,
+    #161340 30%,
+    #131036 40%,
+    #0F1538 50%,
+    #141036 60%,
+    #171242 70%,
+    #0E1434 80%,
+    #121034 90%,
+    #080D1A 100%
+  );
+  background-size: 100% 220%;
+  animation: radiantHeroFlow 26s ease-in-out infinite;
+}
+
+.hero-radiant-bg {
+  background: linear-gradient(
+    180deg,
+    #080D1A 0%,
+    #09132C 20%,
+    #0D1B3E 50%,
+    #13143A 80%,
+    #181342 100%
+  );
+  background-size: 100% 160%;
+  animation: radiantHeroFlow 18s ease-in-out infinite;
+}
+
+/* Radiant Animated Aurora Light Layers for Hero */
+@keyframes radiantLightPulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1) translate(0px, 0px);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08) translate(15px, -10px);
+  }
+}
+
+.animate-radiant-pulse {
+  animation: radiantLightPulse 8s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* Thumbs Up Mascot Sticker Idle Floating Animation */
+@keyframes stickerFloatBob {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-10px) rotate(1.5deg);
+  }
+  70% {
+    transform: translateY(-4px) rotate(-1.5deg);
+  }
+}
+
+.animate-sticker-bob {
+  animation: stickerFloatBob 5s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Seamless Card Section Connected Gradient Background */
+.seamless-marquee-bg {
+  background: transparent;
+}
+
 .animated-home-gradient {
   background: radial-gradient(circle at 15% 20%, rgba(0, 240, 255, 0.08) 0%, transparent 45%),
               radial-gradient(circle at 85% 35%, rgba(236, 72, 153, 0.07) 0%, transparent 50%),
@@ -1015,6 +1132,135 @@ body:has(.app-viewport-lock),
   animation: homeGradientShift 30s ease infinite;
 }
 
+/* Smooth Dropdown Slide & Fade Animation */
+@keyframes dropdownSlideFade {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown-slide {
+  animation: dropdownSlideFade 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top center;
+}
+
+/* Hero Headline Word Swipe Animations */
+@keyframes heroSwipeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(105%);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes heroSwipeOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-105%);
+    filter: blur(4px);
+  }
+}
+
+.animate-hero-swipe-in {
+  animation: heroSwipeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+.animate-hero-swipe-out {
+  animation: heroSwipeOut 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+/* Hero Swiping Word (Single Solid Blue Color - No Shadow, No Gradient) */
+.hero-swipe-blue {
+  color: #00F0FF !important;
+  text-shadow: none !important;
+  background: none !important;
+  -webkit-text-fill-color: #00F0FF !important;
+}
+
+/* Child Card Slide Fade Out & Reconnect Cycle */
+@keyframes cardSlideFadeConnect {
+  0%, 62% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+  70% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+    filter: blur(2px);
+  }
+  84% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+    filter: blur(2px);
+  }
+  92% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.02);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.animate-card-fade-cycle {
+  animation: cardSlideFadeConnect 8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  will-change: transform, opacity;
+}
+
+/* Matching Circuit Line Disconnect & Reconnect Cycle */
+@keyframes lineFadeConnect {
+  0%, 62% {
+    opacity: 1;
+  }
+  70%, 84% {
+    opacity: 0;
+  }
+  92%, 100% {
+    opacity: 1;
+  }
+}
+
+.circuit-line-cycle {
+  animation: lineFadeConnect 8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  will-change: opacity;
+}
+
+/* Hero Stream Canvas Circuit Line Flow Animation */
+@keyframes circuitPulseFlow {
+  from {
+    stroke-dashoffset: 84;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.circuit-pulse-trace {
+  animation: circuitPulseFlow 2.8s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
 /* ============================================================== */
 /* DAY / LIGHT MODE COMPREHENSIVE RECOLOR & STYLING               */
 /* ============================================================== */
@@ -1022,21 +1268,21 @@ html.light-mode {
   color-scheme: light;
 }
 
-/* Base Canvas & Viewport */
+/* Base Canvas & Viewport (Pure Crisp Studio White) */
 html.light-mode body {
-  background-color: #F1F5F9 !important;
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
 }
 
 html.light-mode #root,
 html.light-mode main {
-  background-color: #F1F5F9 !important;
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
 }
 
 html.light-mode .bg-\[\#060911\],
 html.light-mode .bg-\[\#070A12\] {
-  background-color: #F1F5F9 !important;
+  background-color: #FFFFFF !important;
 }
 
 /* ============================================================== */
@@ -1081,16 +1327,21 @@ html.light-mode aside button.text-slate-400 .text-slate-400 {
   color: #64748B !important;
 }
 
-/* Active Nav Item (Elevated Sky Accent) */
+/* Active Nav Item (Elevated Neutral Accent - No Blue) */
 html.light-mode aside button.bg-slate-800 {
-  background-color: #E0F2FE !important;
-  color: #0369A1 !important;
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
   font-weight: 700 !important;
-  border: 1px solid #BAE6FD !important;
-  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.08) !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+html.light-mode aside button.bg-slate-800 .text-white,
+html.light-mode aside button.bg-slate-800 svg {
+  color: #0F172A !important;
+  stroke: #0F172A !important;
 }
 html.light-mode aside button.bg-slate-800 .text-cyan-400 {
-  color: #0284C7 !important;
+  color: #0F172A !important;
 }
 
 /* Sidebar Toggle Menu Button */
@@ -1117,25 +1368,56 @@ html.light-mode header h1 {
   color: #0F172A !important;
 }
 
-/* Current Tab Icon Container */
-html.light-mode header .bg-slate-900.border-slate-700\/80 {
+/* Current Tab Icon Container in Day Mode */
+html.light-mode header .w-9.rounded-xl,
+html.light-mode header .w-10.rounded-xl {
   background-color: #F1F5F9 !important;
-  border-color: #CBD5E1 !important;
-  color: #0284C7 !important;
+  color: #0F172A !important;
 }
 
-/* Action Icon Buttons (Mailbox, Copy, Mode) */
+html.light-mode header .w-9.rounded-xl svg,
+html.light-mode header .w-10.rounded-xl svg,
+html.light-mode header .w-9.rounded-xl .text-white,
+html.light-mode header .w-10.rounded-xl .text-white {
+  color: #0F172A !important;
+  stroke: #0F172A !important;
+}
+
+/* Action Icon Buttons & Containers (Mailbox, Copy, Mode) in Day Mode */
 html.light-mode header .bg-slate-900\/90,
 html.light-mode header .bg-slate-900 {
   background-color: #F8FAFC !important;
-  border-color: #E2E8F0 !important;
   color: #334155 !important;
 }
+
 html.light-mode header .bg-slate-900\/90:hover,
 html.light-mode header .bg-slate-900:hover {
   background-color: #F1F5F9 !important;
-  border-color: #CBD5E1 !important;
   color: #0F172A !important;
+}
+
+/* All icons inside header buttons in Day Mode */
+html.light-mode header button svg {
+  color: #475569 !important;
+  stroke: #475569 !important;
+}
+
+html.light-mode header button:hover svg {
+  color: #0F172A !important;
+  stroke: #0F172A !important;
+}
+
+/* Keep Sun icon vivid amber in Day Mode */
+html.light-mode header button svg.text-amber-500,
+html.light-mode header button svg.text-amber-400 {
+  color: #D97706 !important;
+  stroke: #D97706 !important;
+}
+
+/* Keep Copied Check icon vivid emerald in Day Mode */
+html.light-mode header button svg.text-emerald-400 {
+  color: #059669 !important;
+  stroke: #059669 !important;
 }
 
 /* Profile Dropdown Popover */
@@ -1155,6 +1437,170 @@ html.light-mode .bg-\[\#0B0F19\]\/95 .text-slate-400 {
 }
 html.light-mode .bg-\[\#0B0F19\]\/95 button:hover {
   background-color: #F1F5F9 !important;
+}
+
+/* ============================================================== */
+/* PUBLIC WEBSITE NAVBAR & MEGA MENU DROPDOWN                     */
+/* ============================================================== */
+html.light-mode header.sticky.bg-\[\#070A12\]\/95,
+html.light-mode header.bg-\[\#070A12\]\/95,
+html.light-mode header.sticky {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light-mode header a span.text-white,
+html.light-mode header button span.text-white,
+html.light-mode header nav a.text-white,
+html.light-mode header nav button.text-white {
+  color: #0F172A !important;
+  background-color: transparent !important;
+}
+
+html.light-mode header nav a.text-slate-400,
+html.light-mode header nav button.text-slate-400 {
+  color: #475569 !important;
+  background-color: transparent !important;
+}
+
+html.light-mode header nav a.text-slate-400:hover,
+html.light-mode header nav button.text-slate-400:hover {
+  color: #0F172A !important;
+  background-color: transparent !important;
+}
+
+html.light-mode header nav .border-l {
+  border-left-color: #E2E8F0 !important;
+}
+
+/* TV route */
+html.light-mode header nav a[href="/tv"] {
+  color: #0F172A !important;
+  background-color: transparent !important;
+}
+html.light-mode header nav a[href="/tv"]:hover {
+  color: #059669 !important;
+  background-color: transparent !important;
+}
+html.light-mode header nav a[href="/tv"].text-emerald-400 {
+  color: #059669 !important;
+  background-color: transparent !important;
+}
+
+/* ============================================================== */
+/* RESOURCES MEGA DROPDOWN (NIGHT / DARK MODE EXCELLENCE)         */
+/* ============================================================== */
+.mega-menu-container {
+  background-color: #0A0E1A !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.98), 0 0 40px rgba(0, 240, 255, 0.08) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+}
+
+/* Invisible hover bridge across top 10px gap so mouse never drops */
+.mega-menu-container::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: transparent;
+}
+
+.mega-menu-header {
+  color: #94A3B8 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.mega-menu-item {
+  border: 1px solid transparent !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Elevated dark card with subtle cyan glow on hover in Night Mode */
+.mega-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(0, 240, 255, 0.28) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 240, 255, 0.07) !important;
+}
+
+.mega-menu-item:hover .mega-menu-title {
+  color: #00F0FF !important;
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.4) !important;
+}
+
+.mega-menu-item:hover .mega-menu-icon {
+  transform: scale(1.12) !important;
+}
+
+.mega-menu-item:hover .mega-menu-sub {
+  color: #CBD5E1 !important;
+}
+
+.mega-menu-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #94A3B8 !important;
+}
+
+/* Resources Mega Dropdown Menu (Day / Light Mode) */
+html.light-mode [data-mega-menu],
+html.light-mode .mega-menu-container {
+  background-color: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.12), 0 0 35px rgba(2, 132, 199, 0.08) !important;
+}
+
+html.light-mode .mega-menu-header {
+  color: #64748B !important;
+  border-bottom-color: #F1F5F9 !important;
+}
+
+html.light-mode .mega-menu-item {
+  border-color: transparent !important;
+}
+
+html.light-mode .mega-menu-item:hover {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: none !important;
+}
+
+html.light-mode .mega-menu-title {
+  color: #0F172A !important;
+}
+
+html.light-mode .mega-menu-item:hover .mega-menu-title {
+  color: #0284C7 !important;
+  text-shadow: none !important;
+}
+
+html.light-mode .mega-menu-sub {
+  color: #64748B !important;
+}
+
+html.light-mode .mega-menu-footer {
+  border-top-color: #F1F5F9 !important;
+  color: #64748B !important;
+}
+
+/* Mobile Drawer in Day Mode */
+html.light-mode .md\:hidden.bg-\[\#070A12\]\/98 {
+  background-color: #FFFFFF !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+}
+html.light-mode .md\:hidden.bg-\[\#070A12\]\/98 button {
+  color: #334155 !important;
+}
+html.light-mode .md\:hidden.bg-\[\#070A12\]\/98 button:hover {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+html.light-mode .md\:hidden.bg-\[\#070A12\]\/98 .bg-white\/\[0\.08\] {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
 }
 
 /* ============================================================== */
@@ -1242,9 +1688,19 @@ html.light-mode h6 {
 
 /* Primary Card Text and Numbers (preserving colored button text!) */
 html.light-mode .font-black.text-white,
+html.light-mode .font-extrabold.text-white,
 html.light-mode .font-bold.text-white:not(button):not(.bg-cyan-500):not(.bg-pink-600),
 html.light-mode .font-semibold.text-white:not(button) {
   color: #0F172A !important;
+}
+
+/* Hero Shimmer Gradient Headline (High-Contrast Rich Gradient in Day Mode) */
+html.light-mode .hero-gradient-text,
+html.light-mode .animate-shimmer {
+  background-image: linear-gradient(135deg, #0284C7 0%, #4F46E5 50%, #D946EF 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
 }
 
 /* Card titles & Stat numbers */
@@ -1257,13 +1713,21 @@ html.light-mode .text-4xl.text-white {
 
 /* Descriptions & Secondary text */
 html.light-mode p.text-slate-400,
-html.light-mode span.text-slate-400 {
+html.light-mode span.text-slate-400,
+html.light-mode div.text-slate-400 {
   color: #64748B !important;
 }
 
 html.light-mode p.text-slate-300,
-html.light-mode span.text-slate-300 {
+html.light-mode span.text-slate-300,
+html.light-mode div.text-slate-300 {
   color: #475569 !important;
+}
+
+html.light-mode p.text-slate-300 b.text-white,
+html.light-mode span.text-slate-300 b.text-white,
+html.light-mode p.text-slate-400 b.text-white {
+  color: #0F172A !important;
 }
 
 html.light-mode .text-slate-500 {
@@ -1406,18 +1870,233 @@ html.light-mode .bg-cyan-500\/10 {
   color: #0369A1 !important;
 }
 
-/* Ambient glow orbs muted in light mode to prevent murkiness */
-html.light-mode .ambient-glow-cyan,
-html.light-mode .ambient-glow-pink,
+/* Ambient glow orbs in Day Mode: luminous pastel tints that look clean on pure white */
+html.light-mode .ambient-glow-cyan {
+  background: radial-gradient(circle, rgba(2, 132, 199, 0.08) 0%, transparent 70%) !important;
+  opacity: 0.8 !important;
+}
+html.light-mode .ambient-glow-pink {
+  background: radial-gradient(circle, rgba(219, 39, 119, 0.06) 0%, transparent 70%) !important;
+  opacity: 0.8 !important;
+}
 html.light-mode .ambient-glow-purple {
-  opacity: 0.15 !important;
+  background: radial-gradient(circle, rgba(147, 51, 234, 0.06) 0%, transparent 70%) !important;
+  opacity: 0.8 !important;
+}
+
+html.light-mode .animated-home-gradient {
+  background: radial-gradient(circle at 15% 20%, rgba(2, 132, 199, 0.05) 0%, transparent 45%),
+              radial-gradient(circle at 85% 35%, rgba(236, 72, 153, 0.04) 0%, transparent 50%),
+              radial-gradient(circle at 50% 65%, rgba(139, 92, 246, 0.04) 0%, transparent 50%),
+              radial-gradient(circle at 20% 85%, rgba(16, 185, 129, 0.04) 0%, transparent 45%) !important;
+  opacity: 1 !important;
 }
 
 /* Subtle Cyber Grid in Light Mode */
 html.light-mode .cyber-grid {
   background-image: 
-    linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px) !important;
+    linear-gradient(to right, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.035) 1px, transparent 1px) !important;
+  opacity: 0.5 !important;
+}
+
+/* OBS Studio Dot-Matrix Canvas in Light Mode */
+html.light-mode .obs-studio-dot-grid {
+  background-color: #FFFFFF !important;
+  background-image: radial-gradient(#CBD5E1 1.2px, transparent 1.2px) !important;
+  background-size: 24px 24px !important;
+}
+
+/* ============================================================== */
+/* PUBLIC HOMEPAGE DAY MODE CARDS & COMPONENTS                   */
+/* ============================================================== */
+
+/* Hero CTA Button (Solid Blue - No Gradient) */
+.home-hero-cta {
+  background: #0284C7 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 25px rgba(2, 132, 199, 0.45) !important;
+}
+
+.home-hero-cta:hover {
+  background: #0369A1 !important;
+  box-shadow: 0 0 35px rgba(2, 132, 199, 0.65) !important;
+}
+
+html.light-mode .home-hero-cta {
+  background: #0284C7 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 24px -4px rgba(2, 132, 199, 0.45) !important;
+}
+
+html.light-mode .home-hero-cta:hover {
+  background: #0369A1 !important;
+  box-shadow: 0 12px 32px -4px rgba(2, 132, 199, 0.6) !important;
+}
+
+html.light-mode .home-hero-cta span {
+  color: #FFFFFF !important;
+}
+
+/* Hero Explore Features Button (No border, no background) */
+html.light-mode .home-hero-explore {
+  color: #334155 !important;
+  background: transparent !important;
+  border: none !important;
+}
+html.light-mode .home-hero-explore:hover {
+  color: #0284C7 !important;
+}
+html.light-mode .home-hero-explore svg {
+  color: #0284C7 !important;
+}
+
+/* Verified Creator Network Badge */
+html.light-mode .home-verified-badge {
+  background-color: #E0F2FE !important;
+  border-color: #BAE6FD !important;
+  color: #0284C7 !important;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.1) !important;
+}
+html.light-mode .home-verified-badge svg {
+  color: #0284C7 !important;
+  fill: rgba(2, 132, 199, 0.15) !important;
+}
+
+/* Streamer Marquee Fade Vignettes (Soft white gradient in light mode) */
+html.light-mode .marquee-vignette-left {
+  background: linear-gradient(to right, #FFFFFF 0%, rgba(255, 255, 255, 0.85) 60%, transparent 100%) !important;
+}
+html.light-mode .marquee-vignette-right {
+  background: linear-gradient(to left, #FFFFFF 0%, rgba(255, 255, 255, 0.85) 60%, transparent 100%) !important;
+}
+
+/* Verified Streamer Cards in Day Mode */
+html.light-mode .home-streamer-card,
+html.light-mode .bg-\[\#0C101C\]\/90,
+html.light-mode .bg-\[\#0C101C\],
+html.light-mode .bg-\[\#121829\] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* ============================================================== */
+/* DOCUMENTATION WEB APPLICATION (DAY MODE COMPREHENSIVE STYLING) */
+/* ============================================================== */
+html.light-mode .doc-app-canvas {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+}
+
+html.light-mode .doc-top-bar {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light-mode .doc-sidebar {
+  background-color: #FFFFFF !important;
+  border-right: 1px solid #E2E8F0 !important;
+}
+
+html.light-mode .doc-top-bar input {
+  background-color: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+html.light-mode .doc-top-bar input::placeholder {
+  color: #94A3B8 !important;
+}
+
+html.light-mode .doc-sidebar button.text-slate-400 {
+  color: #475569 !important;
+}
+
+html.light-mode .doc-sidebar button.text-slate-400:hover {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+
+html.light-mode .doc-sidebar button.bg-cyan-500\/15 {
+  background-color: #E0F2FE !important;
+  color: #0284C7 !important;
+  border-color: #BAE6FD !important;
+}
+
+html.light-mode .doc-content-area h1,
+html.light-mode .doc-content-area h2,
+html.light-mode .doc-content-area h3 {
+  color: #0F172A !important;
+}
+
+html.light-mode .doc-content-area p {
+  color: #475569 !important;
+}
+
+/* Step-by-step cards */
+html.light-mode .doc-content-area .bg-slate-900\/40,
+html.light-mode .doc-content-area .bg-slate-900\/30 {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light-mode .doc-content-area .bg-cyan-500\/20 {
+  background-color: #E0F2FE !important;
+  border-color: #BAE6FD !important;
+  color: #0284C7 !important;
+}
+
+/* Code Snippets */
+html.light-mode .doc-content-area pre,
+html.light-mode .doc-content-area .bg-slate-950 {
+  background-color: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+  color: #0369A1 !important;
+}
+
+/* Callouts in Day Mode */
+html.light-mode .doc-content-area .bg-emerald-950\/20 {
+  background-color: #ECFDF5 !important;
+  border-color: #A7F3D0 !important;
+  color: #065F46 !important;
+}
+
+html.light-mode .doc-content-area .bg-amber-950\/20 {
+  background-color: #FFFBEB !important;
+  border-color: #FDE68A !important;
+  color: #92400E !important;
+}
+
+html.light-mode .doc-content-area .bg-rose-950\/20 {
+  background-color: #FFF1F2 !important;
+  border-color: #FECDD3 !important;
+  color: #9F1239 !important;
+}
+
+html.light-mode .doc-content-area .bg-cyan-950\/20 {
+  background-color: #F0F9FF !important;
+  border-color: #BAE6FD !important;
+  color: #0369A1 !important;
+}
+
+/* Doc Table */
+html.light-mode .doc-content-area table {
+  background-color: #FFFFFF !important;
+}
+html.light-mode .doc-content-area table thead tr {
+  background-color: #F8FAFC !important;
+  color: #475569 !important;
+  border-color: #E2E8F0 !important;
+}
+html.light-mode .doc-content-area table tbody tr {
+  border-color: #F1F5F9 !important;
+  color: #334155 !important;
+}
+html.light-mode .doc-content-area table tbody tr:hover {
+  background-color: #F8FAFC !important;
 }
 
 /* ============================================================== */

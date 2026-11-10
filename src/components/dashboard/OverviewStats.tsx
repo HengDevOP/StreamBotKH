@@ -149,11 +149,13 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
         case '1d':
           return dt.toISOString().slice(0, 10) === yesterdayStr || dt.toDateString() === yesterdayLocalDate;
         case 'this_week':
-        case 'last_week':
           return t >= startOfWeekTime && t <= now;
+        case 'last_week':
+          return age <= 7 * ms1d;
         case 'this_month':
-        case 'last_month':
           return t >= startOfMonthTime && t <= now;
+        case 'last_month':
+          return age <= 30 * ms1d;
         case '3_months':
           return age <= ms90d;
         case '6_months':
@@ -229,8 +231,8 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
   const timeframeTabs: Array<{ key: TimeframeOption; label: string; periodLabel: string }> = [
     { key: 'today', label: 'Today', periodLabel: "Today's stream" },
     { key: 'yesterday', label: 'Yesterday', periodLabel: "Yesterday's stream" },
-    { key: 'this_week', label: 'This Week', periodLabel: 'This week' },
-    { key: 'this_month', label: 'This Month', periodLabel: 'This month' },
+    { key: 'last_week', label: 'Last Week', periodLabel: 'Last 7 days' },
+    { key: 'last_month', label: 'Last Month', periodLabel: 'Last 30 days' },
     { key: '3_months', label: '3 Months', periodLabel: 'Past 3 months' },
     { key: '6_months', label: '6 Months', periodLabel: 'Past 6 months' },
     { key: 'lifetime', label: 'Lifetime', periodLabel: 'All-time lifetime' },
@@ -488,16 +490,16 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Top Header Bar & Timeframe Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-0.5">
-        <h2 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch'] tracking-wide truncate">
+      {/* Top Header Bar & Timeframe Filter (Responsive in Single Row) */}
+      <div className="flex items-center justify-between gap-2 sm:gap-3 pb-0.5 min-w-0">
+        <h2 className="text-xs xs:text-sm sm:text-base md:text-lg font-bold text-white font-['Chakra_Petch'] tracking-wide truncate min-w-0 flex-1">
           Performance &amp; Earning Revenue
         </h2>
 
         {/* Timeframe Filter Dropdown & Custom Range Picker */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto sm:ml-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
           {selectedTimeframe === 'custom' && (
-            <div className="flex items-center gap-1.5 bg-[#090D18] border border-slate-800 rounded-xl px-2.5 py-1.5 shadow-sm text-xs font-mono">
+            <div className="hidden xs:flex items-center gap-1.5 bg-[#090D18] border border-slate-800 rounded-xl px-2.5 py-1.5 shadow-sm text-xs font-mono">
               <Calendar size={13} className="text-cyan-400 shrink-0" />
               <input
                 type="date"
@@ -524,7 +526,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
               value={selectedTimeframe}
               onChange={(e) => setSelectedTimeframe(e.target.value as TimeframeOption)}
               aria-label="Filter timeframe"
-              className="appearance-none pl-3.5 pr-9 py-2 rounded-xl bg-[#090D18] border border-slate-800 text-xs font-mono font-bold text-white hover:border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer shadow-sm"
+              className="appearance-none pl-2.5 sm:pl-3.5 pr-7 sm:pr-9 py-1.5 sm:py-2 rounded-xl bg-[#090D18] border border-slate-800 text-[11px] sm:text-xs font-mono font-bold text-white hover:border-slate-700 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer shadow-sm"
             >
               {timeframeTabs.map((tab) => (
                 <option key={tab.key} value={tab.key} className="bg-slate-950 text-white py-1">
@@ -532,7 +534,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
                 </option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
         </div>
       </div>

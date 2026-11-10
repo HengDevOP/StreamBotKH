@@ -38,6 +38,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useModal } from '../../context/ModalContext';
 import { useAudio } from '../../hooks/useAudio';
 import { MediaItem } from './MediaLibraryManager';
+import { getRandomTemplateGif } from '../../data/presetsData';
 import { mediaService } from '../../services/mediaService';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 
@@ -86,7 +87,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
   const [name, setName] = useState('');
   const [width, setWidth] = useState(1080);
   const [height, setHeight] = useState(720);
-  const [mediaUrl, setMediaUrl] = useState('https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif');
+  const [mediaUrl, setMediaUrl] = useState(() => getRandomTemplateGif());
   const [soundUrl, setSoundUrl] = useState('/sounds/neon-chime.mp3');
   const [soundVolume, setSoundVolume] = useState(0.85);
   const [glowColor, setGlowColor] = useState('#00F0FF');
@@ -181,7 +182,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
             setName(ov.name || 'Overlay');
             setWidth(ov.width || 1080);
             setHeight(ov.height || 720);
-            setMediaUrl(ov.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif');
+            setMediaUrl(ov.mediaUrl || getRandomTemplateGif());
             setSoundUrl(ov.soundUrl || '/sounds/neon-chime.mp3');
             setSoundVolume(ov.soundVolume ?? 0.85);
             setGlowColor(ov.glowColor || '#00F0FF');
@@ -195,7 +196,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
               message: 'The requested overlay could not be found.',
               type: 'danger'
             });
-            navigate('/dashboard?tab=overlay');
+            navigate('/creator?tab=overlay');
           }
 
           if (resMedia.ok && dataMedia.success) {
@@ -303,7 +304,7 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
         try {
           const res = await fetch(`/api/overlays/${overlay._id}`, { method: 'DELETE' });
           if (res.ok) {
-            navigate('/dashboard?tab=overlay');
+            navigate('/creator?tab=overlay');
           }
         } catch (e) {}
       }
@@ -331,11 +332,11 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
       <header className="h-14 border-b border-slate-800/80 bg-[#090D18] px-4 flex items-center justify-between flex-shrink-0 z-20">
         <div className="flex items-center gap-3">
           <Link
-            to="/dashboard?tab=overlay"
+            to="/creator?tab=overlay"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-slate-300 hover:text-white transition-colors"
           >
             <ArrowLeft size={14} />
-            <span>Dashboard</span>
+            <span>Creator Panel</span>
           </Link>
 
           <span className="text-slate-600">/</span>
@@ -449,11 +450,11 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
               onClick={() => setActiveTab('appearance')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold font-mono transition-all text-left ${
                 activeTab === 'appearance'
-                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                  ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
               }`}
             >
-              <Sparkles size={16} className={activeTab === 'appearance' ? 'text-cyan-400' : 'text-slate-500'} />
+              <Sparkles size={16} className={activeTab === 'appearance' ? 'text-white' : 'text-slate-500'} />
               <div className="leading-tight">
                 <div className="font-bold">Appearance & Media</div>
                 <div className="text-[10px] text-slate-500 font-normal">Reactions, glow color, style</div>
@@ -464,11 +465,11 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
               onClick={() => setActiveTab('audio')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold font-mono transition-all text-left ${
                 activeTab === 'audio'
-                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                  ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
               }`}
             >
-              <Volume2 size={16} className={activeTab === 'audio' ? 'text-cyan-400' : 'text-slate-500'} />
+              <Volume2 size={16} className={activeTab === 'audio' ? 'text-white' : 'text-slate-500'} />
               <div className="leading-tight">
                 <div className="font-bold">Sound & Audio</div>
                 <div className="text-[10px] text-slate-500 font-normal">Chimes, volume control</div>
@@ -479,11 +480,11 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
               onClick={() => setActiveTab('text')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold font-mono transition-all text-left ${
                 activeTab === 'text'
-                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                  ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
               }`}
             >
-              <MessageSquare size={16} className={activeTab === 'text' ? 'text-cyan-400' : 'text-slate-500'} />
+              <MessageSquare size={16} className={activeTab === 'text' ? 'text-white' : 'text-slate-500'} />
               <div className="leading-tight">
                 <div className="font-bold">Text & Duration</div>
                 <div className="text-[10px] text-slate-500 font-normal">Template, timer, TTS</div>
@@ -494,11 +495,11 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
               onClick={() => setActiveTab('canvas')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold font-mono transition-all text-left ${
                 activeTab === 'canvas'
-                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                  ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
               }`}
             >
-              <Layers size={16} className={activeTab === 'canvas' ? 'text-cyan-400' : 'text-slate-500'} />
+              <Layers size={16} className={activeTab === 'canvas' ? 'text-white' : 'text-slate-500'} />
               <div className="leading-tight">
                 <div className="font-bold">Canvas Dimensions</div>
                 <div className="text-[10px] text-slate-500 font-normal">{width}×{height} px resolution</div>
@@ -509,11 +510,11 @@ export const OverlayStudio: React.FC<OverlayStudioProps> = ({ overlayId }) => {
               onClick={() => setActiveTab('obs')}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold font-mono transition-all text-left ${
                 activeTab === 'obs'
-                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                  ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
               }`}
             >
-              <Settings size={16} className={activeTab === 'obs' ? 'text-cyan-400' : 'text-slate-500'} />
+              <Settings size={16} className={activeTab === 'obs' ? 'text-white' : 'text-slate-500'} />
               <div className="leading-tight">
                 <div className="font-bold">OBS Browser Setup</div>
                 <div className="text-[10px] text-slate-500 font-normal">Integration instructions</div>

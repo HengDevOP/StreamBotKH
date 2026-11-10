@@ -261,6 +261,37 @@ export interface StreamChatSettingsDoc {
   updatedAt?: Date;
 }
 
+export interface CustomOverlayDoc {
+  _id?: ObjectId;
+  id?: string;
+  streamerId?: string;
+  streamerToken: string;
+  badgeText?: string;
+  badgeIcon?: string;
+  headline: string;
+  subtext?: string;
+  tickerMessages?: string[];
+  animationFlow: 'marquee' | 'typewriter' | 'fade-slide' | 'float-bounce' | 'wave-glow' | 'cyber-glitch' | 'flip-3d';
+  animationSpeed: 'slow' | 'normal' | 'fast';
+  showGoal: boolean;
+  goalLayout?: 'docked' | 'compact-pill' | 'stacked';
+  customWidth?: number;
+  customHeight?: number;
+  layoutPosition: 'top-ticker' | 'bottom-ticker' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center-lower';
+  fontFamily: string;
+  fontSize: number;
+  textColor: string;
+  accentColor: string;
+  glowColor: string;
+  backgroundColor: string;
+  borderColor: string;
+  backgroundStyle: 'glass' | 'deep' | 'neon-border' | 'transparent';
+  showBackground?: boolean;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface SubscriberTierDoc {
   id: string;
   name: string;
@@ -951,6 +982,11 @@ export async function getStreamChatSettingsCollection(): Promise<Collection<Stre
   return db.collection<StreamChatSettingsDoc>('stream_chat_settings');
 }
 
+export async function getCustomOverlaysCollection(): Promise<Collection<CustomOverlayDoc>> {
+  const db = await getMongoDb();
+  return db.collection<CustomOverlayDoc>('custom_overlays');
+}
+
 export interface PlatformTrialConfigDoc {
   _id?: ObjectId;
   id: string; // 'pro_plan_trial'
@@ -1368,7 +1404,7 @@ export async function initMongo() {
         userId: 'demo-streamer-id-1001',
         name: 'Default Neon Alert Overlay',
         overlayToken: 'ovl_token_neon_demo_9921',
-        mediaUrl: 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+        mediaUrl: '/sbkh/sbkh_hi.gif',
         soundUrl: '/sounds/neon-chime.mp3',
         soundVolume: 0.85,
         glowColor: '#00F0FF',

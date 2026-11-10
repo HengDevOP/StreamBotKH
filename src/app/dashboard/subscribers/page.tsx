@@ -7,7 +7,7 @@ export default function SubscribersPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/dashboard?tab=subscribers');
+    router.replace('/creator?tab=subscribers');
   }, [router]);
 
   return (

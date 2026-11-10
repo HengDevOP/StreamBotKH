@@ -648,7 +648,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                       : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
                   }`}
                 >
-                  <Sparkles size={14} className={`flex-shrink-0 ${activeSection === 'template' ? 'text-cyan-400' : ''}`} />
+                  <Sparkles size={14} className={`flex-shrink-0 ${activeSection === 'template' ? 'text-white' : ''}`} />
                   <span>Template ({PRESET_TEMPLATES.length})</span>
                   <span className="px-1.5 py-0.2 rounded bg-purple-500/90 text-white text-[8px] font-bold uppercase tracking-wider flex-shrink-0">
                     HD + GIF
@@ -680,7 +680,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                       : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
                   }`}
                 >
-                  <Smile size={14} className={`flex-shrink-0 ${activeSection === 'stickers' ? 'text-cyan-400' : ''}`} />
+                  <Smile size={14} className={`flex-shrink-0 ${activeSection === 'stickers' ? 'text-white' : ''}`} />
                   <span>Stickers (500)</span>
                   <span className="px-1.5 py-0.2 rounded bg-pink-500/90 text-white text-[8px] font-bold uppercase tracking-wider flex-shrink-0">
                     FB
@@ -699,7 +699,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                       : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
                   }`}
                 >
-                  <Film size={14} className={`flex-shrink-0 ${activeSection === 'gifs' ? 'text-cyan-400' : ''}`} />
+                  <Film size={14} className={`flex-shrink-0 ${activeSection === 'gifs' ? 'text-white' : ''}`} />
                   <span>GIFs (100)</span>
                   <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-cyan-500/30 text-cyan-300 text-[8px] font-bold uppercase tracking-wider">
                     TRENDING
@@ -721,7 +721,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                     : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
                 }`}
               >
-                <Music size={14} className={`flex-shrink-0 ${activeSection === 'sounds' ? 'text-cyan-400' : ''}`} />
+                <Music size={14} className={`flex-shrink-0 ${activeSection === 'sounds' ? 'text-white' : ''}`} />
                 <span>Sounds ({PRESET_SOUNDS.length})</span>
                 <span className="px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-300 text-[8px] font-bold uppercase tracking-wider flex-shrink-0">
                   SFX
@@ -742,9 +742,9 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               }`}
             >
               {isAudioOnly ? (
-                <Volume2 size={14} className={`flex-shrink-0 ${activeSection === 'uploads' ? 'text-cyan-400' : ''}`} />
+                <Volume2 size={14} className={`flex-shrink-0 ${activeSection === 'uploads' ? 'text-white' : ''}`} />
               ) : (
-                <Layers size={14} className={`flex-shrink-0 ${activeSection === 'uploads' ? 'text-cyan-400' : ''}`} />
+                <Layers size={14} className={`flex-shrink-0 ${activeSection === 'uploads' ? 'text-white' : ''}`} />
               )}
               <span>
                 {isAudioOnly ? `My Uploads (${audioUploadsCount})` : `My Uploads (${mediaList.length})`}

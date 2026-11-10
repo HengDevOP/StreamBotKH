@@ -10,9 +10,9 @@ export default function Page() {
 
   useEffect(() => {
     if (id) {
-      router.replace(`/dashboard?tab=donation&id=${encodeURIComponent(id)}`);
+      router.replace(`/creator?tab=donation&id=${encodeURIComponent(id)}`);
     } else {
-      router.replace('/dashboard?tab=donation');
+      router.replace('/creator?tab=donation');
     }
   }, [router, id]);
 

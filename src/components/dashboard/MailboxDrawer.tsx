@@ -249,8 +249,8 @@ export const MailboxDrawer: React.FC<MailboxDrawerProps> = ({
 
   const handleActionClick = (url?: string) => {
     if (!url) return;
-    if (url.startsWith('/dashboard?tab=')) {
-      const targetTab = url.replace('/dashboard?tab=', '').split('&')[0];
+    if (url.startsWith('/dashboard?tab=') || url.startsWith('/creator?tab=')) {
+      const targetTab = url.replace(/^\/(dashboard|creator)\?tab=/, '').split('&')[0];
       if (onNavigateTab) {
         onNavigateTab(targetTab);
         onClose();

@@ -496,7 +496,7 @@ export const MailboxManager: React.FC<MailboxManagerProps> = ({
                   <div className="pt-4 border-t border-slate-800/80">
                     <button
                       onClick={() => {
-                        if (selectedMessage.actionUrl?.startsWith('/dashboard?tab=')) {
+                        if (selectedMessage.actionUrl?.startsWith('/dashboard?tab=') || selectedMessage.actionUrl?.startsWith('/creator?tab=')) {
                           const targetTab = selectedMessage.actionUrl.split('?tab=')[1];
                           onNavigateTab?.(targetTab);
                         } else if (selectedMessage.actionUrl?.startsWith('/')) {

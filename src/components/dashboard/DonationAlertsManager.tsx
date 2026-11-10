@@ -24,6 +24,7 @@ import { useModal } from '../../context/ModalContext';
 import { DonationAlertStudio } from './DonationAlertStudio';
 import { AlertPresetModal } from './AlertPresetModal';
 import { AlertPreset } from '../../data/donationAlertPresets';
+import { getRandomTemplateGif } from '../../data/presetsData';
 
 interface DonationAlertsManagerProps {
   streamerToken?: string;
@@ -133,7 +134,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setSelectedBoxId(box._id);
     onSelectBoxId?.(box._id);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/dashboard?tab=donation&id=${box._id}`);
+      window.history.pushState(null, '', `/creator?tab=donation&id=${box._id}`);
     }
   };
 
@@ -192,7 +193,9 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
           isEnabled: true,
           templateStyle: preset?.templateStyle || 'neon-box',
           showImage: true,
-          mediaUrl: preset?.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+          mediaUrl: preset?.mediaUrl && !preset.mediaUrl.includes('l41lT4n6ylgW2hh04')
+            ? preset.mediaUrl
+            : getRandomTemplateGif(),
           layoutMode: preset?.layoutMode || 'top',
           soundUrl: preset?.soundUrl || '/sounds/cash-register-kaching.mp3',
           soundVolume: 0.85,
@@ -236,7 +239,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setSelectedBoxId(null);
     onSelectBoxId?.(null);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', '/dashboard?tab=donation');
+      window.history.pushState(null, '', '/creator?tab=donation');
     }
   };
 
@@ -252,7 +255,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setSelectedBoxId(savedBox._id);
     onSelectBoxId?.(savedBox._id);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/dashboard?tab=donation&id=${savedBox._id}`);
+      window.history.pushState(null, '', `/creator?tab=donation&id=${savedBox._id}`);
     }
   };
 
@@ -262,7 +265,7 @@ export const DonationAlertsManager: React.FC<DonationAlertsManagerProps> = ({
     setSelectedBoxId(null);
     onSelectBoxId?.(null);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', '/dashboard?tab=donation');
+      window.history.pushState(null, '', '/creator?tab=donation');
     }
   };
 

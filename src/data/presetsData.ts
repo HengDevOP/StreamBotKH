@@ -18047,3 +18047,12 @@ export const ALL_PRESETS: PresetMediaItem[] = [
   ...PRESET_STICKERS,
   ...PRESET_SOUNDS
 ];
+
+export const getRandomTemplateGif = (): string => {
+  const templateGifs = PRESET_TEMPLATES.filter(
+    (item) => item.format === 'gif' || item.url.toLowerCase().endsWith('.gif')
+  );
+  if (templateGifs.length === 0) return '/sbkh/sbkh_hi.gif';
+  const randomIndex = Math.floor(Math.random() * templateGifs.length);
+  return templateGifs[randomIndex].url;
+};

@@ -69,7 +69,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
     ? `${amount.toLocaleString()} ៛`
     : `$${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const defaultGif = 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif';
+  const defaultGif = '/sbkh/sbkh_hi.gif';
   const displayGif = customGifUrl || mediaUrl || defaultGif;
   const shouldShowImage = alert.showImage !== false;
   const activeFont = alert.fontFamily || 'Chakra Petch';

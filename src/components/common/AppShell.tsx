@@ -9,7 +9,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const location = useLocation();
   const pathname = location.pathname;
   const isOverlay = pathname?.startsWith('/overlay');
-  const isDashboard = pathname?.startsWith('/dashboard');
+  const isDashboard = pathname?.startsWith('/dashboard') || pathname?.startsWith('/creator');
   const isMultiStream =
     pathname === '/tv' ||
     pathname?.startsWith('/tv/') ||
@@ -33,7 +33,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   if (isMultiStream) {
     return (
-      <main className="app-viewport-lock fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none bg-[#060911] text-slate-100 flex flex-col">
+      <main className="app-viewport-lock fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none bg-gradient-to-br from-[#0C1222] via-[#070A14] to-[#090E1D] text-slate-100 flex flex-col">
         {children}
       </main>
     );
@@ -42,7 +42,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   // Pure Full-Screen Responsive Application for Dashboard (Navbar hidden)
   if (isDashboard) {
     return (
-      <main className="app-viewport-lock fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none bg-[#060911] text-slate-100 flex flex-col">
+      <main className="app-viewport-lock fixed inset-0 w-full h-[100dvh] overflow-hidden overscroll-none bg-gradient-to-br from-[#0C1222] via-[#070A14] to-[#090E1D] text-slate-100 flex flex-col">
         {children}
       </main>
     );
@@ -53,20 +53,20 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     pathname?.startsWith('/donate') ||
     (!!pathname &&
       pathname !== '/' &&
-      !['/login', '/pricing', '/documents', '/docs', '/discord', '/resources', '/dashboard', '/overlay'].some((p) =>
+      !['/login', '/pricing', '/documents', '/docs', '/discord', '/resources', '/dashboard', '/creator', '/overlay'].some((p) =>
         pathname.startsWith(p)
       ));
 
   if (isDonate) {
     return (
-      <main className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col">
+      <main className="min-h-screen bg-gradient-to-br from-[#0C1222] via-[#070A14] to-[#090E1D] text-slate-100 flex flex-col">
         {children}
       </main>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#070A12] text-slate-100">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0C1222] via-[#070A14] to-[#090E1D] text-slate-100">
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />

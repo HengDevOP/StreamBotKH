@@ -10,9 +10,9 @@ export default function SubscriberTierRoutePage() {
 
   useEffect(() => {
     if (tierId) {
-      router.replace(`/dashboard?tab=subscribers&id=${encodeURIComponent(tierId)}`);
+      router.replace(`/creator?tab=subscribers&id=${encodeURIComponent(tierId)}`);
     } else {
-      router.replace('/dashboard?tab=subscribers');
+      router.replace('/creator?tab=subscribers');
     }
   }, [router, tierId]);
 

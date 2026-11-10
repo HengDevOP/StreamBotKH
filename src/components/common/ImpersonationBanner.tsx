@@ -16,7 +16,7 @@ export const ImpersonationBanner: React.FC = () => {
     try {
       setExiting(true);
       await stopImpersonating();
-      window.location.href = '/dashboard?tab=admin-users';
+      window.location.href = '/creator?tab=admin-users';
     } catch (err) {
       console.error('Failed to exit impersonation:', err);
       setExiting(false);

@@ -35,10 +35,10 @@ const TIMEFRAME_LABELS: Record<TimeframeOption, string> = {
   yesterday: 'Yesterday',
   '1d': 'Yesterday',
   '3d': '3d',
-  this_week: 'This Week',
-  last_week: 'This Week',
-  this_month: 'This Month',
-  last_month: 'This Month',
+  this_week: 'Last Week',
+  last_week: 'Last Week',
+  this_month: 'Last Month',
+  last_month: 'Last Month',
   '3_months': '3 Months',
   '6_months': '6 Months',
   lifetime: 'Lifetime',
@@ -95,11 +95,13 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
         case '1d':
           return dt.toISOString().slice(0, 10) === yesterdayStr || dt.toDateString() === yesterdayLocalDate;
         case 'this_week':
-        case 'last_week':
           return t >= startOfWeekTime && t <= now;
+        case 'last_week':
+          return age <= 7 * ms1d;
         case 'this_month':
-        case 'last_month':
           return t >= startOfMonthTime && t <= now;
+        case 'last_month':
+          return age <= 30 * ms1d;
         case '3_months':
           return age <= ms90d;
         case '6_months':

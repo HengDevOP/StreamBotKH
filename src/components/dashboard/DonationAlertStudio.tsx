@@ -58,6 +58,7 @@ import { AlertPreset } from '../../data/donationAlertPresets';
 import { MediaItem, isAudioAsset } from './MediaLibraryManager';
 import { normalizeCurrencyAndSymbols, khmerNumberToWords } from '../../utils/ttsHelper';
 import { KHMER_FONTS_2019 } from '../../data/khmerFonts';
+import { getRandomTemplateGif } from '../../data/presetsData';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 
 interface DonationAlertStudioProps {
@@ -110,14 +111,6 @@ const GLOW_COLOR_PRESETS = [
   { label: 'Pure White', hex: '#FFFFFF' }
 ];
 
-const GIF_PRESETS = [
-  { label: 'Neon Cyber Cat', url: 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif' },
-  { label: 'Dancing Hype Alien', url: 'https://media.giphy.com/media/26AHONQ79FdWZhAI0/giphy.gif' },
-  { label: 'Rain of Gold Coins', url: 'https://media.giphy.com/media/l0Ex6kAKAoFRsFhIE/giphy.gif' },
-  { label: 'Pixel Hearts', url: 'https://media.giphy.com/media/xT0xeJpnrWC4XWblEk/giphy.gif' },
-  { label: 'Victory Anime Hype', url: 'https://media.giphy.com/media/artj92V8o75VPL7AeQ/giphy.gif' }
-];
-
 export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   box,
   streamerToken,
@@ -145,7 +138,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         isEnabled: true,
         templateStyle: c.templateStyle || box.templateStyle || 'neon-box',
         showImage: c.showImage !== false,
-        mediaUrl: c.mediaUrl ?? box.mediaUrl ?? 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+        mediaUrl: c.mediaUrl ?? box.mediaUrl ?? getRandomTemplateGif(),
         layoutMode: c.layoutMode || box.layoutMode || 'top',
         soundUrl:
           c.soundUrl && !c.soundUrl.includes('neon-chime')
@@ -177,7 +170,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
         isEnabled: true,
         templateStyle: box?.templateStyle || 'neon-box',
         showImage: box?.showImage !== false,
-        mediaUrl: box?.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif',
+        mediaUrl: box?.mediaUrl || getRandomTemplateGif(),
         layoutMode: box?.layoutMode || 'top',
         soundUrl:
           box?.soundUrl && !box.soundUrl.includes('neon-chime')
@@ -217,7 +210,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   );
   const [showImage, setShowImage] = useState<boolean>(firstTier.showImage !== false);
   const [mediaUrl, setMediaUrl] = useState<string>(
-    firstTier.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif'
+    firstTier.mediaUrl || getRandomTemplateGif()
   );
   const [layoutMode, setLayoutMode] = useState<'top' | 'left' | 'right' | 'banner'>(
     firstTier.layoutMode || 'top'
@@ -419,7 +412,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
     setConditionAmountInput(nextAmt.toFixed(2));
     setTemplateStyle(tier.templateStyle || 'neon-box');
     setShowImage(tier.showImage !== false);
-    setMediaUrl(tier.mediaUrl || 'https://media.giphy.com/media/l41lT4n6ylgW2hh04/giphy.gif');
+    setMediaUrl(tier.mediaUrl || getRandomTemplateGif());
     setLayoutMode(tier.layoutMode || 'top');
     setSoundUrl(
       tier.soundUrl && !tier.soundUrl.includes('neon-chime')
@@ -1282,7 +1275,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 <ChevronDown
                   size={16}
                   className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${
-                    activeTab === 'text' ? 'rotate-180 text-cyan-400' : ''
+                    activeTab === 'text' ? 'rotate-180 text-white' : ''
                   }`}
                 />
               </button>
@@ -1798,7 +1791,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 <ChevronDown
                   size={16}
                   className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${
-                    activeTab === 'image' ? 'rotate-180 text-cyan-400' : ''
+                    activeTab === 'image' ? 'rotate-180 text-white' : ''
                   }`}
                 />
               </button>
@@ -1867,30 +1860,6 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                                 Direct GIF, PNG, or WebP URL
                               </p>
                             </div>
-                          </div>
-                        </div>
-
-                        {/* Quick GIF Presets */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-mono font-bold text-slate-300 block">
-                            Popular Animated GIF Presets
-                          </label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {GIF_PRESETS.map((preset) => (
-                              <button
-                                key={preset.url}
-                                type="button"
-                                onClick={() => setMediaUrl(preset.url)}
-                                className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all ${
-                                  mediaUrl === preset.url
-                                    ? 'bg-cyan-500/15 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                                }`}
-                              >
-                                <img src={preset.url} alt={preset.label} className="w-6 h-6 rounded object-cover flex-shrink-0" />
-                                <span className="text-[11px] font-mono truncate">{preset.label}</span>
-                              </button>
-                            ))}
                           </div>
                         </div>
 
@@ -2043,7 +2012,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 <ChevronDown
                   size={16}
                   className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${
-                    activeTab === 'tts' ? 'rotate-180 text-cyan-400' : ''
+                    activeTab === 'tts' ? 'rotate-180 text-white' : ''
                   }`}
                 />
               </button>
@@ -2297,7 +2266,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
                 <ChevronDown
                   size={16}
                   className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${
-                    activeTab === 'rules' ? 'rotate-180 text-cyan-400' : ''
+                    activeTab === 'rules' ? 'rotate-180 text-white' : ''
                   }`}
                 />
               </button>

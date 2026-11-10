@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LogOut,
   Menu,
   X,
   ChevronDown,
@@ -40,7 +39,7 @@ interface NavbarProps {
 
 // Official 4-color Google Icon
 const GoogleIcon = () => (
-  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+  <svg className="w-4.5 h-4.5 flex-shrink-0" viewBox="0 0 24 24">
     <path
       fill="#4285F4"
       d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
@@ -62,14 +61,14 @@ const GoogleIcon = () => (
 
 // Official Discord Icon
 const DiscordIcon = () => (
-  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+  <svg className="w-4.5 h-4.5 sm:w-5 sm:h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
     <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
   </svg>
 );
 
 // Official Telegram Icon
 const TelegramIcon = () => (
-  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+  <svg className="w-4.5 h-4.5 sm:w-5 sm:h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.536-.195 1.006.128.832.942z" />
   </svg>
 );
@@ -89,197 +88,154 @@ export interface MegaMenuSection {
   items: MegaMenuItem[];
 }
 
-// 4 Categorized Mega Menu Columns matching Streamlabs-style Architecture
-const MEGA_MENU_SECTIONS: MegaMenuSection[] = [
+// Categorized Products Mega Menu Columns
+const PRODUCTS_MENU_SECTIONS: MegaMenuSection[] = [
   {
-    header: 'Most popular',
+    header: 'Overlays & Alerts',
     items: [
       {
-        title: '2D Pokémon',
-        sub: 'Interactive chat avatars & retro bubbles',
+        title: 'Alert Box',
+        sub: 'Instant Bakong KHQR, ABA & ACLEDA 60 FPS alerts',
+        href: '/resources/donations-alerts',
+        icon: Bell,
+        color: '#00F0FF',
+        badge: '0.02s'
+      },
+      {
+        title: 'Video Share',
+        sub: 'YouTube media share player & video donor cheers',
+        href: '/resources/video-alerts',
+        icon: Video,
+        color: '#EC4899',
+        badge: 'OBS'
+      },
+      {
+        title: 'Khmer AI TTS',
+        sub: 'Automated Cambodian neural voice donor speech reader',
+        href: '/creator?tab=tts',
+        icon: Volume2,
+        color: '#10B981',
+        badge: 'VOICE'
+      },
+      {
+        title: 'Custom Overlay Studio',
+        sub: 'Drag-and-drop multi-widget broadcast layout studio',
+        href: '/creator?tab=custom-overlay',
+        icon: Layers,
+        color: '#8B5CF6'
+      },
+      {
+        title: 'Theme Library',
+        sub: 'Custom streamer overlay themes and neon presets',
+        href: '/resources/media-share',
+        icon: Sparkles,
+        color: '#F59E0B'
+      }
+    ]
+  },
+  {
+    header: 'Widgets & Interactive',
+    items: [
+      {
+        title: 'Live Chat Widget',
+        sub: 'Multistream unified chat for OBS Studio & vMix',
+        href: '/creator?tab=live-chat',
+        icon: MessageSquare,
+        color: '#00F0FF',
+        badge: 'SYNC'
+      },
+      {
+        title: 'Goal Tracker',
+        sub: 'Realtime stream donation and subscriber goals',
+        href: '/resources/goal',
+        icon: Target,
+        color: '#14B8A6'
+      },
+      {
+        title: 'Leaderboard',
+        sub: 'Top tipper rankings & VIP donor hall of fame',
+        href: '/resources/leaderboard',
+        icon: Trophy,
+        color: '#F59E0B'
+      },
+      {
+        title: '2D Pokémon Avatars',
+        sub: 'Retro chat avatars & interactive interactive sprites',
         href: '/resources/2d-pokemon',
         icon: Gamepad2,
         color: '#10B981',
         actionText: 'Studio Preview'
       },
       {
-        title: 'Donation Alerts',
-        sub: 'Dynamic Bakong KHQR & ABA alerts',
-        href: '/resources/donations-alerts',
-        icon: Bell,
-        color: '#00F0FF'
-      },
-      {
-        title: 'Leaderboard',
-        sub: 'Top supporter rankings & 20 themes',
-        href: '/resources/leaderboard',
-        icon: Trophy,
-        color: '#F59E0B'
-      },
-      {
-        title: 'Video Alerts',
-        sub: 'YouTube media share & video clips',
-        href: '/resources/video-alerts',
-        icon: Video,
+        title: 'Spinning Wheel',
+        sub: 'Custom lucky wheel giveaways & interactive chat games',
+        href: '/resources/wheels',
+        icon: Disc,
         color: '#EC4899'
       },
       {
-        title: 'Theme Library',
-        sub: 'Widget themes & stream overlays',
-        href: '/resources/media-share',
-        icon: Layers,
-        color: '#6366F1'
+        title: 'Subathon Timer',
+        sub: 'Dynamic live countdown clock with auto tip extensions',
+        href: '/resources/timer',
+        icon: Timer,
+        color: '#F97316'
       }
     ]
   },
   {
-    header: 'Stream and record',
+    header: 'Monetization & TV',
     items: [
       {
+        title: 'Direct KHQR Tipping',
+        sub: 'Zero platform cuts, instant ABA & Bakong transfers',
+        href: '/creator?tab=payments',
+        icon: CreditCard,
+        color: '#00F0FF',
+        badge: '0% FEE'
+      },
+      {
         title: 'StreamBot TV',
-        sub: 'Live broadcast station & multi-view',
+        sub: '24/7 Creator broadcast station & multi-view player',
         href: '/tv',
         icon: Tv,
         color: '#10B981',
         badge: 'LIVE'
       },
       {
-        title: 'Subathon Timer',
-        sub: 'Live countdown with auto top-ups',
-        href: '/resources/timer',
-        icon: Timer,
-        color: '#F97316'
-      },
-      {
-        title: 'Stream Goals',
-        sub: 'Customizable stream donation progress',
-        href: '/resources/goal',
-        icon: Target,
-        color: '#14B8A6'
-      },
-      {
-        title: 'Soundboard',
-        sub: 'PC hotkey SFX engine with instant play',
-        href: '/resources/soundboard',
-        icon: Volume2,
-        color: '#10B981'
-      },
-      {
-        title: 'Media Library',
-        sub: 'Cloud storage for MP4, GIF & sounds',
-        href: '/dashboard?tab=media',
-        icon: HardDrive,
-        color: '#3B82F6'
-      },
-      {
-        title: 'Tip QR Overlay',
-        sub: 'Scan-to-tip on OBS stream screen',
-        href: '/dashboard?tab=overview',
-        icon: QrCode,
-        color: '#00F0FF'
-      },
-      {
-        title: 'Spinning Wheel',
-        sub: 'Custom giveaways & lucky spins',
-        href: '/resources/wheels',
-        icon: Disc,
-        color: '#8B5CF6'
-      }
-    ]
-  },
-  {
-    header: 'Level up your brand',
-    items: [
-      {
-        title: 'YouTube Guide',
-        sub: 'Access helpful videos and updates',
-        href: '/resources/youtube-guide',
-        icon: Youtube,
-        color: '#FF0000'
-      },
-      {
-        title: 'Facebook Guide',
-        sub: 'Facebook Gaming & Cambodia live reach',
-        href: '/resources/facebook-guide',
-        icon: Facebook,
-        color: '#1877F2'
-      },
-      {
-        title: 'Instagram Guide',
-        sub: 'Vertical 9:16 OBS streams & engagement',
-        href: '/resources/instagram-guide',
-        icon: Instagram,
-        color: '#E1306C'
-      },
-      {
-        title: 'TikTok Trending',
-        sub: 'Viral sounds & TikTok Live growth',
-        href: '/resources/tiktok-trending',
-        icon: Flame,
-        color: '#00F2FE',
-        badge: 'HOT'
-      },
-      {
-        title: 'Discord Community',
-        sub: 'Connect with 2,400+ creators',
-        href: '/discord',
-        icon: MessageSquare,
-        color: '#5865F2'
-      },
-      {
-        title: 'Live System Status',
-        sub: 'Realtime database, API & socket nodes',
-        href: '/status',
-        icon: Activity,
-        color: '#10B981'
-      }
-    ]
-  },
-  {
-    header: 'Earn money streaming',
-    items: [
-      {
-        title: 'Tipping',
-        sub: 'Allow viewers to support you',
-        href: '/dashboard?tab=payments',
-        icon: CreditCard,
-        color: '#00F0FF',
-        badge: '0% FEE'
-      },
-      {
-        title: 'Sponsorships',
-        sub: 'Get paid to stream & brand banners',
-        href: '/pricing',
-        icon: DollarSign,
-        color: '#10B981'
-      },
-      {
-        title: 'Pro Plan Ultra',
-        sub: 'One plan, all the pro features',
-        href: '/pricing',
+        title: 'Subscribers & Members',
+        sub: 'Tiered monthly supporter perks & badges',
+        href: '/creator?tab=subscribers',
         icon: Sparkles,
         color: '#A855F7'
       },
       {
-        title: 'Support Desk',
-        sub: 'Claim ticket & live chat with staff',
-        href: '/dashboard?tab=tickets',
+        title: 'Soundboard',
+        sub: 'Hotkey sound effects engine with instant play',
+        href: '/resources/soundboard',
         icon: Headphones,
-        color: '#F59E0B'
+        color: '#F97316'
+      },
+      {
+        title: 'Media Cloud Storage',
+        sub: 'Unlimited storage for MP4, GIF & sound effects',
+        href: '/creator?tab=media',
+        icon: HardDrive,
+        color: '#3B82F6'
       }
     ]
   }
 ];
 
 // Flat list for quick reference
-const RESOURCE_FEATURES = MEGA_MENU_SECTIONS.flatMap((s) => s.items);
+const RESOURCE_FEATURES = PRODUCTS_MENU_SECTIONS.flatMap((s) => s.items);
 
 export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
-  const { user, loading, logout, loginWithGoogleRedirect } = useAuth();
+  const { user, loading, loginWithGoogleRedirect } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [mobileResourcesOpen, setMobileResourcesOpen] = useState(false);
+  const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dropdownContainerRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const pathname = location.pathname;
   const navigate = useNavigate();
@@ -296,6 +252,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
       setMobileMenuOpen(false);
       setDropdownOpen(false);
       loginWithGoogleRedirect();
+      return;
+    }
+    if (key === 'documentation' || path === '/documentation' || path === '/docs' || key === 'documents' || path === '/documents') {
+      setMobileMenuOpen(false);
+      setDropdownOpen(false);
+      window.open('/documentation', '_blank');
       return;
     }
     if (key === 'home' || path === '/') {
@@ -326,7 +288,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
   };
 
   useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownContainerRef.current && !dropdownContainerRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
       if (dropdownTimeoutRef.current) {
         clearTimeout(dropdownTimeoutRef.current);
       }
@@ -334,21 +303,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#070A12]/95 backdrop-blur-md border-b border-white/[0.08]">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16">
+    <header className="sticky top-0 z-50 w-full bg-[#080D1A]/50 backdrop-blur-xl border-b border-white/[0.05] shadow-[0_4px_30px_rgba(0,0,0,0.35)] transition-colors duration-300">
+      <div className="max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-6 sm:px-10 lg:px-12 xl:px-16 2xl:px-20">
+        {/* Expanded Navbar Height: h-16 sm:h-20 lg:h-20 */}
+        <div className="flex items-center justify-between h-16 sm:h-20 lg:h-20">
           {/* Left: Mobile Menu Toggle + Logo + Title ("streambotkh.com") + Nav Menu */}
-          <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 min-w-0">
+          <div className="flex items-center gap-3 sm:gap-5 lg:gap-7 min-w-0">
             {/* Mobile menu toggle on the left side */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1.5 sm:p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors flex-shrink-0"
+              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors flex-shrink-0"
               aria-label="Toggle navigation menu"
             >
-              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            {/* Logo on the left & Title "streambotkh.com" */}
+            {/* Logo on the left & Title "streambotkh.com" (Links to Home) */}
             <Link
               to="/"
               onClick={(e) => {
@@ -360,99 +330,78 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                   onNavigate('home');
                 }
               }}
-              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none min-w-0 mr-1 sm:mr-2"
+              className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group select-none min-w-0 mr-1 sm:mr-3"
             >
-              <div className="relative w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center flex-shrink-0">
+              <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
                 <img
                   src="/images/logo-192.png"
                   alt="streambotkh.com logo"
-                  className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)] group-hover:scale-105 group-hover:drop-shadow-[0_0_12px_rgba(0,240,255,0.6)] transition-all duration-200"
+                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-[0_0_10px_rgba(0,240,255,0.45)] group-hover:scale-105 group-hover:drop-shadow-[0_0_15px_rgba(0,240,255,0.7)] transition-all duration-200"
                 />
               </div>
 
               <div className="flex items-center min-w-0">
-                <span className="text-base sm:text-lg font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
+                <span className="text-base sm:text-xl font-extrabold tracking-tight text-white font-['Chakra_Petch'] truncate">
                   streambot<span className="text-cyan-400">kh</span>
                 </span>
-                <span className="hidden xxs:inline text-[10px] sm:text-xs font-mono font-semibold text-slate-400 ml-0.5">
+                <span className="hidden xxs:inline text-xs sm:text-sm font-mono font-bold text-slate-400 ml-0.5">
                   .com
                 </span>
               </div>
             </Link>
 
-            {/* Nav Menu directly after the title with own route page links */}
-            <nav className="hidden md:flex items-center gap-1 lg:gap-1.5 pl-3 lg:pl-4 border-l border-slate-800/80">
-              {/* 1. Home Route (/) */}
-              <Link
-                to="/"
-                onClick={(e) => {
-                  if (pathname === '/') {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }
-                  if (onNavigate) {
-                    e.preventDefault();
-                    onNavigate('home');
-                  }
-                }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-                  active('/', 'home')
-                    ? 'text-white bg-white/[0.08] shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-                }`}
-              >
-                Home
-              </Link>
-
-              {/* TV Direct Live Stream Route */}
-              <Link
-                to="/tv"
-                className={`flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-colors ${
-                  active('/tv', 'tv')
-                    ? 'text-emerald-400 bg-emerald-500/10 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
-                }`}
-              >
-                <Tv size={13} className="text-emerald-400" />
-                <span>TV</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              </Link>
-
-              {/* 2. Resources Dropdown Menu (on hover shows list of features) */}
+            {/* Nav Menu directly after title with own route links (No Home, replaced with Products) */}
+            <nav className="hidden md:flex items-center gap-1.5 lg:gap-2.5 pl-4 lg:pl-6 border-l border-white/10">
+              {/* 1. Products Dropdown (Hover or Click) */}
               <div
+                ref={dropdownContainerRef}
                 className="relative"
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
               >
                 <button
-                  onClick={() => handleNav('/resources', 'resources')}
-                  className={`flex items-center gap-1 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-                    active('/resources', 'resources') || dropdownOpen
-                      ? 'text-white bg-white/[0.08] shadow-sm'
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (dropdownTimeoutRef.current) {
+                      clearTimeout(dropdownTimeoutRef.current);
+                    }
+                    setDropdownOpen((prev) => !prev);
+                  }}
+                  className={`flex items-center gap-1.5 px-3.5 lg:px-4 py-2 sm:py-2.5 rounded-xl text-sm sm:text-[15px] font-bold tracking-wide transition-colors ${
+                    dropdownOpen || active('/resources', 'resources') || active('/creator', 'creator')
+                      ? 'text-white'
+                      : 'text-slate-300 hover:text-white'
                   }`}
                 >
-                  <span>Resources</span>
+                  <span>Products</span>
                   <ChevronDown
-                    size={13}
+                    size={15}
                     className={`transition-transform duration-200 ${
-                      dropdownOpen ? 'rotate-180 text-cyan-400' : 'text-slate-500'
+                      dropdownOpen ? 'rotate-180 text-cyan-400' : 'text-slate-400'
                     }`}
                   />
                 </button>
 
-                {/* Mega Dropdown Menu matching Streamlabs Multi-Column Design */}
+                {/* Mega Dropdown Menu matching exact main card design */}
                 {dropdownOpen && (
                   <div
-                    className="absolute top-full left-[-40px] lg:left-[-100px] xl:left-[-140px] mt-2.5 w-[92vw] max-w-[980px] p-6 rounded-2xl bg-[#090D18]/98 backdrop-blur-2xl border border-slate-800 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150"
+                    data-mega-menu="true"
+                    className="mega-menu-container absolute top-full left-[-20px] lg:left-[-60px] xl:left-[-80px] mt-2.5 w-[94vw] max-w-[1020px] p-6 sm:p-7 rounded-2xl bg-gradient-to-br from-[#0C1222]/98 via-[#070A14]/98 to-[#090E1D]/98 border-2 border-white/15 shadow-2xl z-50 animate-dropdown-slide backdrop-blur-2xl"
                     style={{
-                      boxShadow: '0 25px 65px -15px rgba(0,0,0,0.95), 0 0 35px rgba(0,240,255,0.06)'
+                      boxShadow: '0 25px 65px -15px rgba(0,0,0,0.95), 0 0 45px rgba(255,255,255,0.06)'
                     }}
                   >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 select-none">
-                      {MEGA_MENU_SECTIONS.map((section) => (
+                    {/* Subtle Cyber Grid matching Main Card */}
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none rounded-2xl" />
+
+                    <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7 select-none">
+                      {PRODUCTS_MENU_SECTIONS.map((section) => (
                         <div key={section.header} className="space-y-3">
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono pb-1 border-b border-slate-800/60">
-                            {section.header}
+                          <div className="mega-menu-header text-xs font-bold text-slate-300 uppercase tracking-wider font-mono pb-1.5 border-b border-white/10 flex items-center justify-between">
+                            <span>{section.header}</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/80" />
                           </div>
                           <div className="space-y-1">
                             {section.items.map((item) => {
@@ -464,21 +413,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                                     setDropdownOpen(false);
                                     handleNav(item.href, item.href.replace(/^\//, ''));
                                   }}
-                                  className="p-2 rounded-xl hover:bg-white/[0.06] border border-transparent hover:border-slate-800 cursor-pointer transition-all group"
+                                  className="mega-menu-item p-2.5 rounded-xl cursor-pointer transition-all hover:bg-white/[0.06] group"
                                 >
-                                  <div className="flex items-start gap-2.5">
+                                  <div className="flex items-start gap-3">
                                     <div
-                                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-transform group-hover:scale-110"
+                                      className="mega-menu-icon w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-transform group-hover:scale-110"
                                       style={{
                                         backgroundColor: `${item.color || '#00F0FF'}15`,
                                         color: item.color || '#00F0FF'
                                       }}
                                     >
-                                      <IconComp size={15} />
+                                      <IconComp size={17} />
                                     </div>
                                     <div className="space-y-0.5 min-w-0 flex-1">
                                       <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors leading-tight">
+                                        <span className="mega-menu-title text-sm font-bold text-white group-hover:text-cyan-300 transition-colors leading-tight">
                                           {item.title}
                                         </span>
                                         {item.badge && (
@@ -487,7 +436,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                                           </span>
                                         )}
                                       </div>
-                                      <div className="text-[11px] text-slate-400 leading-tight">
+                                      <div className="mega-menu-sub text-xs text-slate-400 leading-tight">
                                         {item.sub}
                                       </div>
                                       {item.actionText && (
@@ -509,25 +458,40 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                     </div>
 
                     {/* Bottom Status & Hub Bar */}
-                    <div className="mt-5 pt-3.5 border-t border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-mono text-slate-400">
+                    <div className="relative z-10 mega-menu-footer mt-5 pt-3.5 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-mono text-slate-400">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[11px]">All OBS &amp; Payment Nodes Operational • 0% Platform Fee</span>
+                        <span className="text-[11px] text-slate-300">
+                          All OBS &amp; Payment Nodes Operational • 0% Platform Fee
+                        </span>
                       </div>
-                      <button
-                        onClick={() => {
-                          setDropdownOpen(false);
-                          handleNav('/resources', 'resources');
-                        }}
+                      <a
+                        href="/documentation"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setDropdownOpen(false)}
                         className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 hover:underline cursor-pointer"
                       >
                         <span>Explore All Creator Hub Docs</span>
                         <ArrowRight size={12} />
-                      </button>
+                      </a>
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* 2. TV Direct Live Stream Route */}
+              <Link
+                to="/tv"
+                className={`flex items-center gap-1.5 px-3.5 lg:px-4 py-2 sm:py-2.5 rounded-xl text-sm sm:text-[15px] font-bold tracking-wide transition-colors ${
+                  active('/tv', 'tv')
+                    ? 'text-emerald-400 font-extrabold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>TV</span>
+              </Link>
 
               {/* 3. Pricing Route (/pricing) */}
               <Link
@@ -538,45 +502,41 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                     onNavigate('pricing');
                   }
                 }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+                className={`px-3.5 lg:px-4 py-2 sm:py-2.5 rounded-xl text-sm sm:text-[15px] font-bold tracking-wide transition-colors ${
                   active('/pricing', 'pricing')
-                    ? 'text-white bg-white/[0.08] shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                    ? 'text-white font-extrabold'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 Pricing
               </Link>
 
-              {/* 4. Documents Route (/documents) */}
-              <Link
-                to="/documents"
-                onClick={(e) => {
-                  if (onNavigate) {
-                    e.preventDefault();
-                    onNavigate('documents');
-                  }
-                }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-                  active('/documents', 'documents') || active('/resources', 'resources')
-                    ? 'text-white bg-white/[0.08] shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+              {/* 4. Documentations Route (Opens in new window page) */}
+              <a
+                href="/documentation"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`px-3.5 lg:px-4 py-2 sm:py-2.5 rounded-xl text-sm sm:text-[15px] font-bold tracking-wide transition-colors ${
+                  active('/documentation', 'documentation') || active('/docs', 'docs')
+                    ? 'text-white font-extrabold'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
-                Documents
-              </Link>
+                Documentations
+              </a>
             </nav>
           </div>
 
-          {/* Right Section: Social Redirect URL Icons & Sign in with Google / Profile Logo */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
-            {/* Social Redirect URL Icons: Telegram & Discord */}
-            <div className="flex items-center gap-0.5 sm:gap-1">
+          {/* Right Section: Social Icons & Google Auth / Profile */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Social Redirect Icons: Telegram & Discord */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
               <a
                 href="https://t.me/streambotkh"
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Telegram Channel (t.me/streambotkh)"
-                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-[#229ED9] hover:bg-white/[0.06] transition-colors flex items-center justify-center cursor-pointer"
+                className="p-2 sm:p-2.5 rounded-xl text-slate-300 hover:text-[#229ED9] hover:bg-white/[0.08] transition-colors flex items-center justify-center cursor-pointer"
                 aria-label="Telegram"
               >
                 <TelegramIcon />
@@ -587,46 +547,39 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Discord Community (discord.gg/streambotkh)"
-                className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-[#5865F2] hover:bg-white/[0.06] transition-colors flex items-center justify-center cursor-pointer"
+                className="p-2 sm:p-2.5 rounded-xl text-slate-300 hover:text-[#5865F2] hover:bg-white/[0.08] transition-colors flex items-center justify-center cursor-pointer"
                 aria-label="Discord"
               >
                 <DiscordIcon />
               </a>
             </div>
-            {/* User authenticated: Show ONLY the profile logo */}
+
+            {/* User authenticated: Show Profile avatar */}
             {user ? (
-              <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-2">
                 <Link
-                  to="/dashboard"
-                  title="Dashboard"
+                  to="/creator"
+                  title="Creator Panel"
                   onClick={(e) => {
                     if (onNavigate) {
                       e.preventDefault();
-                      onNavigate('dashboard');
+                      onNavigate('creator');
                     }
                   }}
-                  className="p-1 sm:p-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:shadow-[0_0_12px_rgba(0,240,255,0.2)] transition-all flex items-center justify-center group"
+                  className="p-1 sm:p-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:shadow-[0_0_15px_rgba(0,240,255,0.25)] transition-all flex items-center justify-center group"
                 >
                   <img
                     src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
                     alt={user.displayName || 'Profile'}
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 object-cover ring-1 ring-white/10 group-hover:scale-105 transition-transform"
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-slate-800 object-cover ring-1 ring-white/10 group-hover:scale-105 transition-transform"
                   />
                 </Link>
-
-                <button
-                  onClick={logout}
-                  title="Sign Out"
-                  className="p-1.5 sm:p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/50 hover:text-red-400 text-slate-400 transition-colors cursor-pointer"
-                >
-                  <LogOut size={15} />
-                </button>
               </div>
             ) : loading ? (
               /* Sleek Avatar Skeleton while verifying auth */
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center justify-center p-1 sm:p-1.5">
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 animate-pulse" />
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center justify-center p-1 sm:p-1.5">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-slate-800 animate-pulse" />
                 </div>
               </div>
             ) : (
@@ -637,7 +590,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                     e.preventDefault();
                     loginWithGoogleRedirect();
                   }}
-                  className="group relative inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] hover:border-white/[0.25] text-white text-xs font-semibold transition-all duration-200 cursor-pointer flex-shrink-0 shadow-sm"
+                  className="group relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] hover:border-white/[0.25] text-white text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex-shrink-0 shadow-sm"
                 >
                   <GoogleIcon />
                   <span className="hidden sm:inline">Sign in with Google</span>
@@ -650,56 +603,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
         </div>
       </div>
 
-      {/* Mobile Drawer Menu */}
+      {/* ===================== MOBILE SLIDE-DOWN MENU ===================== */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#070A12]/98 border-b border-slate-800 px-4 py-3 space-y-1 animate-fadeIn shadow-2xl">
-          <button
-            onClick={() => handleNav('/', 'home')}
-            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold ${
-              active('/', 'home')
-                ? 'text-white bg-white/[0.08]'
-                : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
-            }`}
-          >
-            Home
-          </button>
-
-          <button
-            onClick={() => handleNav('/tv', 'tv')}
-            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between ${
-              active('/tv', 'tv')
-                ? 'text-emerald-400 bg-emerald-500/10'
-                : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <Tv size={14} className="text-emerald-400" />
-              <span>StreamBot TV</span>
-            </span>
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[9px] font-mono font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-              LIVE
-            </span>
-          </button>
-
-          {/* Resources Accordion */}
+        <div className="md:hidden border-t border-white/10 bg-[#0A0E1A]/98 backdrop-blur-2xl px-4 py-4 space-y-2 max-h-[85vh] overflow-y-auto">
+          {/* 1. Products Accordion (Replaces "Home") */}
           <div>
             <button
-              onClick={() => setMobileResourcesOpen(!mobileResourcesOpen)}
-              className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.04] flex items-center justify-between"
+              onClick={() => setMobileProductsOpen(!mobileProductsOpen)}
+              className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-white/[0.04] flex items-center justify-between"
             >
-              <span>Resources &amp; Features</span>
+              <span>Products</span>
               <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 ${mobileResourcesOpen ? 'rotate-180 text-cyan-400' : 'text-slate-500'}`}
+                size={16}
+                className={`transition-transform duration-200 ${
+                  mobileProductsOpen ? 'rotate-180 text-cyan-400' : 'text-slate-400'
+                }`}
               />
             </button>
 
-            {mobileResourcesOpen && (
-              <div className="pl-2 space-y-3 py-2 border-l border-slate-800 ml-2 my-1">
-                {MEGA_MENU_SECTIONS.map((sec) => (
+            {mobileProductsOpen && (
+              <div className="pl-2 space-y-3 py-2 border-l border-white/10 ml-2 my-1">
+                {PRODUCTS_MENU_SECTIONS.map((sec) => (
                   <div key={sec.header} className="space-y-1">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 px-2 block">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 px-2 block">
                       {sec.header}
                     </span>
                     <div className="space-y-0.5">
@@ -712,22 +638,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                               setMobileMenuOpen(false);
                               handleNav(item.href, item.href.replace(/^\//, ''));
                             }}
-                            className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-cyan-400 hover:bg-slate-800/60 flex items-center justify-between gap-2 group"
+                            className="w-full text-left px-2 py-2 rounded-lg text-xs font-medium text-slate-300 hover:text-cyan-400 hover:bg-slate-800/60 flex items-center justify-between gap-2 group"
                           >
                             <span className="flex items-center gap-2 min-w-0">
                               <span
-                                className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                                className="w-6 h-6 rounded flex items-center justify-center shrink-0"
                                 style={{
                                   backgroundColor: `${item.color || '#00F0FF'}15`,
                                   color: item.color || '#00F0FF'
                                 }}
                               >
-                                <IconComp size={12} />
+                                <IconComp size={13} />
                               </span>
-                              <span className="truncate">{item.title}</span>
+                              <span className="truncate font-semibold">{item.title}</span>
                             </span>
                             {item.badge ? (
-                              <span className="px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[8px] font-mono font-bold">
+                              <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[8px] font-mono font-bold">
                                 {item.badge}
                               </span>
                             ) : (
@@ -745,66 +671,67 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             )}
           </div>
 
+          {/* 2. TV Direct Link */}
+          <button
+            onClick={() => handleNav('/tv', 'tv')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 ${
+              active('/tv', 'tv')
+                ? 'text-emerald-400 font-bold'
+                : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>TV Broadcast</span>
+          </button>
+
+          {/* 3. Pricing */}
           <button
             onClick={() => handleNav('/pricing', 'pricing')}
-            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold ${
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold ${
               active('/pricing', 'pricing')
-                ? 'text-white bg-white/[0.08]'
-                : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
+                ? 'text-white font-bold'
+                : 'text-slate-300 hover:text-white'
             }`}
           >
             Pricing
           </button>
 
-          <button
-            onClick={() => handleNav('/documents', 'documents')}
-            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold ${
-              active('/documents', 'documents') || active('/resources', 'resources')
-                ? 'text-white bg-white/[0.08]'
-                : 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
+          {/* 4. Documentations */}
+          <a
+            href="/documentation"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setMobileMenuOpen(false)}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold block ${
+              active('/documentation', 'documentation') || active('/docs', 'docs')
+                ? 'text-white font-bold'
+                : 'text-slate-300 hover:text-white'
             }`}
           >
-            Documents
-          </button>
-
-          <a
-            href="https://t.me/streambotkh"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setMobileMenuOpen(false)}
-            className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 text-slate-300 hover:text-[#229ED9] hover:bg-white/[0.04]"
-          >
-            <TelegramIcon />
-            <span>Telegram Channel (t.me/streambotkh)</span>
+            Documentations
           </a>
 
-          <a
-            href="https://discord.gg/streambotkh"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setMobileMenuOpen(false)}
-            className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 text-slate-300 hover:text-[#5865F2] hover:bg-white/[0.04]"
-          >
-            <DiscordIcon />
-            <span>Discord Community (discord.gg/streambotkh)</span>
-          </a>
-
-          {!user && !loading && (
-            <div className="pt-2 border-t border-slate-800">
-              <a
-                href={`/api/auth/google?origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setMobileMenuOpen(false);
-                  loginWithGoogleRedirect();
-                }}
-                className="w-full py-2 px-3 rounded-xl bg-white/[0.08] border border-white/[0.12] text-white font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md"
-              >
-                <GoogleIcon />
-                <span>Sign in with Google</span>
-              </a>
-            </div>
-          )}
+          {/* Social Links on Mobile */}
+          <div className="pt-2 border-t border-white/10 flex items-center gap-2">
+            <a
+              href="https://t.me/streambotkh"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex-1 text-center py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-white/[0.04] border border-white/10"
+            >
+              Telegram
+            </a>
+            <a
+              href="https://discord.gg/streambotkh"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex-1 text-center py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-white/[0.04] border border-white/10"
+            >
+              Discord
+            </a>
+          </div>
         </div>
       )}
     </header>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Lock, X, ExternalLink } from 'lucide-react';
 
 interface ProUpgradeModalProps {
@@ -31,20 +32,22 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
 
   const modalTitle = featureName ? `${featureName} is available on Pro plan` : title;
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 xs:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn select-none"
+      className="fixed inset-0 flex items-center justify-center p-3 xs:p-4 bg-black/85 backdrop-blur-md animate-fadeIn select-none"
+      style={{ zIndex: 200000 }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-[#090D18] border border-amber-500/40 p-4 xs:p-6 shadow-2xl shadow-amber-500/10 relative space-y-4 xs:space-y-5 text-center"
+        className="w-full max-w-sm rounded-2xl bg-[#090D18] border border-amber-500/40 p-4 xs:p-6 shadow-2xl shadow-amber-500/20 relative space-y-4 xs:space-y-5 text-center"
+        style={{ zIndex: 200001 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer"
         >
           <X size={18} />
         </button>
@@ -68,14 +71,14 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-semibold text-xs transition-colors"
+            className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white font-semibold text-xs transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleUpgradeClick}
-            className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98]"
+            className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98] cursor-pointer"
           >
             <span>Upgrade</span>
             <ExternalLink size={14} />
@@ -84,4 +87,8 @@ export const ProUpgradeModal: React.FC<ProUpgradeModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 };

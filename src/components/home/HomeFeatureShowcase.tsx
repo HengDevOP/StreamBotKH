@@ -17,7 +17,9 @@ import {
   Trophy,
   Medal,
   Award,
-  Tv
+  Tv,
+  VolumeX,
+  Bell
 } from 'lucide-react';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 import { GoalTemplateRenderer } from '../overlay/goalTemplates';
@@ -522,7 +524,7 @@ export const HomeFeatureShowcase: React.FC = () => {
   };
 
   return (
-    <section className="max-w-6xl mx-auto px-4 space-y-28 sm:space-y-36 relative">
+    <section className="max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-6 sm:px-10 lg:px-12 xl:px-16 2xl:px-20 space-y-28 sm:space-y-36 relative">
       {/* Background Ambient Glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-cyan-500/5 blur-[160px] pointer-events-none rounded-full" />
       <div className="absolute top-2/3 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-purple-500/5 blur-[160px] pointer-events-none rounded-full" />
@@ -535,6 +537,11 @@ export const HomeFeatureShowcase: React.FC = () => {
       <ScrollSwipeSection className="flex flex-col lg:flex-row items-center gap-10 lg:gap-14 relative z-10">
         {/* Left Side: Rich Detailed Donation Alert Overview */}
         <div className="w-full lg:w-1/2 space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 font-mono text-xs font-bold tracking-wider uppercase">
+            <Bell size={13} className="text-cyan-400" />
+            <span>LIVE DONATION ALERTS ENGINE</span>
+          </div>
+
           <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Fully Customizable 60 FPS Live Donation Alerts
           </h3>
@@ -546,6 +553,49 @@ export const HomeFeatureShowcase: React.FC = () => {
           <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
             Personalize your broadcast with customizable entrance animations, dynamic mascot positions (Top, Left, Right, Bottom), dual USD &amp; Cambodian Riel currency formatting, and neural KiriTTS voice cheers with automatic stream audio ducking.
           </p>
+
+          {/* Feature Highlights Grid - No element outlines */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0 text-cyan-400 mt-0.5">
+                <Zap size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">&lt; 150ms Instant</span>
+                <span className="text-[11px] text-slate-400">Zero latency popups</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
+                <CheckCircle2 size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">0% Platform Cut</span>
+                <span className="text-[11px] text-slate-400">Direct bank payout</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-rose-500/15 flex items-center justify-center shrink-0 text-rose-400 mt-0.5">
+                <Volume2 size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">Khmer AI Voice TTS</span>
+                <span className="text-[11px] text-slate-400">Automated cheers</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 text-amber-400 mt-0.5">
+                <Star size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">USD &amp; KHR Dual</span>
+                <span className="text-[11px] text-slate-400">Bakong KHQR sync</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Side: 3D Preview (Smoothly rotates 15° left / 15° right when it changes on mobile) */}
@@ -591,10 +641,16 @@ export const HomeFeatureShowcase: React.FC = () => {
       {/* ========================================================================= */}
       {/* FEATURE 2: VIDEO ALERTS (LEFT: 3D CARD, RIGHT: TEXT)                      */}
       {/* Smoothly rotates 15° when video clip changes                              */}
+      {/* Zero element outline: clean border-0 with soft translucent glass          */}
       {/* ========================================================================= */}
       <ScrollSwipeSection className="flex flex-col lg:flex-row-reverse items-center gap-10 lg:gap-14 relative z-10">
         {/* Right Side: Title & Description */}
         <div className="w-full lg:w-1/2 space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 font-mono text-xs font-bold tracking-wider uppercase">
+            <Video size={13} className="text-cyan-400" />
+            <span>YOUTUBE &amp; MEDIA SHARE ENGINE</span>
+          </div>
+
           <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Media Share &amp; Video Alerts with Live Scrubber
           </h3>
@@ -602,6 +658,49 @@ export const HomeFeatureShowcase: React.FC = () => {
           <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
             Allow your viewers to share hype gameplay moments, music tracks, or funny clips on stream. Our video alert engine synchronizes YouTube playback with live progress scrubbers, volume leveling, and automatic game audio ducking.
           </p>
+
+          {/* Feature Highlights Grid - No outlines */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0 text-cyan-400 mt-0.5">
+                <Tv size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">OBS Studio 60 FPS</span>
+                <span className="text-[11px] text-slate-400">Zero CPU browser overlay</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
+                <Volume2 size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">Auto-Ducking 85%</span>
+                <span className="text-[11px] text-slate-400">Protects voice &amp; gameplay</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-rose-500/15 flex items-center justify-center shrink-0 text-rose-400 mt-0.5">
+                <Flame size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">Live Scrubber</span>
+                <span className="text-[11px] text-slate-400">Red duration bar sync</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0 text-purple-400 mt-0.5">
+                <ShieldCheck size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">Safety Moderation</span>
+                <span className="text-[11px] text-slate-400">Instant skip hotkeys</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Left Side: 3D Preview (Smoothly rotates 15° left / 15° right when clip updates on mobile) */}
@@ -615,19 +714,19 @@ export const HomeFeatureShowcase: React.FC = () => {
               willChange: 'transform'
             }}
           >
-            {/* Animated Wrapper remounting on each 5s cycle key for change animation */}
+            {/* Animated Wrapper remounting on each 5s cycle key for change animation - No element outline */}
             <div
               key={`media-share-${videoClipCycleKey}-${currentMediaClip.id}`}
-              className={`w-full relative flex flex-col ${currentMediaClip.animationStyle} select-none`}
+              className={`w-full relative flex flex-col rounded-3xl overflow-hidden border-0 shadow-[0_0_50px_rgba(0,0,0,0.85)] ${currentMediaClip.animationStyle} select-none`}
               style={{
                 filter: `drop-shadow(0 0 25px ${currentMediaClip.glowColor}25)`
               }}
             >
               {/* ============================================================== */}
               {/* 1. TOP SECTION: THE DONOR (NAME & AMOUNT)                     */}
-              {/* Exact format: donor name & amount, styled like overlay assets  */}
+              {/* Zero element outline, translucent obsidian glass              */}
               {/* ============================================================== */}
-              <div className="w-full px-4 py-2.5 flex items-center justify-between text-xs font-mono bg-slate-950/95 rounded-t-2xl border border-b-0 border-slate-800/90 backdrop-blur-md">
+              <div className="w-full px-4 py-3 flex items-center justify-between text-xs font-mono bg-[#0A0F1E]/95 backdrop-blur-xl">
                 <div className="flex items-center gap-2 min-w-0">
                   <span
                     className="text-sm sm:text-base font-bold font-['Chakra_Petch'] tracking-wide truncate"
@@ -638,7 +737,7 @@ export const HomeFeatureShowcase: React.FC = () => {
                   >
                     {currentMediaClip.donorName}
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono font-bold border border-cyan-500/30 flex-shrink-0">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 font-mono font-bold flex-shrink-0">
                     MEDIA SHARE
                   </span>
                 </div>
@@ -656,9 +755,9 @@ export const HomeFeatureShowcase: React.FC = () => {
 
               {/* ============================================================== */}
               {/* 2. THE VIDEO SCREEN (16:9 Aspect Ratio)                        */}
-              {/* Clean authentic video display matching OBS overlay             */}
+              {/* Zero element outline                                           */}
               {/* ============================================================== */}
-              <div className="relative w-full aspect-video overflow-hidden bg-black border-x border-slate-800/90 flex flex-col justify-between p-3.5 sm:p-4">
+              <div className="relative w-full aspect-video overflow-hidden bg-black flex flex-col justify-between p-3.5 sm:p-4">
                 {/* Background Gameplay & Ambient Scene */}
                 <div className={`absolute inset-0 bg-gradient-to-br ${currentMediaClip.themeGradient} opacity-90`} />
 
@@ -673,20 +772,20 @@ export const HomeFeatureShowcase: React.FC = () => {
                   }}
                 />
 
-                {/* Top Video HUD: Game tag & 60 FPS Badge */}
+                {/* Top Video HUD: Game tag & 60 FPS Badge - No element outline */}
                 <div className="relative z-10 flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded bg-black/75 backdrop-blur-md text-[10px] sm:text-[11px] font-mono font-bold text-white border border-white/10 shadow-sm">
+                  <span className="px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md text-[10px] sm:text-[11px] font-mono font-bold text-white shadow-sm">
                     {currentMediaClip.gameTag}
                   </span>
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/75 backdrop-blur-md text-[10px] font-mono text-cyan-300 border border-cyan-500/30">
+                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/75 backdrop-blur-md text-[10px] font-mono text-cyan-300">
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
                     <span>60 FPS</span>
                   </div>
                 </div>
 
-                {/* Center Video Playing Indicator & Title */}
+                {/* Center Video Playing Indicator & Title - No element outline */}
                 <div className="relative z-10 my-auto text-center space-y-1.5">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/85 backdrop-blur-md border border-red-500/50 text-red-400 text-xs font-mono shadow-lg">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/85 backdrop-blur-md text-red-400 text-xs font-mono shadow-lg">
                     <Play size={12} className="fill-red-500 text-red-500 animate-pulse" />
                     <span className="font-bold tracking-wide">Playing Live Media Share</span>
                   </div>
@@ -712,7 +811,7 @@ export const HomeFeatureShowcase: React.FC = () => {
               {/* 3. THE DURATION BAR (THE RED COLOR ONE)                         */}
               {/* Smooth real-time countdown progress bar                        */}
               {/* ============================================================== */}
-              <div className="w-full h-1.5 sm:h-2 relative overflow-hidden bg-slate-950 border-x border-slate-800/90">
+              <div className="w-full h-1.5 sm:h-2 relative overflow-hidden bg-slate-950">
                 <div
                   className="h-full rounded-r-sm will-change-[width]"
                   style={{
@@ -725,14 +824,15 @@ export const HomeFeatureShowcase: React.FC = () => {
 
               {/* ============================================================== */}
               {/* 4. THE MESSAGES SECTION (WHAT THE DONOR SAY AT BOTTOM)         */}
+              {/* No element outline                                             */}
               {/* ============================================================== */}
-              <div className="w-full p-3 sm:p-3.5 rounded-b-2xl bg-slate-950/95 border border-t-0 border-slate-800/90 backdrop-blur-md flex items-center justify-between gap-3">
+              <div className="w-full p-3.5 sm:p-4 bg-[#0A0F1E]/95 backdrop-blur-xl flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-slate-200 leading-snug font-sans italic truncate">
-                    {currentMediaClip.donorMessage}
+                    &ldquo;{currentMediaClip.donorMessage}&rdquo;
                   </p>
                 </div>
-                <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1 flex-shrink-0">
+                <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 flex-shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
                   <span>5s CLIP</span>
                 </div>
@@ -788,8 +888,8 @@ export const HomeFeatureShowcase: React.FC = () => {
 
             {/* Podium Donor Rows */}
             <div className="space-y-2.5">
-              {/* Rank 1: Gold */}
-              <div className="p-3 rounded-xl bg-gradient-to-r from-yellow-500/15 via-amber-500/10 to-slate-950 border border-yellow-400/50 flex items-center justify-between shadow-lg">
+              {/* Rank 1: Gold - No element outline */}
+              <div className="p-3 rounded-xl bg-gradient-to-r from-yellow-500/15 via-amber-500/10 to-slate-950/80 border-0 flex items-center justify-between shadow-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-yellow-500 to-amber-300 p-0.5 flex items-center justify-center shadow-md">
                     <div className="w-full h-full rounded-[10px] bg-slate-950 flex items-center justify-center text-yellow-400">
@@ -816,10 +916,10 @@ export const HomeFeatureShowcase: React.FC = () => {
                 </div>
               </div>
 
-              {/* Rank 2: Silver */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between hover:border-slate-700 transition-all">
+              {/* Rank 2: Silver - No element outline */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border-0 flex items-center justify-between transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-600 flex items-center justify-center text-slate-300">
+                  <div className="w-9 h-9 rounded-xl bg-slate-800 border-0 flex items-center justify-center text-slate-300">
                     <Medal size={16} />
                   </div>
                   <div>
@@ -842,10 +942,10 @@ export const HomeFeatureShowcase: React.FC = () => {
                 </div>
               </div>
 
-              {/* Rank 3: Bronze */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between hover:border-slate-700 transition-all">
+              {/* Rank 3: Bronze - No element outline */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border-0 flex items-center justify-between transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-950/40 border border-amber-700/50 flex items-center justify-center text-amber-500">
+                  <div className="w-9 h-9 rounded-xl bg-amber-950/40 border-0 flex items-center justify-center text-amber-500">
                     <Award size={16} />
                   </div>
                   <div>
@@ -971,8 +1071,8 @@ export const HomeFeatureShowcase: React.FC = () => {
               </div>
             </div>
 
-            {/* Pinned Superchat Banner */}
-            <div className="mb-3.5 p-3 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 border border-pink-500/40 flex items-center justify-between shadow-lg relative z-10">
+            {/* Pinned Superchat Banner - No element outline */}
+            <div className="mb-3.5 p-3 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 border-0 flex items-center justify-between shadow-lg relative z-10">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-pink-500 flex items-center justify-center text-white font-black text-xs font-mono">
                   $25
@@ -992,13 +1092,13 @@ export const HomeFeatureShowcase: React.FC = () => {
               <div className="text-xs font-black text-pink-300 font-mono">$25.00</div>
             </div>
 
-            {/* Chat Message Rows */}
+            {/* Chat Message Rows - No element outlines */}
             <div className="space-y-2.5 font-sans relative z-10">
               {[
                 {
                   author: 'Chhay_99',
                   badge: 'VIP',
-                  badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+                  badgeBg: 'bg-amber-500/20 text-amber-300',
                   icon: Flame,
                   text: 'Savage kill right there! Insane reaction time ⚡⚡',
                   color: 'text-amber-400'
@@ -1006,7 +1106,7 @@ export const HomeFeatureShowcase: React.FC = () => {
                 {
                   author: 'Bopha_Gamer',
                   badge: 'SUB 6MO',
-                  badgeBg: 'bg-pink-500/20 text-pink-300 border-pink-500/40',
+                  badgeBg: 'bg-pink-500/20 text-pink-300',
                   icon: Star,
                   text: 'Let\'s hit 1,000 stars tonight squad! 💖💖',
                   color: 'text-pink-400'
@@ -1014,7 +1114,7 @@ export const HomeFeatureShowcase: React.FC = () => {
                 {
                   author: 'Socheat_Mod',
                   badge: 'MOD',
-                  badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+                  badgeBg: 'bg-emerald-500/20 text-emerald-300',
                   icon: ShieldCheck,
                   text: 'Rules: Be respectful in chat & enjoy the live gameplay! 🎮',
                   color: 'text-emerald-400'
@@ -1022,7 +1122,7 @@ export const HomeFeatureShowcase: React.FC = () => {
                 {
                   author: 'Meng_MLBB',
                   badge: 'SUB 2MO',
-                  badgeBg: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+                  badgeBg: 'bg-cyan-500/20 text-cyan-300',
                   icon: Zap,
                   text: 'That ultimate combo was legendary 🔥🔥🔥',
                   color: 'text-cyan-400'
@@ -1032,9 +1132,9 @@ export const HomeFeatureShowcase: React.FC = () => {
                 return (
                   <div
                     key={i}
-                    className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-2.5 hover:border-pink-500/40 transition-all text-xs"
+                    className="p-2.5 rounded-xl bg-slate-950/70 border-0 flex items-start gap-2.5 transition-all text-xs"
                   >
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border flex items-center gap-1 ${msg.badgeBg}`}>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold flex items-center gap-1 ${msg.badgeBg}`}>
                       <Icon size={10} />
                       <span>{msg.badge}</span>
                     </span>

@@ -63,7 +63,7 @@ export async function sendAccountDeletionRequestEmail(
     process.env.NEXT_PUBLIC_APP_URL ||
     'http://localhost:5173'
   ).replace(/\/$/, '');
-  const accountSettingsUrl = `${appUrl}/dashboard?tab=account`;
+  const accountSettingsUrl = `${appUrl}/creator?tab=account`;
 
   const formattedRequestedAt = requestedAt.toUTCString();
   const formattedScheduledAt = scheduledDeletionAt.toLocaleDateString('en-US', {

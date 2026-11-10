@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
         senderName: 'GramJS Telegram Listener',
         category: 'security',
         content: `Your Telegram bank notification group "${finalTitle}" (${finalChatId}) was successfully connected. GramJS is now actively monitoring incoming transaction receipts in real time to trigger live OBS alerts.`,
-        actionUrl: '/dashboard?tab=payments',
+        actionUrl: '/creator?tab=payments',
         actionLabel: 'Payment Gateway',
         priority: 'high'
       });

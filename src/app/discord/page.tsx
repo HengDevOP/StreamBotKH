@@ -8,7 +8,7 @@ export default function Page() {
 
   const handleNavigate = (page: string) => {
     if (page === 'home') router.push('/');
-    else if (page === 'dashboard') router.push('/dashboard');
+    else if (page === 'dashboard' || page === 'creator') router.push('/creator');
     else router.push(`/${page}`);
   };
 

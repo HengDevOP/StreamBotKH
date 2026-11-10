@@ -144,7 +144,7 @@ export const CreateOverlayModal: React.FC<CreateOverlayModalProps> = ({
 
       onClose();
       // Redirect the user to the dedicated overlay management studio
-      navigate(`/dashboard?overlay=${created._id}`);
+      navigate(`/creator?overlay=${created._id}`);
     } catch (err: any) {
       setError(err.message || 'Could not create overlay. Please try again.');
       setCreating(false);

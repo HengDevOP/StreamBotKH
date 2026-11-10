@@ -278,7 +278,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     setSelectedTierForAlert(tierToOpen);
     onSelectTierId?.(tierToOpen.id);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/dashboard?tab=subscribers&id=${tierToOpen.id}`);
+      window.history.pushState(null, '', `/creator?tab=subscribers&id=${tierToOpen.id}`);
     }
   };
 
@@ -286,7 +286,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     setSelectedTierForAlert(null);
     onSelectTierId?.(null);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', '/dashboard?tab=subscribers');
+      window.history.pushState(null, '', '/creator?tab=subscribers');
     }
   };
 

@@ -20,6 +20,7 @@ import { PricingPage } from './views/PricingPage';
 import { DiscordPage } from './views/DiscordPage';
 import { StatusPage } from './views/StatusPage';
 import { MultiStreamPage } from './views/MultiStreamPage';
+import { DocumentationPage } from './views/DocumentationPage';
 
 // Overlay Widgets
 import { StreamSoundboardOverlay } from './components/overlay/StreamSoundboardOverlay';
@@ -30,6 +31,7 @@ import { PokemonStreamOverlay } from './components/overlay/PokemonStreamOverlay'
 import { StreamTipQrOverlay } from './components/overlay/StreamTipQrOverlay';
 import { StreamWheelOverlay } from './components/overlay/StreamWheelOverlay';
 import { StreamChatOverlay } from './components/overlay/StreamChatOverlay';
+import { CustomStreamOverlay } from './components/overlay/CustomStreamOverlay';
 
 // Wrapper for Dashboard Page reading query parameters (?tab=...&id=...)
 function DashboardRouteWrapper() {
@@ -259,16 +261,50 @@ function ChatOverlayRouteWrapper() {
   );
 }
 
+// Wrapper for Custom Stream Overlay (Text Flow Animation & Live Goal)
+function CustomOverlayRouteWrapper() {
+  const { token } = useParams<{ token?: string }>();
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0">
+      <style>{`
+        html, body, #root, main {
+          background: transparent !important;
+          background-color: transparent !important;
+          background-image: none !important;
+        }
+      `}</style>
+      <CustomStreamOverlay token={token || 'demo-token'} />
+    </div>
+  );
+}
+
 // Layout wrapper determining whether to display Navbar and Footer
 function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const pathname = location.pathname;
 
+  React.useEffect(() => {
+    if (pathname === '/') {
+      // Landing page is strictly dark & radiant mode (no day/night mode)
+      document.documentElement.classList.remove('light-mode');
+    } else {
+      try {
+        const savedTheme = localStorage.getItem('streambot_theme_mode');
+        if (savedTheme === 'light' && (pathname.startsWith('/creator') || pathname.startsWith('/dashboard') || pathname.startsWith('/documentation') || pathname.startsWith('/docs'))) {
+          document.documentElement.classList.add('light-mode');
+        } else {
+          document.documentElement.classList.remove('light-mode');
+        }
+      } catch (e) {}
+    }
+  }, [pathname]);
+
   const isOverlay = pathname.startsWith('/overlay') || pathname.startsWith('/widget');
-  const isDashboard = pathname.startsWith('/dashboard');
+  const isDashboard = pathname.startsWith('/dashboard') || pathname.startsWith('/creator');
   const isDonate = pathname.startsWith('/@') || pathname.startsWith('/donate');
   const isMultiStream = pathname === '/tv' || pathname.startsWith('/tv/') || pathname.startsWith('/tv?') || pathname === '/muti-stream' || pathname === '/multi-stream';
+  const isDocumentation = pathname.startsWith('/documentation') || pathname.startsWith('/docs') || pathname.startsWith('/documents');
 
   if (isOverlay) {
     return <main className="w-screen h-screen overflow-hidden bg-transparent m-0 p-0">{children}</main>;
@@ -300,14 +336,24 @@ function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (isDocumentation) {
+    return (
+      <main className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col m-0 p-0">
+        <ImpersonationBanner />
+        {children}
+      </main>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#070A12] text-slate-100">
+    <div className="min-h-screen flex flex-col bg-[#080D1A] text-slate-100">
       <ImpersonationBanner />
       <Navbar
         onNavigate={(page, params) => {
           if (page === 'home') navigate('/');
           else if (page === 'login') authService.initiateGoogleOAuth();
           else if (page === 'donate') navigate(`/@${params?.username || 'neonstreamer'}`);
+          else if (page === 'dashboard' || page === 'creator') navigate('/creator');
           else navigate(`/${page}`);
         }}
       />
@@ -324,6 +370,8 @@ function AppRoutes() {
     if (page === 'home') navigate('/');
     else if (page === 'login') authService.initiateGoogleOAuth();
     else if (page === 'donate') navigate(`/@${params?.username || 'neonstreamer'}`);
+    else if (page === 'dashboard' || page === 'creator') navigate('/creator');
+    else if (page === 'documentation' || page === 'documents' || page === 'docs') navigate('/documentation');
     else navigate(`/${page}`);
   };
 
@@ -333,8 +381,12 @@ function AppRoutes() {
         {/* Core Web Pages */}
         <Route path="/" element={<HomePage onNavigate={handleNav} />} />
         <Route path="/pricing" element={<PricingPage onNavigate={handleNav} />} />
-        <Route path="/documents" element={<ResourcesPage onNavigate={handleNav} />} />
-        <Route path="/docs" element={<ResourcesPage onNavigate={handleNav} />} />
+        <Route path="/documentation" element={<DocumentationPage onNavigate={handleNav} />} />
+        <Route path="/documentation/:docId" element={<DocumentationPage onNavigate={handleNav} />} />
+        <Route path="/docs" element={<Navigate to="/documentation" replace />} />
+        <Route path="/docs/*" element={<Navigate to="/documentation" replace />} />
+        <Route path="/documents" element={<Navigate to="/documentation" replace />} />
+        <Route path="/documents/*" element={<Navigate to="/documentation" replace />} />
         <Route path="/resources" element={<ResourcesPage onNavigate={handleNav} />} />
         <Route path="/resources/:featureSlug" element={<ResourceFeaturePage onNavigate={handleNav} />} />
         <Route path="/status" element={<StatusPage />} />
@@ -343,9 +395,11 @@ function AppRoutes() {
         <Route path="/tv/:username" element={<MultiStreamPage />} />
         <Route path="/muti-stream" element={<Navigate to="/tv" replace />} />
         <Route path="/multi-stream" element={<Navigate to="/tv" replace />} />
-        <Route path="/dashboard" element={<DashboardRouteWrapper />} />
-        <Route path="/dashboard/*" element={<DashboardRouteWrapper />} />
-        <Route path="/login" element={<LoginPage onSuccess={() => navigate('/dashboard')} />} />
+        <Route path="/creator" element={<DashboardRouteWrapper />} />
+        <Route path="/creator/*" element={<DashboardRouteWrapper />} />
+        <Route path="/dashboard" element={<Navigate to="/creator" replace />} />
+        <Route path="/dashboard/*" element={<Navigate to="/creator" replace />} />
+        <Route path="/login" element={<LoginPage onSuccess={() => navigate('/creator')} />} />
 
         {/* Donation Pages */}
         <Route path="/donate" element={<DonateRouteWrapper />} />
@@ -379,11 +433,15 @@ function AppRoutes() {
         <Route path="/overlay/wheel/:token" element={<WheelOverlayRouteWrapper />} />
         <Route path="/overlay/chat" element={<ChatOverlayRouteWrapper />} />
         <Route path="/overlay/chat/:token" element={<ChatOverlayRouteWrapper />} />
+        <Route path="/overlay/custom" element={<CustomOverlayRouteWrapper />} />
+        <Route path="/overlay/custom/:token" element={<CustomOverlayRouteWrapper />} />
         <Route path="/overlay/qr" element={<TipQrOverlayRouteWrapper />} />
         <Route path="/overlay/qr/:token" element={<TipQrOverlayRouteWrapper />} />
         <Route path="/overlay/tip-qr/:token" element={<TipQrOverlayRouteWrapper />} />
 
         {/* Widget Aliases */}
+        <Route path="/widget/custom" element={<CustomOverlayRouteWrapper />} />
+        <Route path="/widget/custom/:token" element={<CustomOverlayRouteWrapper />} />
         <Route path="/widget/alert/:token" element={<OverlayRouteWrapper mode="alert-only" />} />
         <Route path="/widget/alerts/:token" element={<OverlayRouteWrapper mode="alert-only" />} />
         <Route path="/widget/video/:token" element={<OverlayRouteWrapper mode="video-only" />} />
@@ -412,7 +470,7 @@ export function App() {
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem('streambot_theme_mode');
-      if (savedTheme === 'light') {
+      if (savedTheme === 'light' && window.location.pathname !== '/') {
         document.documentElement.classList.add('light-mode');
       } else {
         document.documentElement.classList.remove('light-mode');

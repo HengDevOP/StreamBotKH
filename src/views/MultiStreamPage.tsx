@@ -2717,12 +2717,12 @@ export const MultiStreamPage: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setIsUnconfiguredTipModalOpen(false);
-                  navigate('/dashboard');
+                  navigate('/creator');
                 }}
                 className="flex-1 py-2.5 sm:py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-950 font-black text-xs font-mono transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/25 cursor-pointer"
               >
                 <Sliders size={14} />
-                <span>Go to Dashboard</span>
+                <span>Go to Creator Panel</span>
               </button>
               <button
                 type="button"

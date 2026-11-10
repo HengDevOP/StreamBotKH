@@ -6,5 +6,5 @@ import { LoginPage } from '@/views/LoginPage';
 export default function Page() {
   const router = useRouter();
 
-  return <LoginPage onSuccess={() => router.push('/dashboard')} />;
+  return <LoginPage onSuccess={() => router.push('/creator')} />;
 }

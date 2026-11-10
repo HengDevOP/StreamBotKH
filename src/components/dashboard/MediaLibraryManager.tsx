@@ -457,34 +457,11 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   return (
     <div className="space-y-6 w-full min-w-0 max-w-full">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/60">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <ImageIcon size={22} className="text-cyan-400" />
-            Media Library &amp; Presets
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Upload custom MP4/GIF/audio, or use SBKH Templates, 48 MLBB Layla emotes, 500+ Facebook stickers, 100 alert GIFs, and stream sounds.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs font-mono flex-wrap">
-          <span className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300">
-            {mediaList.length} uploads
-          </span>
-          <span className="px-2.5 py-1 rounded-md bg-purple-950/80 text-purple-300 border border-purple-800/50">
-            {PRESET_TEMPLATES.length} Templates
-          </span>
-          <span className="px-2.5 py-1 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/50">
-            {PRESET_MLBB.length} MLBB Emotes
-          </span>
-          <span className="px-2.5 py-1 rounded-md bg-pink-950/80 text-pink-300 border border-pink-800/50">
-            500 Stickers
-          </span>
-          <span className="px-2.5 py-1 rounded-md bg-cyan-950 text-cyan-300">
-            100 GIFs
-          </span>
-        </div>
+      <div className="flex items-center justify-between pb-4 border-b border-slate-800/60">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2 font-['Chakra_Petch']">
+          <ImageIcon size={22} className="text-cyan-400" />
+          <span>Media Library</span>
+        </h2>
       </div>
 
       {/* Plan Pro Notice Banner for Free Users */}

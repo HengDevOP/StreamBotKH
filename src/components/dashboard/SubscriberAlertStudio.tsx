@@ -733,14 +733,12 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
               onClick={() => setActiveTab(activeTab === 'text' ? null : 'text')}
               className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
             >
-              <h3 className={`text-xs sm:text-sm font-bold font-['Chakra_Petch'] transition-colors ${
-                activeTab === 'text' ? 'text-cyan-400' : 'text-white'
-              }`}>
+              <h3 className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] text-white">
                 Text &amp; Typography
               </h3>
               <ChevronDown
                 className={`w-4 h-4 text-slate-400 transition-transform ${
-                  activeTab === 'text' ? 'rotate-180 text-cyan-400' : ''
+                  activeTab === 'text' ? 'rotate-180 text-white' : ''
                 }`}
               />
             </button>
@@ -927,14 +925,12 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
               onClick={() => setActiveTab(activeTab === 'image' ? null : 'image')}
               className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
             >
-              <h3 className={`text-xs sm:text-sm font-bold font-['Chakra_Petch'] transition-colors ${
-                activeTab === 'image' ? 'text-amber-400' : 'text-white'
-              }`}>
+              <h3 className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] text-white">
                 Media, Sound &amp; Visual Style
               </h3>
               <ChevronDown
                 className={`w-4 h-4 text-slate-400 transition-transform ${
-                  activeTab === 'image' ? 'rotate-180 text-cyan-400' : ''
+                  activeTab === 'image' ? 'rotate-180 text-white' : ''
                 }`}
               />
             </button>
@@ -1215,14 +1211,12 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
               onClick={() => setActiveTab(activeTab === 'tts' ? null : 'tts')}
               className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
             >
-              <h3 className={`text-xs sm:text-sm font-bold font-['Chakra_Petch'] transition-colors ${
-                activeTab === 'tts' ? 'text-emerald-400' : 'text-white'
-              }`}>
+              <h3 className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] text-white">
                 Text-To-Speech (TTS)
               </h3>
               <ChevronDown
                 className={`w-4 h-4 text-slate-400 transition-transform ${
-                  activeTab === 'tts' ? 'rotate-180 text-cyan-400' : ''
+                  activeTab === 'tts' ? 'rotate-180 text-white' : ''
                 }`}
               />
             </button>
@@ -1415,14 +1409,12 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
                 onClick={() => setActiveTab(activeTab === 'copy' ? null : 'copy')}
                 className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-slate-900/50 transition-colors cursor-pointer"
               >
-                <h3 className={`text-xs sm:text-sm font-bold font-['Chakra_Petch'] transition-colors ${
-                  activeTab === 'copy' ? 'text-blue-400' : 'text-white'
-                }`}>
+                <h3 className="text-xs sm:text-sm font-bold font-['Chakra_Petch'] text-white">
                   Copy from Another Tier
                 </h3>
                 <ChevronDown
                   className={`w-4 h-4 text-slate-400 transition-transform ${
-                    activeTab === 'copy' ? 'rotate-180 text-cyan-400' : ''
+                    activeTab === 'copy' ? 'rotate-180 text-white' : ''
                   }`}
                 />
               </button>

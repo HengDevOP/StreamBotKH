@@ -17,6 +17,7 @@ import {
   RefreshCw,
   LogOut,
   Menu,
+  Sidebar,
   Sun,
   Moon,
   Home,
@@ -98,6 +99,7 @@ import { DashboardSkeleton, FeatureTabSkeleton } from '../components/dashboard/D
 import { DonationAlertsManager } from '../components/dashboard/DonationAlertsManager';
 import { LeaderboardWidgetManager } from '../components/dashboard/LeaderboardWidgetManager';
 import { GoalWidgetManager } from '../components/dashboard/GoalWidgetManager';
+import { CustomOverlayManager } from '../components/dashboard/CustomOverlayManager';
 import { SpinningWheelManager } from '../components/dashboard/SpinningWheelManager';
 import { VideoAlertsManager } from '../components/dashboard/VideoAlertsManager';
 import { PokemonWidgetManager } from '../components/dashboard/PokemonWidgetManager';
@@ -139,6 +141,7 @@ export type DashboardTab =
   | 'media'
   | 'leaderboard'
   | 'goal'
+  | 'custom-overlay'
   | 'wheel'
   | 'chat'
   | 'subscribers'
@@ -349,7 +352,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         if (rawTab === 'alerts' || rawTab === 'donations') rawTab = 'donation';
         if (rawTab) {
           if (isCurrentTabDirtyRef.current) {
-            window.history.pushState(null, '', `/dashboard?tab=${activeTabRef.current}`);
+            window.history.pushState(null, '', `/creator?tab=${activeTabRef.current}`);
             window.dispatchEvent(
               new CustomEvent('dashboard-unsaved-earthquake', {
                 detail: { tab: activeTabRef.current }
@@ -427,24 +430,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     } catch (e) {}
   }, [themeMode]);
 
-  // User Profile Dropdown State
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const profileDropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
-        setIsProfileDropdownOpen(false);
-      }
-    }
-    if (isProfileDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isProfileDropdownOpen]);
-
   useEffect(() => {
     const handleUnsaved = (e: any) => {
       setChatHasUnsavedChanges(Boolean(e.detail?.hasUnsavedChanges));
@@ -505,7 +490,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     setActiveTab(targetTab);
     setMobileDrawerOpen(false);
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `/dashboard?tab=${targetTab}`);
+      window.history.pushState(null, '', `/creator?tab=${targetTab}`);
     }
   };
 
@@ -809,7 +794,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     };
   }, []);
 
-  // Automatically redirect unauthenticated visitors on /dashboard directly to Google Sign-In URL
+  // Automatically redirect unauthenticated visitors on /creator directly to Google Sign-In URL
   useEffect(() => {
     if (authLoading || user) return;
     if (typeof window !== 'undefined') {
@@ -941,6 +926,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       'broadcast',
       'leaderboard',
       'goal',
+      'custom-overlay',
       'timer',
       'video-alerts',
       'wheel',
@@ -986,6 +972,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           bgGlow: 'hover:border-emerald-500/50',
           copyMessage: 'Copied Goals OBS URL!'
         };
+      case 'custom-overlay':
+        return {
+          featureKey: 'custom-overlay',
+          label: 'Custom Overlay OBS',
+          shortLabel: 'Custom Overlay',
+          url: `${origin}/overlay/custom/${effectiveToken}`,
+          icon: Layers,
+          color: '#10B981', // Emerald
+          bgGlow: 'hover:border-emerald-500/50',
+          copyMessage: 'Copied Custom Overlay OBS URL!'
+        };
       case 'leaderboard':
         return {
           featureKey: 'leaderboard',
@@ -1011,13 +1008,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       case 'video-alerts':
         return {
           featureKey: 'video-alerts',
-          label: 'Video Alerts OBS',
-          shortLabel: 'Video',
+          label: 'Video Share OBS',
+          shortLabel: 'Video Share',
           url: `${origin}/overlay/video/${effectiveToken}`,
           icon: Video,
           color: '#EC4899', // Pink
           bgGlow: 'hover:border-pink-500/50',
-          copyMessage: 'Copied Video Alerts OBS URL!'
+          copyMessage: 'Copied Video Share OBS URL!'
         };
       case 'wheel':
         return {
@@ -1510,7 +1507,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 id: 'admin-promotion' as DashboardTab,
                 label: 'Promotion Pricing',
                 icon: Tag,
-                badge: activePromo?.isActive ? 'LIVE' : null
+                badge: null
               }
             ]
           }
@@ -1545,26 +1542,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'broadcast' as DashboardTab,
           label: 'Broadcast',
           icon: Radio,
-          badge: 'LIVE',
+          badge: null,
           isLocked: false
         },
         {
           id: 'chat' as DashboardTab,
           label: 'Live Chat',
           icon: MessageSquare,
-          badge: 'NEW',
+          badge: null,
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'subscribers' as DashboardTab,
           label: 'Membership',
           icon: Crown,
-          badge: 'NEW',
+          badge: null,
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'donation' as DashboardTab,
-          label: 'Donations Alerts',
+          label: 'Alertbox',
           icon: Bell,
           badge: null
         },
@@ -1579,6 +1576,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'goal' as DashboardTab,
           label: 'Goals',
           icon: Target,
+          badge: null,
+          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+        },
+        {
+          id: 'custom-overlay' as DashboardTab,
+          label: 'Custom Overlay',
+          icon: Layers,
           badge: null,
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
@@ -1598,7 +1602,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         },
         {
           id: 'video-alerts' as DashboardTab,
-          label: 'Video Alerts',
+          label: 'Video Share',
           icon: Video,
           badge: null,
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
@@ -1614,28 +1618,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'pokemon' as DashboardTab,
           label: '2D Pokémon',
           icon: Gamepad2,
-          badge: 'NEW',
+          badge: null,
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'fireworks' as DashboardTab,
           label: 'Fireworks',
           icon: PartyPopper,
-          badge: 'NEW',
+          badge: null,
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'minecraft' as DashboardTab,
           label: 'Minecraft',
           icon: Pickaxe,
-          badge: 'NEW',
+          badge: null,
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         },
         {
           id: 'clone-tts' as DashboardTab,
           label: 'Clone TTS',
           icon: Mic,
-          badge: 'PRO',
+          badge: null,
           isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
         }
       ]
@@ -1653,7 +1657,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       ]
     },
     {
-      category: 'ACCOUNT & SETTINGS',
+      category: 'SUPPORT & BILLING',
       items: [
         {
           id: 'mailbox' as any,
@@ -1672,22 +1676,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           label: 'Ticket Support',
           icon: Headphones,
           badge: null
-        },
-        {
-          id: 'account' as DashboardTab,
-          label: 'My Account',
-          icon: User,
-          badge: null
         }
       ]
     }
   ];
 
+  const isSettingsTab = activeTab === 'account';
   const currentSection = sidebarSections.find((s) => s.items.some((item) => item.id === activeTab));
-  const currentCategory = currentSection?.category || 'STREAM SOURCES';
+  const currentCategory = isSettingsTab ? 'SETTINGS' : (currentSection?.category || 'STREAM SOURCES');
   const currentTabItem = currentSection?.items.find((item) => item.id === activeTab);
-  const CurrentTabIcon = currentTabItem?.icon || Tv;
-  const currentTabTitle = currentTabItem?.label || 'Dashboard';
+  const CurrentTabIcon = isSettingsTab ? Settings : (currentTabItem?.icon || Tv);
+  const currentTabTitle = isSettingsTab ? 'Settings' : (currentTabItem?.label || 'Creator Panel');
 
   // Shared Scrollable Nav Categories (Clean, Minimal, No Border, Hidden Scrollbar)
   const renderSidebarNav = (isCollapsed: boolean) => (
@@ -1714,6 +1713,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     if ((item as any).isLocked) {
                       setUpgradeFeatureName(item.label);
                       setIsVideoUpgradeModalOpen(true);
+                      setMobileDrawerOpen(false);
                       return;
                     }
                     handleTabNavigation(item.id);
@@ -1729,7 +1729,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
                       className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                        isActive ? 'text-cyan-400' : 'text-slate-400'
+                        isActive ? 'text-white' : 'text-slate-400'
                       }`}
                     >
                       <Icon size={16} />
@@ -1753,7 +1753,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         <span className="p-0.5 text-amber-400 flex items-center justify-center ml-2" title="Pro Plan Feature">
                           <Lock size={14} className="text-amber-400" />
                         </span>
-                      ) : item.badge ? (
+                      ) : item.badge && !['NEW', 'PRO', 'LIVE'].includes(String(item.badge).trim().toUpperCase()) ? (
                         <span
                           className={`text-[10px] font-mono px-2 py-0.5 rounded font-medium ml-2 flex-shrink-0 ${
                             isActive
@@ -1780,8 +1780,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <AlertCircle size={12} className="text-rose-500 stroke-[2.5]" />
                     </span>
                   )}
-                  {isCollapsed && !(item as any).isLocked && (!isPaymentGatewayIncomplete || item.id !== 'payments') && item.badge && (
-                    <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  {isCollapsed && !(item as any).isLocked && (!isPaymentGatewayIncomplete || item.id !== 'payments') && item.badge && !['NEW', 'PRO', 'LIVE'].includes(String(item.badge).trim().toUpperCase()) && (
+                    <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-slate-400" />
                   )}
                 </button>
               );
@@ -1791,6 +1791,123 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       ))}
     </div>
   );
+
+  // Fixed Sidebar Footer (Settings & Streamer Profile / Logout)
+  const renderSidebarFooter = (isCollapsed: boolean) => {
+    const isSettingsActive = activeTab === 'account';
+
+    return (
+      <div className="flex-shrink-0 border-t border-slate-800/80 bg-[#0B0F19] p-2 space-y-1">
+        {/* Fixed "Settings" Navigation Item */}
+        <button
+          type="button"
+          onClick={() => {
+            handleTabNavigation('account');
+            if (mobileDrawerOpen) setMobileDrawerOpen(false);
+          }}
+          title={isCollapsed ? 'Settings' : undefined}
+          className={`w-full flex items-center ${
+            isCollapsed ? 'justify-center px-0 py-2.5 relative' : 'justify-between px-3 py-2'
+          } rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            isSettingsActive
+              ? 'bg-slate-800 text-white font-semibold'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                isSettingsActive ? 'text-white' : 'text-slate-400'
+              }`}
+            >
+              <Settings size={16} />
+            </div>
+            {!isCollapsed && (
+              <span className="whitespace-nowrap truncate">Settings</span>
+            )}
+          </div>
+        </button>
+
+        {/* Streamer Profile Logo & Quick Logout Row */}
+        {!isCollapsed ? (
+          <div className="pt-1.5 border-t border-slate-800/50 flex items-center justify-between gap-2 px-2 py-1">
+            <div
+              onClick={() => {
+                handleTabNavigation('account');
+                if (mobileDrawerOpen) setMobileDrawerOpen(false);
+              }}
+              className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer group"
+              title="View Profile Settings"
+            >
+              <div className="relative flex-shrink-0">
+                <img
+                  src={
+                    profileAvatar ||
+                    user?.avatarUrl ||
+                    `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.username}`
+                  }
+                  alt={user?.displayName || 'Avatar'}
+                  className="w-7 h-7 rounded-xl bg-slate-950 object-cover ring-1 ring-slate-700/60 group-hover:ring-slate-500 transition-all"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0B0F19]" />
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-xs font-bold text-slate-200 group-hover:text-white truncate font-['Chakra_Petch'] leading-tight">
+                  {user?.displayName || user?.username}
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono truncate leading-tight">
+                  @{user?.username}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                onNavigate('home');
+              }}
+              title="Log Out"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer flex-shrink-0"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="pt-1 border-t border-slate-800/50 flex flex-col items-center gap-1.5 py-1">
+            <button
+              type="button"
+              onClick={() => handleTabNavigation('account')}
+              title={`${user?.displayName || user?.username} (@${user?.username})`}
+              className="relative cursor-pointer group"
+            >
+              <img
+                src={
+                  profileAvatar ||
+                  user?.avatarUrl ||
+                  `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.username}`
+                }
+                alt={user?.displayName || 'Avatar'}
+                className="w-7 h-7 rounded-xl bg-slate-950 object-cover ring-1 ring-slate-700/60 group-hover:ring-slate-500 transition-all"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0B0F19]" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                onNavigate('home');
+              }}
+              title="Log Out"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+            >
+              <LogOut size={13} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // When a target donation box is selected, render the dedicated Target Donation Studio as a new dashboard
   // (The main sidebar is completely hidden and replaced by our new sidebar, with the top back button)
@@ -1870,30 +1987,27 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 className="flex items-center gap-3 group cursor-pointer text-left focus:outline-none min-w-0"
                 title="Return to streambotkh.com"
               >
-                <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
-                  <img
-                    src="/images/logo-192.png"
-                    alt="Dashboard Panel"
-                    className="w-9 h-9 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
-                  />
-                </div>
                 <div className="flex items-center min-w-0 leading-tight">
                   <h1 className="text-base font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
-                    Dashboard <span className="text-cyan-400">Panel</span>
+                    Creator Panel
                   </h1>
                 </div>
               </button>
               <button
                 onClick={() => setMobileDrawerOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition-colors"
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer"
                 aria-label="Close Navigation"
+                title="Close Navigation"
               >
-                <X size={20} />
+                <Sidebar size={19} className="text-white" />
               </button>
             </div>
 
             {/* Scrollable Nav Items */}
             {renderSidebarNav(false)}
+
+            {/* Fixed Bottom Settings & Profile */}
+            {renderSidebarFooter(false)}
           </aside>
         </div>,
         document.body
@@ -1919,16 +2033,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               className="flex items-center gap-3 min-w-0 group cursor-pointer text-left focus:outline-none transition-opacity hover:opacity-90"
               title="Return to Home"
             >
-              <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
-                <img
-                  src="/images/logo-192.png"
-                  alt="Dashboard Panel"
-                  className="w-9 h-9 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
-                />
-              </div>
               <div className="flex items-center min-w-0 leading-tight">
                 <h1 className="text-base font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
-                  Dashboard <span className="text-cyan-400">Panel</span>
+                  Creator Panel
                 </h1>
               </div>
             </button>
@@ -1937,15 +2044,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className={`p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-all cursor-pointer flex-shrink-0 ${
-              sidebarCollapsed ? 'bg-slate-900/80 border-slate-800 text-cyan-400' : ''
+              sidebarCollapsed ? 'bg-slate-900/80 border-slate-800 text-white' : ''
             }`}
             title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             aria-label={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
-            <Menu
+            <Sidebar
               size={19}
-              className={`transform transition-transform duration-300 ease-in-out ${
-                sidebarCollapsed ? 'rotate-90 text-cyan-400' : 'rotate-0'
+              className={`transition-colors duration-200 ${
+                sidebarCollapsed ? 'text-white' : 'text-slate-400 hover:text-white'
               }`}
             />
           </button>
@@ -1953,6 +2060,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
         {/* Scrollable Nav Items */}
         {renderSidebarNav(sidebarCollapsed)}
+
+        {/* Fixed Bottom Settings & Profile */}
+        {renderSidebarFooter(sidebarCollapsed)}
       </aside>
 
       {/* ============================================================== */}
@@ -1962,18 +2072,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         {/* Top Desktop Application Header Bar (Executive Workbench Header) */}
         <header className="z-40 h-16 sm:h-20 bg-[#060911]/95 backdrop-blur-xl border-b border-slate-800/80 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0">
           <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-shrink-0">
-            {/* Mobile Menu Hamburger */}
+            {/* Mobile Navigation Drawer Toggle */}
             <button
               onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-              className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white focus:outline-none flex-shrink-0 cursor-pointer"
+              className="md:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition-all flex-shrink-0 cursor-pointer"
               aria-label="Toggle Navigation Drawer"
+              title="Toggle Sidebar"
             >
-              {mobileDrawerOpen ? <X size={18} /> : <Menu size={18} />}
+              <Sidebar size={18} className={mobileDrawerOpen ? 'text-white' : 'text-slate-400'} />
             </button>
 
             {/* Active Section Title */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-700/80 items-center justify-center text-cyan-400 flex-shrink-0 shadow-inner">
+              <div className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 items-center justify-center text-white flex-shrink-0">
                 <CurrentTabIcon size={18} />
               </div>
               <div className="flex flex-col justify-center min-w-0">
@@ -1992,21 +2103,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* Copy & Regenerate Overlay URL Action Buttons (display only from the assets category) */}
             {currentObsConfig && (
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-750 shadow-sm">
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/90 shadow-sm">
                 <button
                   type="button"
                   onClick={handleCopyCurrentObsUrl}
                   className={`relative p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer ${
                     copiedObsUrl
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                      ? 'bg-emerald-500/20 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                      : 'hover:bg-slate-800 text-slate-400 hover:text-white'
                   }`}
                   title={copiedObsUrl ? 'Copied to Clipboard!' : `Copy ${currentObsConfig.label} URL`}
                 >
                   {copiedObsUrl ? (
                     <Check size={16} className="text-emerald-400" />
                   ) : (
-                    <Copy size={16} className="text-slate-400 hover:text-cyan-400 transition-colors" />
+                    <Copy size={16} className="text-slate-400 hover:text-white transition-colors" />
                   )}
                 </button>
 
@@ -2015,7 +2126,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   href={currentObsConfig.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="relative p-1.5 sm:p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-all cursor-pointer"
+                  className="relative p-1.5 sm:p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
                   title={`Open ${currentObsConfig.label} URL in New Tab`}
                 >
                   <ExternalLink size={16} />
@@ -2036,18 +2147,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <button
               type="button"
               onClick={toggleThemeMode}
-              className={`relative p-2 sm:p-2.5 rounded-xl border transition-all shadow-sm cursor-pointer group flex items-center justify-center ${
+              className={`relative p-2 sm:p-2.5 rounded-xl transition-all shadow-sm cursor-pointer group flex items-center justify-center ${
                 themeMode === 'light'
-                  ? 'bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
-                  : 'bg-slate-900/90 hover:bg-slate-800 border-slate-750 hover:border-cyan-500/50 text-slate-200 hover:text-white'
+                  ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white'
               }`}
               title={themeMode === 'light' ? 'Switch to Night Mode' : 'Switch to Day Mode'}
               aria-label="Toggle Night or Day Mode"
             >
               {themeMode === 'light' ? (
-                <Sun size={16} className="text-amber-400 group-hover:scale-110 group-hover:rotate-45 transition-transform" />
+                <Sun size={16} className="text-amber-500 group-hover:scale-110 group-hover:rotate-45 transition-transform" />
               ) : (
-                <Moon size={16} className="text-cyan-400 group-hover:scale-110 group-hover:-rotate-12 transition-transform" />
+                <Moon size={16} className="text-slate-300 group-hover:text-white group-hover:scale-110 group-hover:-rotate-12 transition-transform" />
               )}
             </button>
 
@@ -2056,11 +2167,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               <button
                 type="button"
                 onClick={() => setIsMailboxDropdownOpen(!isMailboxDropdownOpen)}
-                className="relative p-2 sm:p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-750 hover:border-cyan-500/50 text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer group"
+                className="relative p-2 sm:p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer group"
                 title="Open Streamer Mailbox & Notifications"
               >
                 <div className="relative flex items-center justify-center">
-                  <Mail size={16} className="text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <Mail size={16} className="text-slate-300 group-hover:text-white group-hover:scale-110 transition-transform" />
                   {unreadMailCount > 0 && (
                     <span className="absolute -top-1.5 -right-2 px-1.5 py-0.2 min-w-[17px] h-[17px] flex items-center justify-center rounded-full text-[10px] font-mono font-black bg-cyan-400 text-slate-950 shadow-[0_0_8px_rgba(0,240,255,0.7)] animate-pulse">
                       {unreadMailCount > 99 ? '99+' : unreadMailCount}
@@ -2087,137 +2198,45 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 onClick={() => {
                   setIsChatSettingsOpen((prev) => !prev);
                 }}
-                className={`lg:hidden relative flex items-center justify-center p-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                className={`lg:hidden relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   isChatSettingsOpen
-                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
-                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border-slate-750 hover:border-cyan-500/50 shadow-sm'
+                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white shadow-sm'
                 }`}
                 title="Toggle Chat Settings"
                 aria-label="Toggle Live Chat Settings"
               >
-                <Sliders size={16} className={isChatSettingsOpen ? 'text-slate-950' : 'text-cyan-400'} />
+                <Sliders size={16} className={isChatSettingsOpen ? 'text-slate-950' : 'text-slate-300'} />
                 {chatHasUnsavedChanges && (
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
                 )}
               </button>
             )}
 
-            {/* Video Alerts Settings Toggle Menu Button (Top Navbar Right Side - Mobile Only) */}
+            {/* Video Share Settings Toggle Menu Button (Top Navbar Right Side - Mobile Only) */}
             {activeTab === 'video-alerts' && (
               <button
                 type="button"
                 onClick={() => {
                   setIsVideoSettingsOpen((prev) => !prev);
                 }}
-                className={`lg:hidden relative flex items-center justify-center p-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                className={`lg:hidden relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   isVideoSettingsOpen
-                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
-                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border-slate-750 hover:border-cyan-500/50 shadow-sm'
+                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white shadow-sm'
                 }`}
-                title="Toggle Video Settings"
+                title="Toggle Video Share Settings"
                 aria-label="Toggle Video Alert Settings"
               >
                 {isVideoSettingsOpen ? (
                   <X size={16} />
                 ) : (
-                  <Menu size={16} className="text-cyan-400" />
+                  <Menu size={16} className="text-slate-300" />
                 )}
                 {videoHasUnsavedChanges && (
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
                 )}
               </button>
-            )}
-
-            {/* User Profile Rounded Avatar (Image Only) & Dropdown Menu */}
-            {user && (
-              <div className="relative" ref={profileDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                  className={`relative p-0.5 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center focus:outline-none ${
-                    isProfileDropdownOpen
-                      ? 'border-cyan-400 shadow-[0_0_12px_rgba(0,240,255,0.4)]'
-                      : 'border-slate-700 hover:border-cyan-400 shadow-sm'
-                  }`}
-                  title={user.displayName || user.username}
-                  aria-label="User Profile Menu"
-                  aria-expanded={isProfileDropdownOpen}
-                >
-                  <img
-                    src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
-                    alt={user.displayName || 'Profile'}
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-900 object-cover"
-                  />
-                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#060911]" />
-                </button>
-
-                {isProfileDropdownOpen && (
-                  <div
-                    className="absolute right-0 mt-2.5 w-56 sm:w-60 rounded-2xl bg-[#0B0F19]/95 backdrop-blur-xl border border-slate-800 shadow-2xl p-2 z-50 animate-fadeIn"
-                    style={{ boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 240, 255, 0.1)' }}
-                  >
-                    {/* User Profile Header */}
-                    <div className="px-3 py-2.5 border-b border-slate-800/80 mb-1 flex items-center gap-2.5">
-                      <img
-                        src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
-                        alt="Avatar"
-                        className="w-9 h-9 rounded-full bg-slate-950 object-cover ring-1 ring-cyan-500/30 flex-shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs sm:text-sm font-bold text-white truncate font-['Chakra_Petch'] leading-tight">
-                          {user.displayName || user.username}
-                        </div>
-                        <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
-                          @{user.username}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Menu Items */}
-                    <div className="space-y-0.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsProfileDropdownOpen(false);
-                          handleTabNavigation('account');
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors text-left cursor-pointer group"
-                      >
-                        <User size={14} className="text-cyan-400 group-hover:scale-110 transition-transform" />
-                        <span>My Account</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsProfileDropdownOpen(false);
-                          onNavigate('home');
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors text-left cursor-pointer group"
-                      >
-                        <Home size={14} className="text-slate-400 group-hover:text-cyan-400 group-hover:scale-110 transition-transform" />
-                        <span>Return to Website</span>
-                      </button>
-                    </div>
-
-                    <div className="my-1 border-t border-slate-800/80" />
-
-                    {/* Log Out Option */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsProfileDropdownOpen(false);
-                        logout();
-                        onNavigate('home');
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 transition-all text-left cursor-pointer group"
-                    >
-                      <LogOut size={14} className="group-hover:-translate-x-0.5 transition-transform" />
-                      <span>Log Out</span>
-                    </button>
-                  </div>
-                )}
-              </div>
             )}
           </div>
         </header>
@@ -2420,7 +2439,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     {currentTabTitle} is Available on Pro Plan
                   </h3>
                   <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
-                    Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, Spinning Wheels, and Live Chat are included in the{' '}
+                    Leaderboard, Goals, Subathon Timer, Soundboard, Video Share, Spinning Wheels, and Live Chat are included in the{' '}
                     <strong className="text-white">Pro Plan ($4.99/mo)</strong> along with 100MB storage and removed donation page watermark.
                   </p>
                 </div>
@@ -2468,6 +2487,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <GoalWidgetManager
               streamerToken={user?.overlayToken}
               totalRaised={stats?.summary?.totalRevenueUsd || 0}
+            />
+          )}
+
+          {activeTab === 'custom-overlay' && (currentPlan !== 'free' || isAdmin) && (
+            <CustomOverlayManager
+              streamerToken={user?.overlayToken}
+              onNavigateToGoals={() => setActiveTab('goal')}
             />
           )}
 
@@ -3603,7 +3629,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <div className="text-3xl font-extrabold text-white font-mono">$0</div>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Ideal for new streamers starting out. Includes Donations Alerts, Payment Gateway, and 20MB storage.
+                      Ideal for new streamers starting out. Includes Alertbox, Payment Gateway, and 20MB storage.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-300 flex-1">
                       <li className="flex items-center gap-2 text-cyan-300 font-semibold">
@@ -3616,11 +3642,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </li>
                       <li className="flex items-center gap-2">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>Donations Alerts &amp; OBS 60FPS Browser Overlay</span>
+                        <span>Alertbox &amp; OBS 60FPS Browser Overlay</span>
                       </li>
                       <li className="flex items-center gap-2 text-slate-500">
                         <span className="w-3.5 text-center font-mono">-</span>
-                        <span>Leaderboard, Goals, Timer, Soundboard, Video Alerts &amp; Wheels</span>
+                        <span>Leaderboard, Goals, Timer, Soundboard, Video Share &amp; Wheels</span>
                       </li>
                       <li className="flex items-center gap-2 text-slate-500">
                         <span className="w-3.5 text-center font-mono">-</span>
@@ -3702,7 +3728,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       ) : null}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Alerts, Wheels), and removed watermark.
+                      Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Share, Wheels), and removed watermark.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
                       <li className="flex items-center gap-2 text-purple-300 font-semibold">
@@ -3715,7 +3741,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </li>
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                        <span>Unlock Video Alerts (Media Share) &amp; Spinning Wheels</span>
+                        <span>Unlock Video Share &amp; Spinning Wheels</span>
                       </li>
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />

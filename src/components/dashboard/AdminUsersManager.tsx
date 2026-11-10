@@ -298,8 +298,8 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
           setImpersonatingId(targetUser.id);
           setErrorMsg(null);
           await impersonateUser(targetUser.id);
-          // Redirect to the streamer dashboard
-          window.location.href = '/dashboard?tab=overview';
+          // Redirect to the streamer creator panel
+          window.location.href = '/creator?tab=overview';
         } catch (err: any) {
           setErrorMsg(err.message || 'Failed to switch into user session');
           setImpersonatingId(null);

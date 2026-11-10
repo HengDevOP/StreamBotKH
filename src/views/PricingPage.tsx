@@ -165,7 +165,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
   const faqs = [
     {
       q: 'What are the differences between the Free and Pro plans?',
-      a: 'The Free plan ($0) includes 20MB media storage, Donations Alerts, and the Payment Gateway (ABA PayWay & Bakong KHQR). The Pro plan ($4.99/mo with annual discount) removes the donation page watermark, expands storage to 100MB (supporting MP4, GIF, MP3, WAV & all formats), and unlocks all advanced stream assets: Leaderboard, Goals, Subathon Timer, Soundboard, Video Alerts, and Spinning Wheels.'
+      a: 'The Free plan ($0) includes 20MB media storage, Alertbox, and the Payment Gateway (ABA PayWay & Bakong KHQR). The Pro plan ($4.99/mo with annual discount) removes the donation page watermark, expands storage to 100MB (supporting MP4, GIF, MP3, WAV & all formats), and unlocks all advanced stream assets: Leaderboard, Goals, Subathon Timer, Soundboard, Video Share, and Spinning Wheels.'
     },
     {
       q: 'Is the Payment Gateway available on both Free and Pro plans?',
@@ -173,7 +173,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
     },
     {
       q: 'Which stream widgets are unlocked on the Pro plan?',
-      a: 'Upgrading to the Pro plan unlocks Donor Leaderboard, Goal Progress Bars, Subathon Countdown Timer, PC Hotkey Soundboard, YouTube Media Share Video Alerts, and Interactive Spinning Wheels.'
+      a: 'Upgrading to the Pro plan unlocks Donor Leaderboard, Goal Progress Bars, Subathon Countdown Timer, PC Hotkey Soundboard, YouTube Video Share, and Interactive Spinning Wheels.'
     },
     {
       q: 'Which Cambodian banks are supported by Bakong KHQR?',
@@ -203,7 +203,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
         <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed px-1">
           {!isWaitingForData && isProUser
             ? 'You are currently on the Pro plan with full access to all stream widgets, 100MB storage, and zero watermark. View Free tier details below.'
-            : 'Start free with Donations Alerts, Payment Gateway, and 20MB storage, or upgrade to Pro to unlock 100MB storage, Leaderboard, Goals, Timer, Soundboard, Video Alerts, and Spinning Wheels.'}
+            : 'Start free with Alertbox, Payment Gateway, and 20MB storage, or upgrade to Pro to unlock 100MB storage, Leaderboard, Goals, Timer, Soundboard, Video Share, and Spinning Wheels.'}
         </p>
 
         {/* Currency & Billing Controls */}
@@ -349,7 +349,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 </li>
                 <li className="flex items-center gap-3">
                   <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                  <span>Donations Alerts &amp; 60FPS OBS Browser Overlay</span>
+                  <span>Alertbox &amp; 60FPS OBS Browser Overlay</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <Check size={16} className="text-cyan-400 flex-shrink-0" />
@@ -373,7 +373,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 </li>
                 <li className="flex items-center gap-3 text-slate-600">
                   <span className="w-4 text-center">-</span>
-                  <span>Video Alerts (Media Share) &amp; Spinning Wheels</span>
+                  <span>Video Share &amp; Spinning Wheels</span>
                 </li>
               </ul>
             </div>
@@ -440,7 +440,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                   </li>
                   <li className="flex items-center gap-3 text-emerald-300 font-semibold">
                     <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                    <span>Unlock Soundboard, Video Alerts &amp; Spinning Wheels</span>
+                    <span>Unlock Soundboard, Video Share &amp; Spinning Wheels</span>
                   </li>
                   <li className="flex items-center gap-3 text-emerald-300 font-semibold">
                     <Check size={16} className="text-emerald-400 flex-shrink-0" />
@@ -556,7 +556,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Donations Alerts &amp; OBS 60FPS Browser Overlay</td>
+                <td className="py-3.5 px-6 font-medium text-white">Alertbox &amp; OBS 60FPS Browser Overlay</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
               </tr>
@@ -576,7 +576,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Video Alerts (YouTube Media Share)</td>
+                <td className="py-3.5 px-6 font-medium text-white">Video Share (YouTube Media Share)</td>
                 <td className="py-3.5 px-6 text-center text-slate-600">-</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
