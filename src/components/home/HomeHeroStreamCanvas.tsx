@@ -146,7 +146,7 @@ export const HomeHeroStreamCanvas: React.FC = () => {
       </svg>
 
       {/* ============================================================== */}
-      {/* 1. HUGE MAIN CARD: "LIVESTREAM" ONLY (No Live Dot, No Modal)   */}
+      {/* 1. HUGE MAIN CARD: "LIVE" ONLY (Responsive Fluid Sizing)       */}
       {/* Position in 600x460: left: 20%, top: 19%, w: 60%, h: 62%        */}
       {/* ============================================================== */}
       <div
@@ -164,10 +164,13 @@ export const HomeHeroStreamCanvas: React.FC = () => {
         <div className="absolute bottom-2.5 left-2.5 w-2.5 h-2.5 border-b-2 border-l-2 border-white/40 pointer-events-none" />
         <div className="absolute bottom-2.5 right-2.5 w-2.5 h-2.5 border-b-2 border-r-2 border-white/40 pointer-events-none" />
 
-        {/* Center Text: LIVESTREAM Only (No Live Dot) */}
-        <div className="relative z-10 flex items-center justify-center px-4 select-none">
-          <span className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white font-['Chakra_Petch'] uppercase tracking-wider sm:tracking-[0.18em] leading-none drop-shadow-[0_2px_14px_rgba(0,0,0,0.9)]">
-            LIVESTREAM
+        {/* Center Text: LIVE Only (Responsive Fluid Sizing) */}
+        <div className="relative z-10 flex items-center justify-center px-2 sm:px-4 select-none w-full max-w-full min-w-0">
+          <span
+            className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white font-['Chakra_Petch'] uppercase tracking-widest sm:tracking-[0.24em] leading-none drop-shadow-[0_2px_16px_rgba(0,0,0,0.95)]"
+            style={{ fontSize: 'clamp(28px, 6.5vw, 68px)' }}
+          >
+            LIVE
           </span>
         </div>
       </div>

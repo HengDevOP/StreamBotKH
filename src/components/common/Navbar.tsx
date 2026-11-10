@@ -318,7 +318,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            {/* Logo on the left & Title "streambotkh.com" (Links to Home) */}
+            {/* Logo on the left & Title "StreamBotKH" (Links to Home) */}
             <Link
               to="/"
               onClick={(e) => {
@@ -335,17 +335,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
               <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
                 <img
                   src="/images/logo-192.png"
-                  alt="streambotkh.com logo"
+                  alt="StreamBotKH logo"
                   className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-[0_0_10px_rgba(0,240,255,0.45)] group-hover:scale-105 group-hover:drop-shadow-[0_0_15px_rgba(0,240,255,0.7)] transition-all duration-200"
                 />
               </div>
 
               <div className="flex items-center min-w-0">
                 <span className="text-base sm:text-xl font-extrabold tracking-tight text-white font-['Chakra_Petch'] truncate">
-                  streambot<span className="text-cyan-400">kh</span>
-                </span>
-                <span className="hidden xxs:inline text-xs sm:text-sm font-mono font-bold text-slate-400 ml-0.5">
-                  .com
+                  StreamBot<span className="text-cyan-400">KH</span>
                 </span>
               </div>
             </Link>
