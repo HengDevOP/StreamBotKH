@@ -302,7 +302,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     </span>
                   </span>
                 </h1>
-                <p className="text-sm sm:text-base xl:text-lg text-slate-300 leading-relaxed font-normal max-w-2xl mx-auto lg:mx-0">
+                <p className="text-xs sm:text-sm md:text-base lg:text-base xl:text-lg text-slate-300 leading-relaxed font-normal max-w-2xl mx-auto lg:mx-0 text-justify [text-align-last:center] lg:[text-align-last:left]">
                   The next-generation live tipping engine built for Cambodian content creators. Accept instant payments via <b className="text-white font-semibold">ABA Mobile</b>, <b className="text-white font-semibold">ACLEDA</b>, and <b className="text-white font-semibold">Bakong KHQR</b> with 60 FPS OBS alerts, automated Khmer/English voice TTS, and Telegram alerts.
                 </p>
               </div>
@@ -378,7 +378,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 TRUSTED BY VERIFIED CAMBODIAN STREAMERS
               </h2>
 
-              <p className="text-sm sm:text-base text-slate-400 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-xs sm:text-sm md:text-base text-slate-400 max-w-3xl mx-auto leading-relaxed text-justify [text-align-last:center]">
                 Leading gaming creators, esports casters, and livestreamers accept direct tips with 0% platform cuts, instant ABA Mobile &amp; Bakong KHQR transfers, and real-time alerts.
               </p>
             </div>
@@ -530,7 +530,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   />
                 </button>
                 {isOpen && (
-                  <div className="home-faq-content px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-white/[0.04]">
+                  <div className="home-faq-content px-5 pb-5 pt-1 text-xs sm:text-sm md:text-base text-slate-300 leading-relaxed border-t border-white/[0.04] text-justify [text-align-last:left]">
                     {item.a}
                   </div>
                 )}
@@ -568,7 +568,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     YOUR LIVESTREAM?
                   </span>
                 </h2>
-                <p className="text-sm sm:text-base lg:text-lg xl:text-xl text-slate-300 leading-relaxed font-normal max-w-2xl xl:max-w-3xl">
+                <p className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl text-slate-300 leading-relaxed font-normal max-w-2xl xl:max-w-3xl text-justify [text-align-last:center] lg:[text-align-last:left]">
                   Join top Cambodian content creators broadcasting with zero-latency tip alerts, Khmer voice synthesis, and direct bank payouts straight to your ABA or Bakong account.
                 </p>
               </div>

@@ -40,7 +40,7 @@ interface ShowcaseAlertCombo {
 }
 
 const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
-  // 1. TOP LAYOUT (Mascot Top, Pikachu, Zoom)
+  // 1. TOP LAYOUT (Mascot Top, Pikachu, Zoom In)
   {
     id: 'combo-1',
     donorName: 'Sophea Gaming',
@@ -55,14 +55,14 @@ const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
     fontFamily: 'Chakra Petch',
     mediaUrl: '/assets/pokemon/25.gif'
   },
-  // 2. LEFT LAYOUT (Mascot Left Side, Lucario, Glitch Split)
+  // 2. TOP LAYOUT (Mascot Top, Lucario, Glitch Split)
   {
     id: 'combo-2',
     donorName: 'Dara_Esports',
     donorMessage: 'That AWM 400m sniper shot was illegal! Chicken dinner tonight squad 🍗⚡',
     amount: 50,
     currency: 'USD',
-    layoutMode: 'left',
+    layoutMode: 'top',
     animationStyle: 'glitch',
     donorColor: 'linear-gradient(135deg, #EC4899 0%, #F43F5E 100%)',
     amountColor: 'linear-gradient(135deg, #A855F7 0%, #C084FC 100%)',
@@ -70,14 +70,14 @@ const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
     fontFamily: 'Orbitron',
     mediaUrl: '/assets/pokemon/448.gif'
   },
-  // 3. RIGHT LAYOUT (Mascot Right Side, Charmander, Wobble Bounce)
+  // 3. TOP LAYOUT (Mascot Top, Charmander, Wobble Bounce)
   {
     id: 'combo-3',
     donorName: 'Vannak Pro',
-    donorMessage: 'Coffee on me bro! Road to Mythical Glory let’s gooo ☕💖',
+    donorMessage: 'Coffee on me bro! Road to Mythical Glory let’s gooo and keep it hype ☕💖',
     amount: 40000,
     currency: 'KHR',
-    layoutMode: 'right',
+    layoutMode: 'top',
     animationStyle: 'bounce',
     donorColor: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
     amountColor: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
@@ -85,14 +85,14 @@ const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
     fontFamily: 'Kanit',
     mediaUrl: '/assets/pokemon/4.gif'
   },
-  // 4. BOTTOM LAYOUT (Mascot at Bottom, Gengar, 3D Flip)
+  // 4. TOP LAYOUT (Mascot Top, Gengar, 3D Flip)
   {
     id: 'combo-4',
     donorName: 'Bopha_Cute',
     donorMessage: 'Insane reaction time right there! Keep grinding the late night stream 🎮🔥',
     amount: 25,
     currency: 'USD',
-    layoutMode: 'bottom',
+    layoutMode: 'top',
     animationStyle: 'flip',
     donorColor: 'linear-gradient(135deg, #8B5CF6 0%, #D946EF 100%)',
     amountColor: 'linear-gradient(135deg, #00F0FF 0%, #10B981 100%)',
@@ -100,11 +100,11 @@ const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
     fontFamily: 'Chakra Petch',
     mediaUrl: '/assets/pokemon/94.gif'
   },
-  // 5. TOP LAYOUT (Mew, Slide Up Bounce)
+  // 5. TOP LAYOUT (Mascot Top, Mew, Slide Up Bounce)
   {
     id: 'combo-5',
     donorName: 'Meng MLBB',
-    donorMessage: 'That 1v5 clutch had the whole chat screaming! Unstoppable carry 👑⚡',
+    donorMessage: 'That 1v5 clutch had the whole chat screaming! Unstoppable carry tonight 👑⚡',
     amount: 100000,
     currency: 'KHR',
     layoutMode: 'top',
@@ -115,14 +115,14 @@ const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
     fontFamily: 'Bebas Neue',
     mediaUrl: '/assets/pokemon/151.gif'
   },
-  // 6. LEFT LAYOUT (Dragonite, Camera Shake)
+  // 6. TOP LAYOUT (Mascot Top, Dragonite, Camera Shake)
   {
     id: 'combo-6',
     donorName: 'Chhay_FPS',
-    donorMessage: 'Savage kill right there! MVP of the tournament! 🔥🔥🔥',
+    donorMessage: 'Savage kill right there! MVP of the tournament, keep shredding bro! 🔥🔥🔥',
     amount: 100,
     currency: 'USD',
-    layoutMode: 'left',
+    layoutMode: 'top',
     animationStyle: 'shake',
     donorColor: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
     amountColor: 'linear-gradient(135deg, #FACC15 0%, #F59E0B 100%)',
@@ -130,14 +130,14 @@ const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
     fontFamily: 'Orbitron',
     mediaUrl: '/assets/pokemon/149.gif'
   },
-  // 7. RIGHT LAYOUT (Eevee, Heartbeat Pulse)
+  // 7. TOP LAYOUT (Mascot Top, Eevee, Heartbeat Pulse)
   {
     id: 'combo-7',
     donorName: 'Ah_Lin_Live',
-    donorMessage: 'Thank you for the pro gameplay tips, learned so much today! 🌟🎮',
+    donorMessage: 'Thank you for the pro gameplay tips, learned so much from today’s stream 🌟🎮',
     amount: 5,
     currency: 'USD',
-    layoutMode: 'right',
+    layoutMode: 'top',
     animationStyle: 'pulse',
     donorColor: 'linear-gradient(135deg, #F43F5E 0%, #FB7185 100%)',
     amountColor: 'linear-gradient(135deg, #38BDF8 0%, #818CF8 100%)',
@@ -145,14 +145,14 @@ const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
     fontFamily: 'Kanit',
     mediaUrl: '/assets/pokemon/133.gif'
   },
-  // 8. BOTTOM LAYOUT (Snorlax, CapCut Zoom-In)
+  // 8. TOP LAYOUT (Mascot Top, Snorlax, CapCut Zoom-In)
   {
     id: 'combo-8',
     donorName: 'Socheat Carry',
-    donorMessage: 'Good luck in the MPL tournament! Cambodia esports to the top 🏆✨',
+    donorMessage: 'Good luck in the MPL tournament! Cambodia esports to the absolute top 🏆✨',
     amount: 20000,
     currency: 'KHR',
-    layoutMode: 'bottom',
+    layoutMode: 'top',
     animationStyle: 'zoom',
     donorColor: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
     amountColor: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
@@ -546,11 +546,11 @@ export const HomeFeatureShowcase: React.FC = () => {
             Fully Customizable 60 FPS Live Donation Alerts
           </h3>
 
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+          <p className="text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed text-justify [text-align-last:left]">
             When a viewer scans your Bakong KHQR code with ABA Mobile, ACLEDA, or Wing, alerts flash instantaneously onto your stream screen in full 60 FPS without dropping a single frame. Money deposits straight into your personal bank account with 0% platform cuts and zero waiting period.
           </p>
 
-          <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+          <p className="text-slate-400 text-xs sm:text-sm leading-relaxed text-justify [text-align-last:left]">
             Personalize your broadcast with customizable entrance animations, dynamic mascot positions (Top, Left, Right, Bottom), dual USD &amp; Cambodian Riel currency formatting, and neural KiriTTS voice cheers with automatic stream audio ducking.
           </p>
 
@@ -598,10 +598,10 @@ export const HomeFeatureShowcase: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: 3D Preview (Smoothly rotates 15° left / 15° right when it changes on mobile) */}
+        {/* Right Side: 3D Preview (Locked fixed width & height frame, smoothly rotates 15° left / 15° right on mobile) */}
         <div className="perspective-container w-full lg:w-1/2 flex justify-center">
           <div
-            className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center min-h-[360px]"
+            className="w-full max-w-[480px] h-[360px] sm:h-[380px] bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center overflow-hidden"
             style={{
               transform: getCardTransform(true, alertCycleKey),
               transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -610,29 +610,38 @@ export const HomeFeatureShowcase: React.FC = () => {
             }}
           >
             {/* Exact Dashboard Alert Component: Image, Title, and Messages (Remounts on key change for fresh animations) */}
-            <div className="w-full relative z-10 py-2">
-              <NeonAlertCard
-                key={`alert-preview-${alertCycleKey}-${currentAlert.id}`}
-                alert={{
-                  donationId: `preview-${alertCycleKey}`,
-                  donorName: currentAlert.donorName,
-                  donorMessage: currentAlert.donorMessage,
-                  amount: currentAlert.amount,
-                  currency: currentAlert.currency,
-                  textTemplate: '{donator} donated {amount} through superchat!',
-                  textColor: '#FFFFFF',
-                  donorColor: currentAlert.donorColor,
-                  amountColor: currentAlert.amountColor,
-                  mediaUrl: currentAlert.mediaUrl,
-                  customGifUrl: currentAlert.mediaUrl,
-                  showImage: true,
-                  fontFamily: currentAlert.fontFamily,
-                  fontSize: 28,
-                  layoutMode: currentAlert.layoutMode,
-                  animationStyle: currentAlert.animationStyle,
-                  glowColor: currentAlert.glowColor
-                }}
-              />
+            <div className="w-full h-full relative z-10 flex items-center justify-center p-2">
+              <div className="w-full max-w-[440px] h-[340px] sm:h-[360px] flex items-center justify-center overflow-hidden">
+                <NeonAlertCard
+                  key={`alert-preview-${alertCycleKey}-${currentAlert.id}`}
+                  className="w-full max-w-[440px] h-[340px] sm:h-[360px] flex flex-col items-center justify-center"
+                  style={{
+                    width: '100%',
+                    maxWidth: '440px',
+                    height: '100%',
+                    maxHeight: '360px'
+                  }}
+                  alert={{
+                    donationId: `preview-${alertCycleKey}`,
+                    donorName: currentAlert.donorName,
+                    donorMessage: currentAlert.donorMessage,
+                    amount: currentAlert.amount,
+                    currency: currentAlert.currency,
+                    textTemplate: '{donator} donated {amount} through superchat!',
+                    textColor: '#FFFFFF',
+                    donorColor: currentAlert.donorColor,
+                    amountColor: currentAlert.amountColor,
+                    mediaUrl: currentAlert.mediaUrl,
+                    customGifUrl: currentAlert.mediaUrl,
+                    showImage: true,
+                    fontFamily: currentAlert.fontFamily,
+                    fontSize: 24,
+                    layoutMode: 'top',
+                    animationStyle: currentAlert.animationStyle,
+                    glowColor: currentAlert.glowColor
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -655,7 +664,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             Media Share &amp; Video Alerts with Live Scrubber
           </h3>
 
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+          <p className="text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed text-justify [text-align-last:left]">
             Allow your viewers to share hype gameplay moments, music tracks, or funny clips on stream. Our video alert engine synchronizes YouTube playback with live progress scrubbers, volume leveling, and automatic game audio ducking.
           </p>
 
@@ -853,7 +862,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             Real-Time Stream Leaderboard &amp; Top Supporters
           </h3>
 
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+          <p className="text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed text-justify [text-align-last:left]">
             Recognize your top supporters and high rollers with high-contrast Hall of Fame leaderboards. Features real-time ranking updates, gold crown podium highlights, and automatic multi-currency conversion between USD and KHR.
           </p>
         </div>
@@ -989,7 +998,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             Dynamic Stream Goals with 0% to 100% Progress
           </h3>
 
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+          <p className="text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed text-justify [text-align-last:left]">
             Rally your community toward hardware upgrades, gaming tournaments, or charity milestones. Watch the glowing neon progress bar run smoothly in real time with dynamic numeric counters and automatic celebration particle bursts.
           </p>
         </div>
@@ -1038,7 +1047,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             Live Stream Chat with Swipe Animations
           </h3>
 
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+          <p className="text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed text-justify [text-align-last:left]">
             Keep your viewers engaged with customizable, high-contrast chat bubbles. Incoming messages slide in smoothly with our dynamic swipe animation, while superchats stay pinned for maximum visibility.
           </p>
         </div>

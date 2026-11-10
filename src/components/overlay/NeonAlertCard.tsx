@@ -8,6 +8,8 @@ import { VideoPlayerWithProgressBar } from '../common/VideoPlayerWithProgressBar
 interface NeonAlertCardProps {
   alert: LiveAlertPayload;
   onEnded?: () => void;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 export const getGradientOrColorStyle = (colorStr?: string): React.CSSProperties => {
@@ -25,7 +27,7 @@ export const getGradientOrColorStyle = (colorStr?: string): React.CSSProperties 
   return { color: colorStr };
 };
 
-export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) => {
+export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded, className = '', style }) => {
   const [isVideoFadingOut, setIsVideoFadingOut] = React.useState(false);
 
   const {
@@ -325,11 +327,12 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded }) 
   // ==============================================================
   return (
     <div
-      className={`relative flex flex-col items-center justify-center p-4 text-center ${animClass}`}
+      className={`relative flex flex-col items-center justify-center p-4 text-center ${animClass} ${className}`}
       style={{
         maxWidth: isSideBySide ? '650px' : '560px',
         width: '100%',
-        fontFamily: `"${activeFont}", sans-serif`
+        fontFamily: `"${activeFont}", sans-serif`,
+        ...style
       }}
     >
       {/* 100% Transparent Backgroundless Outer Container */}
