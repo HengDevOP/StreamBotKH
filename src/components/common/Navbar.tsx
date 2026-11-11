@@ -16,6 +16,7 @@ import {
   Timer,
   Tv,
   Gamepad2,
+  Bot,
   Youtube,
   Facebook,
   Instagram,
@@ -159,8 +160,16 @@ const PRODUCTS_MENU_SECTIONS: MegaMenuSection[] = [
         color: '#F59E0B'
       },
       {
+        title: 'Stream Avatars',
+        sub: 'Retro 2D roaming wanderer avatars with chat speech',
+        href: '/creator?tab=avatars',
+        icon: Bot,
+        color: '#00F0FF',
+        badge: 'NEW'
+      },
+      {
         title: '2D Pokémon Avatars',
-        sub: 'Retro chat avatars & interactive interactive sprites',
+        sub: 'Retro chat avatars & animated roaming sprites',
         href: '/resources/2d-pokemon',
         icon: Gamepad2,
         color: '#10B981',
@@ -194,7 +203,7 @@ const PRODUCTS_MENU_SECTIONS: MegaMenuSection[] = [
         badge: '0% FEE'
       },
       {
-        title: 'StreamBot Television',
+        title: 'StreamWidgets Television',
         sub: '24/7 Creator broadcast station & multi-view player',
         href: '/tv',
         icon: Tv,

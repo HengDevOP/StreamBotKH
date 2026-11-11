@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     const usedTrials = await usersCol.countDocuments({ hasUsedTrial: true });
     const eligibleUsers = await usersCol.countDocuments({
       hasUsedTrial: { $ne: true },
-      plan: { $in: ['free', null, ''] }
+      plan: { $in: ['free', null as any, ''] }
     });
 
     return NextResponse.json({

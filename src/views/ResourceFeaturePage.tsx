@@ -27,6 +27,7 @@ import {
   Sliders,
   Monitor,
   Gamepad2,
+  Bot,
   Youtube,
   Facebook,
   Instagram,
@@ -407,14 +408,53 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     ]
   },
   {
+    slug: 'avatars',
+    title: 'Stream Avatars',
+    headline: 'Retro 2D Chat Wanderer Avatars & Live Supporter Celebrations',
+    badge: 'COMMUNITY AVATARS',
+    planBadge: 'ALL PLANS',
+    shortSub: 'Retro 2D roaming wanderers with real-time chat speech',
+    description:
+      'Spawn wandering 2D pixel avatars directly onto your livestream screen! Viewers roam the bottom of your stream, speak with retro comic chat bubbles, and jump in celebration whenever tips and donations arrive.',
+    dashboardTab: 'avatars',
+    color: '#00F0FF',
+    icon: Bot,
+    obsDimensions: { width: '1920 px', height: '360 px', fps: '60 FPS' },
+    obsRouteExample: '/overlay/avatars/:your_token',
+    highlights: [
+      {
+        title: 'Real-Time Roaming Wanderers',
+        desc: 'Avatars wander, pause, turn, and react along the screen floor with smooth 60 FPS physics.'
+      },
+      {
+        title: 'Supporter Celebrations',
+        desc: 'When donations arrive, all avatars jump and celebrate together on screen with particle bursts.'
+      },
+      {
+        title: 'Retro Speech Bubbles',
+        desc: 'Chat messages pop above each viewer avatar with customizable durations and retro arcade fonts.'
+      },
+      {
+        title: 'Zero Latency OBS Browser Source',
+        desc: 'Lightweight HTML5 canvas overlay with transparent alpha channel built for OBS Studio and Streamlabs.'
+      }
+    ],
+    steps: [
+      'Open Dashboard → Assets → Avatars in your StreamWidgets Creator Panel.',
+      'Configure wandering avatar roster, walking speeds, speech bubble timers, and celebration effects.',
+      'Copy your unique Avatars OBS URL into an OBS Studio Browser Source (1920x360).',
+      'Test wanderer animations and watch your live stream chat come alive!'
+    ]
+  },
+  {
     slug: 'youtube-guide',
     title: 'YouTube Live Guide',
-    headline: 'Step-by-Step Guide to Streaming on YouTube with StreamBotKH OBS Overlays',
+    headline: 'Step-by-Step Guide to Streaming on YouTube with StreamWidgets OBS Overlays',
     badge: 'OFFICIAL PLATFORM GUIDE',
     planBadge: 'ALL PLANS',
     shortSub: 'Broadcast setup, stream keys & 0% fee tipping',
     description:
-      'Learn how to connect StreamBotKH with YouTube Live. Broadcast in 1080p60 or 4K, sync live chat with 2D Pokémon, and receive instant zero-broker Bakong KHQR tips directly into your Cambodian bank account without losing 30% to Super Chat.',
+      'Learn how to connect StreamWidgets with YouTube Live. Broadcast in 1080p60 or 4K, sync live chat with 2D Pokémon, and receive instant zero-broker Bakong KHQR tips directly into your Cambodian bank account without losing 30% to Super Chat.',
     dashboardTab: 'overview',
     color: '#FF0000',
     icon: Youtube,
@@ -441,7 +481,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     steps: [
       'Create a Live Stream on YouTube Studio (studio.youtube.com) and copy your RTMP Stream Key.',
       'Paste your Stream Key into OBS Studio Settings → Stream → YouTube - RTMPS.',
-      'From your StreamBotKH Dashboard, copy your Alert Box and Tip QR overlay links into OBS as Browser Sources.',
+      'From your StreamWidgets Dashboard, copy your Alert Box and Tip QR overlay links into OBS as Browser Sources.',
       'Share your personal tip link (@yourname) in your YouTube video description or pinned chat to start earning!'
     ]
   },
@@ -480,8 +520,8 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     steps: [
       'Go to Facebook Live Producer (facebook.com/live/producer) and select "Go live" from your Creator Page.',
       'Select "Streaming software" and copy your Server URL and Stream Key into OBS Studio.',
-      'Add StreamBotKH Overlays (Donation Alerts, Leaderboard, and Subathon Timer) as OBS Browser Sources.',
-      'Pin your StreamBotKH Tip Page link in the comments of your Facebook stream!'
+      'Add StreamWidgets Overlays (Donation Alerts, Leaderboard, and Subathon Timer) as OBS Browser Sources.',
+      'Pin your StreamWidgets Tip Page link in the comments of your Facebook stream!'
     ]
   },
   {
@@ -519,7 +559,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     steps: [
       'Open Instagram on desktop and navigate to Create → Live Video to generate your RTMP Stream URL & Key.',
       'In OBS Studio, set Base Resolution to 1080x1920 (Vertical 9:16) and enter your Instagram RTMP details.',
-      'Add your StreamBotKH Tip QR Overlay (/overlay/qr/:token) in OBS and scale it to fit the bottom corner.',
+      'Add your StreamWidgets Tip QR Overlay (/overlay/qr/:token) in OBS and scale it to fit the bottom corner.',
       'Hit "Start Streaming" in OBS and click "Go Live" in Instagram Live Producer!'
     ]
   },
@@ -544,7 +584,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
       },
       {
         title: 'TikTok Live Studio Custom Browser Sources',
-        desc: 'Step-by-step instructions to paste StreamBotKH overlays directly into TikTok Live Studio.'
+        desc: 'Step-by-step instructions to paste StreamWidgets overlays directly into TikTok Live Studio.'
       },
       {
         title: 'Zero Platform Commission on Viewer Tips',
@@ -557,9 +597,9 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     ],
     steps: [
       'Open TikTok Live Studio on your computer and add a "Browser Source" layer to your scene.',
-      'Copy your StreamBotKH Alert Box or Soundboard URL from your dashboard and paste it into TikTok Live Studio.',
+      'Copy your StreamWidgets Alert Box or Soundboard URL from your dashboard and paste it into TikTok Live Studio.',
       'Use the Soundboard hotkeys on your PC to trigger instant viral sound effects during clutch gaming moments.',
-      'Put your StreamBotKH tip link in your TikTok bio and watch your supporter community grow!'
+      'Put your StreamWidgets tip link in your TikTok bio and watch your supporter community grow!'
     ]
   }
 ];

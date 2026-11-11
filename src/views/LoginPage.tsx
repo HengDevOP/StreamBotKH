@@ -73,14 +73,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
         <div className="w-16 h-16 mx-auto flex items-center justify-center">
           <img
             src="/images/logo-192.png"
-            alt="streambotkh.com logo"
+            alt="StreamWidgets logo"
             className="w-16 h-16 object-contain drop-shadow-[0_0_15px_rgba(0,240,255,0.5)]"
           />
         </div>
 
         <div className="space-y-1.5">
           <h2 className="text-2xl font-extrabold text-white font-['Chakra_Petch'] tracking-wide">
-            streambot<span className="text-cyan-400">kh</span>.com
+            Stream<span className="text-cyan-400">Widgets</span>
           </h2>
           <p className="text-xs text-slate-400">
             Sign in with your Google account to access your livestream alerts &amp; ABA Bakong dashboard

@@ -2228,7 +2228,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   onNavigate('home');
                 }}
                 className="flex items-center gap-3 group cursor-pointer text-left focus:outline-none min-w-0"
-                title="Return to streambotkh.com"
+                title="Return to StreamWidgets"
               >
                 <div className="flex items-center min-w-0 leading-tight">
                   <h1 className="text-base font-bold tracking-tight text-white font-['Chakra_Petch'] truncate">
@@ -3837,7 +3837,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </li>
                       <li className="flex items-center gap-2 text-slate-400">
                         <span className="w-3.5 text-center font-mono text-slate-500">•</span>
-                        <span>Shows streambotkh.com watermark on donation page</span>
+                        <span>Shows StreamWidgets watermark on donation page</span>
                       </li>
                       <li className="flex items-center gap-2 text-emerald-400 font-semibold pt-1 border-t border-slate-800/80">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />

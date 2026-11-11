@@ -205,7 +205,7 @@ export const ResourcesPage: React.FC<ResourcesPageProps> = ({ onNavigate }) => {
 
                 <div className="space-y-4 text-sm text-slate-300">
                   <p>
-                    StreamBotKH provides a 100% transparent browser overlay that renders real-time CSS cyber animations, Web Audio synthesized chimes, and browser Text-to-Speech (TTS) for donation messages.
+                    StreamWidgets provides a 100% transparent browser overlay that renders real-time CSS cyber animations, Web Audio synthesized chimes, and browser Text-to-Speech (TTS) for donation messages.
                   </p>
 
                   <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 font-mono text-xs">
@@ -237,7 +237,7 @@ export const ResourcesPage: React.FC<ResourcesPageProps> = ({ onNavigate }) => {
                   </h3>
                   <ol className="space-y-3 list-decimal list-inside text-xs text-slate-300 leading-relaxed">
                     <li>
-                      Log into your <button onClick={() => onNavigate('dashboard')} className="text-cyan-400 underline font-bold">StreamBotKH Dashboard</button> and click <b>OBS Browser Source</b> in the top bar.
+                      Log into your <button onClick={() => onNavigate('dashboard')} className="text-cyan-400 underline font-bold">StreamWidgets Dashboard</button> and click <b>OBS Browser Source</b> in the top bar.
                     </li>
                     <li>
                       Copy your private unique overlay URL (keep this secret from viewers).
@@ -246,7 +246,7 @@ export const ResourcesPage: React.FC<ResourcesPageProps> = ({ onNavigate }) => {
                       In OBS Studio, find the <b>Sources</b> panel, click the <b>+ (Add)</b> button and select <b>Browser</b>.
                     </li>
                     <li>
-                      Name the source <code className="text-pink-400">StreamBotKH Alerts</code> and click OK.
+                      Name the source <code className="text-pink-400">StreamWidgets Alerts</code> and click OK.
                     </li>
                     <li>
                       Paste your overlay URL into the <b>URL</b> field. Set Width to <b>800</b> and Height to <b>600</b>.
@@ -255,7 +255,7 @@ export const ResourcesPage: React.FC<ResourcesPageProps> = ({ onNavigate }) => {
                       Enable <b>"Shutdown source when not visible"</b> and <b>"Refresh browser when scene becomes active"</b>.
                     </li>
                     <li>
-                      Return to your StreamBotKH Dashboard and click <b>"Send Test Alert"</b> to verify visual animations and audio playback!
+                      Return to your StreamWidgets Dashboard and click <b>"Send Test Alert"</b> to verify visual animations and audio playback!
                     </li>
                   </ol>
                 </div>
@@ -276,7 +276,7 @@ export const ResourcesPage: React.FC<ResourcesPageProps> = ({ onNavigate }) => {
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 size={14} className="text-cyan-400 flex-shrink-0 mt-0.5" />
-                    <span><b>Zero Overlap:</b> StreamBotKH incorporates an automatic queue buffer so back-to-back tips never play audio over each other.</span>
+                    <span><b>Zero Overlap:</b> StreamWidgets incorporates an automatic queue buffer so back-to-back tips never play audio over each other.</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 size={14} className="text-cyan-400 flex-shrink-0 mt-0.5" />
@@ -324,7 +324,7 @@ export const ResourcesPage: React.FC<ResourcesPageProps> = ({ onNavigate }) => {
 
               <div className="space-y-4 text-sm text-slate-300">
                 <p>
-                  StreamBotKH provides out-of-the-box integration with ABA Bank PayWay API v1. Whenever a donor completes payment through ABA Mobile or card, PayWay issues an instant HTTP POST pushback webhook to your server.
+                  StreamWidgets provides out-of-the-box integration with ABA Bank PayWay API v1. Whenever a donor completes payment through ABA Mobile or card, PayWay issues an instant HTTP POST pushback webhook to your server.
                 </p>
 
                 <div className="space-y-2">

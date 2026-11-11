@@ -165,15 +165,15 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
   const faqs = [
     {
       q: 'What are the differences between the Free and Pro plans?',
-      a: 'The Free plan ($0) includes 20MB media storage, Alertbox, and the Payment Gateway (ABA PayWay & Bakong KHQR). The Pro plan ($4.99/mo with annual discount) removes the donation page watermark, expands storage to 100MB (supporting MP4, GIF, MP3, WAV & all formats), and unlocks all advanced stream assets: Leaderboard, Goals, Subathon Timer, Soundboard, Video Share, and Spinning Wheels.'
+      a: 'All stream widgets, overlays, and direct bank tipping features are 100% accessible on every plan. The Pro plan ($4.99/mo) gives you 10x daily tokens (20,000/day vs 2,000/day), expands cloud media storage to 100MB (5x capacity), and completely removes the StreamWidgets watermark from all broadcast overlays.'
     },
     {
       q: 'Is the Payment Gateway available on both Free and Pro plans?',
-      a: 'Yes! The Payment Gateway (ABA PayWay & Bakong KHQR checkout) is available on all plans so every streamer can start receiving viewer tips right away.'
+      a: 'Yes! The NBC Bakong KHQR and ABA Mobile checkout gateway is available on all plans with 0% platform commission so every streamer receives 100% of viewer tips right away.'
     },
     {
       q: 'Which stream widgets are unlocked on the Pro plan?',
-      a: 'Upgrading to the Pro plan unlocks Donor Leaderboard, Goal Progress Bars, Subathon Countdown Timer, PC Hotkey Soundboard, YouTube Video Share, and Interactive Spinning Wheels.'
+      a: 'All stream widgets—including Alert Box, Stream Avatars, 2D Pokémon, Goal Bars, Subathon Timer, Soundboard, Video Share, and Spinning Wheels—are fully unlocked and accessible on both Free and Pro plans! Upgrading to Pro gives you 10x daily tokens and removes watermarks.'
     },
     {
       q: 'Which Cambodian banks are supported by Bakong KHQR?',
@@ -202,8 +202,8 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
         </h1>
         <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed px-1">
           {!isWaitingForData && isProUser
-            ? 'You are currently on the Pro plan with full access to all stream widgets, 100MB storage, and zero watermark. View Free tier details below.'
-            : 'Start free with Alertbox, Payment Gateway, and 20MB storage, or upgrade to Pro to unlock 100MB storage, Leaderboard, Goals, Timer, Soundboard, Video Share, and Spinning Wheels.'}
+            ? 'You are currently on the Pro plan with 10x daily tokens (20,000/day), 100MB cloud storage, and zero watermark. View Free tier details below.'
+            : 'Start free with 2,000 daily tokens and 20MB storage with all widgets unlocked, or upgrade to Pro for 10x daily tokens (20,000/day), 100MB storage, and 100% watermark-free overlays.'}
         </p>
 
         {/* Currency & Billing Controls */}
@@ -349,7 +349,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 </li>
                 <li className="flex items-center gap-3 text-slate-400">
                   <span className="w-4 text-center font-mono text-slate-500">•</span>
-                  <span>Powered by streambotkh.com watermark</span>
+                  <span>Powered by StreamWidgets watermark</span>
                 </li>
                 <li className="flex items-center gap-3 text-emerald-400 font-semibold pt-1 border-t border-slate-800/80">
                   <Check size={16} className="text-emerald-400 flex-shrink-0" />

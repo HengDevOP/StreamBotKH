@@ -32,7 +32,7 @@ export const DiscordPage: React.FC<DiscordPageProps> = ({ onNavigate }) => {
       <div className="text-center space-y-3 sm:space-y-4 max-w-2xl mx-auto">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-mono text-[#5865F2]">
           <DiscordIcon />
-          <span className="uppercase tracking-widest font-semibold">STREAMBOTKH COMMUNITY</span>
+          <span className="uppercase tracking-widest font-semibold">STREAMWIDGETS COMMUNITY</span>
         </div>
         <h1 className="text-2xl xs:text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
           Join Cambodia's Streamer Hub

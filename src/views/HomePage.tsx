@@ -478,12 +478,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         <div className="space-y-3">
           {[
             {
-              q: 'How do I add StreamBotKH to OBS Studio or Streamlabs?',
+              q: 'How do I add StreamWidgets to OBS Studio or Streamlabs?',
               a: 'In your Creator Panel (/creator), copy your unique Browser Source URL. In OBS Studio, click (+) -> Browser Source, paste your URL, and set Width: 600, Height: 800. That’s it! Your alerts will display transparently over your gameplay.'
             },
             {
-              q: 'How does the 0% platform fee work on the $1.99 Pro plan?',
-              a: 'Unlike Twitch or YouTube which take 30% to 50% cuts from your tips, StreamBotKH Pro charges a tiny flat $1.99 per month fee. 100% of viewer donations go directly to your linked ABA Bank or Bakong account without any cut taken.'
+              q: 'How does the 0% platform fee work on the $4.99 Pro plan?',
+              a: 'Unlike Twitch or YouTube which take 30% to 50% cuts from your tips, StreamWidgets charges zero platform cuts on donor tips. 100% of viewer donations go directly to your linked ABA Bank or Bakong account without any cut taken.'
             },
             {
               q: 'Which banks in Cambodia can viewers use to donate?',

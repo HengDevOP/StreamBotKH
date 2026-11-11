@@ -601,16 +601,16 @@ export const DocumentationPage: React.FC<DocumentationPageProps> = ({ onNavigate
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 select-none group flex-shrink-0"
-              title="Return to StreamBotKH Homepage (Opens in new window)"
+              title="Return to StreamWidgets Homepage (Opens in new window)"
             >
               <img
                 src="/images/logo-192.png"
-                alt="StreamBotKH"
+                alt="StreamWidgets"
                 className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-[0_0_8px_rgba(0,240,255,0.4)] group-hover:scale-105 transition-transform"
               />
               <div className="hidden xxs:flex items-center gap-1.5 font-['Chakra_Petch']">
                 <span className="text-sm sm:text-base font-bold text-white tracking-tight">
-                  streambot<span className="text-cyan-400">kh</span>
+                  Stream<span className="text-cyan-400">Widgets</span>
                 </span>
                 <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-mono font-bold text-[9px] uppercase tracking-wider border border-cyan-500/30">
                   DOCS

@@ -1459,7 +1459,7 @@ export const MultiStreamPage: React.FC = () => {
           <button
             onClick={() => navigate('/')}
             className="flex items-center gap-2 group text-left cursor-pointer focus:outline-none shrink-0"
-            title="Return to streambotkh.com"
+            title="Return to StreamWidgets"
           >
             <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
               <Tv size={15} />

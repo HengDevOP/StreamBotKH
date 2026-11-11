@@ -180,11 +180,17 @@ function createRouteHandler(fullPath: string, method: string) {
   };
 }
 
+const mountedRoutesList: string[] = [];
+const routeLoadErrors: { file: string; error: string; stack?: string }[] = [];
+
 /**
  * Scan src/app/api recursively and mount each route file onto Express
  */
 function scanAndMountRoutes(dir: string, baseRoute = '/api') {
-  if (!fs.existsSync(dir)) return;
+  if (!fs.existsSync(dir)) {
+    console.warn(`⚠️ [API Scanner] Directory does not exist: ${dir}`);
+    return;
+  }
 
   const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -214,10 +220,16 @@ function scanAndMountRoutes(dir: string, baseRoute = '/api') {
           if (typeof module[m] === 'function') {
             const expressMethod = m.toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch';
             app[expressMethod](baseRoute, createRouteHandler(fullPath, m));
+            mountedRoutesList.push(`${m} ${baseRoute}`);
           }
         }
       } catch (err: any) {
-        console.error(`❌ Failed to load API route at ${fullPath}:`, err.message);
+        console.error(`❌ Failed to load API route at ${fullPath}:`, err?.message || err);
+        routeLoadErrors.push({
+          file: path.relative(process.cwd(), fullPath),
+          error: err?.message || String(err),
+          stack: err?.stack
+        });
       }
     }
   }
@@ -230,7 +242,12 @@ initMongo();
 initSocketServer(server);
 
 // 3. Mount all API routes
-const apiDirectory = path.resolve(process.cwd(), 'src/app/api');
+const apiDirectoryCandidates = [
+  path.resolve(__dirname, '../src/app/api'),
+  path.resolve(process.cwd(), 'src/app/api'),
+  path.resolve('/var/www/StreamBotKH/src/app/api')
+];
+const apiDirectory = apiDirectoryCandidates.find((d) => fs.existsSync(d)) || path.resolve(process.cwd(), 'src/app/api');
 scanAndMountRoutes(apiDirectory, '/api');
 
 // 4. Background Workers: Expired Pending Donations, Account Deletions, Pro Plan Midnight Expiration & 3-Day Reminders, 6-Month Retention Cleanup
@@ -247,10 +264,23 @@ setInterval(() => {
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
+  let gitCommit = 'unknown';
+  let gitDate = 'unknown';
+  try {
+    const { execSync } = require('child_process');
+    gitCommit = execSync('git rev-parse HEAD', { encoding: 'utf-8', timeout: 2000 }).trim();
+    gitDate = execSync('git log -1 --format=%cd', { encoding: 'utf-8', timeout: 2000 }).trim();
+  } catch (e) {}
+
   res.json({
     status: 'ok',
     uptime: Math.floor(process.uptime()),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    gitCommit,
+    gitDate,
+    mountedRoutesCount: mountedRoutesList.length,
+    mountedRoutes: mountedRoutesList,
+    routeErrors: routeLoadErrors
   });
 });
 

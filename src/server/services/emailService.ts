@@ -114,12 +114,12 @@ export async function sendAccountDeletionRequestEmail(
   const subject = `⚠️ [Security Alert] Account Deletion Requested for @${username} — Action Required if Unauthorized`;
 
   const textBody = `
-STREAMBOTKH SECURITY ALERT — ACCOUNT DELETION REQUESTED
+STREAMWIDGETS SECURITY ALERT — ACCOUNT DELETION REQUESTED
 =======================================================
 
 Hello ${displayName || username} (@${username}),
 
-We received a request to permanently delete your StreamBotKH creator account associated with ${toEmail}.
+We received a request to permanently delete your StreamWidgets creator account associated with ${toEmail}.
 
 YOUR ACCOUNT IS NOW IN A 7-DAY DELETION WAITING PERIOD:
 • Account Handle: @${username}
@@ -136,19 +136,19 @@ Once the 7-day waiting period expires, all of your account data—including your
 If you did NOT request to delete your account, someone may have unauthorized access to your account or Google session. Please take serious action immediately:
 
 1. Cancel the Deletion Request Right Now:
-   Sign in to your StreamBotKH Dashboard and click "Cancel Request Deletion" in My Account -> Danger Zone before ${formattedScheduledAt}:
+   Sign in to your StreamWidgets Dashboard and click "Cancel Request Deletion" in My Account -> Danger Zone before ${formattedScheduledAt}:
    ${accountSettingsUrl}
 
 2. Secure Your Google Account:
    Change your Google password immediately, enable 2-Step Verification, and revoke any unfamiliar signed-in devices.
 
 3. Rotate Your Stream Keys:
-   Regenerate your OBS Overlay Token in your StreamBotKH Dashboard.
+   Regenerate your OBS Overlay Token in your StreamWidgets Dashboard.
 
 If you intentionally requested this deletion, no further action is needed. Your account will be automatically removed after the 7-day grace period.
 
 Stay safe,
-StreamBotKH Security & Trust Team
+StreamWidgets Security & Trust Team
 ${appUrl}
 `.trim();
 
@@ -357,10 +357,10 @@ export async function sendProPlanUpgradeEmail(
       : 'Today';
 
   const subject = isExtend
-    ? `⚡ [StreamWidget] Your Pro Plan has been extended (+${planDurationDays} Days)`
+    ? `⚡ [StreamWidgets] Your Pro Plan has been extended (+${planDurationDays} Days)`
     : isTrial
-    ? `⚡ [StreamWidget] Your Pro Free Trial is Active (${planDurationDays} Days)`
-    : `🎉 Welcome to StreamWidget Pro — Your 10x Upgrade is Active!`;
+    ? `⚡ [StreamWidgets] Your Pro Free Trial is Active (${planDurationDays} Days)`
+    : `🎉 Welcome to StreamWidgets Pro — Your 10x Upgrade is Active!`;
 
   const badgeText = isExtend
     ? '⚡ PRO PLAN EXTENDED'
@@ -371,8 +371,8 @@ export async function sendProPlanUpgradeEmail(
   const heading = isExtend
     ? 'Pro Plan Extended'
     : isTrial
-    ? 'Welcome to StreamWidget Pro Trial'
-    : 'Welcome to StreamWidget Pro';
+    ? 'Welcome to StreamWidgets Pro Trial'
+    : 'Welcome to StreamWidgets Pro';
 
   const heroSub = isExtend
     ? `Your subscription has been extended by ${planDurationDays} days. Valid until ${formattedExpiresAt}.`
@@ -381,15 +381,15 @@ export async function sendProPlanUpgradeEmail(
     : `Your creator account has been upgraded with 10x daily tokens, 100MB cloud storage, and watermark-free overlays.`;
 
   const textBody = `
-STREAMWIDGET — PRO PLAN ${isExtend ? 'EXTENDED' : 'ACTIVATED'}
+STREAMWIDGETS — PRO PLAN ${isExtend ? 'EXTENDED' : 'ACTIVATED'}
 ============================================================
 
 Hello ${displayName || username} (@${username}),
 
 ${
   isExtend
-    ? `Your StreamWidget Pro subscription has been successfully extended for ${planDurationDays} days!`
-    : `Congratulations! Your StreamWidget account has been upgraded to the Pro Plan.`
+    ? `Your StreamWidgets Pro subscription has been successfully extended for ${planDurationDays} days!`
+    : `Congratulations! Your StreamWidgets account has been upgraded to the Pro Plan.`
 }
 
 PLAN DETAILS:
@@ -408,7 +408,7 @@ WHAT IS UNLOCKED WITH PRO:
 2. 100MB Cloud Storage (5x Boost)
    - Upload custom audio soundboard SFX, high-fps animated celebration GIFs, and custom overlays without running out of room.
 3. 100% Watermark-Free Overlays
-   - StreamWidget branding and watermarks are completely removed from all your OBS browser sources.
+   - StreamWidgets branding and watermarks are completely removed from all your OBS browser sources.
 4. 0% Platform Commission
    - Accept instant tips directly into your personal ABA Mobile or NBC Bakong KHQR account with zero platform fees.
 5. Full Access to All Stream Widgets
@@ -423,7 +423,7 @@ COMMUNITY & SUPPORT:
 • Documentation: ${appUrl}/documentation
 
 Happy streaming,
-The StreamWidget Team
+The StreamWidgets Team
 ${appUrl}
 `.trim();
 
@@ -473,8 +473,8 @@ ${appUrl}
               <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#94A3B8;">
                 ${
                   isExtend
-                    ? `Your <strong>StreamWidget Pro</strong> plan has been successfully extended. Your creator overlays and widgets remain active with unlimited pro perks.`
-                    : `Your account has been upgraded to <strong>StreamWidget Pro</strong>! You now have full access to our top-tier broadcast features, dual-token capacity, and zero watermark presence.`
+                    ? `Your <strong>StreamWidgets Pro</strong> plan has been successfully extended. Your creator overlays and widgets remain active with unlimited pro perks.`
+                    : `Your account has been upgraded to <strong>StreamWidgets Pro</strong>! You now have full access to our top-tier broadcast features, dual-token capacity, and zero watermark presence.`
                 }
               </p>
 
@@ -548,7 +548,7 @@ ${appUrl}
                       ✨ 100% Watermark-Free Broadcast
                     </div>
                     <div style="font-size:12px;line-height:1.5;color:#94A3B8;">
-                      Every overlay, goal bar, and alert animation renders cleanly on your OBS Studio or Streamlabs stream without any StreamWidget watermark branding.
+                      Every overlay, goal bar, and alert animation renders cleanly on your OBS Studio or Streamlabs stream without any StreamWidgets watermark branding.
                     </div>
                   </td>
                 </tr>
@@ -584,7 +584,7 @@ ${appUrl}
           <tr>
             <td style="background-color:#060810;padding:20px 32px;border-top:1px solid #1E293B;text-align:center;">
               <p style="margin:0 0 4px 0;font-size:12px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;">
-                StreamWidget • The Premier Livestream Overlay &amp; Donation Gateway
+                StreamWidgets • The Premier Livestream Overlay &amp; Donation Gateway
               </p>
               <p style="margin:0;font-size:11px;color:#475569;font-family:monospace;">
                 This notification was sent to ${toEmail} regarding your account @${username}.
@@ -600,7 +600,7 @@ ${appUrl}
 </html>
   `.trim();
 
-  const smtp = getSmtpConfig('StreamWidget');
+  const smtp = getSmtpConfig('StreamWidgets');
 
   if (!smtp.isConfigured) {
     console.warn(

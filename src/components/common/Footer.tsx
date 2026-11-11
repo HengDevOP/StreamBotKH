@@ -27,7 +27,8 @@ export const Footer: React.FC = () => {
     { name: 'Subathon Timer', path: '/resources/timer' },
     { name: 'Goal Tracker Bar', path: '/resources/goal' },
     { name: 'Wheel of Fortune', path: '/resources/wheels' },
-    { name: 'Top Supporters Board', path: '/resources/leaderboard' }
+    { name: 'Top Supporters Board', path: '/resources/leaderboard' },
+    { name: 'Stream Avatars (2D Roamers)', path: '/creator?tab=avatars' }
   ];
 
   const platformLinks = [
