@@ -2008,16 +2008,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             {/* Usage Limit Card: Dual progress bars for Pro users, single progress bar for Free users */}
             {isPro ? (
               <div className="mx-0.5 my-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70 space-y-2.5">
-                {/* 1. Free Usage Limit (Consumed first, daily reset paused on Pro) */}
+                {/* 1. Free Usage Limit */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch'] flex items-center gap-1.5">
-                      <span>Free Usage Limit</span>
-                      {freeRemaining === 0 ? (
-                        <span className="text-[9px] font-mono text-slate-500 uppercase px-1 rounded bg-slate-800">Used</span>
-                      ) : (
-                        <span className="text-[9px] font-mono text-slate-400 px-1 rounded bg-slate-800">Priority 1</span>
-                      )}
+                    <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch']">
+                      Free Usage Limit
                     </span>
                     <span className="text-[11px] font-mono text-slate-400 font-medium">
                       {freePercentage}%
@@ -2030,9 +2025,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       }`}
                       style={{ width: `${Math.min(100, Math.max(0, freePercentage))}%` }}
                     />
-                  </div>
-                  <div className="text-[9px] text-slate-500 font-mono flex items-center justify-between">
-                    <span>{freeRemaining === 0 ? 'Exhausted • Switched to Pro tokens' : 'Uses first • Reset paused on Pro'}</span>
                   </div>
                 </div>
 
