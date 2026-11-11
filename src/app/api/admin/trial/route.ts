@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { isAdminEmail } from '@/server/database/db';
 import { getUsersCollection, getTrialConfigCollection } from '@/server/database/mongo';
+import { sendProPlanUpgradeEmail } from '@/server/services/emailService';
 
 async function checkAdmin(req: NextRequest) {
   const authUser = getAuthenticatedUser(req);
@@ -141,6 +142,20 @@ export async function POST(req: NextRequest) {
           }
         }
       );
+
+      if (target.email) {
+        sendProPlanUpgradeEmail({
+          toEmail: target.email,
+          displayName: target.displayName || target.username,
+          username: target.username,
+          planDurationDays: days,
+          planExpiresAt: endDate,
+          planStartedAt: startDate,
+          action: 'trial'
+        }).catch((emailErr) => {
+          console.error('⚠️ [Admin Trial] Failed to send Pro trial email:', emailErr);
+        });
+      }
 
       return NextResponse.json({
         success: true,

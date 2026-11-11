@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { isAdminEmail } from '@/server/database/db';
 import { getUsersCollection } from '@/server/database/mongo';
+import { sendProPlanUpgradeEmail } from '@/server/services/emailService';
 
 const DEFAULT_PAGE_LIMIT = 20;
 const CACHE_TTL_MS = 30 * 1000;
@@ -202,6 +203,7 @@ export async function PUT(req: NextRequest) {
     const resolvedUserId = target.userId || target.id;
     let successMessage = '';
     const updateFields: any = { updatedAt: new Date() };
+    const days = Math.max(1, Number(durationDays) || 31);
 
     // 1. Handle verified badge toggle if provided
     if (isVerified !== undefined) {
@@ -256,6 +258,22 @@ export async function PUT(req: NextRequest) {
     clearAdminUsersCache();
 
     const updated = await usersCol.findOne({ $or: [{ userId: resolvedUserId }, { id: resolvedUserId }] }) as any;
+
+    // Send Pro Plan upgrade or extension email notification to target client
+    if (plan !== undefined && String(plan).toLowerCase() === 'pro' && updated?.email) {
+      sendProPlanUpgradeEmail({
+        toEmail: updated.email,
+        displayName: updated.displayName || updated.username,
+        username: updated.username,
+        planDurationDays: updated.planDurationDays || days,
+        planExpiresAt: updated.planExpiresAt,
+        planStartedAt: updated.planStartedAt,
+        action: action === 'extend' ? 'extend' : 'upgrade'
+      }).catch((emailErr) => {
+        console.error('⚠️ [Admin Users PUT] Failed to send Pro plan email:', emailErr);
+      });
+    }
+
     const remainingDays =
       updated.plan === 'pro' && updated.planExpiresAt
         ? Math.max(1, Math.ceil((new Date(updated.planExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
