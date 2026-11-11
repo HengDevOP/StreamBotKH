@@ -74,7 +74,6 @@ import {
   Pickaxe,
   Mic,
   Upload,
-  Zap,
   RotateCcw
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -1950,53 +1949,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             {/* Subtle Divider */}
             <div className="my-1 border-t border-slate-800/70" />
 
-            {/* Daily Token Usage Card (Progress Down from 100% / 2,000 Tokens) */}
-            <div className="mx-0.5 my-1 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-inner">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <div className="flex items-center gap-1.5 text-slate-300">
-                  <Zap size={13} className="text-cyan-400 fill-cyan-400/20" />
-                  <span className="text-[11px] font-bold font-['Chakra_Petch'] tracking-wide uppercase text-slate-200">
-                    Usage Limit
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span
-                    className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                      remainingPercentage <= 15
-                        ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20'
-                        : remainingPercentage <= 40
-                        ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
-                        : 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20'
-                    }`}
-                  >
-                    {remainingPercentage}%
-                  </span>
-                </div>
+            {/* Usage Limit Card (Simple, Neutral Progress Bar) */}
+            <div className="mx-0.5 my-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch']">
+                  Usage Limit
+                </span>
+                <span className="text-[11px] font-mono text-slate-400 font-medium">
+                  {remainingPercentage}%
+                </span>
               </div>
 
-              {/* Progress Bar (2000 tokens = 100%, drains down as client uses tokens) */}
-              <div className="w-full h-2 rounded-full bg-slate-950 border border-slate-800/80 overflow-hidden relative">
+              {/* Simple Neutral Progress Bar */}
+              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ease-out ${
-                    remainingPercentage <= 15
-                      ? 'bg-gradient-to-r from-rose-600 to-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
-                      : remainingPercentage <= 40
-                      ? 'bg-gradient-to-r from-amber-500 to-yellow-400 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
-                      : 'bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 shadow-[0_0_8px_rgba(6,182,212,0.4)]'
-                  }`}
+                  className="h-full rounded-full bg-slate-300 transition-all duration-300 ease-out"
                   style={{ width: `${Math.min(100, Math.max(0, remainingPercentage))}%` }}
                 />
               </div>
 
-              {/* Tokens numeric breakdown & Daily Reset Indicator */}
-              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-1.5">
-                <span className="text-slate-300 font-semibold">
-                  {tokenRemaining.toLocaleString()}{' '}
-                  <span className="text-slate-500 font-normal">/ {tokenLimit.toLocaleString()}</span>
-                </span>
+              {/* Reset Countdown Indicator */}
+              <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-1.5">
                 <span
                   title="Global reset at 2:00 PM Singapore Time (Asia/Singapore, UTC+8)"
-                  className="text-slate-500 flex items-center gap-1 text-[9px] font-mono tracking-tight"
+                  className="flex items-center gap-1 text-[9px] text-slate-500 tracking-tight"
                 >
                   <RotateCcw size={9} className="text-slate-500 shrink-0" />
                   Resets in {resetCountdown}
