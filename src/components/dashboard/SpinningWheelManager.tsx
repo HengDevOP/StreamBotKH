@@ -387,38 +387,6 @@ export const SpinningWheelManager: React.FC<SpinningWheelManagerProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Pro Locked Callout Banner */}
-      {isLocked && (
-        <div className="p-5 rounded-2xl bg-[#090D18] border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1 max-w-xl">
-            <div className="flex items-center gap-2">
-              <span className="p-1 rounded bg-amber-500/20 text-amber-400">
-                <Lock size={14} />
-              </span>
-              <span className="text-[11px] font-mono text-amber-400 font-bold uppercase tracking-wider">
-                Pro Plan Feature
-              </span>
-            </div>
-            <h3 className="text-base font-bold text-white font-['Chakra_Petch']">
-              Interactive Wheels on Stream
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Upgrade to the Pro plan to customize wheel rewards, minimum tip amounts, and live OBS browser integration.
-            </p>
-          </div>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onUpgrade || (() => window.open('https://t.me/hchenheng', '_blank', 'noopener,noreferrer'))}
-            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shrink-0 flex items-center gap-1.5"
-          >
-            <Sparkles size={14} />
-            <span>Upgrade to Pro</span>
-            <ExternalLink size={13} />
-          </Button>
-        </div>
-      )}
-
       {/* Main Wheel Grid: Left Simulator / Right Settings */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* LEFT SIDE: Live Interactive Wheel Simulator */}

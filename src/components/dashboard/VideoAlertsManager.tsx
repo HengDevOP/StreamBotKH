@@ -48,7 +48,7 @@ export interface VideoAlertsManagerProps {
 
 export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
   streamerToken,
-  isLocked = false,
+  isLocked: _isLockedProp = false,
   currentPlan = 'free',
   onUpgrade,
   onRegenerateToken,
@@ -57,6 +57,7 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
   onCloseRightbar,
   onUnsavedChangesChange
 }) => {
+  const isLocked = false; // Video alerts and controls unlocked on free plan
   const { socket } = useSocket();
 
   // Rightbar Settings Drawer State (Controlled from Navbar or Uncontrolled fallback)
@@ -454,47 +455,8 @@ export const VideoAlertsManager: React.FC<VideoAlertsManagerProps> = ({
       {/* ============================================================== */}
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto space-y-4 pr-0 lg:pr-1 no-scrollbar pb-20 lg:pb-6">
         
-        {/* FREE PLAN: LOCKED CALLOUT & UPGRADE BANNER */}
-        {isLocked && (
-          <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-amber-950/30 via-slate-900/80 to-slate-950 border border-amber-500/30 relative overflow-hidden flex-shrink-0">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              <div className="space-y-3 max-w-2xl">
-                <div className="flex items-center gap-2">
-                  <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                    <Lock size={20} />
-                  </span>
-                  <span className="text-xs font-mono text-amber-400 font-bold uppercase tracking-wider">
-                    Premium Streamer Feature
-                  </span>
-                </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-white font-['Chakra_Petch']">
-                  Unlock YouTube Video Share on Stream
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Video Share allows fans to share high-energy YouTube clips, music videos, and meme reactions directly onto your live broadcast screen when they donate. Upgrade to any paid plan to enable Media Share with full moderation and timestamp trimming controls.
-                </p>
-              </div>
-
-              <div className="flex-shrink-0 flex flex-col items-start lg:items-end gap-2">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={onUpgrade || (() => window.open('https://t.me/hchenheng', '_blank', 'noopener,noreferrer'))}
-                  className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-extrabold shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
-                >
-                  <Sparkles size={16} />
-                  <span>Upgrade Plan</span>
-                  <ArrowRight size={16} />
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* CARD 1: LIVE VIDEO ALERT PREVIEW SCREEN */}
-        <div className={`rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 shadow-2xl flex flex-col gap-4 flex-shrink-0 ${isLocked ? 'opacity-70 pointer-events-none' : ''}`}>
+        <div className="rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 shadow-2xl flex flex-col gap-4 flex-shrink-0">
           <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner">

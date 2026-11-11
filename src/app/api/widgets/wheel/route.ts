@@ -67,19 +67,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const token = body.token || 'demo-token';
 
-    // Verify streamer has Pro plan active
-    const { isPro } = await verifyProStreamerByToken(token);
-    if (!isPro) {
-      return NextResponse.json(
-        {
-          success: false,
-          isLocked: true,
-          error: 'Pro plan required for Spinning Wheels feature.'
-        },
-        { status: 403 }
-      );
-    }
-
     // Check if this request is saving settings to MongoDB
     if (body.action === 'save_settings' || body.settings || (body.slices && body.totalRotation === undefined)) {
       const wheelCol = await getWheelSettingsCollection();

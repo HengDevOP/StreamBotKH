@@ -43,11 +43,6 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
-        if (data.isLocked || !data.success) {
-          setIsLocked(true);
-          setTopDonors([]);
-          return;
-        }
         setIsLocked(false);
         if (data.success && data.leaderboard) {
           const lb = data.leaderboard;

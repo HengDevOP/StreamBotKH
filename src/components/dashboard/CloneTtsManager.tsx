@@ -678,32 +678,6 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
         </div>
       )}
 
-      {/* PRO PLAN REQUIREMENT CALLOUT (If Free User) */}
-      {!isProUser && (
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">
-              <Lock size={18} />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-white">
-                Clone TTS is Available on the Pro Plan
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Upgrade to Pro ($4.99/mo) to train up to 3 custom voices and activate your voice on all live stream alerts.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onUpgrade}
-            className="px-4 py-2 rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-semibold text-xs transition-colors shrink-0 cursor-pointer"
-          >
-            Upgrade to Pro
-          </button>
-        </div>
-      )}
-
       {/* MAIN VOICE TRAINER WORKSPACE */}
       <div className="rounded-2xl bg-[#0B0F19] border border-slate-800 p-4 sm:p-6 space-y-4 sm:space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">

@@ -12,21 +12,6 @@ export async function GET(req: NextRequest) {
     const token = searchParams.get('token') || 'demo-token';
     const goalId = searchParams.get('goalId');
 
-    // Verify streamer has Pro plan active
-    const { isPro } = await verifyProStreamerByToken(token);
-    if (!isPro) {
-      return NextResponse.json(
-        {
-          success: false,
-          isLocked: true,
-          error: 'Pro plan required for Stream Goal widget.',
-          goals: [],
-          goal: null
-        },
-        { status: 403 }
-      );
-    }
-
     const goalsCol = await getStreamGoalsCollection();
     let goals = await goalsCol.find({ streamerToken: token }).sort({ isActive: -1, createdAt: -1 }).toArray();
 
@@ -119,19 +104,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const token = body.token || 'demo-token';
-
-    // Verify streamer has Pro plan active before creating or broadcasting
-    const { isPro } = await verifyProStreamerByToken(token);
-    if (!isPro) {
-      return NextResponse.json(
-        {
-          success: false,
-          isLocked: true,
-          error: 'Pro plan required to configure or broadcast to Goal overlay.'
-        },
-        { status: 403 }
-      );
-    }
 
     const title = (body.title || 'New Stream Goal').trim();
     const targetAmount = Math.max(1, parseFloat(body.targetAmount) || 100);
@@ -237,19 +209,6 @@ export async function PUT(req: NextRequest) {
     const id = body.id;
     const token = body.token || 'demo-token';
 
-    // Verify streamer has Pro plan active before updating or broadcasting
-    const { isPro } = await verifyProStreamerByToken(token);
-    if (!isPro) {
-      return NextResponse.json(
-        {
-          success: false,
-          isLocked: true,
-          error: 'Pro plan required to configure or broadcast to Goal overlay.'
-        },
-        { status: 403 }
-      );
-    }
-
     if (!id) {
       return NextResponse.json({ error: 'Missing goal id' }, { status: 400 });
     }
@@ -351,19 +310,6 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const token = searchParams.get('token') || 'demo-token';
-
-    // Verify streamer has Pro plan active
-    const { isPro } = await verifyProStreamerByToken(token);
-    if (!isPro) {
-      return NextResponse.json(
-        {
-          success: false,
-          isLocked: true,
-          error: 'Pro plan required.'
-        },
-        { status: 403 }
-      );
-    }
 
     if (!id) {
       return NextResponse.json({ error: 'Missing goal id' }, { status: 400 });

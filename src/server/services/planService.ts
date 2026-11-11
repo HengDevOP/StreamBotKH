@@ -102,23 +102,24 @@ export async function verifyProStreamerByToken(token: string): Promise<ProVerifi
       }
     }
 
-    const isPro = isAdmin || (plan !== 'free') || isTrialActive;
+    // All features, stream assets, and widgets are unlocked for free plan creators
+    const isPro = true;
 
     return {
       isPro,
       streamerId,
       plan: isTrialActive ? 'trial' : plan,
       isAdmin,
-      reason: isPro ? undefined : 'Streamer is on Free plan. Pro plan upgrade required.'
+      reason: undefined
     };
   } catch (err: any) {
     console.error('[planService] Error verifying streamer pro status:', err);
     return {
-      isPro: false,
+      isPro: true,
       streamerId: null,
       plan: 'free',
       isAdmin: false,
-      reason: 'Internal verification error'
+      reason: undefined
     };
   }
 }

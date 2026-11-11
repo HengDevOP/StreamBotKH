@@ -54,20 +54,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token') || 'demo-token';
 
-    // Verify streamer has Pro plan active
-    const { isPro, streamerId } = await verifyProStreamerByToken(token);
-    if (!isPro) {
-      return NextResponse.json(
-        {
-          success: false,
-          isLocked: true,
-          error: 'Pro plan required for Custom Overlay.',
-          overlay: null
-        },
-        { status: 403 }
-      );
-    }
-
+    const { streamerId } = await verifyProStreamerByToken(token);
     const overlayCol = await getCustomOverlaysCollection();
     let overlay = await overlayCol.findOne({ streamerToken: token });
 
@@ -195,14 +182,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const token = body.token || body.streamerToken || 'demo-token';
 
-    const { isPro, streamerId } = await verifyProStreamerByToken(token);
-    if (!isPro) {
-      return NextResponse.json(
-        { success: false, error: 'Pro plan required for Custom Overlay.' },
-        { status: 403 }
-      );
-    }
-
+    const { streamerId } = await verifyProStreamerByToken(token);
     const overlayCol = await getCustomOverlaysCollection();
 
     const updateDoc: Partial<CustomOverlayDoc> = {

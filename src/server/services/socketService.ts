@@ -331,17 +331,6 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
         isTest: true
       };
 
-      // Strip videoUrl if streamer is on Free plan (Video Alerts is Pro feature)
-      if (testPayload.videoUrl) {
-        const { isPro } = await verifyProStreamerByToken(token);
-        if (!isPro) {
-          delete testPayload.videoUrl;
-          delete testPayload.videoTitle;
-          delete testPayload.videoStartTime;
-          delete testPayload.videoEndTime;
-        }
-      }
-
       // Broadcast single alert event across all streamer overlay rooms
       await broadcastToAllStreamerRooms(token, 'donation:alert', testPayload);
     });
@@ -471,14 +460,9 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
-    // Soundboard event triggers for OBS overlay & stream sync (PRO Plan Feature Only)
+    // Soundboard event triggers for OBS overlay & stream sync (unlocked for all streamers)
     socket.on('soundboard:play', async (payload: any) => {
       const token = payload?.overlayToken || payload?.token || 'demo-token';
-      const { isPro } = await verifyProStreamerByToken(token);
-      if (!isPro) {
-        console.warn(`[Socket] Blocked soundboard:play - Free streamer token: ${token}`);
-        return;
-      }
       console.log(`[Socket] Soundboard play event: "${payload?.title || payload?.soundId}" (Token: ${token})`);
       io?.to(`overlay:${token}`).emit('soundboard:play', payload);
       if (token !== 'demo-token') {
@@ -488,11 +472,6 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
 
     socket.on('soundboard:stop', async (payload: any) => {
       const token = payload?.overlayToken || payload?.token || 'demo-token';
-      const { isPro } = await verifyProStreamerByToken(token);
-      if (!isPro) {
-        console.warn(`[Socket] Blocked soundboard:stop - Free streamer token: ${token}`);
-        return;
-      }
       console.log(`[Socket] Soundboard panic stop event (Token: ${token})`);
       io?.to(`overlay:${token}`).emit('soundboard:stop', payload);
       if (token !== 'demo-token') {
@@ -502,25 +481,15 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
 
     socket.on('soundboard:update', async (payload: any) => {
       const token = payload?.overlayToken || payload?.token || 'demo-token';
-      const { isPro } = await verifyProStreamerByToken(token);
-      if (!isPro) {
-        console.warn(`[Socket] Blocked soundboard:update - Free streamer token: ${token}`);
-        return;
-      }
       io?.to(`overlay:${token}`).emit('soundboard:update', payload);
       if (token !== 'demo-token') {
         io?.to('overlay:demo-token').emit('soundboard:update', payload);
       }
     });
 
-    // Spinning Wheel event triggers for OBS overlay & stream sync (PRO Plan Feature Only)
+    // Spinning Wheel event triggers for OBS overlay & stream sync (unlocked for all streamers)
     socket.on('wheel:spin', async (payload: any) => {
       const token = payload?.overlayToken || payload?.token || 'demo-token';
-      const { isPro } = await verifyProStreamerByToken(token);
-      if (!isPro) {
-        console.warn(`[Socket] Blocked wheel:spin - Free streamer token: ${token}`);
-        return;
-      }
       console.log(`[Socket] Wheel spin event for token: ${token}`);
       io?.to(`overlay:${token}`).emit('wheel:spin', payload);
       if (token !== 'demo-token') {

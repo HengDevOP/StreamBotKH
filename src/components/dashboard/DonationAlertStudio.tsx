@@ -261,9 +261,7 @@ export const DonationAlertStudio: React.FC<DonationAlertStudioProps> = ({
   const [clonedVoices, setClonedVoices] = useState<any[]>([]);
   const [loadingClonedVoices, setLoadingClonedVoices] = useState(false);
 
-  const isPro =
-    String(user?.plan || '').toLowerCase() === 'pro' ||
-    Boolean(user?.isAdmin || user?.is_admin || user?.role === 'admin');
+  const isPro = true; // All alert studio features and cloned TTS voices unlocked for all creators
 
   useEffect(() => {
     let isMounted = true;

@@ -88,12 +88,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const [showProModal, setShowProModal] = useState(false);
   const [proModalFeature, setProModalFeature] = useState('Stickers & GIF Presets');
 
-  const isProOrTrial =
-    currentPlan === 'pro' ||
-    currentPlan === 'starter' ||
-    Boolean(isTrialActive) ||
-    Boolean(isAdmin) ||
-    storageInfo?.plan === 'pro';
+  const isProOrTrial = true; // All media assets, stickers, GIFs and audio presets unlocked for all plans
 
   // Section Selector: 'uploads' | 'template' | 'mlbb' | 'stickers' | 'gifs' | 'sounds'
   const isInitiallyPreset = useMemo<'uploads' | 'template' | 'mlbb' | 'stickers' | 'gifs' | 'sounds'>(() => {

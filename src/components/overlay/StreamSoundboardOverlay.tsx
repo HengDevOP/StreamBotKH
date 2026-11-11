@@ -55,10 +55,6 @@ export const StreamSoundboardOverlay: React.FC<StreamSoundboardOverlayProps> = (
     fetch(`/api/soundboard?token=${effectiveToken}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.isLocked || !data.success) {
-          setIsLocked(true);
-          return;
-        }
         setIsLocked(false);
         if (data.success && data.settings) {
           setOutputMode(data.settings.outputMode || 'both');

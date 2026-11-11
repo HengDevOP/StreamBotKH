@@ -205,32 +205,7 @@ export async function POST(req: NextRequest) {
     }
 
     // DEFAULT ACTION: TRAIN AND CLONE NEW VOICE
-    // 1. Enforce Pro Plan check
-    if (userId && userId !== DEMO_USER_ID) {
-      try {
-        const usersCol = await getUsersCollection();
-        const streamer = (await usersCol.findOne({
-          $or: [
-            { userId },
-            { id: userId },
-            { _id: ObjectId.isValid(userId) ? new ObjectId(userId) : null }
-          ].filter(Boolean) as any
-        })) as any;
-
-        const currentPlan = String(streamer?.plan || 'free').toLowerCase();
-        const isAdminUser = Boolean(streamer?.isAdmin || streamer?.is_admin || streamer?.role === 'admin');
-
-        if (streamer && currentPlan !== 'pro' && !isAdminUser) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: 'Clone TTS is an exclusive feature for Pro Plan users only. Please upgrade to Pro to clone your voice.'
-            },
-            { status: 403 }
-          );
-        }
-      } catch (e) {}
-    }
+    // All voice cloning features unlocked for free plan creators as well
 
     // 2. Enforce 3 Cloned Voices maximum limit
     const MAX_CLONED_VOICES = 3;

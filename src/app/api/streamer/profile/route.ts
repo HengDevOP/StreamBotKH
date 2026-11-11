@@ -205,8 +205,7 @@ export async function PUT(req: NextRequest) {
       };
     }
 
-    // 3. Process social links with plan limits: Free (1 link), Pro (5 links)
-    const isPro = newPlan === 'pro';
+    // 3. Process social links (up to 5 links unlocked for all creators)
     const currentLinks: any[] = Array.isArray(current.socialLinks) ? current.socialLinks : [];
 
     let finalLinks = currentLinks;
@@ -214,17 +213,12 @@ export async function PUT(req: NextRequest) {
       if (!Array.isArray(incomingLinks)) {
         return NextResponse.json({ error: 'Social links must be an array' }, { status: 400 });
       }
-      if (!isPro && incomingLinks.length > 1) {
+      if (incomingLinks.length > 5) {
         return NextResponse.json({
-          error: 'Free plan is limited to 1 link. Upgrade to Pro to add up to 5 links!'
+          error: 'Maximum of 5 social links allowed.'
         }, { status: 400 });
       }
-      if (isPro && incomingLinks.length > 5) {
-        return NextResponse.json({
-          error: 'Pro plan allows a maximum of 5 links.'
-        }, { status: 400 });
-      }
-      finalLinks = sanitizeSocialLinks(incomingLinks, isPro);
+      finalLinks = sanitizeSocialLinks(incomingLinks, true);
     }
 
     const now = new Date();

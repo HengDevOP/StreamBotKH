@@ -35,11 +35,6 @@ export const StreamGoalOverlay: React.FC<StreamGoalOverlayProps> = ({ token, goa
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
-        if (data.isLocked || !data.success) {
-          setIsLocked(true);
-          setIsLoading(false);
-          return;
-        }
         setIsLocked(false);
         if (data.success) {
           const g = data.goal || data.activeGoal;

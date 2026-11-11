@@ -695,25 +695,6 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
     setMessages([]);
   };
 
-  if (isLocked) {
-    return (
-      <Card className="p-8 text-center bg-slate-900/60 border border-slate-800">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-4 text-amber-400">
-          <Lock className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-white mb-2 font-['Chakra_Petch']">Live Chat Widget is Pro Only</h2>
-        <p className="text-slate-400 max-w-md mx-auto mb-6 text-sm">
-          Upgrade to a Pro or Creator Plan to unlock real-time live chat overlay on your OBS stream with customizable themes, animations, and auto-fade.
-        </p>
-        {onUpgrade && (
-          <Button onClick={onUpgrade} className="bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold">
-            Upgrade to Pro
-          </Button>
-        )}
-      </Card>
-    );
-  }
-
   // Font size class with proportional line heights to lock Y-pitch
   const getFontSizeClass = (size: string) => {
     switch (size) {

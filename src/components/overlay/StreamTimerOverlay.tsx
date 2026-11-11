@@ -40,10 +40,6 @@ export const StreamTimerOverlay: React.FC<StreamTimerOverlayProps> = ({ token })
     fetch(`/api/widgets/timer?token=${effectiveToken}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.isLocked || !data.success) {
-          setIsLocked(true);
-          return;
-        }
         setIsLocked(false);
         if (data.success && data.timer) {
           const t = data.timer;

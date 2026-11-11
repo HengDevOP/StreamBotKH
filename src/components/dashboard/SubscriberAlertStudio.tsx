@@ -197,9 +197,7 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
 
   // User Auth & Pro Plan Status
   const { user } = useAuth();
-  const isPro =
-    String(user?.plan || '').toLowerCase() === 'pro' ||
-    Boolean(user?.isAdmin || user?.is_admin || user?.role === 'admin');
+  const isPro = true; // All subscriber alert studio features and cloned TTS voices unlocked for all creators
 
   // Cloned Voices List from server
   const [clonedVoices, setClonedVoices] = useState<any[]>([]);

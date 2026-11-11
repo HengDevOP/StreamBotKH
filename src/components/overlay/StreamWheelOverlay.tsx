@@ -40,15 +40,11 @@ export const StreamWheelOverlay: React.FC<StreamWheelOverlayProps> = ({ token })
   const spinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fadeOutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Load initial settings & verify Pro plan
+  // 1. Load initial settings
   useEffect(() => {
     fetch(`/api/widgets/wheel?token=${encodeURIComponent(effectiveToken)}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.isLocked) {
-          setIsLocked(true);
-          return;
-        }
         setIsLocked(false);
         if (data.settings) {
           if (Array.isArray(data.settings.slices) && data.settings.slices.length > 0) {

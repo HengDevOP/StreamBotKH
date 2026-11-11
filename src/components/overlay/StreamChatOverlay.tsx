@@ -187,15 +187,11 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
     }
   };
 
-  // 1. Initial settings fetch & Pro plan verification
+  // 1. Initial settings fetch
   useEffect(() => {
     fetch(`/api/widgets/chat?token=${effectiveToken}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.isLocked || !data.success) {
-          setIsLocked(true);
-          return;
-        }
         setIsLocked(false);
         if (data.settings) {
           setSettings((prev) => ({ ...prev, ...data.settings }));

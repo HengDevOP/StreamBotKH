@@ -101,10 +101,9 @@ async function resolveStreamerContext(req: NextRequest, providedToken?: string |
   const streamerId = streamer?.userId || streamer?.id || (streamer?._id ? String(streamer._id) : null);
   const streamerUsername = streamer?.username || null;
 
-  // Pro access determination
+  // Pro access determination - Unlocked for all streamers on Free plan
   const isAdm = Boolean(streamer?.isAdmin) || isAdminEmail(streamer?.email) || isAdminEmail(authUser?.email);
-  const isPlanPro = (streamer?.plan && streamer.plan.toLowerCase() !== 'free') || Boolean(streamer?.trialActive);
-  const isPro = isAdm || isPlanPro || activeToken === 'demo-token';
+  const isPro = true;
 
   return {
     streamer,
@@ -128,22 +127,6 @@ export async function GET(req: NextRequest) {
       streamerUsername,
       isPro
     } = await resolveStreamerContext(req, tokenParam);
-
-    // Verify streamer has Pro plan active (or Admin / Demo)
-    if (!isPro) {
-      const verification = await verifyProStreamerByToken(activeToken);
-      if (!verification.isPro) {
-        return NextResponse.json(
-          {
-            success: false,
-            isLocked: true,
-            error: 'Pro plan required for Live Chat stream widget.',
-            settings: null
-          },
-          { status: 403 }
-        );
-      }
-    }
 
     const col = await getStreamChatSettingsCollection();
 
@@ -253,21 +236,6 @@ export async function POST(req: NextRequest) {
       streamerUsername,
       isPro
     } = await resolveStreamerContext(req, rawToken);
-
-    // Verify streamer has Pro plan active before configuring or broadcasting
-    if (!isPro) {
-      const verification = await verifyProStreamerByToken(activeToken);
-      if (!verification.isPro) {
-        return NextResponse.json(
-          {
-            success: false,
-            isLocked: true,
-            error: 'Pro plan required to configure or broadcast to Live Chat overlay.'
-          },
-          { status: 403 }
-        );
-      }
-    }
 
     const io = getIO();
     const col = await getStreamChatSettingsCollection();

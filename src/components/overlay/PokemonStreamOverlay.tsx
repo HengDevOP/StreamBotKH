@@ -77,12 +77,8 @@ export const PokemonStreamOverlay: React.FC<PokemonStreamOverlayProps> = ({
     fetch(`/api/widgets/pokemon?token=${token}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.isLocked || !data.success) {
-          setIsLocked(true);
-          return;
-        }
         setIsLocked(false);
-        if (data.success && data.settings) {
+        if (data.settings) {
           setSettings((prev) => ({
             ...prev,
             ...data.settings
