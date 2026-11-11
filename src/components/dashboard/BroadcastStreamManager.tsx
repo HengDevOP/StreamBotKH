@@ -18,6 +18,7 @@ import {
   Layers
 } from 'lucide-react';
 import { streamerService } from '../../services/streamerService';
+import { AnimatedCounter } from '../overlay/StreamViewCountOverlay';
 
 export interface BroadcastStreamManagerProps {
   user: any;
@@ -86,8 +87,8 @@ const PLATFORMS: PlatformItem[] = [
     subtitle: 'Kick Live Stream',
     placeholder: 'https://kick.com/username',
     logo: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#53FC18] shrink-0" aria-label="Kick">
-        <path d="M2.399 0v24h6.002v-6h2.4v-2.4h2.4v2.4h2.4V24h6.002V0h-6.002v6h-2.4v2.4h-2.4V6h-2.4V0H2.399zm6.002 8.4h2.4v2.4h-2.4V8.4zm2.4 2.4h2.4v2.4h-2.4v-2.4zm-2.4 2.4h2.4v2.4h-2.4v-2.4z" />
+      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#53FC18] shrink-0 drop-shadow-[0_0_8px_rgba(83,252,24,0.6)]" aria-label="Kick">
+        <path d="M1.333 0h8v5.333H12V2.667h2.667V0h8v8H20v2.667h-2.667v2.666H20V16h2.667v8h-8v-2.667H12v-2.666H9.333V24h-8Z" />
       </svg>
     )
   }
@@ -546,17 +547,20 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
                 </span>
               )}
 
-              {/* Viewers Counter */}
-              <span className="text-base font-black font-mono tracking-tight text-white drop-shadow-md">
-                {manualViewers.toLocaleString()}
-              </span>
+              {/* Viewers Counter with Bold Style and Smooth Animated Counter */}
+              <div className="flex items-baseline gap-2">
+                <AnimatedCounter
+                  value={manualViewers}
+                  className="text-xl sm:text-2xl font-black font-['Chakra_Petch',sans-serif] tracking-tight text-white drop-shadow-md"
+                />
 
-              {/* Viewers Label */}
-              {showLabel && (
-                <span className="text-[11px] font-bold font-mono tracking-wider text-slate-300 uppercase">
-                  Viewers
-                </span>
-              )}
+                {/* Viewers Label */}
+                {showLabel && (
+                  <span className="text-[11px] font-black uppercase tracking-widest text-slate-300 font-['Chakra_Petch',sans-serif]">
+                    Viewers
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

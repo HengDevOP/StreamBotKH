@@ -9,11 +9,68 @@ export interface StreamViewCountOverlayProps {
 
 type PlatformId = 'youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick';
 
-interface PlatformMeta {
-  id: PlatformId;
-  name: string;
-  logo: React.ReactNode;
-}
+// Smooth animated counter component
+export const AnimatedCounter: React.FC<{
+  value: number;
+  duration?: number;
+  className?: string;
+}> = ({ value, duration = 850, className = '' }) => {
+  const [displayValue, setDisplayValue] = useState<number>(value);
+  const [animDirection, setAnimDirection] = useState<'up' | 'down' | 'idle'>('idle');
+  const prevValueRef = useRef<number>(value);
+  const animFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const fromVal = prevValueRef.current;
+    const toVal = value;
+    prevValueRef.current = value;
+
+    if (fromVal === toVal) return;
+
+    setAnimDirection(toVal > fromVal ? 'up' : 'down');
+
+    const startTime = performance.now();
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Ease-out cubic for smooth natural deceleration
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(fromVal + (toVal - fromVal) * ease);
+
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        animFrameRef.current = requestAnimationFrame(step);
+      } else {
+        setDisplayValue(toVal);
+        setTimeout(() => setAnimDirection('idle'), 350);
+      }
+    };
+
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    animFrameRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [value, duration]);
+
+  return (
+    <span
+      className={`inline-block tabular-nums transition-all duration-300 ${
+        animDirection === 'up'
+          ? 'scale-[1.07] text-emerald-300 drop-shadow-[0_0_15px_rgba(52,211,153,0.8)]'
+          : animDirection === 'down'
+          ? 'scale-[1.05] text-amber-300 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)]'
+          : 'scale-100 text-white'
+      } ${className}`}
+    >
+      {displayValue.toLocaleString()}
+    </span>
+  );
+};
 
 const PLATFORM_LOGOS: Record<PlatformId, React.ReactNode> = {
   youtube: (
@@ -36,9 +93,10 @@ const PLATFORM_LOGOS: Record<PlatformId, React.ReactNode> = {
       <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.64 1.82 2.89 3.5 2.77 1.81-.03 3.29-1.54 3.32-3.35.03-4.92.01-9.84.02-14.76V.02Z" />
     </svg>
   ),
+  // Official Kick.com logo (pixelated K mark)
   kick: (
-    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#53FC18] shrink-0 drop-shadow-[0_0_8px_rgba(83,252,24,0.5)]" aria-label="Kick">
-      <path d="M2.399 0v24h6.002v-6h2.4v-2.4h2.4v2.4h2.4V24h6.002V0h-6.002v6h-2.4v2.4h-2.4V6h-2.4V0H2.399zm6.002 8.4h2.4v2.4h-2.4V8.4zm2.4 2.4h2.4v2.4h-2.4v-2.4zm-2.4 2.4h2.4v2.4h-2.4v-2.4z" />
+    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#53FC18] shrink-0 drop-shadow-[0_0_8px_rgba(83,252,24,0.6)]" aria-label="Kick">
+      <path d="M1.333 0h8v5.333H12V2.667h2.667V0h8v8H20v2.667h-2.667v2.666H20V16h2.667v8h-8v-2.667H12v-2.666H9.333V24h-8Z" />
     </svg>
   )
 };
@@ -147,28 +205,28 @@ export const StreamViewCountOverlay: React.FC<StreamViewCountOverlayProps> = ({ 
       case 'neon-glow':
         return 'bg-slate-950/90 border-2 border-cyan-400/80 shadow-[0_0_25px_rgba(0,240,255,0.4)] text-white';
       case 'minimal-pill':
-        return 'bg-black/75 border border-white/20 shadow-2xl text-white rounded-full';
+        return 'bg-black/85 border border-white/20 shadow-2xl text-white rounded-full';
       case 'pure-transparent':
         return 'bg-transparent border-none shadow-none text-white';
       case 'glass-dark':
       default:
-        return 'bg-[#0B0F19]/85 backdrop-blur-xl border border-slate-700/60 shadow-[0_12px_40px_rgba(0,0,0,0.8)] text-white';
+        return 'bg-[#0B0F19]/90 backdrop-blur-xl border border-slate-700/70 shadow-[0_12px_40px_rgba(0,0,0,0.85)] text-white';
     }
   };
 
   return (
     <div className="w-full h-full flex items-center justify-center p-2 select-none pointer-events-none">
       <div
-        className={`inline-flex items-center gap-3 px-4 py-2.5 rounded-2xl transition-all duration-300 ${getThemeClasses()} ${
-          isPulsing ? 'scale-105 ring-2 ring-cyan-400/50' : 'scale-100'
+        className={`inline-flex items-center gap-3.5 px-5 py-3 rounded-2xl transition-all duration-300 ${getThemeClasses()} ${
+          isPulsing ? 'scale-105 ring-2 ring-cyan-400/60 shadow-[0_0_30px_rgba(6,182,212,0.4)]' : 'scale-100'
         }`}
       >
         {/* Ticked Platform Logos (e.g. YouTube & Facebook) */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           {activePlatforms.map((pid) => (
             <div
               key={pid}
-              className="w-7 h-7 rounded-lg bg-slate-900/80 border border-slate-700/50 flex items-center justify-center transition-transform hover:scale-110"
+              className="w-8 h-8 rounded-xl bg-slate-900/90 border border-slate-700/60 flex items-center justify-center transition-transform hover:scale-110 shadow-sm"
               title={pid}
             >
               {PLATFORM_LOGOS[pid]}
@@ -177,25 +235,26 @@ export const StreamViewCountOverlay: React.FC<StreamViewCountOverlayProps> = ({ 
         </div>
 
         {/* Subtle Vertical Divider */}
-        <div className="h-5 w-px bg-slate-700/60 shrink-0" />
+        <div className="h-6 w-px bg-slate-700/60 shrink-0" />
 
         {/* Live Red Pulse Dot */}
         {showLiveDot && (
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+            <span className="relative flex h-3 w-3 items-center justify-center">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]" />
             </span>
           </div>
         )}
 
-        {/* Total Concurrent View Count */}
-        <div className="flex items-baseline gap-1.5 shrink-0 font-mono">
-          <span className="text-lg xs:text-xl font-black text-white tracking-tight drop-shadow-md font-['Chakra_Petch',sans-serif]">
-            {totalViewers.toLocaleString()}
-          </span>
+        {/* Total Concurrent View Count with Bold Style and Smooth Counter Animation */}
+        <div className="flex items-baseline gap-2 shrink-0">
+          <AnimatedCounter
+            value={totalViewers}
+            className="text-2xl sm:text-3xl font-black font-['Chakra_Petch',sans-serif] tracking-tight text-white leading-none drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]"
+          />
           {showLabel && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-sans">
+            <span className="text-[11px] font-black uppercase tracking-widest text-slate-300/90 font-['Chakra_Petch',sans-serif]">
               Viewers
             </span>
           )}
