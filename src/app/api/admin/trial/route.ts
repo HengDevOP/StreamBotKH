@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { isAdminEmail } from '@/server/database/db';
-import { getUsersCollection, getTrialConfigCollection } from '@/server/database/mongo';
+import { getUsersCollection, getTrialConfigCollection, calculateMidnightPlanExpiration } from '@/server/database/mongo';
 import { sendProPlanUpgradeEmail } from '@/server/services/emailService';
 
 async function checkAdmin(req: NextRequest) {
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
       const days = Number(body.days || 7);
       const startDate = new Date().toISOString();
-      const endDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+      const endDate = calculateMidnightPlanExpiration(days).toISOString();
 
       await usersCol.updateOne(
         { _id: target._id },

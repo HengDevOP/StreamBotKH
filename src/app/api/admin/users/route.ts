@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { isAdminEmail } from '@/server/database/db';
-import { getUsersCollection } from '@/server/database/mongo';
+import { getUsersCollection, calculateMidnightPlanExpiration } from '@/server/database/mongo';
 import { sendProPlanUpgradeEmail } from '@/server/services/emailService';
 
 const DEFAULT_PAGE_LIMIT = 20;
@@ -234,7 +234,7 @@ export async function PUT(req: NextRequest) {
         }
 
         planStartedAt = target.planStartedAt && action === 'extend' ? target.planStartedAt : now.toISOString();
-        planExpiresAt = new Date(baseTime + days * 24 * 60 * 60 * 1000).toISOString();
+        planExpiresAt = calculateMidnightPlanExpiration(days, new Date(baseTime)).toISOString();
         planDurationDays = days;
       }
 

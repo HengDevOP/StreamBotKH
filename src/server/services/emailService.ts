@@ -24,6 +24,30 @@ export interface ProPlanUpgradeEmailParams {
   dashboardUrl?: string;
 }
 
+export interface WelcomeEmailParams {
+  toEmail: string;
+  displayName?: string;
+  username: string;
+  dashboardUrl?: string;
+}
+
+export interface ProPlanExpiringSoonEmailParams {
+  toEmail: string;
+  displayName?: string;
+  username: string;
+  daysLeft: number;
+  planExpiresAt: string | Date;
+  dashboardUrl?: string;
+}
+
+export interface ProPlanExpiredEmailParams {
+  toEmail: string;
+  displayName?: string;
+  username: string;
+  planExpiresAt: string | Date;
+  dashboardUrl?: string;
+}
+
 function getSmtpConfig(customFromName?: string) {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
   const port = Number(process.env.SMTP_PORT || 587);
@@ -33,8 +57,8 @@ function getSmtpConfig(customFromName?: string) {
     port === 465;
   const user = (process.env.SMTP_USER || '').trim();
   const pass = (process.env.SMTP_PASS || '').trim();
-  const fromName = (customFromName || process.env.SMTP_FROM_NAME || 'StreamWidget').trim();
-  const fromEmail = (process.env.SMTP_FROM_EMAIL || user || 'notifications@streamwidget.com').trim();
+  const fromName = (customFromName || process.env.SMTP_FROM_NAME || 'StreamWidgets').trim();
+  const fromEmail = (process.env.SMTP_FROM_EMAIL || user || 'notifications@streamwidgets.com').trim();
 
   return {
     host,
@@ -618,5 +642,643 @@ ${appUrl}
       sent: false,
       error: err?.message || 'Failed to send email via SMTP'
     };
+  }
+}
+
+/**
+ * Sends a warm welcome email to first-time sign-in creators.
+ * Includes dashboard link, OBS Studio video tutorial & setup guide, Bakong KHQR setup, and community channels.
+ */
+export async function sendWelcomeEmail(
+  params: WelcomeEmailParams
+): Promise<{ sent: boolean; simulated?: boolean; error?: string }> {
+  const { toEmail, displayName, username, dashboardUrl } = params;
+
+  if (!toEmail || !toEmail.includes('@')) {
+    return { sent: false, error: 'Invalid recipient email address' };
+  }
+
+  const appUrl = (
+    dashboardUrl ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'https://streambotkh.com'
+  ).replace(/\/$/, '');
+  const creatorUrl = `${appUrl}/creator`;
+  const obsTutorialUrl = `${appUrl}/documentation/obs-studio`;
+  const paymentGatewayUrl = `${creatorUrl}?tab=payment-gateway`;
+
+  const subject = `👋 Welcome to StreamWidgets — Let's setup your live stream alerts!`;
+
+  const textBody = `
+WELCOME TO STREAMWIDGETS!
+==========================
+
+Hello ${displayName || username} (@${username}),
+
+Welcome to StreamWidgets! We are delighted to have you join Cambodia's premier live stream overlay & donation platform.
+
+Whether you stream gaming, chatting, or live events on YouTube, TikTok Live, or Facebook Gaming, StreamWidgets gives you all the tools to engage viewers and monetize with zero platform cuts.
+
+QUICK START GUIDE:
+1. Creator Dashboard
+   Customize your Alert Box, Retro Chat Avatars, Goal Bars, and Soundboard:
+   ${creatorUrl}
+
+2. OBS Browser Source Setup & Video Guide
+   Copy your overlay link and add it to OBS Studio or Streamlabs Desktop in under 2 minutes:
+   ${obsTutorialUrl}
+
+3. Connect Your Bakong KHQR & ABA Mobile
+   Accept instant viewer tips with 0% platform commission directly into your personal Cambodian bank account:
+   ${paymentGatewayUrl}
+
+COMMUNITY & 24/7 SUPPORT:
+• Telegram Channel: https://t.me/streambotkh
+• Discord Community: https://discord.gg/streambotkh
+• Guides & Docs: ${appUrl}/documentation
+
+Happy streaming!
+The StreamWidgets Team
+${appUrl}
+`.trim();
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to StreamWidgets</title>
+</head>
+<body style="margin:0;padding:0;background-color:#05070E;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#E2E8F0;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#05070E;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background-color:#0A0E1A;border:1px solid #1E293B;border-radius:16px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.85);">
+          
+          <!-- Top Banner -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#0c1a2e 0%,#042533 50%,#09131d 100%);padding:32px 32px 28px 32px;border-bottom:1px solid rgba(0,240,255,0.25);">
+              <div style="display:inline-block;padding:5px 12px;border-radius:999px;background-color:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.35);color:#00F0FF;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px;">
+                ✨ WELCOME TO STREAMWIDGETS
+              </div>
+              <h1 style="margin:0;font-size:24px;font-weight:800;color:#FFFFFF;letter-spacing:-0.5px;line-height:1.25;">
+                Welcome, ${displayName || username}!
+              </h1>
+              <p style="margin:8px 0 0 0;font-size:14px;color:#94A3B8;line-height:1.5;">
+                Your creator account has been successfully created. Let's get your stream overlays ready to broadcast!
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding:32px;">
+              
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#CBD5E1;">
+                Hello <strong style="color:#FFFFFF;">${displayName || username}</strong> (@${username}),
+              </p>
+              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#94A3B8;">
+                Welcome to <strong>StreamWidgets</strong>! We are thrilled to have you join Cambodia's dedicated live streaming platform. Everything is set up so you can accept real-time tips, showcase animated overlays, and interact with your chat community.
+              </p>
+
+              <!-- Quick Steps -->
+              <h3 style="margin:0 0 16px 0;font-size:14px;font-weight:800;color:#FFFFFF;text-transform:uppercase;letter-spacing:0.8px;">
+                ⚡ 3 Steps to Get Started
+              </h3>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:28px;">
+                <tr>
+                  <td style="padding:16px;background-color:#0D1424;border:1px solid #1E293B;border-radius:12px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td width="36" valign="top">
+                          <div style="width:28px;height:28px;border-radius:8px;background-color:rgba(0,240,255,0.15);border:1px solid rgba(0,240,255,0.3);color:#00F0FF;text-align:center;line-height:28px;font-weight:800;font-size:13px;">1</div>
+                        </td>
+                        <td style="padding-left:12px;">
+                          <div style="font-size:14px;font-weight:700;color:#FFFFFF;margin-bottom:4px;">
+                            Explore Your Creator Dashboard
+                          </div>
+                          <div style="font-size:12px;line-height:1.5;color:#94A3B8;margin-bottom:8px;">
+                            Configure your Alert Box animations, retro chat avatars, bilingual Khmer/English TTS sound synthesizers, and goal progress trackers.
+                          </div>
+                          <a href="${creatorUrl}" style="font-size:12px;color:#00F0FF;text-decoration:none;font-weight:700;">
+                            Open Dashboard &rarr;
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr><td style="height:12px;"></td></tr>
+                <tr>
+                  <td style="padding:16px;background-color:#0D1424;border:1px solid #1E293B;border-radius:12px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td width="36" valign="top">
+                          <div style="width:28px;height:28px;border-radius:8px;background-color:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);color:#A855F7;text-align:center;line-height:28px;font-weight:800;font-size:13px;">2</div>
+                        </td>
+                        <td style="padding-left:12px;">
+                          <div style="font-size:14px;font-weight:700;color:#FFFFFF;margin-bottom:4px;">
+                            OBS Studio Browser Source Guide
+                          </div>
+                          <div style="font-size:12px;line-height:1.5;color:#94A3B8;margin-bottom:8px;">
+                            Copy your unique transparent overlay URLs and paste them straight into OBS Studio, Streamlabs, or Prism Live Studio in under 2 minutes.
+                          </div>
+                          <a href="${obsTutorialUrl}" style="font-size:12px;color:#A855F7;text-decoration:none;font-weight:700;">
+                            View Video Tutorial &amp; Guide &rarr;
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr><td style="height:12px;"></td></tr>
+                <tr>
+                  <td style="padding:16px;background-color:#0D1424;border:1px solid #1E293B;border-radius:12px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td width="36" valign="top">
+                          <div style="width:28px;height:28px;border-radius:8px;background-color:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#10B981;text-align:center;line-height:28px;font-weight:800;font-size:13px;">3</div>
+                        </td>
+                        <td style="padding-left:12px;">
+                          <div style="font-size:14px;font-weight:700;color:#FFFFFF;margin-bottom:4px;">
+                            Connect Bakong KHQR &amp; ABA Mobile
+                          </div>
+                          <div style="font-size:12px;line-height:1.5;color:#94A3B8;margin-bottom:8px;">
+                            Accept instant live tips via NBC Bakong KHQR with 0% platform cuts. 100% of viewer donations go directly to your bank account.
+                          </div>
+                          <a href="${paymentGatewayUrl}" style="font-size:12px;color:#10B981;text-decoration:none;font-weight:700;">
+                            Setup Payment Gateway &rarr;
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Big CTA Button -->
+              <div style="text-align:center;padding:12px 0 24px 0;">
+                <a href="${creatorUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(90deg,#00F0FF 0%,#00B4D8 100%);color:#05070E;font-size:14px;font-weight:800;text-decoration:none;border-radius:10px;letter-spacing:0.5px;text-transform:uppercase;box-shadow:0 0 25px rgba(0,240,255,0.4);">
+                  Launch Creator Dashboard →
+                </a>
+              </div>
+
+              <!-- Community Support Box -->
+              <div style="background-color:#070A12;border:1px solid #1E293B;border-radius:10px;padding:14px 16px;font-size:12px;line-height:1.6;color:#64748B;text-align:center;">
+                Need assistance? Our streamer community is here to help! Join our official <a href="https://t.me/streambotkh" style="color:#00F0FF;text-decoration:underline;">Telegram Channel</a> or <a href="https://discord.gg/streambotkh" style="color:#818CF8;text-decoration:underline;">Discord Community Hub</a>.
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#060810;padding:20px 32px;border-top:1px solid #1E293B;text-align:center;">
+              <p style="margin:0 0 4px 0;font-size:12px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;">
+                StreamWidgets • The Premier Livestream Overlay &amp; Donation Gateway
+              </p>
+              <p style="margin:0;font-size:11px;color:#475569;font-family:monospace;">
+                Sent to ${toEmail} for account @${username}.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  const smtp = getSmtpConfig('StreamWidgets');
+
+  if (!smtp.isConfigured) {
+    console.warn(`⚠️ [Nodemailer] SMTP credentials not configured. Logged Welcome email for ${toEmail} (@${username}).`);
+    return { sent: false, simulated: true, error: 'SMTP credentials not configured in .env' };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: { user: smtp.user, pass: smtp.pass }
+    });
+
+    await transporter.sendMail({
+      from: smtp.from,
+      to: toEmail,
+      subject,
+      text: textBody,
+      html: htmlBody
+    });
+
+    console.log(`📧 [Nodemailer] Sent Welcome email to ${toEmail} (@${username})`);
+    return { sent: true };
+  } catch (err: any) {
+    console.error(`❌ [Nodemailer] Failed to send Welcome email to ${toEmail}:`, err?.message || err);
+    return { sent: false, error: err?.message || 'Failed to send email via SMTP' };
+  }
+}
+
+/**
+ * Sends a reminder email 3 days before the Pro plan expires.
+ * Clearly communicates that expiration occurs at 12:00 AM midnight (Asia/Phnom_Penh / Singapore).
+ */
+export async function sendProPlanExpiringSoonEmail(
+  params: ProPlanExpiringSoonEmailParams
+): Promise<{ sent: boolean; simulated?: boolean; error?: string }> {
+  const { toEmail, displayName, username, daysLeft, planExpiresAt, dashboardUrl } = params;
+
+  if (!toEmail || !toEmail.includes('@')) {
+    return { sent: false, error: 'Invalid recipient email address' };
+  }
+
+  const appUrl = (
+    dashboardUrl ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'https://streambotkh.com'
+  ).replace(/\/$/, '');
+  const pricingUrl = `${appUrl}/pricing`;
+
+  const expiresDate = new Date(planExpiresAt);
+  const formattedExpiresAt = !isNaN(expiresDate.getTime())
+    ? expiresDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : 'Upcoming Date';
+
+  const subject = `⏰ [StreamWidgets] Your Pro Plan expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'} — Renew to keep 10x benefits`;
+
+  const textBody = `
+STREAMWIDGETS — PRO PLAN EXPIRING SOON
+======================================
+
+Hello ${displayName || username} (@${username}),
+
+This is a friendly reminder that your StreamWidgets Pro Plan will expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}:
+• Expiration Date: ${formattedExpiresAt} at 12:00 AM Midnight (Asia/Phnom_Penh / Singapore)
+• Account: @${username}
+
+WHAT HAPPENS IF YOUR PLAN EXPIRES:
+• AI Token Limit: Reverts from 20,000 down to 2,000 daily tokens.
+• Stream Overlay: StreamWidgets watermark will reappear on your broadcast screens.
+• Cloud Storage: Storage quota returns from 100MB to 20MB.
+• DONATIONS: Your Bakong KHQR, ABA alerts, and live overlay links will continue working uninterrupted with 0% platform cuts!
+
+RENEW YOUR PRO PLAN:
+To maintain your 10x daily token boost (20,000 tokens), 100MB cloud storage, and watermark-free overlays, renew your Pro Plan ($4.99 / 31 days) before midnight:
+${pricingUrl}
+
+Happy streaming,
+The StreamWidgets Team
+${appUrl}
+`.trim();
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pro Plan Expiring Soon</title>
+</head>
+<body style="margin:0;padding:0;background-color:#05070E;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#E2E8F0;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#05070E;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background-color:#0A0E1A;border:1px solid #1E293B;border-radius:16px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.85);">
+          
+          <!-- Top Header Banner -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#2e1e0c 0%,#3d2806 50%,#191206 100%);padding:32px 32px 28px 32px;border-bottom:1px solid rgba(245,158,11,0.35);">
+              <div style="display:inline-block;padding:5px 12px;border-radius:999px;background-color:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);color:#FBBF24;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px;">
+                ⏰ ${daysLeft} DAY${daysLeft === 1 ? '' : 'S'} REMAINING
+              </div>
+              <h1 style="margin:0;font-size:24px;font-weight:800;color:#FFFFFF;letter-spacing:-0.5px;line-height:1.25;">
+                Your Pro Plan is Expiring Soon
+              </h1>
+              <p style="margin:8px 0 0 0;font-size:14px;color:#FDE68A;line-height:1.5;">
+                Your subscription ends on ${formattedExpiresAt} at 12:00 AM Midnight.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#CBD5E1;">
+                Hello <strong style="color:#FFFFFF;">${displayName || username}</strong>,
+              </p>
+              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#94A3B8;">
+                This is a quick courtesy notification that your <strong>StreamWidgets Pro</strong> subscription for <strong style="color:#FFFFFF;">@${username}</strong> is scheduled to expire in <strong>${daysLeft} days</strong> at <strong>12:00 AM midnight</strong> (Cambodia / Singapore time).
+              </p>
+
+              <!-- Expiry Details Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#070A12;border:1px solid #1E293B;border-radius:12px;padding:18px 20px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;">Account Handle:</td>
+                  <td style="padding:8px 0;font-size:13px;color:#FFFFFF;font-weight:700;font-family:monospace;text-align:right;">@${username}</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;border-top:1px solid #141C2E;">Expiration Time:</td>
+                  <td style="padding:8px 0;font-size:13px;color:#FBBF24;font-weight:700;font-family:monospace;text-align:right;border-top:1px solid #141C2E;">12:00 AM Midnight</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;border-top:1px solid #141C2E;">Expiration Date:</td>
+                  <td style="padding:8px 0;font-size:13px;color:#FBBF24;font-weight:700;font-family:monospace;text-align:right;border-top:1px solid #141C2E;">${formattedExpiresAt}</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;border-top:1px solid #141C2E;">Timezone:</td>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;text-align:right;border-top:1px solid #141C2E;">Asia/Phnom_Penh (UTC+7) / Singapore (UTC+8)</td>
+                </tr>
+              </table>
+
+              <!-- Notice Box -->
+              <div style="background-color:#0D1424;border:1px solid #1E293B;border-radius:12px;padding:18px;margin-bottom:24px;">
+                <h4 style="margin:0 0 8px 0;font-size:13px;font-weight:800;color:#FFFFFF;text-transform:uppercase;letter-spacing:0.5px;">
+                  What Happens Upon Expiration?
+                </h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.7;color:#94A3B8;">
+                  <li>Daily AI usage limit will return from <strong>20,000 to 2,000 tokens/day</strong>.</li>
+                  <li>The StreamWidgets watermark will reappear on your overlay screens.</li>
+                  <li>Cloud storage quota will adjust from <strong>100MB to 20MB</strong>.</li>
+                  <li><strong style="color:#34D399;">Good news:</strong> Your Bakong KHQR tips, ABA alerts, and live overlay links will remain 100% online with 0% platform commission!</li>
+                </ul>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align:center;padding:12px 0 24px 0;">
+                <a href="${pricingUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(90deg,#F59E0B 0%,#D97706 100%);color:#05070E;font-size:14px;font-weight:800;text-decoration:none;border-radius:10px;letter-spacing:0.5px;text-transform:uppercase;box-shadow:0 0 25px rgba(245,158,11,0.35);">
+                  Review &amp; Renew Pro Plan ($4.99) →
+                </a>
+              </div>
+
+              <p style="margin:0;font-size:12px;line-height:1.6;color:#64748B;text-align:center;">
+                You can renew anytime directly from your dashboard or our <a href="${pricingUrl}" style="color:#00F0FF;text-decoration:underline;">Pricing Page</a>.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#060810;padding:20px 32px;border-top:1px solid #1E293B;text-align:center;">
+              <p style="margin:0 0 4px 0;font-size:12px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;">
+                StreamWidgets • The Premier Livestream Overlay &amp; Donation Gateway
+              </p>
+              <p style="margin:0;font-size:11px;color:#475569;font-family:monospace;">
+                Subscription notice sent to ${toEmail} for @${username}.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  const smtp = getSmtpConfig('StreamWidgets');
+
+  if (!smtp.isConfigured) {
+    console.warn(`⚠️ [Nodemailer] SMTP credentials not configured. Logged Pro expiry reminder email for ${toEmail} (@${username}).`);
+    return { sent: false, simulated: true, error: 'SMTP credentials not configured in .env' };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: { user: smtp.user, pass: smtp.pass }
+    });
+
+    await transporter.sendMail({
+      from: smtp.from,
+      to: toEmail,
+      subject,
+      text: textBody,
+      html: htmlBody
+    });
+
+    console.log(`📧 [Nodemailer] Sent Pro Plan 3-day reminder email to ${toEmail} (@${username})`);
+    return { sent: true };
+  } catch (err: any) {
+    console.error(`❌ [Nodemailer] Failed to send Pro Plan reminder email to ${toEmail}:`, err?.message || err);
+    return { sent: false, error: err?.message || 'Failed to send email via SMTP' };
+  }
+}
+
+/**
+ * Sends a notification email when a creator's Pro plan expires at midnight.
+ * Prompts them to review their subscription and renew to re-enable 10x token capacity, 100MB storage, and watermark removal.
+ */
+export async function sendProPlanExpiredEmail(
+  params: ProPlanExpiredEmailParams
+): Promise<{ sent: boolean; simulated?: boolean; error?: string }> {
+  const { toEmail, displayName, username, planExpiresAt, dashboardUrl } = params;
+
+  if (!toEmail || !toEmail.includes('@')) {
+    return { sent: false, error: 'Invalid recipient email address' };
+  }
+
+  const appUrl = (
+    dashboardUrl ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'https://streambotkh.com'
+  ).replace(/\/$/, '');
+  const pricingUrl = `${appUrl}/pricing`;
+
+  const expiresDate = new Date(planExpiresAt);
+  const formattedExpiresAt = !isNaN(expiresDate.getTime())
+    ? expiresDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : 'Recently';
+
+  const subject = `⚠️ [StreamWidgets] Your Pro Plan has expired — Review your subscription`;
+
+  const textBody = `
+STREAMWIDGETS — PRO PLAN EXPIRED
+================================
+
+Hello ${displayName || username} (@${username}),
+
+Your StreamWidgets Pro Plan expired at 12:00 AM Midnight on ${formattedExpiresAt}.
+Your account has now been automatically transitioned to the Free Plan.
+
+CURRENT PLAN STATUS:
+• Account Handle: @${username}
+• Plan Status: Free Plan (Active)
+• Daily Usage Limit: 2,000 Tokens / day
+• Cloud Storage: 20 MB
+• Overlays: Active with StreamWidgets Watermark
+
+YOUR STREAM REMAINS ACTIVE:
+Don't worry! Your OBS overlays, Bakong KHQR QR codes, and ABA Mobile live donation alerts will continue working as normal with 0% platform cuts.
+
+WANT TO RESTORE PRO BENEFITS?
+Renew your Pro Plan for just $4.99 / 31 days to immediately restore:
+• 20,000 daily AI tokens (10x boost)
+• 100MB cloud storage
+• 100% watermark-free broadcast overlays
+
+Review and renew your plan here:
+${pricingUrl}
+
+Happy streaming,
+The StreamWidgets Team
+${appUrl}
+`.trim();
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pro Plan Expired</title>
+</head>
+<body style="margin:0;padding:0;background-color:#05070E;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#E2E8F0;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#05070E;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background-color:#0A0E1A;border:1px solid #1E293B;border-radius:16px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.85);">
+          
+          <!-- Top Header Banner -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#2e1111 0%,#3d1414 50%,#1a0808 100%);padding:32px 32px 28px 32px;border-bottom:1px solid rgba(239,68,68,0.35);">
+              <div style="display:inline-block;padding:5px 12px;border-radius:999px;background-color:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:#FCA5A5;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px;">
+                ⚠️ SUBSCRIPTION EXPIRED
+              </div>
+              <h1 style="margin:0;font-size:24px;font-weight:800;color:#FFFFFF;letter-spacing:-0.5px;line-height:1.25;">
+                Your Pro Plan Has Expired
+              </h1>
+              <p style="margin:8px 0 0 0;font-size:14px;color:#FECACA;line-height:1.5;">
+                Expired on ${formattedExpiresAt} at 12:00 AM Midnight. Account transitioned to Free Plan.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#CBD5E1;">
+                Hello <strong style="color:#FFFFFF;">${displayName || username}</strong>,
+              </p>
+              <p style="margin:0 0 24px 0;font-size:14px;line-height:1.6;color:#94A3B8;">
+                Your <strong>StreamWidgets Pro</strong> subscription for <strong style="color:#FFFFFF;">@${username}</strong> ended on <strong>${formattedExpiresAt} at 12:00 AM Midnight</strong> (Cambodia / Singapore time). Your account has now transitioned back to the <strong>Free Plan</strong>.
+              </p>
+
+              <!-- Current Plan Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#070A12;border:1px solid #1E293B;border-radius:12px;padding:18px 20px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;">Account Handle:</td>
+                  <td style="padding:8px 0;font-size:13px;color:#FFFFFF;font-weight:700;font-family:monospace;text-align:right;">@${username}</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;border-top:1px solid #141C2E;">Current Plan:</td>
+                  <td style="padding:8px 0;text-align:right;border-top:1px solid #141C2E;">
+                    <span style="display:inline-block;padding:2px 8px;border-radius:6px;background-color:rgba(100,116,139,0.2);border:1px solid rgba(148,163,184,0.3);color:#CBD5E1;font-size:11px;font-weight:800;letter-spacing:0.5px;">
+                      FREE PLAN
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;border-top:1px solid #141C2E;">Daily AI Usage:</td>
+                  <td style="padding:8px 0;font-size:13px;color:#E2E8F0;font-weight:700;text-align:right;border-top:1px solid #141C2E;">2,000 Tokens / day</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;border-top:1px solid #141C2E;">Cloud Storage:</td>
+                  <td style="padding:8px 0;font-size:13px;color:#E2E8F0;font-weight:700;text-align:right;border-top:1px solid #141C2E;">20 MB</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:13px;color:#94A3B8;border-top:1px solid #141C2E;">Overlays:</td>
+                  <td style="padding:8px 0;font-size:13px;color:#FCA5A5;font-weight:700;text-align:right;border-top:1px solid #141C2E;">Watermark Active</td>
+                </tr>
+              </table>
+
+              <!-- Safe Notice -->
+              <div style="background-color:#0D1424;border:1px solid #1E293B;border-radius:12px;padding:18px;margin-bottom:24px;">
+                <h4 style="margin:0 0 6px 0;font-size:13px;font-weight:800;color:#34D399;text-transform:uppercase;letter-spacing:0.5px;">
+                  ✓ Your Live Stream Tips Remain 100% Active
+                </h4>
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#94A3B8;">
+                  Your NBC Bakong KHQR codes, ABA Mobile alert popups, sound effects, and viewer donation records remain online without interruption. You continue to receive 100% of viewer donations directly into your bank account.
+                </p>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align:center;padding:12px 0 24px 0;">
+                <a href="${pricingUrl}" style="display:inline-block;padding:14px 36px;background:linear-gradient(90deg,#00F0FF 0%,#00B4D8 100%);color:#05070E;font-size:14px;font-weight:800;text-decoration:none;border-radius:10px;letter-spacing:0.5px;text-transform:uppercase;box-shadow:0 0 25px rgba(0,240,255,0.4);">
+                  Review Subscription &amp; Renew ($4.99) →
+                </a>
+              </div>
+
+              <p style="margin:0;font-size:12px;line-height:1.6;color:#64748B;text-align:center;">
+                Have questions or need help? Check our <a href="${pricingUrl}" style="color:#00F0FF;text-decoration:underline;">Plans &amp; Pricing Page</a> or talk to us on <a href="https://t.me/streambotkh" style="color:#38BDF8;text-decoration:underline;">Telegram</a>.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#060810;padding:20px 32px;border-top:1px solid #1E293B;text-align:center;">
+              <p style="margin:0 0 4px 0;font-size:12px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;">
+                StreamWidgets • The Premier Livestream Overlay &amp; Donation Gateway
+              </p>
+              <p style="margin:0;font-size:11px;color:#475569;font-family:monospace;">
+                Subscription notice sent to ${toEmail} for @${username}.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  const smtp = getSmtpConfig('StreamWidgets');
+
+  if (!smtp.isConfigured) {
+    console.warn(`⚠️ [Nodemailer] SMTP credentials not configured. Logged Pro expired email for ${toEmail} (@${username}).`);
+    return { sent: false, simulated: true, error: 'SMTP credentials not configured in .env' };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: { user: smtp.user, pass: smtp.pass }
+    });
+
+    await transporter.sendMail({
+      from: smtp.from,
+      to: toEmail,
+      subject,
+      text: textBody,
+      html: htmlBody
+    });
+
+    console.log(`📧 [Nodemailer] Sent Pro Plan expired notification email to ${toEmail} (@${username})`);
+    return { sent: true };
+  } catch (err: any) {
+    console.error(`❌ [Nodemailer] Failed to send Pro Plan expired email to ${toEmail}:`, err?.message || err);
+    return { sent: false, error: err?.message || 'Failed to send email via SMTP' };
   }
 }

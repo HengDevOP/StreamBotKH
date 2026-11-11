@@ -11,7 +11,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { NextRequest } from 'next/server';
-import { initMongo, cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo, processExpiredAccountDeletions } from '../src/server/database/mongo';
+import { initMongo, cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo, processExpiredAccountDeletions, processPlanExpirationsAndReminders } from '../src/server/database/mongo';
 import { initSocketServer } from '../src/server/services/socketService';
 import { globalRateLimiterMiddleware } from '../src/server/utils/rateLimiter';
 
@@ -233,14 +233,16 @@ initSocketServer(server);
 const apiDirectory = path.resolve(process.cwd(), 'src/app/api');
 scanAndMountRoutes(apiDirectory, '/api');
 
-// 4. Background Expired Pending Donations Cleanup (runs every 30s), Account Deletion 7-Day Grace Period Check, & 6-month Retention Cleanup in MongoDB
+// 4. Background Workers: Expired Pending Donations, Account Deletions, Pro Plan Midnight Expiration & 3-Day Reminders, 6-Month Retention Cleanup
 cleanupExpiredPendingDonationsMongo();
 cleanupOlderDonationsMongo(6);
 processExpiredAccountDeletions();
+processPlanExpirationsAndReminders();
 setInterval(() => {
   cleanupExpiredPendingDonationsMongo();
   cleanupOlderDonationsMongo(6);
   processExpiredAccountDeletions();
+  processPlanExpirationsAndReminders();
 }, 30 * 1000);
 
 // Health check endpoint
@@ -285,10 +287,10 @@ if (distDir) {
       <html lang="en">
         <head>
           <meta charset="utf-8">
-          <title>StreamWidget Core API</title>
+          <title>StreamWidgets Core API</title>
         </head>
         <body style="background:#070A12;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;padding:60px 20px;text-align:center;">
-          <h1 style="color:#00F0FF;margin-bottom:8px;">⚡ StreamBotKH Server Active</h1>
+          <h1 style="color:#00F0FF;margin-bottom:8px;">⚡ StreamWidgets Server Active</h1>
           <p style="color:#94a3b8;font-size:16px;">Core API & Socket.IO are running successfully on port ${process.env.PORT || '5173'}.</p>
           <div style="margin:30px auto;max-width:500px;background:#0d1322;border:1px solid #1e293b;border-radius:12px;padding:20px;text-align:left;">
             <p style="color:#f59e0b;font-weight:bold;margin-top:0;">Notice: Frontend assets not built yet</p>

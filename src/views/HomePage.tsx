@@ -86,6 +86,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
   React.useEffect(() => {
     let isMounted = true;
+    document.title = 'StreamWidgets - Home';
     setIsLoadingStreamers(true);
 
     fetch('/api/streamer/verified')

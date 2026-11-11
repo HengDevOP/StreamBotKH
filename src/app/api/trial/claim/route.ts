@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getUsersCollection, getTrialConfigCollection } from '@/server/database/mongo';
+import { getUsersCollection, getTrialConfigCollection, calculateMidnightPlanExpiration } from '@/server/database/mongo';
 import { isAdminEmail } from '@/server/database/db';
 
 export async function POST(req: NextRequest) {
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     // 4. Activate 7-day trial
     const startDate = new Date().toISOString();
-    const endDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+    const endDate = calculateMidnightPlanExpiration(durationDays).toISOString();
 
     await usersCol.updateOne(
       { _id: streamer._id },

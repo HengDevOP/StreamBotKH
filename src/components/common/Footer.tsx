@@ -55,7 +55,7 @@ export const Footer: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-black text-white tracking-wider font-mono">
-                  STREAM<span className="text-cyan-400">WIDGET</span>
+                  STREAM<span className="text-cyan-400">WIDGETS</span>
                 </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
                   v2.4

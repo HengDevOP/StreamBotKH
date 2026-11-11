@@ -6,6 +6,7 @@ import { getUsersCollection, getOverlaysCollection, getAlertSettingsCollection, 
 import { getJwtSecret } from '@/server/auth';
 import { generateSecureOverlayToken } from '@/server/utils/crypto';
 import { getRandomTemplateGif } from '@/data/presetsData';
+import { sendWelcomeEmail } from '@/server/services/emailService';
 
 function reloadEnv() {
   const savedPort = process.env.PORT;
@@ -207,6 +208,8 @@ export async function upsertGoogleStreamer(profile: {
   let pairingCode = '';
   let socialLinks: any[] = [];
 
+  const isFirstTimeUser = !existingMongoUser?.userId;
+
   if (existingMongoUser?.userId) {
     streamerId = existingMongoUser.userId;
     streamerUsername = existingMongoUser.username || email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'streamer';
@@ -304,6 +307,22 @@ export async function upsertGoogleStreamer(profile: {
       },
       { upsert: true }
     );
+  }
+
+  // Send Welcome Email to first-time sign-in creators
+  if (isFirstTimeUser || !existingMongoUser?.welcomeEmailSentAt) {
+    sendWelcomeEmail({
+      toEmail: email,
+      displayName,
+      username: streamerUsername
+    }).catch((emailErr) => {
+      console.error('⚠️ [Google Auth] Failed to send Welcome email:', emailErr);
+    });
+
+    usersCol.updateOne(
+      { userId: streamerId },
+      { $set: { welcomeEmailSentAt: new Date() } }
+    ).catch(() => {});
   }
 
   // Ensure default overlay

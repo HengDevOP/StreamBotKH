@@ -29,6 +29,10 @@ export interface UserDoc {
   planStartedAt?: string | null;
   planExpiresAt?: string | null;
   planDurationDays?: number;
+  proExpiryReminderSentFor?: string | null;
+  proExpiryReminderSentAt?: Date | null;
+  proExpiredEmailSentFor?: string | null;
+  welcomeEmailSentAt?: Date | null;
   trialActive?: boolean;
   trialStartDate?: string | null;
   trialEndDate?: string | null;
@@ -2001,6 +2005,125 @@ export async function processExpiredAccountDeletions(): Promise<number> {
   }
 }
 
+/**
+ * Background worker:
+ * 1. Downgrades expired Pro subscriptions (past their 12:00 AM midnight expiration) to Free plan,
+ *    and sends the plan expired notification email to review their subscription.
+ * 2. Scans for Pro plans expiring within 3 days and sends the 3-day reminder email.
+ */
+export async function processPlanExpirationsAndReminders(): Promise<void> {
+  try {
+    const usersCol = await getUsersCollection();
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    // Dynamically import email functions to avoid circular references
+    const { sendProPlanExpiredEmail, sendProPlanExpiringSoonEmail } = await import('@/server/services/emailService');
+
+    // 1. Process Expired Pro Users (planExpiresAt <= now)
+    const expiredUsers = await usersCol
+      .find({
+        plan: 'pro',
+        planExpiresAt: { $ne: null, $lte: nowIso }
+      })
+      .toArray();
+
+    for (const u of expiredUsers) {
+      try {
+        const expiredDateIso = u.planExpiresAt;
+
+        // Downgrade user back to free plan and reset limits
+        await usersCol.updateOne(
+          { _id: u._id },
+          {
+            $set: {
+              plan: 'free',
+              dailyTokensLimit: DEFAULT_DAILY_TOKENS, // 2,000
+              planExpiresAt: null,
+              planStartedAt: null,
+              planDurationDays: 0,
+              trialActive: false,
+              trialEnded: true,
+              proExpiredEmailSentFor: expiredDateIso,
+              updatedAt: new Date()
+            }
+          }
+        );
+
+        // Send expired email notification
+        if (u.email && u.proExpiredEmailSentFor !== expiredDateIso) {
+          sendProPlanExpiredEmail({
+            toEmail: u.email,
+            displayName: u.displayName || u.username,
+            username: u.username,
+            planExpiresAt: expiredDateIso || new Date()
+          }).catch((err) => {
+            console.error(`⚠️ [Plan Expiry] Failed to send expired email to ${u.email}:`, err);
+          });
+          console.log(`📧 [Plan Expiry] Transitioned @${u.username} (${u.email}) to Free Plan and queued expiry review email.`);
+        }
+      } catch (err) {
+        console.error(`❌ [Plan Expiry] Error processing expired user ${u.username}:`, err);
+      }
+    }
+
+    // 2. Process Pro Users Expiring within 3 Days (now < planExpiresAt <= now + 3 days)
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const threeDaysIso = threeDaysFromNow.toISOString();
+
+    const expiringSoonUsers = await usersCol
+      .find({
+        plan: 'pro',
+        planExpiresAt: { $gt: nowIso, $lte: threeDaysIso }
+      })
+      .toArray();
+
+    for (const u of expiringSoonUsers) {
+      try {
+        const expIso = u.planExpiresAt;
+        if (!expIso) continue;
+
+        // Ensure reminder is sent strictly once per specific plan expiration date
+        if (u.proExpiryReminderSentFor === expIso) {
+          continue;
+        }
+
+        const expMs = new Date(expIso).getTime();
+        const daysLeft = Math.max(1, Math.ceil((expMs - now.getTime()) / (1000 * 60 * 60 * 24)));
+
+        // Record reminder sent
+        await usersCol.updateOne(
+          { _id: u._id },
+          {
+            $set: {
+              proExpiryReminderSentFor: expIso,
+              proExpiryReminderSentAt: new Date(),
+              updatedAt: new Date()
+            }
+          }
+        );
+
+        if (u.email) {
+          sendProPlanExpiringSoonEmail({
+            toEmail: u.email,
+            displayName: u.displayName || u.username,
+            username: u.username,
+            daysLeft,
+            planExpiresAt: expIso
+          }).catch((err) => {
+            console.error(`⚠️ [Plan Reminder] Failed to send 3-day reminder email to ${u.email}:`, err);
+          });
+          console.log(`📧 [Plan Reminder] Sent 3-day expiry reminder to @${u.username} (${u.email}), expiring in ${daysLeft} days.`);
+        }
+      } catch (err) {
+        console.error(`❌ [Plan Reminder] Error processing expiring user ${u.username}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('❌ [processPlanExpirationsAndReminders] Global error:', err);
+  }
+}
+
 // ============================================================================
 // DAILY TOKEN USAGE SYSTEM (Free: 2,000 / Pro: 20,000 Daily Tokens with Daily Reset)
 // ============================================================================
@@ -2066,6 +2189,29 @@ export function getUserDailyTokenLimit(user: any): number {
  * In UTC, this is exactly 06:00:00 UTC (14:00 - 8 hours).
  */
 export const GLOBAL_RESET_HOUR_UTC = 6;
+
+/**
+ * Calculates the exact 12:00 AM midnight expiration date in Cambodia / Singapore timezone (UTC+7 / UTC+8).
+ * Defaults to Asia/Phnom_Penh (UTC+7).
+ * For example, if a plan is activated/extended today for 31 days:
+ * The expiration occurs at exactly 12:00 AM midnight (00:00:00.000 local time) on the end date.
+ */
+export function calculateMidnightPlanExpiration(
+  days: number,
+  fromDate = new Date(),
+  timezoneOffsetHours = 7
+): Date {
+  const localTimeMs = fromDate.getTime() + timezoneOffsetHours * 60 * 60 * 1000;
+  const localDate = new Date(localTimeMs);
+
+  const targetYear = localDate.getUTCFullYear();
+  const targetMonth = localDate.getUTCMonth();
+  const targetDay = localDate.getUTCDate() + days;
+
+  // Local 00:00:00.000 (12:00 AM Midnight) converted back to UTC
+  const localMidnightUtc = Date.UTC(targetYear, targetMonth, targetDay, 0 - timezoneOffsetHours, 0, 0, 0);
+  return new Date(localMidnightUtc);
+}
 
 /**
  * Returns the Date timestamp of the NEXT 2:00 PM Singapore Time (06:00 UTC) reset.
