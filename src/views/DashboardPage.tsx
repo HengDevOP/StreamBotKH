@@ -401,7 +401,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [showOverlayToken, setShowOverlayToken] = useState(false);
   const [testFiring, setTestFiring] = useState(false);
   const [selectedMediaForOverlay, setSelectedMediaForOverlay] = useState<MediaItem | null>(null);
-  const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
+  const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
   const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
@@ -2218,22 +2223,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               />
             </div>
 
-            {/* Live Chat Settings Toggle Menu Button (Top Navbar Right Side - Mobile Only) */}
+            {/* Live Chat Settings Toggle Button (Main Dashboard Navbar) */}
             {activeTab === 'chat' && (
               <button
                 type="button"
                 onClick={() => {
                   setIsChatSettingsOpen((prev) => !prev);
                 }}
-                className={`lg:hidden relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   isChatSettingsOpen
                     ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
                     : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white shadow-sm'
                 }`}
-                title="Toggle Chat Settings"
+                title={isChatSettingsOpen ? 'Close Settings' : 'Open Settings'}
                 aria-label="Toggle Live Chat Settings"
               >
-                <Sliders size={16} className={isChatSettingsOpen ? 'text-slate-950' : 'text-slate-300'} />
+                <Sparkles size={16} className={isChatSettingsOpen ? 'text-slate-950' : 'text-cyan-400'} />
                 {chatHasUnsavedChanges && (
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
                 )}

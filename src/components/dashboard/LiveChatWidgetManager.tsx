@@ -1048,11 +1048,11 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                 <span>Simulate</span>
               </button>
 
-              {/* Toggle Rightbar Settings on Mobile */}
+              {/* Toggle Rightbar Settings Button */}
               <button
                 type="button"
                 onClick={toggleRightbar}
-                className={`lg:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border cursor-pointer ${
                   isRightbarOpen
                     ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.4)]'
                     : 'bg-slate-900 hover:bg-slate-800 text-cyan-300 border-cyan-500/30'
@@ -1060,7 +1060,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                 title={isRightbarOpen ? 'Close Settings' : 'Open Settings'}
                 aria-label="Toggle Chat Settings"
               >
-                <Sliders className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5" />
                 <span>Settings</span>
               </button>
           </div>
@@ -1173,17 +1173,17 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         id="chat-settings-section"
         className={`
           ${isRightbarOpen
-            ? 'fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto z-[100] w-full sm:w-[420px] bg-[#090D18] sm:border-l border-slate-800 shadow-2xl flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden animate-in slide-in-from-right duration-200'
+            ? 'fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto z-[100] w-full sm:w-[420px] bg-[#090D18] sm:border-l border-slate-800 shadow-2xl flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden animate-in slide-in-from-right duration-200 lg:relative lg:inset-auto lg:z-auto lg:w-[340px] xl:w-[370px] lg:flex lg:flex-col lg:rounded-2xl lg:border lg:border-slate-800/90'
             : 'hidden'
           }
-          lg:relative lg:inset-auto lg:z-auto lg:w-[340px] xl:w-[370px] lg:flex lg:flex-col lg:rounded-2xl lg:border lg:border-slate-800/90 lg:shadow-2xl lg:h-full lg:overflow-hidden lg:min-h-0 flex-shrink-0
+          lg:shadow-2xl lg:h-full lg:overflow-hidden lg:min-h-0 flex-shrink-0
         `}
       >
           {/* Rightbar Header Deck */}
           <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#060911]/90 flex items-center justify-between gap-3 flex-shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner flex-shrink-0">
-                <Sliders className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
