@@ -377,9 +377,7 @@ export async function sendProPlanUpgradeEmail(
   const heroSub = isExtend
     ? `Your subscription has been extended by ${planDurationDays} days. Valid until ${formattedExpiresAt}.`
     : isTrial
-    ? `Your account now has full access to StreamWidget Pro for ${planDurationDays} days on us.`
-    : `Your creator account has been upgraded with 10x daily tokens, 100MB cloud storage, and watermark-free overlays.`;
-    ? `Your subscription has been extended by ${planDurationDays} days. Valid until ${formattedExpiresAt}.`
+    ? `Your account now has full access to StreamWidgets Pro for ${planDurationDays} days on us.`
     : `Your creator account has been upgraded with 10x daily tokens, 100MB cloud storage, and watermark-free overlays.`;
 
   const textBody = `
