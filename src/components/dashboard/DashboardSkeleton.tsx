@@ -755,7 +755,43 @@ export const AccountSkeleton: React.FC = () => {
 };
 
 // ==============================================================
-// 14. SMART FEATURE TAB SKELETON DISPATCHER
+// 14. BROADCAST STREAM SKELETON
+// ==============================================================
+export const BroadcastSkeleton: React.FC = () => {
+  return (
+    <div className="space-y-4 max-w-5xl mx-auto pb-12 animate-pulse select-none">
+      <div className="space-y-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="rounded-2xl bg-[#090D18] border border-slate-800 p-5 space-y-4 shadow-sm"
+          >
+            {/* Row Header */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800/80 shrink-0" />
+                <div className="space-y-1.5">
+                  <div className="h-4 w-24 bg-slate-800 rounded" />
+                  <div className="h-3 w-32 bg-slate-800/60 rounded" />
+                </div>
+              </div>
+
+              <div className="h-6 w-24 rounded-full bg-slate-900 border border-slate-800" />
+            </div>
+
+            {/* Input row */}
+            <div className="flex items-center gap-2.5">
+              <div className="flex-1 h-10 rounded-xl bg-slate-950 border border-slate-800" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ==============================================================
+// 15. SMART FEATURE TAB SKELETON DISPATCHER
 // ==============================================================
 export const FeatureTabSkeleton: React.FC<{ tab: DashboardTab | string }> = ({ tab }) => {
   switch (tab) {
@@ -768,6 +804,7 @@ export const FeatureTabSkeleton: React.FC<{ tab: DashboardTab | string }> = ({ t
     case 'media':
       return <MediaLibrarySkeleton />;
     case 'broadcast':
+      return <BroadcastSkeleton />;
     case 'video-alerts':
       return <VideoAlertsSkeleton />;
     case 'leaderboard':
