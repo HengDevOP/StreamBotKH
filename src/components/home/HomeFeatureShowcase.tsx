@@ -906,15 +906,19 @@ export const HomeFeatureShowcase: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: Clean Default Flat Preview (Responsive width & height, no overflow clip) */}
-        <div className="w-full lg:w-1/2 flex justify-center min-w-0">
-          <div className="w-full max-w-[460px] min-h-[290px] sm:min-h-[340px] bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center min-w-0">
-            {/* Exact Dashboard Alert Component: Image, Title, and Messages */}
-            <div className="w-full h-full relative z-10 flex items-center justify-center p-1 sm:p-2 min-w-0">
-              <div className="w-full max-w-[440px] flex items-center justify-center min-w-0">
+        {/* Right Side: Clean Default Flat Preview (Fixed W and H, 100% Stable) */}
+        <div className="w-full lg:w-1/2 flex justify-center items-center min-w-0">
+          <div className="w-full max-w-[460px] h-[340px] sm:h-[370px] bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center justify-center min-w-0 shrink-0 overflow-hidden">
+            {/* Absolute Centered Stage: Prevents Any W or H Mutation During Animation Changes */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-2 sm:p-4 min-w-0 overflow-hidden pointer-events-none">
+              <div className="w-full max-w-[440px] flex flex-col items-center justify-center pointer-events-auto min-w-0">
                 <NeonAlertCard
                   key={`alert-preview-${alertCycleKey}-${currentAlert.id}`}
                   className="w-full max-w-full flex flex-col items-center justify-center"
+                  style={{
+                    width: '100%',
+                    maxWidth: '440px'
+                  }}
                   alert={{
                     donationId: `preview-${alertCycleKey}`,
                     donorName: currentAlert.donorName,
