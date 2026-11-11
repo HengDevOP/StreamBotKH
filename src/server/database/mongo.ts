@@ -54,6 +54,9 @@ export interface UserDoc {
     facebook?: string;
     kick?: string;
   };
+  dailyTokensLimit?: number;
+  dailyTokensUsed?: number;
+  lastTokenResetDate?: string;
   deletionStatus?: 'pending' | 'deleted' | null;
   deletionRequestedAt?: Date | string | null;
   deletionScheduledAt?: Date | string | null;
@@ -1970,3 +1973,199 @@ export async function processExpiredAccountDeletions(): Promise<number> {
     return 0;
   }
 }
+
+// ============================================================================
+// DAILY TOKEN USAGE SYSTEM (2,000 Daily Tokens with Automatic Daily Reset)
+// ============================================================================
+
+export const DEFAULT_DAILY_TOKENS = 2000;
+
+/**
+ * Returns today's date in YYYY-MM-DD format using Asia/Bangkok (UTC+7) or fallback.
+ */
+export function getTodayDateString(): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+export interface UserTokenStats {
+  limit: number;
+  used: number;
+  remaining: number;
+  percentage: number;
+  lastResetDate: string;
+}
+
+/**
+ * Computes live token stats for a user document.
+ * If the recorded reset date is older than today, dailyTokensUsed resets to 0.
+ */
+export function computeUserTokenStats(user: any): UserTokenStats {
+  const today = getTodayDateString();
+  const limit =
+    typeof user?.dailyTokensLimit === 'number' && user.dailyTokensLimit > 0
+      ? user.dailyTokensLimit
+      : DEFAULT_DAILY_TOKENS;
+
+  const isDifferentDay = !user?.lastTokenResetDate || user.lastTokenResetDate !== today;
+  const used = isDifferentDay ? 0 : Math.max(0, Number(user?.dailyTokensUsed || 0));
+  const remaining = Math.max(0, limit - used);
+  const percentage = Math.min(100, Math.round((used / limit) * 100));
+
+  return {
+    limit,
+    used,
+    remaining,
+    percentage,
+    lastResetDate: isDifferentDay ? today : (user?.lastTokenResetDate || today)
+  };
+}
+
+/**
+ * Fetches token stats for a streamer by userId, username, or overlayToken.
+ * Automatically synchronizes daily reset in the database if a new day has arrived.
+ */
+export async function getUserTokenStats(userIdOrOverlayToken: string): Promise<UserTokenStats> {
+  const defaultStats: UserTokenStats = {
+    limit: DEFAULT_DAILY_TOKENS,
+    used: 0,
+    remaining: DEFAULT_DAILY_TOKENS,
+    percentage: 0,
+    lastResetDate: getTodayDateString()
+  };
+
+  if (!userIdOrOverlayToken) return defaultStats;
+
+  try {
+    const usersCol = await getUsersCollection();
+    const user = await usersCol.findOne({
+      $or: [
+        { userId: userIdOrOverlayToken },
+        { id: userIdOrOverlayToken as any },
+        { username: userIdOrOverlayToken },
+        { overlayToken: userIdOrOverlayToken },
+        { overlay_token: userIdOrOverlayToken }
+      ]
+    });
+
+    if (!user) return defaultStats;
+
+    const stats = computeUserTokenStats(user);
+    const today = getTodayDateString();
+
+    // If day changed, update database with reset values
+    if (user.lastTokenResetDate !== today) {
+      await usersCol.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            dailyTokensLimit: stats.limit,
+            dailyTokensUsed: 0,
+            lastTokenResetDate: today,
+            updatedAt: new Date()
+          }
+        }
+      ).catch(() => {});
+    }
+
+    return stats;
+  } catch (err) {
+    console.warn('[Tokens] Error fetching token stats:', err);
+    return defaultStats;
+  }
+}
+
+/**
+ * Deducts tokens from a user's daily allowance.
+ * Resets daily usage first if a new day has arrived.
+ */
+export async function deductUserTokens(
+  streamerIdOrToken: string,
+  cost: number
+): Promise<{ success: boolean; stats: UserTokenStats; error?: string }> {
+  const today = getTodayDateString();
+  const defaultStats: UserTokenStats = {
+    limit: DEFAULT_DAILY_TOKENS,
+    used: 0,
+    remaining: DEFAULT_DAILY_TOKENS,
+    percentage: 0,
+    lastResetDate: today
+  };
+
+  if (!streamerIdOrToken || cost <= 0) {
+    return { success: true, stats: defaultStats };
+  }
+
+  try {
+    const usersCol = await getUsersCollection();
+    const user = await usersCol.findOne({
+      $or: [
+        { userId: streamerIdOrToken },
+        { id: streamerIdOrToken as any },
+        { username: streamerIdOrToken },
+        { overlayToken: streamerIdOrToken },
+        { overlay_token: streamerIdOrToken }
+      ]
+    });
+
+    if (!user) {
+      return {
+        success: false,
+        stats: defaultStats,
+        error: 'User not found'
+      };
+    }
+
+    const currentStats = computeUserTokenStats(user);
+
+    if (currentStats.remaining < cost) {
+      return {
+        success: false,
+        stats: currentStats,
+        error: `Insufficient daily tokens. Required: ${cost}, Remaining: ${currentStats.remaining}`
+      };
+    }
+
+    const newUsed = currentStats.used + cost;
+    const newStats: UserTokenStats = {
+      limit: currentStats.limit,
+      used: newUsed,
+      remaining: Math.max(0, currentStats.limit - newUsed),
+      percentage: Math.min(100, Math.round((newUsed / currentStats.limit) * 100)),
+      lastResetDate: today
+    };
+
+    await usersCol.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          dailyTokensLimit: newStats.limit,
+          dailyTokensUsed: newUsed,
+          lastTokenResetDate: today,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    return {
+      success: true,
+      stats: newStats
+    };
+  } catch (err: any) {
+    console.error('[Tokens] Error deducting tokens:', err);
+    return {
+      success: false,
+      stats: defaultStats,
+      error: err.message || 'Error deducting tokens'
+    };
+  }
+}
+

@@ -6,6 +6,14 @@ export interface SocialLink {
   icon?: string;
 }
 
+export interface TokenUsage {
+  limit: number;
+  used: number;
+  remaining: number;
+  percentage: number;
+  lastResetDate?: string;
+}
+
 export interface Streamer {
   id: string;
   email: string;
@@ -40,6 +48,7 @@ export interface Streamer {
     facebook?: string;
     kick?: string;
   };
+  tokenUsage?: TokenUsage;
   deletionStatus?: 'pending' | 'deleted' | null;
   deletionRequestedAt?: string | null;
   deletionScheduledAt?: string | null;

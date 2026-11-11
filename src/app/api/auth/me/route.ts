@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser, generateToken } from '@/server/auth';
-import { getUsersCollection, processExpiredAccountDeletions } from '@/server/database/mongo';
+import { getUsersCollection, processExpiredAccountDeletions, computeUserTokenStats, getTodayDateString } from '@/server/database/mongo';
 import { isAdminEmail } from '@/server/database/db';
 
 export async function GET(req: NextRequest) {
@@ -94,6 +94,23 @@ export async function GET(req: NextRequest) {
   }
 
   const resolvedUserId = streamer.userId || (streamer as any).id || String(streamer._id);
+  const tokenStats = computeUserTokenStats(streamer);
+  const today = getTodayDateString();
+
+  if (streamer.lastTokenResetDate !== today) {
+    usersCol.updateOne(
+      { _id: streamer._id },
+      {
+        $set: {
+          dailyTokensLimit: tokenStats.limit,
+          dailyTokensUsed: 0,
+          lastTokenResetDate: today,
+          updatedAt: new Date()
+        }
+      }
+    ).catch(() => {});
+  }
+
   const refreshedToken =
     user.id !== resolvedUserId || user.username !== streamer.username
       ? generateToken({
@@ -135,6 +152,7 @@ export async function GET(req: NextRequest) {
       facebook: '',
       kick: ''
     },
+    tokenUsage: tokenStats,
     socialLinks: Array.isArray(streamer.socialLinks) ? streamer.socialLinks : [],
     deletionStatus: streamer.deletionStatus || null,
     deletionRequestedAt: streamer.deletionRequestedAt

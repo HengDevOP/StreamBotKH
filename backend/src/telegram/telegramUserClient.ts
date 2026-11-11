@@ -5,7 +5,7 @@ import { NewMessage } from 'telegram/events';
 import { sleep, returnBigInt, getRandomInt } from 'telegram/Helpers';
 import { UpdateConnectionState } from 'telegram/network';
 import { v4 as uuidv4 } from 'uuid';
-import { broadcastAlertToOverlay, broadcastDonationToDashboard, getIO } from '../../../src/server/services/socketService';
+import { broadcastAlertToOverlay, broadcastDonationToDashboard, broadcastTokenUsageUpdated, getIO } from '../../../src/server/services/socketService';
 import { PhraseCatcher } from './phraseCatcher';
 import { findMatchingTemporaryDonation, matchBankNames, isGenericBankKeyword } from '../../../src/server/utils/nameMatching';
 import {
@@ -21,7 +21,9 @@ import {
   getSubscribersCollection,
   getSubscriberSettingsCollection,
   buildSubscriberUsernameQuery,
-  cleanupExpiredPendingDonationsMongo
+  cleanupExpiredPendingDonationsMongo,
+  deductUserTokens,
+  getUserTokenStats
 } from '../../../src/server/database/mongo';
 import { ObjectId } from 'mongodb';
 import { encryptTelegramSession, decryptTelegramSession, maskPhoneNumber, generateSecureOverlayToken } from '../../../src/server/utils/crypto';
@@ -1843,71 +1845,125 @@ class TelegramUserClientManager {
             console.warn('[TelegramJS] Could not fetch mongo alert boxes:', e);
           }
 
-          // Broadcast alert to OBS Studio overlay in real-time with current saved settings
-          broadcastAlertToOverlay(targetOverlayToken, {
-            streamerId: targetStreamerId,
-            streamerUsername: targetStreamer.username,
-            boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
-            donationId: activeDonationId,
-            donorName: effectiveDonorName,
-            donorMessage: effectiveDonorMessage,
-            donor_message: effectiveDonorMessage,
-            message: effectiveDonorMessage,
-            amount: effectiveAmount,
-            currency: effectiveCurrency,
-            bankingName: effectiveBankingName,
-            isSubscription: isSubscription || undefined,
-            tierId: tierId || undefined,
-            tierName: tierName || undefined,
-            badgeText: badgeText || undefined,
-            badgeColor: badgeColor || undefined,
-            videoUrl: effectiveVideoUrl,
-            videoTitle: effectiveVideoTitle,
-            videoStartTime: effectiveVideoStartTime,
-            videoEndTime: effectiveVideoEndTime,
-            videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
-            videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
-            videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
-            templateStyle: (isSubscription && tierAlertSettings?.templateStyle) || matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
-            textTemplate: isSubscription
-              ? (tierAlertSettings?.textTemplate || '{name} joined as a {tier} subscriber!')
-              : (matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!'),
-            textColor: (isSubscription && tierAlertSettings?.textColor) || matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
-            donorColor: (isSubscription && (tierAlertSettings?.subscriberColor || tierAlertSettings?.donorColor)) || matchingBox?.donorColor || undefined,
-            amountColor: (isSubscription && (tierAlertSettings?.tierColor || tierAlertSettings?.amountColor)) || matchingBox?.amountColor || undefined,
-            customGifUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-            mediaUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-            showImage: (isSubscription && tierAlertSettings?.showImage !== undefined) ? tierAlertSettings.showImage : (matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0)),
-            fontFamily: (isSubscription && tierAlertSettings?.fontFamily) || matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
-            fontSize: (isSubscription && tierAlertSettings?.fontSize) || matchingBox?.fontSize || alertSettings?.font_size || 28,
-            layoutMode: (isSubscription && tierAlertSettings?.layoutMode) || matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
-            animationStyle: (isSubscription && tierAlertSettings?.animationStyle) || matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
-            glowColor: (isSubscription && (tierAlertSettings?.glowColor || badgeColor)) || (matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF'),
-            soundUrl: (isSubscription && tierAlertSettings?.soundUrl)
-              ? tierAlertSettings.soundUrl
-              : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
-                  ? matchingBox.soundUrl
-                  : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
-                      ? alertSettings.sound_url
-                      : '/sounds/cash-register-kaching.mp3')),
-            soundVolume: (isSubscription && tierAlertSettings?.soundVolume !== undefined)
-              ? tierAlertSettings.soundVolume
-              : (matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85),
-            durationSeconds: (isSubscription && tierAlertSettings?.durationSeconds)
-              ? tierAlertSettings.durationSeconds
-              : (effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
-                  ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
-                  : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8)),
-            ttsEnabled: (isSubscription && tierAlertSettings?.ttsEnabled !== undefined)
+          // Determine TTS state & token cost: 20 tokens if TTS included, 15 tokens if no TTS
+          const isTtsActive = Boolean(
+            (isSubscription && tierAlertSettings?.ttsEnabled !== undefined)
               ? tierAlertSettings.ttsEnabled
-              : (matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1)),
-            ttsType: (isSubscription && tierAlertSettings?.ttsType)
-              ? tierAlertSettings.ttsType
-              : (matchingBox?.ttsType || alertSettings?.tts_type || 'google'),
-            clonedVoiceSampleUrl: (isSubscription && tierAlertSettings?.clonedVoiceSampleUrl)
-              ? tierAlertSettings.clonedVoiceSampleUrl
-              : (matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url)
-          });
+              : (matchingBox?.ttsEnabled !== undefined
+                  ? matchingBox.ttsEnabled
+                  : ((alertSettings?.tts_enabled ?? 1) === 1))
+          );
+
+          let finalTtsActive = isTtsActive;
+          let tokenCost = finalTtsActive ? 20 : 15;
+
+          // Attempt token deduction (2,000 tokens daily allowance with automatic daily reset)
+          let tokenDeduction = await deductUserTokens(targetStreamerId, tokenCost);
+
+          // Graceful fallback: If user lacks 20 tokens for TTS but has >= 15 tokens, downgrade TTS to false and deduct 15 tokens
+          if (!tokenDeduction.success && finalTtsActive && tokenCost === 20) {
+            const fallbackCheck = await deductUserTokens(targetStreamerId, 15);
+            if (fallbackCheck.success) {
+              tokenDeduction = fallbackCheck;
+              finalTtsActive = false;
+              tokenCost = 15;
+              console.log(`⚡ [TelegramJS] Low tokens for @${targetStreamer.username}: downgraded TTS to false (charged 15 tokens instead of 20).`);
+            }
+          }
+
+          if (tokenDeduction.success) {
+            console.log(`🎯 [TelegramJS Alert] Charged ${tokenCost} tokens to @${targetStreamer.username} (TTS: ${finalTtsActive ? 'ON (20 tokens)' : 'OFF (15 tokens)'}). Remaining: ${tokenDeduction.stats.remaining}/${tokenDeduction.stats.limit}`);
+
+            // Broadcast alert to OBS Studio overlay in real-time with current saved settings
+            broadcastAlertToOverlay(targetOverlayToken, {
+              streamerId: targetStreamerId,
+              streamerUsername: targetStreamer.username,
+              boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
+              donationId: activeDonationId,
+              donorName: effectiveDonorName,
+              donorMessage: effectiveDonorMessage,
+              donor_message: effectiveDonorMessage,
+              message: effectiveDonorMessage,
+              amount: effectiveAmount,
+              currency: effectiveCurrency,
+              bankingName: effectiveBankingName,
+              isSubscription: isSubscription || undefined,
+              tierId: tierId || undefined,
+              tierName: tierName || undefined,
+              badgeText: badgeText || undefined,
+              badgeColor: badgeColor || undefined,
+              videoUrl: effectiveVideoUrl,
+              videoTitle: effectiveVideoTitle,
+              videoStartTime: effectiveVideoStartTime,
+              videoEndTime: effectiveVideoEndTime,
+              videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
+              videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
+              videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
+              templateStyle: (isSubscription && tierAlertSettings?.templateStyle) || matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
+              textTemplate: isSubscription
+                ? (tierAlertSettings?.textTemplate || '{name} joined as a {tier} subscriber!')
+                : (matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!'),
+              textColor: (isSubscription && tierAlertSettings?.textColor) || matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+              donorColor: (isSubscription && (tierAlertSettings?.subscriberColor || tierAlertSettings?.donorColor)) || matchingBox?.donorColor || undefined,
+              amountColor: (isSubscription && (tierAlertSettings?.tierColor || tierAlertSettings?.amountColor)) || matchingBox?.amountColor || undefined,
+              customGifUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+              mediaUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+              showImage: (isSubscription && tierAlertSettings?.showImage !== undefined) ? tierAlertSettings.showImage : (matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0)),
+              fontFamily: (isSubscription && tierAlertSettings?.fontFamily) || matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
+              fontSize: (isSubscription && tierAlertSettings?.fontSize) || matchingBox?.fontSize || alertSettings?.font_size || 28,
+              layoutMode: (isSubscription && tierAlertSettings?.layoutMode) || matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
+              animationStyle: (isSubscription && tierAlertSettings?.animationStyle) || matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
+              glowColor: (isSubscription && (tierAlertSettings?.glowColor || badgeColor)) || (matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF'),
+              soundUrl: (isSubscription && tierAlertSettings?.soundUrl)
+                ? tierAlertSettings.soundUrl
+                : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+                    ? matchingBox.soundUrl
+                    : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
+                        ? alertSettings.sound_url
+                        : '/sounds/cash-register-kaching.mp3')),
+              soundVolume: (isSubscription && tierAlertSettings?.soundVolume !== undefined)
+                ? tierAlertSettings.soundVolume
+                : (matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85),
+              durationSeconds: (isSubscription && tierAlertSettings?.durationSeconds)
+                ? tierAlertSettings.durationSeconds
+                : (effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
+                    ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
+                    : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8)),
+              ttsEnabled: finalTtsActive,
+              ttsType: (isSubscription && tierAlertSettings?.ttsType)
+                ? tierAlertSettings.ttsType
+                : (matchingBox?.ttsType || alertSettings?.tts_type || 'google'),
+              clonedVoiceSampleUrl: (isSubscription && tierAlertSettings?.clonedVoiceSampleUrl)
+                ? tierAlertSettings.clonedVoiceSampleUrl
+                : (matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url)
+            });
+
+            // Broadcast updated token balance to streamer dashboard in real-time
+            broadcastTokenUsageUpdated(targetStreamerId, tokenDeduction.stats);
+            if (targetOverlayToken && targetOverlayToken !== targetStreamerId) {
+              broadcastTokenUsageUpdated(targetOverlayToken, tokenDeduction.stats);
+            }
+          } else {
+            console.warn(`⚠️ [TelegramJS Alert] Daily token limit reached for @${targetStreamer.username} (${tokenDeduction.stats.used}/${tokenDeduction.stats.limit} tokens used). Alert overlay suppressed.`);
+            broadcastTokenUsageUpdated(targetStreamerId, tokenDeduction.stats);
+            if (targetOverlayToken && targetOverlayToken !== targetStreamerId) {
+              broadcastTokenUsageUpdated(targetOverlayToken, tokenDeduction.stats);
+            }
+
+            try {
+              const { addMongoMailboxMessage } = await import('../../../src/server/database/mongo');
+              await addMongoMailboxMessage({
+                streamerId: targetStreamerId,
+                title: 'Daily Token Limit Reached (2,000 Tokens) ⚡',
+                senderName: 'System Token Monitor',
+                category: 'system',
+                content: `You have consumed all 2,000 daily tokens for today. Incoming donations are still logged in your ledger, but overlay alerts are paused until your daily tokens reset at 00:00.`,
+                actionUrl: '/dashboard',
+                actionLabel: 'View Dashboard',
+                priority: 'high'
+              });
+            } catch (_) {}
+          }
 
           // Broadcast to Streamer Dashboard (Updates revenue live)
           broadcastDonationToDashboard(targetStreamerId, {
@@ -1921,6 +1977,9 @@ class TelegramUserClientManager {
             status: 'PAID',
             is_subscription: isSubscription,
             subscriber: subscriberRecord,
+            tokenCost: tokenDeduction.success ? tokenCost : 0,
+            tokenExhausted: !tokenDeduction.success,
+            tokensRemaining: tokenDeduction.stats.remaining,
             created_at: new Date().toISOString(),
             paid_at: new Date().toISOString()
           });

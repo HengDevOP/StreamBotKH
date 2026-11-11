@@ -73,7 +73,9 @@ import {
   PartyPopper,
   Pickaxe,
   Mic,
-  Upload
+  Upload,
+  Zap,
+  RotateCcw
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -83,7 +85,7 @@ import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { useSocket } from '../context/SocketContext';
 import { streamerService } from '../services/streamerService';
-import { StreamerDashboardStats, PaymentSettings } from '../types/streamer';
+import { StreamerDashboardStats, PaymentSettings, TokenUsage } from '../types/streamer';
 import { AlertSettings } from '../types/alert';
 import { detectPlatform, SocialLinkItem } from '../utils/socialPlatforms';
 import { Button } from '../components/common/Button';
@@ -410,6 +412,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   });
   const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [liveTokenUsage, setLiveTokenUsage] = useState<TokenUsage | null>(null);
+
+  const currentTokenStats: TokenUsage = liveTokenUsage || user?.tokenUsage || {
+    limit: 2000,
+    used: 0,
+    remaining: 2000,
+    percentage: 0
+  };
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
   const [videoHasUnsavedChanges, setVideoHasUnsavedChanges] = useState(false);
   const [unsavedTabs, setUnsavedTabs] = useState<Record<string, boolean>>({});
@@ -925,15 +935,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       handleIncomingDonation(paidData);
     };
 
+    const handleTokenUsageUpdated = (stats: TokenUsage) => {
+      if (stats && typeof stats.limit === 'number') {
+        setLiveTokenUsage(stats);
+      }
+    };
+
     socket.on('donation:new', handleIncomingDonation);
     socket.on('donation:paid', handleDonationPaid);
     socket.on('donation:alert', handleDonationPaid);
+    socket.on('streamer:token_usage_updated', handleTokenUsageUpdated);
 
     return () => {
       socket.off('connect', joinRooms);
       socket.off('donation:new', handleIncomingDonation);
       socket.off('donation:paid', handleDonationPaid);
       socket.off('donation:alert', handleDonationPaid);
+      socket.off('streamer:token_usage_updated', handleTokenUsageUpdated);
     };
   }, [user, socket]);
 
@@ -1572,97 +1590,98 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           label: 'Live Chat',
           icon: MessageSquare,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'subscribers' as DashboardTab,
           label: 'Membership',
           icon: Crown,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'donation' as DashboardTab,
           label: 'Alertbox',
           icon: Bell,
-          badge: null
+          badge: null,
+          isLocked: false
         },
         {
           id: 'leaderboard' as DashboardTab,
           label: 'Leaderboard',
           icon: Trophy,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'goal' as DashboardTab,
           label: 'Goals',
           icon: Target,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'custom-overlay' as DashboardTab,
           label: 'Custom Overlay',
           icon: Layers,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'timer' as DashboardTab,
           label: 'Timer',
           icon: Timer,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'soundboard' as DashboardTab,
           label: 'Soundboard',
           icon: Volume2,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'video-alerts' as DashboardTab,
           label: 'Video Share',
           icon: Video,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'wheel' as DashboardTab,
           label: 'Wheels',
           icon: Disc,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'pokemon' as DashboardTab,
           label: '2D Pokémon',
           icon: Gamepad2,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'fireworks' as DashboardTab,
           label: 'Fireworks',
           icon: PartyPopper,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'minecraft' as DashboardTab,
           label: 'Minecraft',
           icon: Pickaxe,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         },
         {
           id: 'clone-tts' as DashboardTab,
           label: 'Clone TTS',
           icon: Mic,
           badge: null,
-          isLocked: currentPlan === 'free' && !isAdmin && !isTrialActive
+          isLocked: false
         }
       ]
     },
@@ -1828,7 +1847,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           <div
             className={`absolute z-50 bg-[#0F1422] border border-slate-800/90 rounded-2xl shadow-[0_-10px_35px_rgba(0,0,0,0.7)] p-1.5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200 ${
               isCollapsed
-                ? 'bottom-2 left-full ml-2.5 w-56'
+                ? 'bottom-2 left-full ml-2.5 w-64'
                 : 'bottom-full left-2 right-2 mb-2'
             }`}
           >
@@ -1875,6 +1894,58 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 </p>
               </div>
             </button>
+
+            {/* Subtle Divider */}
+            <div className="my-1 border-t border-slate-800/70" />
+
+            {/* Daily Token Usage Card (Percentage Design) */}
+            <div className="mx-0.5 my-1 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-inner">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-1.5 text-slate-300">
+                  <Zap size={13} className="text-cyan-400 fill-cyan-400/20" />
+                  <span className="text-[11px] font-bold font-['Chakra_Petch'] tracking-wide uppercase text-slate-200">
+                    Daily Tokens
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span
+                    className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      currentTokenStats.percentage >= 90
+                        ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20'
+                        : currentTokenStats.percentage >= 70
+                        ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
+                        : 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20'
+                    }`}
+                  >
+                    {currentTokenStats.percentage}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Percentage Progress Bar */}
+              <div className="w-full h-2 rounded-full bg-slate-950 border border-slate-800/80 overflow-hidden relative">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    currentTokenStats.percentage >= 90
+                      ? 'bg-gradient-to-r from-amber-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                      : 'bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 shadow-[0_0_8px_rgba(6,182,212,0.4)]'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, currentTokenStats.percentage))}%` }}
+                />
+              </div>
+
+              {/* Tokens numeric breakdown & Daily Reset Indicator */}
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-1.5">
+                <span className="text-slate-300 font-semibold">
+                  {currentTokenStats.used.toLocaleString()}{' '}
+                  <span className="text-slate-500 font-normal">/ {currentTokenStats.limit.toLocaleString()}</span>
+                </span>
+                <span className="text-slate-500 flex items-center gap-1 text-[9px]">
+                  <RotateCcw size={9} className="text-slate-500" />
+                  Daily Reset
+                </span>
+              </div>
+            </div>
 
             {/* Subtle Divider */}
             <div className="my-1 border-t border-slate-800/70" />
@@ -2454,95 +2525,42 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           )}
 
           {/* ============================================================== */}
-          {/* PRO PLAN STREAM ASSETS (LEADERBOARD, GOALS, TIMER, SOUNDBOARD, VIDEO ALERTS, WHEELS, LIVE CHAT, SUBSCRIBERS) */}
+          {/* STREAM ASSETS (AVAILABLE FOR ALL PLANS)                        */}
           {/* ============================================================== */}
-          {(['leaderboard', 'goal', 'timer', 'soundboard', 'video-alerts', 'wheel', 'chat', 'subscribers', 'pokemon', 'clone-tts'] as DashboardTab[]).includes(activeTab) &&
-            currentPlan === 'free' &&
-            !isAdmin &&
-            !isTrialActive && (
-              <div className="p-8 sm:p-12 rounded-2xl bg-gradient-to-b from-[#0e1424] to-[#090D18] border border-amber-500/30 text-center max-w-2xl mx-auto space-y-6 my-8 shadow-2xl">
-                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/20 mx-auto">
-                  <Lock size={32} />
-                </div>
-                <div className="space-y-2">
-                  <span className="text-[11px] font-mono uppercase tracking-widest text-amber-400 font-bold px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
-                    Pro Plan Feature
-                  </span>
-                  <h3 className="text-2xl font-bold text-white font-['Chakra_Petch']">
-                    {currentTabTitle} is Available on Pro Plan
-                  </h3>
-                  <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
-                    Leaderboard, Goals, Subathon Timer, Soundboard, Video Share, Spinning Wheels, and Live Chat are included in the{' '}
-                    <strong className="text-white">Pro Plan ($4.99/mo)</strong> along with 100MB storage and removed donation page watermark.
-                  </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                  {trialSettings?.isEnabled && !hasUsedTrial && (
-                    <button
-                      type="button"
-                      onClick={handleClaimTrial}
-                      disabled={claimingTrial}
-                      className="py-3 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
-                    >
-                      <Gift size={15} />
-                      <span>{claimingTrial ? 'Activating...' : `Start Free ${trialSettings.durationDays || 7}-Day Trial`}</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setUpgradeFeatureName(currentTabTitle);
-                      setIsVideoUpgradeModalOpen(true);
-                    }}
-                    className="py-3 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-purple-500/20 transition-all cursor-pointer"
-                  >
-                    <Sparkles size={14} />
-                    <span>Upgrade to Pro Plan</span>
-                  </button>
-                </div>
-
-                {hasUsedTrial && (
-                  <p className="text-[11px] text-amber-400/80 font-mono pt-1">
-                    • Your 7-day free trial has expired. Upgrade to Pro to continue using {currentTabTitle}.
-                  </p>
-                )}
-              </div>
-            )}
-
-          {activeTab === 'leaderboard' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'leaderboard' && (
             <LeaderboardWidgetManager
               streamerToken={user?.overlayToken}
               recentDonations={stats?.recentDonations}
             />
           )}
 
-          {activeTab === 'goal' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'goal' && (
             <GoalWidgetManager
               streamerToken={user?.overlayToken}
               totalRaised={stats?.summary?.totalRevenueUsd || 0}
             />
           )}
 
-          {activeTab === 'custom-overlay' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'custom-overlay' && (
             <CustomOverlayManager
               streamerToken={user?.overlayToken}
               onNavigateToGoals={() => setActiveTab('goal')}
             />
           )}
 
-          {activeTab === 'timer' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'timer' && (
             <TimerWidgetManager
               streamerToken={user?.overlayToken}
             />
           )}
 
-          {activeTab === 'soundboard' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'soundboard' && (
             <SoundboardManager
               streamerToken={user?.overlayToken}
             />
           )}
 
-          {activeTab === 'video-alerts' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'video-alerts' && (
             <VideoAlertsManager
               streamerToken={user?.overlayToken}
               isLocked={false}
@@ -2556,7 +2574,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             />
           )}
 
-          {activeTab === 'wheel' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'wheel' && (
             <SpinningWheelManager
               streamerToken={user?.overlayToken}
               streamerUsername={user?.username}
@@ -2573,7 +2591,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             />
           )}
 
-          {activeTab === 'chat' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'chat' && (
             <LiveChatWidgetManager
               streamerToken={user?.overlayToken}
               isLocked={false}
@@ -2584,7 +2602,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             />
           )}
 
-          {activeTab === 'subscribers' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'subscribers' && (
             <SubscribersManager
               streamerToken={user?.overlayToken}
               streamerUsername={user?.username}
@@ -2596,11 +2614,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             />
           )}
 
-          {activeTab === 'pokemon' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'pokemon' && (
             <PokemonWidgetManager streamerToken={user?.overlayToken} />
           )}
 
-          {activeTab === 'clone-tts' && (currentPlan !== 'free' || isAdmin) && (
+          {activeTab === 'clone-tts' && (
             <CloneTtsManager
               user={user}
               currentPlan={currentPlan}

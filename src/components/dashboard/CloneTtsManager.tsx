@@ -77,7 +77,7 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
   isAdmin = false,
   onUpgrade
 }) => {
-  const isProUser = currentPlan === 'pro' || isAdmin;
+  const isProUser = true; // All features unlocked for free plan users
 
   // Voice list & active alert status
   const [clones, setClones] = useState<VoiceCloneItem[]>([]);

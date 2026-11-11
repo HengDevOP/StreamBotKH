@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
-import { getUsersCollection, getGatewayConfigCollection, getTemporaryDonationsCollection, getStreamChatSettingsCollection } from '@/server/database/mongo';
+import { getUsersCollection, getGatewayConfigCollection, getTemporaryDonationsCollection, getStreamChatSettingsCollection, computeUserTokenStats, getTodayDateString } from '@/server/database/mongo';
 import { sanitizeSocialLinks } from '@/utils/socialPlatforms';
 import { extractYoutubeId, getYoutubeLiveStats } from '@/utils/youtube';
 import { broadcastTvStreamerUpdated } from '@/server/services/socketService';
@@ -87,6 +87,22 @@ export async function GET(req: NextRequest) {
     }
 
     const userSocialLinks = Array.isArray(streamer.socialLinks) ? streamer.socialLinks : [];
+    const tokenStats = computeUserTokenStats(streamer);
+    const today = getTodayDateString();
+
+    if (streamer.lastTokenResetDate !== today) {
+      usersCol.updateOne(
+        { _id: streamer._id },
+        {
+          $set: {
+            dailyTokensLimit: tokenStats.limit,
+            dailyTokensUsed: 0,
+            lastTokenResetDate: today,
+            updatedAt: new Date()
+          }
+        }
+      ).catch(() => {});
+    }
 
     return NextResponse.json({
       id: streamer.userId || (streamer as any).id || String(streamer._id),
@@ -99,6 +115,7 @@ export async function GET(req: NextRequest) {
       customThanksMessage: streamer.customThanksMessage || '',
       socialLinks: userSocialLinks,
       links: userSocialLinks,
+      tokenUsage: tokenStats,
       isVerified: Boolean(streamer.isVerified),
       plan: streamer.plan || 'free',
       overlayToken: streamer.overlayToken || streamer.overlay_token,

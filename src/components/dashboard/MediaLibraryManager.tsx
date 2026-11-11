@@ -92,12 +92,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   const [showProModal, setShowProModal] = useState(false);
   const [proModalFeature, setProModalFeature] = useState('Presets Library');
 
-  const isProOrTrial =
-    currentPlan === 'pro' ||
-    currentPlan === 'starter' ||
-    Boolean(isTrialActive) ||
-    Boolean(isAdmin) ||
-    storageInfo?.plan === 'pro';
+  const isProOrTrial = true; // All features unlocked for free plan users
 
   // Section Selector: 'uploads' | 'template' | 'mlbb' | 'stickers' | 'gifs' | 'sounds'
   const [activeSection, setActiveSection] = useState<'uploads' | 'template' | 'mlbb' | 'stickers' | 'gifs' | 'sounds'>('uploads');

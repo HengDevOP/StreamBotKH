@@ -296,6 +296,9 @@ export async function upsertGoogleStreamer(profile: {
           isVerified,
           plan,
           socialLinks,
+          dailyTokensLimit: 2000,
+          dailyTokensUsed: 0,
+          lastTokenResetDate: new Date().toISOString().slice(0, 10),
           createdAt: new Date()
         }
       },

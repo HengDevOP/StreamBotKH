@@ -637,6 +637,19 @@ export function broadcastDonationToDashboard(streamerId: string, donation: any) 
   activeIo.emit('donation:paid', payload);
 }
 
+export function broadcastTokenUsageUpdated(
+  streamerIdOrToken: string,
+  stats: { limit: number; used: number; remaining: number; percentage: number; lastResetDate?: string }
+) {
+  const activeIo = getIO();
+  if (!activeIo || !streamerIdOrToken) return;
+  activeIo.to(`dashboard:${streamerIdOrToken}`).emit('streamer:token_usage_updated', stats);
+  activeIo.to(`overlay:${streamerIdOrToken}`).emit('streamer:token_usage_updated', stats);
+  if (streamerIdOrToken !== 'demo-token' && streamerIdOrToken !== 'demo-streamer-id-1001') {
+    activeIo.to('dashboard:demo-streamer-id-1001').emit('streamer:token_usage_updated', stats);
+  }
+}
+
 export function broadcastMediaUpdate(userId: string, data: { media: any[]; storage: any }) {
   const activeIo = getIO();
   if (!activeIo) return;

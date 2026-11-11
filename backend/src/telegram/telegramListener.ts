@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { PhraseCatcher, ParsedDonationPhrase } from './phraseCatcher';
 import { v4 as uuidv4 } from 'uuid';
-import { broadcastAlertToOverlay, broadcastDonationToDashboard } from '../../../src/server/services/socketService';
+import { broadcastAlertToOverlay, broadcastDonationToDashboard, broadcastTokenUsageUpdated } from '../../../src/server/services/socketService';
 import { findMatchingTemporaryDonation, isGenericBankKeyword } from '../../../src/server/utils/nameMatching';
 import {
   getUsersCollection,
@@ -11,7 +11,8 @@ import {
   getTemporaryDonationsCollection,
   getAlertBoxesCollection,
   resolveMatchingAlertBox,
-  cleanupExpiredPendingDonationsMongo
+  cleanupExpiredPendingDonationsMongo,
+  deductUserTokens
 } from '../../../src/server/database/mongo';
 
 export interface TelegramListenerConfig {
@@ -524,10 +525,43 @@ export class TelegramGroupListener {
         clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url
       };
 
-      // 4. Broadcast to OBS Browser Source Overlay & Streamer Dashboard
-      if (streamerOverlayToken) {
-        broadcastAlertToOverlay(streamerOverlayToken, alertPayload);
+      // Determine alert token cost: 20 tokens if TTS is active, 15 tokens if no TTS
+      const isTtsActive = Boolean(alertPayload.ttsEnabled);
+      let finalTtsActive = isTtsActive;
+      let tokenCost = finalTtsActive ? 20 : 15;
+
+      // Attempt token deduction (2,000 daily tokens limit)
+      let tokenDeduction = await deductUserTokens(streamerId, tokenCost);
+
+      // Low tokens fallback: downgrade TTS to false if >= 15 tokens available
+      if (!tokenDeduction.success && finalTtsActive && tokenCost === 20) {
+        const fallbackCheck = await deductUserTokens(streamerId, 15);
+        if (fallbackCheck.success) {
+          tokenDeduction = fallbackCheck;
+          finalTtsActive = false;
+          tokenCost = 15;
+          alertPayload.ttsEnabled = false;
+          console.log(`⚡ [TelegramListener] Low tokens for @${streamer.username}: downgraded TTS to false (15 tokens charged).`);
+        }
       }
+
+      // 4. Broadcast to OBS Browser Source Overlay & Streamer Dashboard
+      if (tokenDeduction.success) {
+        if (streamerOverlayToken) {
+          broadcastAlertToOverlay(streamerOverlayToken, alertPayload);
+        }
+        broadcastTokenUsageUpdated(streamerId, tokenDeduction.stats);
+        if (streamerOverlayToken && streamerOverlayToken !== streamerId) {
+          broadcastTokenUsageUpdated(streamerOverlayToken, tokenDeduction.stats);
+        }
+      } else {
+        console.warn(`⚠️ [TelegramListener] Daily token limit reached for @${streamer.username} (${tokenDeduction.stats.used}/${tokenDeduction.stats.limit} tokens used). Alert overlay suppressed.`);
+        broadcastTokenUsageUpdated(streamerId, tokenDeduction.stats);
+        if (streamerOverlayToken && streamerOverlayToken !== streamerId) {
+          broadcastTokenUsageUpdated(streamerOverlayToken, tokenDeduction.stats);
+        }
+      }
+
       broadcastDonationToDashboard(streamerId, {
         id: activeDonationId,
         donor_name: effectiveDonorName,
@@ -537,6 +571,9 @@ export class TelegramGroupListener {
         banking_name: effectiveBankingName,
         payment_method: 'TELEGRAM_GROUP_ALERT',
         status: 'PAID',
+        tokenCost: tokenDeduction.success ? tokenCost : 0,
+        tokenExhausted: !tokenDeduction.success,
+        tokensRemaining: tokenDeduction.stats.remaining,
         created_at: new Date().toISOString()
       });
 
