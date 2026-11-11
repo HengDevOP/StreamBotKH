@@ -1952,12 +1952,13 @@ class TelegramUserClientManager {
 
             try {
               const { addMongoMailboxMessage } = await import('../../../src/server/database/mongo');
+              const limitStr = tokenDeduction.stats.limit.toLocaleString();
               await addMongoMailboxMessage({
                 streamerId: targetStreamerId,
-                title: 'Daily Token Limit Reached (2,000 Tokens) ⚡',
+                title: `Daily Token Limit Reached (${limitStr} Tokens) ⚡`,
                 senderName: 'System Token Monitor',
                 category: 'system',
-                content: `You have consumed all 2,000 daily tokens for today. Incoming donations are still logged in your ledger, but overlay alerts are paused until your daily tokens reset at 00:00.`,
+                content: `You have consumed all ${limitStr} daily tokens for today. Incoming donations are still logged in your ledger, but overlay alerts are paused until your daily tokens reset at 2:00 PM Singapore Time (14:00 SGT).`,
                 actionUrl: '/dashboard',
                 actionLabel: 'View Dashboard',
                 priority: 'high'

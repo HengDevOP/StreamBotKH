@@ -94,16 +94,16 @@ export async function GET(req: NextRequest) {
   }
 
   const resolvedUserId = streamer.userId || (streamer as any).id || String(streamer._id);
-  const tokenStats = computeUserTokenStats(streamer);
+  const tokenStats = computeUserTokenStats({ ...streamer, plan: currentPlan, trialActive });
   const today = getTodayDateString();
 
-  if (streamer.lastTokenResetDate !== today) {
+  if (streamer.lastTokenResetDate !== today || streamer.dailyTokensLimit !== tokenStats.limit) {
     usersCol.updateOne(
       { _id: streamer._id },
       {
         $set: {
           dailyTokensLimit: tokenStats.limit,
-          dailyTokensUsed: 0,
+          dailyTokensUsed: streamer.lastTokenResetDate !== today ? 0 : Math.min(Number(streamer?.dailyTokensUsed || 0), tokenStats.limit),
           lastTokenResetDate: today,
           updatedAt: new Date()
         }

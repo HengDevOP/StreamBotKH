@@ -463,10 +463,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     return () => clearInterval(timer);
   }, [computeResetCountdown]);
 
+  const isPro = currentPlan === 'pro' || user?.plan === 'pro';
+  const defaultLimit = isPro ? 10000 : 2000;
   const currentTokenStats: TokenUsage = liveTokenUsage || user?.tokenUsage || {
-    limit: 2000,
+    limit: defaultLimit,
     used: 0,
-    remaining: 2000,
+    remaining: defaultLimit,
     percentage: 100
   };
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
@@ -1904,12 +1906,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Fixed Sidebar Footer: Single Fixed "Settings" Button with Animated Dropup Menu (Profile & Log Out)
   const renderSidebarFooter = (isCollapsed: boolean) => {
     const isSettingsActive = activeTab === 'account';
-    const planBadgeText = (currentPlan === 'pro' || user?.plan === 'pro') ? 'PRO' : 'FREE';
-    const tokenLimit = currentTokenStats.limit || 2000;
+    const isPro = currentPlan === 'pro' || user?.plan === 'pro';
+    const planBadgeText = isPro ? 'PRO' : 'FREE';
+    const defaultLimit = isPro ? 10000 : 2000;
+    const tokenLimit = currentTokenStats.limit || defaultLimit;
     const tokenRemaining = typeof currentTokenStats.remaining === 'number'
       ? currentTokenStats.remaining
       : Math.max(0, tokenLimit - (currentTokenStats.used || 0));
-    // 2,000 tokens count as 100%; progress bar drains down as client uses tokens
+    // Full daily tokens (2,000 for Free, 10,000 for Pro) count as 100%; progress bar drains down as client uses tokens
     const remainingPercentage = Math.max(
       0,
       Math.min(100, Math.round((tokenRemaining / tokenLimit) * 100))
@@ -3754,6 +3758,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     <ul className="space-y-2.5 text-xs text-slate-300 flex-1">
                       <li className="flex items-center gap-2 text-cyan-300 font-semibold">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
+                        <span>2,000 Daily Tokens (Global Reset at 2:00 PM SGT)</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-cyan-300 font-semibold">
+                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
                         <span>20MB Media Storage Quota</span>
                       </li>
                       <li className="flex items-center gap-2 text-emerald-300 font-semibold">
@@ -3851,6 +3859,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Share, Wheels), and removed watermark.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
+                      <li className="flex items-center gap-2 text-purple-300 font-semibold">
+                        <Check size={14} className="text-purple-400 flex-shrink-0" />
+                        <span>10,000 Daily Tokens (5x Usage Allowance • Reset Daily)</span>
+                      </li>
                       <li className="flex items-center gap-2 text-purple-300 font-semibold">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
                         <span>100MB Media Cloud Storage (MP4, GIF, MP3, WAV, All Formats)</span>

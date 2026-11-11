@@ -237,6 +237,7 @@ export async function PUT(req: NextRequest) {
       }
 
       updateFields.plan = normalizedPlan;
+      updateFields.dailyTokensLimit = normalizedPlan === 'pro' ? 10000 : 2000;
       updateFields.planStartedAt = planStartedAt;
       updateFields.planExpiresAt = planExpiresAt;
       updateFields.planDurationDays = planDurationDays;

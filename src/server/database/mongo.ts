@@ -2002,10 +2002,64 @@ export async function processExpiredAccountDeletions(): Promise<number> {
 }
 
 // ============================================================================
-// DAILY TOKEN USAGE SYSTEM (2,000 Daily Tokens with Automatic Daily Reset)
+// DAILY TOKEN USAGE SYSTEM (Free: 2,000 / Pro: 10,000 Daily Tokens with Daily Reset)
 // ============================================================================
 
 export const DEFAULT_DAILY_TOKENS = 2000;
+export const PRO_DAILY_TOKENS = 10000; // 5x token allowance for Pro plan users
+
+/**
+ * Helper to check if a user qualifies for the Pro plan benefits (Pro subscription, active trial, or admin).
+ */
+export function isProUser(user: any): boolean {
+  if (!user) return false;
+  if (user.isAdmin || user.role === 'admin') return true;
+
+  // Active 7-Day Free Pro Trial
+  if (user.trialActive) {
+    if (user.trialEndDate) {
+      const endMs = new Date(user.trialEndDate).getTime();
+      if (!isNaN(endMs) && endMs <= Date.now()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Active Pro Subscription
+  const plan = String(user.plan || '').toLowerCase();
+  if (plan === 'pro' || plan === 'premium' || plan === 'trial') {
+    if (user.planExpiresAt) {
+      const expMs = new Date(user.planExpiresAt).getTime();
+      if (!isNaN(expMs) && expMs <= Date.now()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Returns the effective daily token limit based on user's active plan.
+ * Free Plan: 2,000 daily tokens
+ * Pro Plan (and active trial): 10,000 daily tokens (5x multiplier)
+ */
+export function getUserDailyTokenLimit(user: any): number {
+  if (isProUser(user)) {
+    if (typeof user?.dailyTokensLimit === 'number' && user.dailyTokensLimit > PRO_DAILY_TOKENS) {
+      return user.dailyTokensLimit;
+    }
+    return PRO_DAILY_TOKENS;
+  }
+
+  if (typeof user?.dailyTokensLimit === 'number' && user.dailyTokensLimit > 0 && user.dailyTokensLimit !== PRO_DAILY_TOKENS) {
+    return user.dailyTokensLimit;
+  }
+
+  return DEFAULT_DAILY_TOKENS;
+}
 
 /**
  * Global Daily Reset Time: 2:00 PM (14:00) Singapore Time (Asia/Singapore, UTC+8).
@@ -2112,15 +2166,12 @@ export interface UserTokenStats {
 export function computeUserTokenStats(user: any): UserTokenStats {
   const today = getTodayDateString();
   const nextResetDate = getNextSingaporeResetTime();
-  const limit =
-    typeof user?.dailyTokensLimit === 'number' && user.dailyTokensLimit > 0
-      ? user.dailyTokensLimit
-      : DEFAULT_DAILY_TOKENS;
+  const limit = getUserDailyTokenLimit(user);
 
   const isDifferentDay = !user?.lastTokenResetDate || user.lastTokenResetDate !== today;
   const used = isDifferentDay ? 0 : Math.max(0, Number(user?.dailyTokensUsed || 0));
   const remaining = Math.max(0, limit - used);
-  // 2,000 tokens count as 100%; percentage progress decreases down as tokens are used
+  // Full tokens count as 100%; percentage progress decreases down as tokens are consumed
   const percentage = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
 
   return {
@@ -2167,14 +2218,14 @@ export async function getUserTokenStats(userIdOrOverlayToken: string): Promise<U
     const stats = computeUserTokenStats(user);
     const today = getTodayDateString();
 
-    // If day changed, update database with reset values
-    if (user.lastTokenResetDate !== today) {
+    // If day changed OR if user's stored limit doesn't match their current plan, update database
+    if (user.lastTokenResetDate !== today || user.dailyTokensLimit !== stats.limit) {
       await usersCol.updateOne(
         { _id: user._id },
         {
           $set: {
             dailyTokensLimit: stats.limit,
-            dailyTokensUsed: 0,
+            dailyTokensUsed: user.lastTokenResetDate !== today ? 0 : Math.min(Number(user?.dailyTokensUsed || 0), stats.limit),
             lastTokenResetDate: today,
             updatedAt: new Date()
           }

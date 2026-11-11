@@ -341,6 +341,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               <ul className="space-y-3.5 text-xs text-slate-300 flex-1">
                 <li className="flex items-center gap-3 text-cyan-300 font-semibold">
                   <Check size={16} className="text-cyan-400 flex-shrink-0" />
+                  <span>2,000 Daily Tokens (Global Reset at 2:00 PM SGT)</span>
+                </li>
+                <li className="flex items-center gap-3 text-cyan-300 font-semibold">
+                  <Check size={16} className="text-cyan-400 flex-shrink-0" />
                   <span>20MB Storage</span>
                 </li>
                 <li className="flex items-center gap-3 text-emerald-300 font-semibold">
@@ -430,6 +434,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <div className="h-px bg-purple-500/20 my-6" />
 
                 <ul className="space-y-3.5 text-xs text-slate-200 flex-1">
+                  <li className="flex items-center gap-3 text-purple-300 font-semibold">
+                    <Check size={16} className="text-purple-400 flex-shrink-0" />
+                    <span>10,000 Daily Tokens (5x Usage Allowance • Reset Daily)</span>
+                  </li>
                   <li className="flex items-center gap-3 text-purple-300 font-semibold">
                     <Check size={16} className="text-purple-400 flex-shrink-0" />
                     <span>100MB Storage</span>
