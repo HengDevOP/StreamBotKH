@@ -339,45 +339,21 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               <div className="h-px bg-slate-800 my-6" />
 
               <ul className="space-y-3.5 text-xs text-slate-300 flex-1">
-                <li className="flex items-center gap-3 text-cyan-300 font-semibold">
+                <li className="flex items-center gap-3 font-semibold text-cyan-300">
                   <Check size={16} className="text-cyan-400 flex-shrink-0" />
                   <span>2,000 Daily Tokens (Global Reset at 2:00 PM SGT)</span>
                 </li>
-                <li className="flex items-center gap-3 text-cyan-300 font-semibold">
+                <li className="flex items-center gap-3 font-semibold text-cyan-300">
                   <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                  <span>20MB Storage</span>
+                  <span>20MB Storage Quota</span>
                 </li>
-                <li className="flex items-center gap-3 text-emerald-300 font-semibold">
+                <li className="flex items-center gap-3 text-slate-400">
+                  <span className="w-4 text-center font-mono text-slate-500">•</span>
+                  <span>Powered by streambotkh.com watermark</span>
+                </li>
+                <li className="flex items-center gap-3 text-emerald-400 font-semibold pt-1 border-t border-slate-800/80">
                   <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                  <span>Payment Gateway Included (ABA PayWay &amp; Bakong KHQR)</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                  <span>Alertbox &amp; 60FPS OBS Browser Overlay</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                  <span>Telegram Bot Notification Integration</span>
-                </li>
-                <li className="flex items-center gap-3 text-slate-600">
-                  <span className="w-4 text-center">-</span>
-                  <span>Removed Watermark on Donation Page</span>
-                </li>
-                <li className="flex items-center gap-3 text-slate-600">
-                  <span className="w-4 text-center">-</span>
-                  <span>Donor Leaderboard (20 Unique Styles)</span>
-                </li>
-                <li className="flex items-center gap-3 text-slate-600">
-                  <span className="w-4 text-center">-</span>
-                  <span>Goal Progress Bar &amp; Subathon Timer</span>
-                </li>
-                <li className="flex items-center gap-3 text-slate-600">
-                  <span className="w-4 text-center">-</span>
-                  <span>Soundboard with PC Hotkey SFX Engine</span>
-                </li>
-                <li className="flex items-center gap-3 text-slate-600">
-                  <span className="w-4 text-center">-</span>
-                  <span>Video Share &amp; Spinning Wheels</span>
+                  <span>All stream features, alerts &amp; widgets fully accessible</span>
                 </li>
               </ul>
             </div>
@@ -434,45 +410,21 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <div className="h-px bg-purple-500/20 my-6" />
 
                 <ul className="space-y-3.5 text-xs text-slate-200 flex-1">
-                  <li className="flex items-center gap-3 text-purple-300 font-semibold">
+                  <li className="flex items-center gap-3 font-semibold text-purple-300">
                     <Check size={16} className="text-purple-400 flex-shrink-0" />
                     <span>20,000 Daily Tokens (10x Usage Allowance • Reset Daily)</span>
                   </li>
-                  <li className="flex items-center gap-3 text-purple-300 font-semibold">
+                  <li className="flex items-center gap-3 font-semibold text-purple-300">
                     <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>100MB Storage</span>
+                    <span>100MB Cloud Storage (5x Storage Quota)</span>
                   </li>
-                  <li className="flex items-center gap-3 text-emerald-300 font-semibold">
+                  <li className="flex items-center gap-3 font-semibold text-purple-300">
+                    <Check size={16} className="text-purple-400 flex-shrink-0" />
+                    <span>Removed Watermark (100% Clean Custom Branding)</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-emerald-400 font-semibold pt-1 border-t border-purple-500/20">
                     <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                    <span>Unlock Leaderboard, Goals &amp; Subathon Timer</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-emerald-300 font-semibold">
-                    <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                    <span>Unlock Soundboard, Video Share &amp; Spinning Wheels</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-emerald-300 font-semibold">
-                    <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                    <span>Removed Watermark (Clean Donation Page)</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>Payment Gateway (ABA PayWay &amp; Bakong KHQR) + Telegram Bot</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>Text-to-Speech (TTS) Voice Donor Reader</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>Zero-latency queued alert dispatcher</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>Multiple caster overlay tokens</span>
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>Priority 24/7 direct Telegram SLA</span>
+                    <span>All stream features, alerts &amp; widgets fully accessible</span>
                   </li>
                 </ul>
               </div>
@@ -544,9 +496,14 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               <tr>
+                <td className="py-3.5 px-6 font-medium text-white">Daily Usage Allowance (Global Reset at 2:00 PM SGT)</td>
+                <td className="py-3.5 px-6 text-center text-cyan-400 font-bold">2,000 Tokens</td>
+                <td className="py-3.5 px-6 text-center text-purple-400 font-bold">20,000 Tokens (10x Usage)</td>
+              </tr>
+              <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Media Storage Limit (MP4, GIF, MP3, WAV, All Formats)</td>
                 <td className="py-3.5 px-6 text-center text-cyan-400 font-bold">20MB</td>
-                <td className="py-3.5 px-6 text-center text-purple-400 font-bold">100MB</td>
+                <td className="py-3.5 px-6 text-center text-purple-400 font-bold">100MB (5x Storage)</td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Removed Watermark (Clean Donation Page)</td>
@@ -560,53 +517,48 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Telegram Bot &amp; GramJS Listener</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Alertbox &amp; OBS 60FPS Browser Overlay</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Donor Leaderboard (20 Unique Styles)</td>
-                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Goal Progress Bar &amp; Subathon Timer</td>
-                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">PC Hotkey Soundboard Engine</td>
-                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Video Share (YouTube Media Share)</td>
-                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Interactive Spinning Wheels Widget</td>
-                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Web Speech TTS Donor Voice Reader</td>
-                <td className="py-3.5 px-6 text-center text-slate-600">-</td>
-                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-cyan-400" /></td>
-              </tr>
-              <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Alert Queue Buffer</td>
-                <td className="py-3.5 px-6 text-center">Standard</td>
-                <td className="py-3.5 px-6 text-center text-purple-400 font-semibold">Priority Zero-Latency</td>
+                <td className="py-3.5 px-6 font-medium text-white">Text-to-Speech (TTS) Voice Donor Reader</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Support SLA</td>
-                <td className="py-3.5 px-6 text-center">Community</td>
-                <td className="py-3.5 px-6 text-center text-purple-400 font-semibold">24/7 Direct Telegram</td>
+                <td className="py-3.5 px-6 text-center text-cyan-400 font-semibold">24/7 Community &amp; Telegram</td>
+                <td className="py-3.5 px-6 text-center text-purple-400 font-semibold">24/7 Priority Telegram SLA</td>
               </tr>
             </tbody>
           </table>

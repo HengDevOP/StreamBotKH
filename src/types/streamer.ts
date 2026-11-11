@@ -6,13 +6,23 @@ export interface SocialLink {
   icon?: string;
 }
 
+export interface TokenBucket {
+  limit: number;
+  used: number;
+  remaining: number;
+  percentage: number;
+}
+
 export interface TokenUsage {
+  isPro?: boolean;
   limit: number;
   used: number;
   remaining: number;
   percentage: number;
   lastResetDate?: string;
   nextResetAt?: string;
+  free?: TokenBucket;
+  pro?: TokenBucket;
 }
 
 export interface Streamer {

@@ -2150,38 +2150,101 @@ export function formatResetDuration(targetDate: Date, now = new Date()): string 
   return `${minutes}m`;
 }
 
+export interface TokenBucket {
+  limit: number;
+  used: number;
+  remaining: number;
+  percentage: number;
+}
+
 export interface UserTokenStats {
+  isPro: boolean;
   limit: number;
   used: number;
   remaining: number;
   percentage: number;
   lastResetDate: string;
   nextResetAt: string;
+  free: TokenBucket;
+  pro?: TokenBucket;
 }
 
 /**
  * Computes live token stats for a user document.
- * If the recorded reset date is older than today, dailyTokensUsed resets to 0.
+ * Free plan: 2,000 daily tokens, resets daily at 2:00 PM SGT.
+ * Pro plan: Dual usage limits (Free 2,000 tokens used first, then Pro 20,000 tokens).
+ * While on Pro, the Free tokens stop resetting daily. The Pro tokens reset daily as normal.
  */
 export function computeUserTokenStats(user: any): UserTokenStats {
   const today = getTodayDateString();
   const nextResetDate = getNextSingaporeResetTime();
-  const limit = getUserDailyTokenLimit(user);
+  const userIsPro = isProUser(user);
 
-  const isDifferentDay = !user?.lastTokenResetDate || user.lastTokenResetDate !== today;
-  const used = isDifferentDay ? 0 : Math.max(0, Number(user?.dailyTokensUsed || 0));
-  const remaining = Math.max(0, limit - used);
-  // Full tokens count as 100%; percentage progress decreases down as tokens are consumed
-  const percentage = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+  const freeLimit = 2000;
+  const proLimit = 20000;
 
-  return {
-    limit,
-    used,
-    remaining,
-    percentage,
-    lastResetDate: isDifferentDay ? today : (user?.lastTokenResetDate || today),
-    nextResetAt: nextResetDate.toISOString()
-  };
+  if (userIsPro) {
+    // 1. Pro tokens reset daily at 2:00 PM SGT
+    const isDifferentDayPro = !user?.lastTokenResetDate || user.lastTokenResetDate !== today;
+    const proUsed = isDifferentDayPro ? 0 : Math.max(0, Number(user?.proTokensUsed ?? user?.dailyTokensUsed ?? 0));
+    const proRemaining = Math.max(0, proLimit - proUsed);
+    const proPercentage = Math.max(0, Math.min(100, Math.round((proRemaining / proLimit) * 100)));
+
+    // 2. Free tokens: "the free plan token will stop reseting until the client plan is reset to free back."
+    // While on Pro, free tokens DO NOT reset daily. They persist until exhausted or plan reverts to Free.
+    const freeUsed = Math.min(freeLimit, Math.max(0, Number(user?.freeTokensUsed ?? (user?.dailyTokensUsed && user.dailyTokensUsed <= 2000 ? user.dailyTokensUsed : 0))));
+    const freeRemaining = Math.max(0, freeLimit - freeUsed);
+    const freePercentage = Math.max(0, Math.min(100, Math.round((freeRemaining / freeLimit) * 100)));
+
+    const totalLimit = freeLimit + proLimit;
+    const totalRemaining = freeRemaining + proRemaining;
+    const totalUsed = freeUsed + proUsed;
+    const totalPercentage = Math.max(0, Math.min(100, Math.round((totalRemaining / totalLimit) * 100)));
+
+    return {
+      isPro: true,
+      limit: totalLimit,
+      used: totalUsed,
+      remaining: totalRemaining,
+      percentage: totalPercentage,
+      lastResetDate: isDifferentDayPro ? today : (user?.lastTokenResetDate || today),
+      nextResetAt: nextResetDate.toISOString(),
+      free: {
+        limit: freeLimit,
+        used: freeUsed,
+        remaining: freeRemaining,
+        percentage: freePercentage
+      },
+      pro: {
+        limit: proLimit,
+        used: proUsed,
+        remaining: proRemaining,
+        percentage: proPercentage
+      }
+    };
+  } else {
+    // Free plan: 2,000 tokens resetting daily at 2:00 PM SGT
+    const isDifferentDay = !user?.lastTokenResetDate || user.lastTokenResetDate !== today;
+    const freeUsed = isDifferentDay ? 0 : Math.max(0, Number(user?.freeTokensUsed ?? user?.dailyTokensUsed ?? 0));
+    const freeRemaining = Math.max(0, freeLimit - freeUsed);
+    const freePercentage = Math.max(0, Math.min(100, Math.round((freeRemaining / freeLimit) * 100)));
+
+    return {
+      isPro: false,
+      limit: freeLimit,
+      used: freeUsed,
+      remaining: freeRemaining,
+      percentage: freePercentage,
+      lastResetDate: isDifferentDay ? today : (user?.lastTokenResetDate || today),
+      nextResetAt: nextResetDate.toISOString(),
+      free: {
+        limit: freeLimit,
+        used: freeUsed,
+        remaining: freeRemaining,
+        percentage: freePercentage
+      }
+    };
+  }
 }
 
 /**
@@ -2189,16 +2252,7 @@ export function computeUserTokenStats(user: any): UserTokenStats {
  * Automatically synchronizes daily reset in the database if a new day has arrived.
  */
 export async function getUserTokenStats(userIdOrOverlayToken: string): Promise<UserTokenStats> {
-  const nextResetDate = getNextSingaporeResetTime();
-  const defaultStats: UserTokenStats = {
-    limit: DEFAULT_DAILY_TOKENS,
-    used: 0,
-    remaining: DEFAULT_DAILY_TOKENS,
-    percentage: 100,
-    lastResetDate: getTodayDateString(),
-    nextResetAt: nextResetDate.toISOString()
-  };
-
+  const defaultStats = computeUserTokenStats(null);
   if (!userIdOrOverlayToken) return defaultStats;
 
   try {
@@ -2218,19 +2272,25 @@ export async function getUserTokenStats(userIdOrOverlayToken: string): Promise<U
     const stats = computeUserTokenStats(user);
     const today = getTodayDateString();
 
-    // If day changed OR if user's stored limit doesn't match their current plan, update database
-    if (user.lastTokenResetDate !== today || user.dailyTokensLimit !== stats.limit) {
-      await usersCol.updateOne(
-        { _id: user._id },
-        {
-          $set: {
-            dailyTokensLimit: stats.limit,
-            dailyTokensUsed: user.lastTokenResetDate !== today ? 0 : Math.min(Number(user?.dailyTokensUsed || 0), stats.limit),
-            lastTokenResetDate: today,
-            updatedAt: new Date()
-          }
-        }
-      ).catch(() => {});
+    // If day changed, synchronize daily reset in MongoDB
+    if (user.lastTokenResetDate !== today) {
+      const updateFields: any = {
+        lastTokenResetDate: today,
+        updatedAt: new Date()
+      };
+      if (stats.isPro) {
+        // Pro plan: proTokensUsed resets to 0 daily; freeTokensUsed does NOT reset on Pro!
+        updateFields.proTokensUsed = 0;
+        updateFields.dailyTokensUsed = 0;
+        updateFields.dailyTokensLimit = 20000;
+      } else {
+        // Free plan: freeTokensUsed resets to 0 daily
+        updateFields.freeTokensUsed = 0;
+        updateFields.dailyTokensUsed = 0;
+        updateFields.dailyTokensLimit = 2000;
+      }
+
+      await usersCol.updateOne({ _id: user._id }, { $set: updateFields }).catch(() => {});
     }
 
     return stats;
@@ -2242,25 +2302,18 @@ export async function getUserTokenStats(userIdOrOverlayToken: string): Promise<U
 
 /**
  * Deducts tokens from a user's daily allowance.
- * Resets daily usage first if a new day has arrived.
+ * Pro users consume the Free bucket first, then transition to Pro tokens.
+ * The Free bucket stops resetting daily while on Pro; Pro tokens reset daily.
  */
 export async function deductUserTokens(
   streamerIdOrToken: string,
   cost: number
 ): Promise<{ success: boolean; stats: UserTokenStats; error?: string }> {
   const today = getTodayDateString();
-  const nextResetDate = getNextSingaporeResetTime();
-  const defaultStats: UserTokenStats = {
-    limit: DEFAULT_DAILY_TOKENS,
-    used: 0,
-    remaining: DEFAULT_DAILY_TOKENS,
-    percentage: 100,
-    lastResetDate: today,
-    nextResetAt: nextResetDate.toISOString()
-  };
+  const emptyStats = computeUserTokenStats(null);
 
   if (!streamerIdOrToken || cost <= 0) {
-    return { success: true, stats: defaultStats };
+    return { success: true, stats: emptyStats };
   }
 
   try {
@@ -2278,54 +2331,114 @@ export async function deductUserTokens(
     if (!user) {
       return {
         success: false,
-        stats: defaultStats,
+        stats: emptyStats,
         error: 'User not found'
       };
     }
 
     const currentStats = computeUserTokenStats(user);
 
-    if (currentStats.remaining < cost) {
+    if (currentStats.isPro) {
+      // PRO PLAN DEDUCTION:
+      const freeRemaining = currentStats.free.remaining;
+      const proRemaining = currentStats.pro ? currentStats.pro.remaining : 0;
+      const totalRemaining = freeRemaining + proRemaining;
+
+      if (totalRemaining < cost) {
+        return {
+          success: false,
+          stats: currentStats,
+          error: `Insufficient tokens. Required: ${cost}, Available: ${totalRemaining}`
+        };
+      }
+
+      let newFreeUsed = currentStats.free.used;
+      let newProUsed = currentStats.pro ? currentStats.pro.used : 0;
+
+      // Consume Free tokens first; if exhausted, continue to Pro tokens
+      if (freeRemaining >= cost) {
+        newFreeUsed += cost;
+      } else if (freeRemaining > 0) {
+        const fromFree = freeRemaining;
+        const fromPro = cost - fromFree;
+        newFreeUsed += fromFree; // Free bucket fully exhausted (2,000 / 2,000)
+        newProUsed += fromPro;
+      } else {
+        newProUsed += cost;
+      }
+
+      const updatedUserDoc = {
+        ...user,
+        freeTokensUsed: newFreeUsed,
+        proTokensUsed: newProUsed,
+        dailyTokensUsed: newProUsed,
+        lastTokenResetDate: today
+      };
+
+      const newStats = computeUserTokenStats(updatedUserDoc);
+
+      await usersCol.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            freeTokensUsed: newFreeUsed,
+            proTokensUsed: newProUsed,
+            dailyTokensUsed: newProUsed,
+            dailyTokensLimit: 20000,
+            lastTokenResetDate: today,
+            updatedAt: new Date()
+          }
+        }
+      );
+
       return {
-        success: false,
-        stats: currentStats,
-        error: `Insufficient daily tokens. Required: ${cost}, Remaining: ${currentStats.remaining}`
+        success: true,
+        stats: newStats
+      };
+    } else {
+      // FREE PLAN DEDUCTION:
+      const freeRemaining = currentStats.free.remaining;
+      if (freeRemaining < cost) {
+        return {
+          success: false,
+          stats: currentStats,
+          error: `Insufficient daily tokens. Required: ${cost}, Remaining: ${freeRemaining}`
+        };
+      }
+
+      const newFreeUsed = currentStats.free.used + cost;
+      const updatedUserDoc = {
+        ...user,
+        freeTokensUsed: newFreeUsed,
+        dailyTokensUsed: newFreeUsed,
+        lastTokenResetDate: today
+      };
+
+      const newStats = computeUserTokenStats(updatedUserDoc);
+
+      await usersCol.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            freeTokensUsed: newFreeUsed,
+            dailyTokensUsed: newFreeUsed,
+            dailyTokensLimit: 2000,
+            lastTokenResetDate: today,
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      return {
+        success: true,
+        stats: newStats
       };
     }
-
-    const newUsed = currentStats.used + cost;
-    const remaining = Math.max(0, currentStats.limit - newUsed);
-    const remainingPercentage = Math.max(0, Math.min(100, Math.round((remaining / currentStats.limit) * 100)));
-    const newStats: UserTokenStats = {
-      limit: currentStats.limit,
-      used: newUsed,
-      remaining,
-      percentage: remainingPercentage,
-      lastResetDate: today,
-      nextResetAt: nextResetDate.toISOString()
-    };
-
-    await usersCol.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          dailyTokensLimit: newStats.limit,
-          dailyTokensUsed: newUsed,
-          lastTokenResetDate: today,
-          updatedAt: new Date()
-        }
-      }
-    );
-
-    return {
-      success: true,
-      stats: newStats
-    };
   } catch (err: any) {
     console.error('[Tokens] Error deducting tokens:', err);
     return {
       success: false,
-      stats: defaultStats,
+      stats: emptyStats,
       error: err.message || 'Error deducting tokens'
     };
   }

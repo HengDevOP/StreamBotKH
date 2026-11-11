@@ -464,12 +464,29 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   }, [computeResetCountdown]);
 
   const isPro = currentPlan === 'pro' || user?.plan === 'pro';
-  const defaultLimit = isPro ? 20000 : 2000;
+  const defaultLimit = isPro ? 22000 : 2000;
   const currentTokenStats: TokenUsage = liveTokenUsage || user?.tokenUsage || {
+    isPro,
     limit: defaultLimit,
     used: 0,
     remaining: defaultLimit,
-    percentage: 100
+    percentage: 100,
+    free: {
+      limit: 2000,
+      used: 0,
+      remaining: 2000,
+      percentage: 100
+    },
+    ...(isPro
+      ? {
+          pro: {
+            limit: 20000,
+            used: 0,
+            remaining: 20000,
+            percentage: 100
+          }
+        }
+      : {})
   };
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
   const [videoHasUnsavedChanges, setVideoHasUnsavedChanges] = useState(false);
@@ -1908,16 +1925,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     const isSettingsActive = activeTab === 'account';
     const isPro = currentPlan === 'pro' || user?.plan === 'pro';
     const planBadgeText = isPro ? 'PRO' : 'FREE';
-    const defaultLimit = isPro ? 20000 : 2000;
-    const tokenLimit = currentTokenStats.limit || defaultLimit;
-    const tokenRemaining = typeof currentTokenStats.remaining === 'number'
-      ? currentTokenStats.remaining
-      : Math.max(0, tokenLimit - (currentTokenStats.used || 0));
-    // Full daily tokens (2,000 for Free, 20,000 for Pro) count as 100%; progress bar drains down as client uses tokens
-    const remainingPercentage = Math.max(
-      0,
-      Math.min(100, Math.round((tokenRemaining / tokenLimit) * 100))
-    );
+
+    // Free token bucket
+    const freeBucket = currentTokenStats.free;
+    const freeLimit = freeBucket?.limit || 2000;
+    const freeUsed = typeof freeBucket?.used === 'number' ? freeBucket.used : (currentTokenStats.used || 0);
+    const freeRemaining = typeof freeBucket?.remaining === 'number' ? freeBucket.remaining : Math.max(0, freeLimit - freeUsed);
+    const freePercentage = typeof freeBucket?.percentage === 'number' ? freeBucket.percentage : Math.max(0, Math.min(100, Math.round((freeRemaining / freeLimit) * 100)));
+
+    // Pro token bucket (10x Usage = 20,000 tokens)
+    const proBucket = currentTokenStats.pro;
+    const proLimit = proBucket?.limit || 20000;
+    const proUsed = typeof proBucket?.used === 'number' ? proBucket.used : 0;
+    const proRemaining = typeof proBucket?.remaining === 'number' ? proBucket.remaining : Math.max(0, proLimit - proUsed);
+    const proPercentage = typeof proBucket?.percentage === 'number' ? proBucket.percentage : Math.max(0, Math.min(100, Math.round((proRemaining / proLimit) * 100)));
 
     return (
       <div
@@ -1984,36 +2005,94 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             {/* Subtle Divider */}
             <div className="my-1 border-t border-slate-800/70" />
 
-            {/* Usage Limit Card (Simple, Neutral Progress Bar) */}
-            <div className="mx-0.5 my-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70">
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch']">
-                  Usage Limit
-                </span>
-                <span className="text-[11px] font-mono text-slate-400 font-medium">
-                  {remainingPercentage}%
-                </span>
-              </div>
+            {/* Usage Limit Card: Dual progress bars for Pro users, single progress bar for Free users */}
+            {isPro ? (
+              <div className="mx-0.5 my-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70 space-y-2.5">
+                {/* 1. Free Usage Limit (Consumed first, daily reset paused on Pro) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch'] flex items-center gap-1.5">
+                      <span>Free Usage Limit</span>
+                      {freeRemaining === 0 ? (
+                        <span className="text-[9px] font-mono text-slate-500 uppercase px-1 rounded bg-slate-800">Used</span>
+                      ) : (
+                        <span className="text-[9px] font-mono text-slate-400 px-1 rounded bg-slate-800">Priority 1</span>
+                      )}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400 font-medium">
+                      {freePercentage}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ease-out ${
+                        freeRemaining === 0 ? 'bg-slate-600' : 'bg-slate-300'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, freePercentage))}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] text-slate-500 font-mono flex items-center justify-between">
+                    <span>{freeRemaining === 0 ? 'Exhausted • Switched to Pro tokens' : 'Uses first • Reset paused on Pro'}</span>
+                  </div>
+                </div>
 
-              {/* Simple Neutral Progress Bar */}
-              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-slate-300 transition-all duration-300 ease-out"
-                  style={{ width: `${Math.min(100, Math.max(0, remainingPercentage))}%` }}
-                />
-              </div>
+                <div className="border-t border-slate-800/50" />
 
-              {/* Reset Countdown Indicator */}
-              <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-1.5">
-                <span
-                  title="Global reset at 2:00 PM Singapore Time (Asia/Singapore, UTC+8)"
-                  className="flex items-center gap-1 text-[9px] text-slate-500 tracking-tight"
-                >
-                  <RotateCcw size={9} className="text-slate-500 shrink-0" />
-                  Resets in {resetCountdown}
-                </span>
+                {/* 2. Pro Usage Limit (10x Usage, resets daily as normal) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch'] flex items-center gap-1.5">
+                      <span>Pro Usage Limit</span>
+                      <span className="text-[9px] font-mono text-purple-400 font-bold px-1 rounded bg-purple-500/10 border border-purple-500/20">10x</span>
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400 font-medium">
+                      {proPercentage}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-slate-300 transition-all duration-300 ease-out"
+                      style={{ width: `${Math.min(100, Math.max(0, proPercentage))}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[9px] text-slate-500 font-mono mt-0.5">
+                    <span
+                      title="Global reset at 2:00 PM Singapore Time (Asia/Singapore, UTC+8)"
+                      className="flex items-center gap-1 text-[9px] text-slate-500 tracking-tight"
+                    >
+                      <RotateCcw size={9} className="text-slate-500 shrink-0" />
+                      Resets in {resetCountdown}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="mx-0.5 my-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch']">
+                    Usage Limit
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-400 font-medium">
+                    {freePercentage}%
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-slate-300 transition-all duration-300 ease-out"
+                    style={{ width: `${Math.min(100, Math.max(0, freePercentage))}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-1.5">
+                  <span
+                    title="Global reset at 2:00 PM Singapore Time (Asia/Singapore, UTC+8)"
+                    className="flex items-center gap-1 text-[9px] text-slate-500 tracking-tight"
+                  >
+                    <RotateCcw size={9} className="text-slate-500 shrink-0" />
+                    Resets in {resetCountdown}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Subtle Divider */}
             <div className="my-1 border-t border-slate-800/70" />
@@ -3756,29 +3835,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       Ideal for new streamers starting out. Includes Alertbox, Payment Gateway, and 20MB storage.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-300 flex-1">
-                      <li className="flex items-center gap-2 text-cyan-300 font-semibold">
+                      <li className="flex items-center gap-2 font-semibold text-cyan-300">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
                         <span>2,000 Daily Tokens (Global Reset at 2:00 PM SGT)</span>
                       </li>
-                      <li className="flex items-center gap-2 text-cyan-300 font-semibold">
+                      <li className="flex items-center gap-2 font-semibold text-cyan-300">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
                         <span>20MB Media Storage Quota</span>
                       </li>
-                      <li className="flex items-center gap-2 text-emerald-300 font-semibold">
-                        <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                        <span>Payment Gateway Included (ABA PayWay &amp; Bakong KHQR)</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>Alertbox &amp; OBS 60FPS Browser Overlay</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-slate-500">
-                        <span className="w-3.5 text-center font-mono">-</span>
-                        <span>Leaderboard, Goals, Timer, Soundboard, Video Share &amp; Wheels</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-slate-500">
-                        <span className="w-3.5 text-center font-mono">-</span>
+                      <li className="flex items-center gap-2 text-slate-400">
+                        <span className="w-3.5 text-center font-mono text-slate-500">•</span>
                         <span>Shows streambotkh.com watermark on donation page</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-emerald-400 font-semibold pt-1 border-t border-slate-800/80">
+                        <Check size={14} className="text-emerald-400 flex-shrink-0" />
+                        <span>All stream alerts, features &amp; widgets fully accessible</span>
                       </li>
                     </ul>
                   </div>
@@ -3859,37 +3930,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Share, Wheels), and removed watermark.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
-                      <li className="flex items-center gap-2 text-purple-300 font-semibold">
+                      <li className="flex items-center gap-2 font-semibold text-purple-300">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
                         <span>20,000 Daily Tokens (10x Usage Allowance • Reset Daily)</span>
                       </li>
-                      <li className="flex items-center gap-2 text-purple-300 font-semibold">
+                      <li className="flex items-center gap-2 font-semibold text-purple-300">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
-                        <span>100MB Media Cloud Storage (MP4, GIF, MP3, WAV, All Formats)</span>
+                        <span>100MB Media Cloud Storage (5x Storage Quota)</span>
                       </li>
-                      <li className="flex items-center gap-2 text-emerald-300 font-semibold">
+                      <li className="flex items-center gap-2 font-semibold text-purple-300">
+                        <Check size={14} className="text-purple-400 flex-shrink-0" />
+                        <span>Removed Watermark (Clean Custom Branding)</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-emerald-400 font-semibold pt-1 border-t border-purple-500/20">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                        <span>Unlock Leaderboard, Goals, Timer &amp; Soundboard</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-emerald-300 font-semibold">
-                        <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                        <span>Unlock Video Share &amp; Spinning Wheels</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-emerald-300 font-semibold">
-                        <Check size={14} className="text-emerald-400 flex-shrink-0" />
-                        <span>Removed Watermark (Clean Donation Page)</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>Payment Gateway &amp; Telegram Auto-Listener</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>Text-to-Speech (TTS) Voice Announcer</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>Priority 24/7 direct Telegram SLA</span>
+                        <span>All stream alerts, features &amp; widgets fully accessible</span>
                       </li>
                     </ul>
                   </div>
