@@ -1878,6 +1878,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Fixed Sidebar Footer: Single Fixed "Settings" Button with Animated Dropup Menu (Profile & Log Out)
   const renderSidebarFooter = (isCollapsed: boolean) => {
     const isSettingsActive = activeTab === 'account';
+    const planBadgeText = (currentPlan === 'pro' || user?.plan === 'pro') ? 'PRO' : 'FREE';
     const tokenLimit = currentTokenStats.limit || 2000;
     const tokenRemaining = typeof currentTokenStats.remaining === 'number'
       ? currentTokenStats.remaining
@@ -1934,11 +1935,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   <span className="text-xs font-bold text-slate-200 group-hover:text-white truncate font-['Chakra_Petch'] leading-tight">
                     Profile
                   </span>
-                  {isSettingsActive && (
-                    <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[9px] font-bold shrink-0">
-                      ACTIVE
-                    </span>
-                  )}
+                  <span
+                    className={`px-1.5 py-0.5 rounded font-mono text-[9px] font-bold shrink-0 ${
+                      planBadgeText === 'PRO'
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700/60'
+                    }`}
+                  >
+                    {planBadgeText}
+                  </span>
                 </div>
                 <p className="text-[10px] text-slate-400 font-mono truncate leading-tight mt-0.5">
                   @{user?.username}
