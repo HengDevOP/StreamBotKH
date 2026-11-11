@@ -1886,14 +1886,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center flex-shrink-0 text-rose-400 group-hover:bg-rose-500/20 transition-colors">
                 <LogOut size={15} className="transition-transform group-hover:-translate-x-0.5" />
               </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-xs font-bold font-['Chakra_Petch'] block leading-tight">
-                  Log Out
-                </span>
-                <span className="text-[10px] text-rose-400/70 font-mono block leading-tight mt-0.5">
-                  End session
-                </span>
-              </div>
+              <span className="text-xs font-bold font-['Chakra_Petch'] leading-tight">
+                Log Out
+              </span>
             </button>
           </div>
         )}
