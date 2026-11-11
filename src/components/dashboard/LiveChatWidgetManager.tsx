@@ -16,6 +16,7 @@ import {
   Eye,
   Save,
   Menu,
+  PanelRight,
   X,
   Trash2,
   RefreshCw,
@@ -1060,7 +1061,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                 title={isRightbarOpen ? 'Close Settings' : 'Open Settings'}
                 aria-label="Toggle Chat Settings"
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <PanelRight className="w-3.5 h-3.5" />
                 <span>Settings</span>
               </button>
           </div>
@@ -1183,7 +1184,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
           <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#060911]/90 flex items-center justify-between gap-3 flex-shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner flex-shrink-0">
-                <Sparkles className="w-4 h-4" />
+                <PanelRight className="w-4 h-4" />
               </div>
               <div>
                 <div className="flex items-center gap-2">

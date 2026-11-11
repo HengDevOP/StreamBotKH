@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   Sidebar,
+  PanelRight,
   Sun,
   Moon,
   Home,
@@ -2238,7 +2239,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 title={isChatSettingsOpen ? 'Close Settings' : 'Open Settings'}
                 aria-label="Toggle Live Chat Settings"
               >
-                <Sparkles size={16} className={isChatSettingsOpen ? 'text-slate-950' : 'text-cyan-400'} />
+                <PanelRight size={17} className={isChatSettingsOpen ? 'text-slate-950' : 'text-slate-300'} />
                 {chatHasUnsavedChanges && (
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
                 )}
