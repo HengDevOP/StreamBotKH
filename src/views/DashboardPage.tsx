@@ -464,7 +464,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   }, [computeResetCountdown]);
 
   const isPro = currentPlan === 'pro' || user?.plan === 'pro';
-  const defaultLimit = isPro ? 10000 : 2000;
+  const defaultLimit = isPro ? 20000 : 2000;
   const currentTokenStats: TokenUsage = liveTokenUsage || user?.tokenUsage || {
     limit: defaultLimit,
     used: 0,
@@ -1908,12 +1908,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     const isSettingsActive = activeTab === 'account';
     const isPro = currentPlan === 'pro' || user?.plan === 'pro';
     const planBadgeText = isPro ? 'PRO' : 'FREE';
-    const defaultLimit = isPro ? 10000 : 2000;
+    const defaultLimit = isPro ? 20000 : 2000;
     const tokenLimit = currentTokenStats.limit || defaultLimit;
     const tokenRemaining = typeof currentTokenStats.remaining === 'number'
       ? currentTokenStats.remaining
       : Math.max(0, tokenLimit - (currentTokenStats.used || 0));
-    // Full daily tokens (2,000 for Free, 10,000 for Pro) count as 100%; progress bar drains down as client uses tokens
+    // Full daily tokens (2,000 for Free, 20,000 for Pro) count as 100%; progress bar drains down as client uses tokens
     const remainingPercentage = Math.max(
       0,
       Math.min(100, Math.round((tokenRemaining / tokenLimit) * 100))
@@ -3861,7 +3861,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
                       <li className="flex items-center gap-2 text-purple-300 font-semibold">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
-                        <span>10,000 Daily Tokens (5x Usage Allowance • Reset Daily)</span>
+                        <span>20,000 Daily Tokens (10x Usage Allowance • Reset Daily)</span>
                       </li>
                       <li className="flex items-center gap-2 text-purple-300 font-semibold">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />

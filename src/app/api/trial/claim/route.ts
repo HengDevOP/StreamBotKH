@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
           trialEndDate: endDate,
           hasUsedTrial: true, // Mark user as having used the trial
           plan: 'pro',
-          dailyTokensLimit: 10000,
+          dailyTokensLimit: 20000,
           planStartedAt: startDate,
           planExpiresAt: endDate,
           planDurationDays: durationDays,

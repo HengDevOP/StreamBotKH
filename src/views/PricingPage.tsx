@@ -436,7 +436,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <ul className="space-y-3.5 text-xs text-slate-200 flex-1">
                   <li className="flex items-center gap-3 text-purple-300 font-semibold">
                     <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>10,000 Daily Tokens (5x Usage Allowance • Reset Daily)</span>
+                    <span>20,000 Daily Tokens (10x Usage Allowance • Reset Daily)</span>
                   </li>
                   <li className="flex items-center gap-3 text-purple-300 font-semibold">
                     <Check size={16} className="text-purple-400 flex-shrink-0" />

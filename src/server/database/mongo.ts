@@ -2002,11 +2002,11 @@ export async function processExpiredAccountDeletions(): Promise<number> {
 }
 
 // ============================================================================
-// DAILY TOKEN USAGE SYSTEM (Free: 2,000 / Pro: 10,000 Daily Tokens with Daily Reset)
+// DAILY TOKEN USAGE SYSTEM (Free: 2,000 / Pro: 20,000 Daily Tokens with Daily Reset)
 // ============================================================================
 
 export const DEFAULT_DAILY_TOKENS = 2000;
-export const PRO_DAILY_TOKENS = 10000; // 5x token allowance for Pro plan users
+export const PRO_DAILY_TOKENS = 20000; // 10x token allowance for Pro plan users (2,000 * 10)
 
 /**
  * Helper to check if a user qualifies for the Pro plan benefits (Pro subscription, active trial, or admin).
@@ -2044,7 +2044,7 @@ export function isProUser(user: any): boolean {
 /**
  * Returns the effective daily token limit based on user's active plan.
  * Free Plan: 2,000 daily tokens
- * Pro Plan (and active trial): 10,000 daily tokens (5x multiplier)
+ * Pro Plan (and active trial): 20,000 daily tokens (10x multiplier)
  */
 export function getUserDailyTokenLimit(user: any): number {
   if (isProUser(user)) {
