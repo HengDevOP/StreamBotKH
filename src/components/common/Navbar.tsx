@@ -183,7 +183,7 @@ const PRODUCTS_MENU_SECTIONS: MegaMenuSection[] = [
     ]
   },
   {
-    header: 'Monetization & TV',
+    header: 'Monetization & Television',
     items: [
       {
         title: 'Direct KHQR Tipping',
@@ -194,7 +194,7 @@ const PRODUCTS_MENU_SECTIONS: MegaMenuSection[] = [
         badge: '0% FEE'
       },
       {
-        title: 'StreamBot TV',
+        title: 'StreamBot Television',
         sub: '24/7 Creator broadcast station & multi-view player',
         href: '/tv',
         icon: Tv,
@@ -477,17 +477,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                 )}
               </div>
 
-              {/* 2. TV Direct Live Stream Route */}
+              {/* 2. Television Direct Live Stream Route */}
               <Link
                 to="/tv"
-                className={`flex items-center gap-1.5 px-3.5 lg:px-4 py-2 sm:py-2.5 rounded-xl text-sm sm:text-[15px] font-bold tracking-wide transition-colors ${
+                className={`flex items-center px-3.5 lg:px-4 py-2 sm:py-2.5 rounded-xl text-sm sm:text-[15px] font-bold tracking-wide transition-colors ${
                   active('/tv', 'tv')
                     ? 'text-emerald-400 font-extrabold'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>TV</span>
+                <span>Television</span>
               </Link>
 
               {/* 3. Pricing Route (/pricing) */}
@@ -668,17 +667,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
             )}
           </div>
 
-          {/* 2. TV Direct Link */}
+          {/* 2. Television Direct Link */}
           <button
             onClick={() => handleNav('/tv', 'tv')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 ${
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold flex items-center ${
               active('/tv', 'tv')
                 ? 'text-emerald-400 font-bold'
                 : 'text-slate-300 hover:text-white'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>TV Broadcast</span>
+            <span>Television</span>
           </button>
 
           {/* 3. Pricing */}

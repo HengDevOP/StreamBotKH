@@ -1465,7 +1465,7 @@ export const MultiStreamPage: React.FC = () => {
               <Tv size={15} />
             </div>
             <span className="text-sm font-extrabold tracking-wider font-['Chakra_Petch'] text-white">
-              TV
+              Television
             </span>
           </button>
         </div>
