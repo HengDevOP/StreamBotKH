@@ -79,7 +79,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
   const { showConfirm } = useModal();
   const { user: currentUser, impersonateUser } = useAuth();
   const [users, setUsers] = useState<AdminUserItem[]>([]);
-  const [summary, setSummary] = useState({ totalUsers: 0, proUsers: 0, freeUsers: 0 });
+  const [summary, setSummary] = useState({ totalUsers: 0, ultraUsers: 0, proUsers: 0, freeUsers: 0 });
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
     limit: USERS_PER_PAGE,
@@ -93,7 +93,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
   // Input state vs committed query state (only queries when Enter is pressed)
   const [searchInput, setSearchInput] = useState('');
   const [committedSearch, setCommittedSearch] = useState('');
-  const [planFilter, setPlanFilter] = useState<'ALL' | 'pro' | 'free'>('ALL');
+  const [planFilter, setPlanFilter] = useState<'ALL' | 'ultra' | 'pro' | 'free'>('ALL');
 
   const [loading, setLoading] = useState(true);
   const [servedFromCache, setServedFromCache] = useState(false);
@@ -108,7 +108,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
     async (
       targetPage: number,
       query: string,
-      plan: 'ALL' | 'pro' | 'free',
+      plan: 'ALL' | 'ultra' | 'pro' | 'free',
       options?: { forceRefresh?: boolean }
     ) => {
       const normalizedQuery = query.trim().toLowerCase();
@@ -213,7 +213,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
     }
   };
 
-  const handlePlanFilterChange = (nextPlan: 'ALL' | 'pro' | 'free') => {
+  const handlePlanFilterChange = (nextPlan: 'ALL' | 'ultra' | 'pro' | 'free') => {
     if (nextPlan === planFilter) return;
     setCurrentPage(1);
     setPlanFilter(nextPlan);
@@ -226,24 +226,29 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
 
   const handleUpdateUserPlan = (
     targetUser: AdminUserItem,
-    plan: 'free' | 'pro',
+    plan: 'free' | 'pro' | 'ultra',
     durationDays = 31,
     action?: 'set' | 'extend'
   ) => {
-    const isExtend = plan === 'pro' && action === 'extend';
+    const isExtend = (plan === 'pro' || plan === 'ultra') && action === 'extend';
+    const isUltraUpgrade = plan === 'ultra' && action !== 'extend';
     const isProUpgrade = plan === 'pro' && action !== 'extend';
 
     const modalTitle = isExtend
-      ? `Extend Pro Plan (+${durationDays} Days)?`
+      ? `Extend ${plan.toUpperCase()} Plan (+${durationDays} Days)?`
+      : isUltraUpgrade
+      ? `Upgrade @${targetUser.username} to Ultra Plan (Unlimited tokens, 100MB)?`
       : isProUpgrade
-      ? `Upgrade @${targetUser.username} to Pro Plan?`
-      : `Downgrade @${targetUser.username} to Free Plan?`;
+      ? `Upgrade @${targetUser.username} to Pro Plan (20,000 tokens, 20MB)?`
+      : `Downgrade @${targetUser.username} to Free Plan (2,000 tokens, 5MB)?`;
 
     const modalMessage = isExtend
-      ? `Are you sure you want to add +${durationDays} days to @${targetUser.username} (${targetUser.email})'s active Pro Plan subscription?`
+      ? `Are you sure you want to add +${durationDays} days to @${targetUser.username} (${targetUser.email})'s active ${plan.toUpperCase()} subscription?`
+      : isUltraUpgrade
+      ? `Are you sure you want to upgrade @${targetUser.username} (${targetUser.email}) to the Ultra Plan (Unlimited tokens, 100MB storage) for ${durationDays} days?`
       : isProUpgrade
-      ? `Are you sure you want to upgrade @${targetUser.username} (${targetUser.email}) to the Pro Plan (100MB storage, removed watermark) for ${durationDays} days?`
-      : `Are you sure you want to switch @${targetUser.username} (${targetUser.email}) back to the Free Plan (20MB storage)?`;
+      ? `Are you sure you want to upgrade @${targetUser.username} (${targetUser.email}) to the Pro Plan (20MB storage, 20,000 daily tokens) for ${durationDays} days?`
+      : `Are you sure you want to switch @${targetUser.username} (${targetUser.email}) back to the Free Plan (5MB storage, 2,000 tokens)?`;
 
     showConfirm({
       title: modalTitle,
@@ -251,6 +256,8 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
       type: plan === 'free' ? 'danger' : 'info',
       confirmText: isExtend
         ? `Extend +${durationDays}d`
+        : isUltraUpgrade
+        ? `Confirm Ultra (${durationDays}d)`
         : isProUpgrade
         ? `Confirm Pro (${durationDays}d)`
         : 'Confirm Free Plan',
@@ -410,20 +417,30 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 flex items-center justify-between">
           <div>
             <div className="text-[11px] font-mono uppercase text-slate-400">Total Users</div>
             <div className="text-2xl font-extrabold text-white font-mono mt-1">{summary.totalUsers}</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+          <div className="w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300">
             <Users size={20} />
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-[#090D18] border border-cyan-500/30 flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-mono uppercase text-cyan-300">Ultra VIP (∞ Tokens)</div>
+            <div className="text-2xl font-extrabold text-cyan-400 font-mono mt-1">{(summary as any).ultraUsers || 0}</div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+            <Sparkles size={20} />
           </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-[#090D18] border border-purple-500/30 flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-mono uppercase text-purple-300">Active Pro Plan (31d)</div>
+            <div className="text-[11px] font-mono uppercase text-purple-300">Active Pro Plan (20MB)</div>
             <div className="text-2xl font-extrabold text-purple-400 font-mono mt-1">{summary.proUsers}</div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
@@ -433,11 +450,11 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
 
         <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-mono uppercase text-slate-400">Free Starter Users</div>
+            <div className="text-[11px] font-mono uppercase text-slate-400">Free Users (5MB)</div>
             <div className="text-2xl font-extrabold text-slate-200 font-mono mt-1">{summary.freeUsers}</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
-            <Sparkles size={20} />
+          <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
+            <Users size={20} />
           </div>
         </div>
       </div>
@@ -489,7 +506,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
         </div>
 
         <div className="flex items-center gap-1.5">
-          {(['ALL', 'pro', 'free'] as const).map((f) => (
+          {(['ALL', 'ultra', 'pro', 'free'] as const).map((f) => (
             <button
               key={f}
               onClick={() => handlePlanFilterChange(f)}
@@ -499,7 +516,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                   : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
-              {f === 'ALL' ? 'All Plans' : f === 'pro' ? 'Pro (31d)' : 'Free'}
+              {f === 'ALL' ? 'All Plans' : f === 'ultra' ? 'Ultra (100MB)' : f === 'pro' ? 'Pro (20MB)' : 'Free (5MB)'}
             </button>
           ))}
         </div>
@@ -575,7 +592,9 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
               ) : (
                 users.map((u) => {
                   const isUpdating = updatingId === u.id;
-                  const isPro = u.plan === 'pro';
+                  const isUltra = u.plan === 'ultra';
+                  const isPro = !isUltra && u.plan === 'pro';
+                  const isSubscribed = isUltra || isPro;
 
                   return (
                     <tr key={u.id} className="hover:bg-slate-900/40 transition-colors">
@@ -635,19 +654,24 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
 
                       {/* Plan Badge */}
                       <td className="py-3.5 px-4">
-                        {u.trialActive ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[11px] font-bold uppercase">
+                        {isUltra ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-mono text-[11px] font-bold uppercase">
+                            <Sparkles size={12} className="text-cyan-400" />
+                            <span>ULTRA (∞ Tokens, 100MB)</span>
+                          </span>
+                        ) : u.trialActive ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[11px] font-bold uppercase animate-pulse">
                             <Sparkles size={12} className="text-amber-400" />
                             <span>TRIAL ({u.trialRemainingDays || 7}d left)</span>
                           </span>
                         ) : isPro ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono text-[11px] font-bold uppercase">
                             <Crown size={12} className="text-purple-400" />
-                            <span>PRO PLAN (0% Fee)</span>
+                            <span>PRO PLAN (20MB)</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[11px] font-semibold uppercase">
-                            <span>FREE (10% Fee)</span>
+                            <span>FREE (5MB)</span>
                             {u.hasUsedTrial && <span className="text-[9px] text-amber-500 font-normal ml-1">• Trial Used</span>}
                           </span>
                         )}
@@ -655,7 +679,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
 
                       {/* Duration / Expiration */}
                       <td className="py-3.5 px-4">
-                        {isPro ? (
+                        {isSubscribed ? (
                           <div className="space-y-0.5 font-mono">
                             <div className="text-emerald-400 font-bold flex items-center gap-1.5 text-xs">
                               <Clock size={12} />
@@ -705,16 +729,41 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                             )}
                           </button>
 
-                          {!isPro ? (
-                            <button
-                              onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}
-                              disabled={isUpdating}
-                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-slate-950 font-extrabold text-[11px] font-mono uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50"
-                            >
-                              {isUpdating ? 'Updating...' : 'Set Pro (31d)'}
-                            </button>
-                          ) : (
+                          {isUltra ? (
                             <>
+                              <button
+                                onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'extend')}
+                                disabled={isUpdating}
+                                title="Add +31 days to Ultra Plan"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 font-bold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <Plus size={12} />
+                                <span>31d</span>
+                              </button>
+                              <button
+                                onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}
+                                disabled={isUpdating}
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 font-semibold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                Set Pro
+                              </button>
+                              <button
+                                onClick={() => handleUpdateUserPlan(u, 'free', 0, 'set')}
+                                disabled={isUpdating}
+                                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-red-950/60 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/40 font-semibold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                Set Free
+                              </button>
+                            </>
+                          ) : isPro ? (
+                            <>
+                              <button
+                                onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'set')}
+                                disabled={isUpdating}
+                                className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-400 hover:opacity-95 text-slate-950 font-black text-[11px] font-mono uppercase transition-all cursor-pointer disabled:opacity-50"
+                              >
+                                Set Ultra
+                              </button>
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'extend')}
                                 disabled={isUpdating}
@@ -730,6 +779,23 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                                 className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-red-950/60 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/40 font-semibold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
                               >
                                 Set Free
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'set')}
+                                disabled={isUpdating}
+                                className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-400 hover:opacity-95 text-slate-950 font-black text-[11px] font-mono uppercase transition-all cursor-pointer disabled:opacity-50"
+                              >
+                                Set Ultra
+                              </button>
+                              <button
+                                onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}
+                                disabled={isUpdating}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-slate-950 font-extrabold text-[11px] font-mono uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50"
+                              >
+                                {isUpdating ? 'Updating...' : 'Set Pro (31d)'}
                               </button>
                             </>
                           )}

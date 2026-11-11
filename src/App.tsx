@@ -39,6 +39,10 @@ function DashboardRouteWrapper() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  useEffect(() => {
+    document.title = 'StreamWidgets - Creator Panel';
+  }, []);
+
   let rawTab = searchParams.get('tab') || '';
   let id = searchParams.get('id') || '';
 
@@ -303,6 +307,14 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = location.pathname;
 
   React.useEffect(() => {
+    if (pathname.startsWith('/creator') || pathname.startsWith('/dashboard')) {
+      document.title = 'StreamWidgets - Creator Panel';
+    } else if (pathname === '/pricing') {
+      document.title = 'StreamWidgets - Pricing';
+    } else if (pathname === '/') {
+      document.title = 'StreamWidgets - Home';
+    }
+
     if (pathname === '/') {
       // Landing page is strictly dark & radiant mode (no day/night mode)
       document.documentElement.classList.remove('light-mode');

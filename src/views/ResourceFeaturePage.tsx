@@ -103,7 +103,7 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
     planBadge: 'ALL PLANS',
     shortSub: 'Viewer audio & visual stream sync',
     description:
-      'Upload, preview, and manage all your custom stream assets in one centralized vault. Supports MP4, GIF, MP3, WAV, WEBM, OGG, MOV, PNG, JPG, and WEBP with up to 100MB of high-speed cloud storage on the Pro Plan.',
+      'Upload, preview, and manage all your custom stream assets in one centralized vault. Supports MP4, GIF, MP3, WAV, WEBM, OGG, MOV, PNG, JPG, and WEBP with dedicated high-speed cloud storage across Free (5MB), Pro (20MB), and Ultra (100MB) plans.',
     dashboardTab: 'media',
     color: '#3B82F6',
     icon: Layers,
@@ -115,8 +115,8 @@ export const RESOURCE_FEATURE_PAGES: ResourceFeatureDefinition[] = [
         desc: 'Upload video clips (MP4, WEBM, MOV), animated stickers (GIF, WEBP, PNG), and high-fidelity audio tracks (MP3, WAV, OGG, M4A).'
       },
       {
-        title: 'Up to 100MB Pro Cloud Storage',
-        desc: 'Free plan includes 20MB starter storage, while Pro Plan unlocks 100MB of dedicated cloud asset storage.'
+        title: 'Up to 100MB Cloud Storage',
+        desc: 'Free plan includes 5MB starter storage, Pro Plan provides 20MB, and Ultra Plan unlocks 100MB of dedicated cloud asset storage.'
       },
       {
         title: 'Instant Studio Integration',

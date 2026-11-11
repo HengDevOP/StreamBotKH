@@ -351,7 +351,7 @@ ${appUrl}
 /**
  * Sends a notification email to the client when upgraded to the Pro Plan.
  * Provides complete breakdown of Pro perks: 20,000 daily tokens (10x boost),
- * 100MB cloud storage, watermark-free broadcast, and zero fees on Bakong KHQR.
+ * 20MB cloud storage, watermark-free broadcast, and zero fees on Bakong KHQR.
  */
 export async function sendProPlanUpgradeEmail(
   params: ProPlanUpgradeEmailParams
@@ -423,7 +423,7 @@ export async function sendProPlanUpgradeEmail(
     ? `Your subscription has been extended by ${planDurationDays} days. Valid until ${formattedExpiresAt}.`
     : isTrial
     ? `Your account now has full access to StreamWidgets Pro for ${planDurationDays} days on us.`
-    : `Your creator account has been upgraded with 10x daily tokens, 100MB cloud storage, and watermark-free overlays.`;
+    : `Your creator account has been upgraded with 10x daily tokens, 20MB cloud storage, and watermark-free overlays.`;
 
   const textBody = `
 STREAMWIDGETS — PRO PLAN ${isExtend ? 'EXTENDED' : 'ACTIVATED'}
@@ -444,13 +444,13 @@ PLAN DETAILS:
 • Activated On: ${formattedStartedAt}
 • Valid Until: ${formattedExpiresAt}
 • Daily Usage Limit: 20,000 Tokens / day (10x Boost)
-• Storage Quota: 100 MB Cloud Storage (5x Boost)
+• Storage Quota: 20 MB Cloud Storage (4x Boost)
 • Overlay Branding: 100% Watermark Free
 
 WHAT IS UNLOCKED WITH PRO:
 1. 10x Daily Usage Limit (20,000 Tokens/Day)
    - Dual token system unlocked: free tokens are consumed first, then seamlessly drawn from your 20,000 Pro tokens. Daily reset occurs at 2:00 PM SGT.
-2. 100MB Cloud Storage (5x Boost)
+2. 20MB Cloud Storage (4x Boost)
    - Upload custom audio soundboard SFX, high-fps animated celebration GIFs, and custom overlays without running out of room.
 3. 100% Watermark-Free Overlays
    - StreamWidgets branding and watermarks are completely removed from all your OBS browser sources.
@@ -579,7 +579,7 @@ ${appUrl}
                 <tr>
                   <td style="padding:14px 16px;background-color:#0D1424;border:1px solid #1E293B;border-radius:10px;">
                     <div style="font-size:13px;font-weight:700;color:#A78BFA;margin-bottom:4px;">
-                      🗄️ 100MB Cloud Storage (5x Capacity)
+                      🗄️ 20MB Cloud Storage (4x Capacity)
                     </div>
                     <div style="font-size:12px;line-height:1.5;color:#94A3B8;">
                       Upload your own custom MP3 soundboard sound bites, transparent alert GIFs, custom badges, and celebration stickers without running out of room.
@@ -914,11 +914,11 @@ This is a friendly reminder that your StreamWidgets Pro Plan will expire in ${da
 WHAT HAPPENS IF YOUR PLAN EXPIRES:
 • AI Token Limit: Reverts from 20,000 down to 2,000 daily tokens.
 • Stream Overlay: StreamWidgets watermark will reappear on your broadcast screens.
-• Cloud Storage: Storage quota returns from 100MB to 20MB.
+• Cloud Storage: Storage quota returns from 20MB to 5MB.
 • DONATIONS: Your Bakong KHQR, ABA alerts, and live overlay links will continue working uninterrupted with 0% platform cuts!
 
 RENEW YOUR PRO PLAN:
-To maintain your 10x daily token boost (20,000 tokens), 100MB cloud storage, and watermark-free overlays, renew your Pro Plan ($4.99 / 31 days) before midnight:
+To maintain your 10x daily token boost (20,000 tokens), 20MB cloud storage, and watermark-free overlays, renew your Pro Plan ($4.99 / 31 days) before midnight:
 ${pricingUrl}
 
 Happy streaming,
@@ -993,7 +993,7 @@ ${appUrl}
                 <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.7;color:#94A3B8;">
                   <li>Daily AI usage limit will return from <strong>20,000 to 2,000 tokens/day</strong>.</li>
                   <li>The StreamWidgets watermark will reappear on your overlay screens.</li>
-                  <li>Cloud storage quota will adjust from <strong>100MB to 20MB</strong>.</li>
+                  <li>Cloud storage quota will adjust from <strong>20MB to 5MB</strong>.</li>
                   <li><strong style="color:#34D399;">Good news:</strong> Your Bakong KHQR tips, ABA alerts, and live overlay links will remain 100% online with 0% platform commission!</li>
                 </ul>
               </div>
@@ -1041,7 +1041,7 @@ ${appUrl}
 
 /**
  * Sends a notification email when a creator's Pro plan expires at midnight.
- * Prompts them to review their subscription and renew to re-enable 10x token capacity, 100MB storage, and watermark removal.
+ * Prompts them to review their subscription and renew to re-enable 10x token capacity, 20MB storage, and watermark removal.
  */
 export async function sendProPlanExpiredEmail(
   params: ProPlanExpiredEmailParams
@@ -1084,7 +1084,7 @@ CURRENT PLAN STATUS:
 • Account Handle: @${username}
 • Plan Status: Free Plan (Active)
 • Daily Usage Limit: 2,000 Tokens / day
-• Cloud Storage: 20 MB
+• Cloud Storage: 5 MB
 • Overlays: Active with StreamWidgets Watermark
 
 YOUR STREAM REMAINS ACTIVE:
@@ -1093,7 +1093,7 @@ Don't worry! Your OBS overlays, Bakong KHQR QR codes, and ABA Mobile live donati
 WANT TO RESTORE PRO BENEFITS?
 Renew your Pro Plan for just $4.99 / 31 days to immediately restore:
 • 20,000 daily AI tokens (10x boost)
-• 100MB cloud storage
+• 20MB cloud storage
 • 100% watermark-free broadcast overlays
 
 Review and renew your plan here:

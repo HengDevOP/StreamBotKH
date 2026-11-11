@@ -2130,9 +2130,28 @@ export async function processPlanExpirationsAndReminders(): Promise<void> {
 
 export const DEFAULT_DAILY_TOKENS = 2000;
 export const PRO_DAILY_TOKENS = 20000; // 10x token allowance for Pro plan users (2,000 * 10)
+export const ULTRA_DAILY_TOKENS = -1; // Unlimited token allowance for Ultra plan users
 
 /**
- * Helper to check if a user qualifies for the Pro plan benefits (Pro subscription, active trial, or admin).
+ * Helper to check if a user qualifies for the Ultra plan (unlimited tokens, 100MB storage).
+ */
+export function isUltraUser(user: any): boolean {
+  if (!user) return false;
+  const plan = String(user.plan || '').toLowerCase();
+  if (plan === 'ultra') {
+    if (user.planExpiresAt) {
+      const expMs = new Date(user.planExpiresAt).getTime();
+      if (!isNaN(expMs) && expMs <= Date.now()) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Helper to check if a user qualifies for the Pro plan benefits (Pro subscription, active trial, ultra, or admin).
  */
 export function isProUser(user: any): boolean {
   if (!user) return false;
@@ -2149,9 +2168,9 @@ export function isProUser(user: any): boolean {
     return true;
   }
 
-  // Active Pro Subscription
+  // Active Pro or Ultra Subscription
   const plan = String(user.plan || '').toLowerCase();
-  if (plan === 'pro' || plan === 'premium' || plan === 'trial') {
+  if (plan === 'pro' || plan === 'premium' || plan === 'trial' || plan === 'ultra') {
     if (user.planExpiresAt) {
       const expMs = new Date(user.planExpiresAt).getTime();
       if (!isNaN(expMs) && expMs <= Date.now()) {
@@ -2305,6 +2324,7 @@ export interface TokenBucket {
 
 export interface UserTokenStats {
   isPro: boolean;
+  isUltra?: boolean;
   limit: number;
   used: number;
   remaining: number;
@@ -2313,21 +2333,57 @@ export interface UserTokenStats {
   nextResetAt: string;
   free: TokenBucket;
   pro?: TokenBucket;
+  ultra?: {
+    isUnlimited: boolean;
+    remaining: number;
+  };
 }
 
 /**
  * Computes live token stats for a user document.
  * Free plan: 2,000 daily tokens, resets daily at 2:00 PM SGT.
  * Pro plan: Dual usage limits (Free 2,000 tokens used first, then Pro 20,000 tokens).
- * While on Pro, the Free tokens stop resetting daily. The Pro tokens reset daily as normal.
+ * Ultra plan: Unlimited tokens (no limited token).
  */
 export function computeUserTokenStats(user: any): UserTokenStats {
   const today = getTodayDateString();
   const nextResetDate = getNextSingaporeResetTime();
+  const userIsUltra = isUltraUser(user);
   const userIsPro = isProUser(user);
 
   const freeLimit = 2000;
   const proLimit = 20000;
+
+  if (userIsUltra) {
+    // Ultra Plan: Unlimited tokens
+    const ultraUsed = Math.max(0, Number(user?.dailyTokensUsed ?? 0));
+    return {
+      isPro: true,
+      isUltra: true,
+      limit: -1,
+      used: ultraUsed,
+      remaining: 999999,
+      percentage: 100,
+      lastResetDate: user?.lastTokenResetDate || today,
+      nextResetAt: nextResetDate.toISOString(),
+      free: {
+        limit: freeLimit,
+        used: 0,
+        remaining: freeLimit,
+        percentage: 100
+      },
+      pro: {
+        limit: proLimit,
+        used: 0,
+        remaining: proLimit,
+        percentage: 100
+      },
+      ultra: {
+        isUnlimited: true,
+        remaining: 999999
+      }
+    };
+  }
 
   if (userIsPro) {
     // 1. Pro tokens reset daily at 2:00 PM SGT
@@ -2483,6 +2539,11 @@ export async function deductUserTokens(
     }
 
     const currentStats = computeUserTokenStats(user);
+
+    if (currentStats.isUltra) {
+      // ULTRA PLAN: Unlimited tokens (no token deduction required)
+      return { success: true, stats: currentStats };
+    }
 
     if (currentStats.isPro) {
       // PRO PLAN DEDUCTION:

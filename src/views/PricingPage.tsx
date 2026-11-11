@@ -130,10 +130,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
   };
 
   const isWaitingForData = authLoading || dataLoading;
-  const isProUser = Boolean(user && user.plan === 'pro');
+  const isUltraUser = Boolean(user && user.plan === 'ultra');
+  const isProUser = Boolean(user && (user.plan === 'pro' || user.plan === 'starter' || user.plan === 'studio') && !isUltraUser);
   const hasUsedTrialAlready = Boolean(user && user.hasUsedTrial && !user.isAdmin);
   const isTrialEnabled = Boolean(trialSettings?.isEnabled);
-  const showFreeTrial = isTrialEnabled && !isProUser && !hasUsedTrialAlready;
+  const showFreeTrial = isTrialEnabled && !isProUser && !isUltraUser && !hasUsedTrialAlready;
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -162,10 +163,30 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
     return `$${origUsd.toFixed(2)}`;
   };
 
+  const getUltraPrice = () => {
+    const annualDiscount = Math.max(0, Math.min(100, Number(promo?.annualDiscountPercent ?? 10)));
+    const annualMultiplier = (100 - annualDiscount) / 100;
+    if (currency === 'KHR') {
+      const baseKhr = 60000;
+      const finalKhr = annualBilling ? Math.round(baseKhr * annualMultiplier) : baseKhr;
+      return `${finalKhr.toLocaleString()} ៛`;
+    }
+    const baseUsd = 14.99;
+    const finalUsd = annualBilling ? Number((baseUsd * annualMultiplier).toFixed(2)) : baseUsd;
+    return `$${finalUsd.toFixed(2)}`;
+  };
+
+  const getOriginalUltraPrice = () => {
+    if (currency === 'KHR') {
+      return `60,000 ៛`;
+    }
+    return `$14.99`;
+  };
+
   const faqs = [
     {
-      q: 'What are the differences between the Free and Pro plans?',
-      a: 'All stream widgets, overlays, and direct bank tipping features are 100% accessible on every plan. The Pro plan ($4.99/mo) gives you 10x daily tokens (20,000/day vs 2,000/day), expands cloud media storage to 100MB (5x capacity), and completely removes the StreamWidgets watermark from all broadcast overlays.'
+      q: 'What are the differences between Free, Pro, and Ultra plans?',
+      a: 'All stream widgets, overlays, and direct bank tipping features are 100% accessible on every plan. The Free plan provides 2,000 daily tokens and 5MB storage. The Pro plan ($4.99/mo) gives you 20,000 daily tokens (10x boost), 20MB cloud storage, and removes the watermark. The Ultra plan ($14.99/mo) unlocks Unlimited Daily Tokens (no token limit), expands cloud storage to 100MB, removes watermarks, and includes 24/7 dedicated VIP priority support.'
     },
     {
       q: 'Is the Payment Gateway available on both Free and Pro plans?',
@@ -173,7 +194,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
     },
     {
       q: 'Which stream widgets are unlocked on the Pro plan?',
-      a: 'All stream widgets—including Alert Box, Stream Avatars, 2D Pokémon, Goal Bars, Subathon Timer, Soundboard, Video Share, and Spinning Wheels—are fully unlocked and accessible on both Free and Pro plans! Upgrading to Pro gives you 10x daily tokens and removes watermarks.'
+      a: 'All stream widgets—including Alert Box, Stream Avatars, 2D Pokémon, Goal Bars, Subathon Timer, Soundboard, Video Share, and Spinning Wheels—are fully unlocked and accessible on Free, Pro, and Ultra plans! Upgrading unlocks higher daily tokens, expanded cloud storage, and removes watermarks.'
     },
     {
       q: 'Which Cambodian banks are supported by Bakong KHQR?',
@@ -185,7 +206,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
     },
     {
       q: 'Can I upgrade or downgrade my plan at any time?',
-      a: 'Yes, you can upgrade to Pro or switch back to Free whenever you wish directly from your streamer dashboard billing settings.'
+      a: 'Yes, you can upgrade to Pro or Ultra, or switch back to Free whenever you wish directly from your streamer dashboard billing settings.'
     }
   ];
 
@@ -201,9 +222,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
           Simple, transparent plans for Cambodian streamers
         </h1>
         <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed px-1">
-          {!isWaitingForData && isProUser
-            ? 'You are currently on the Pro plan with 10x daily tokens (20,000/day), 100MB cloud storage, and zero watermark. View Free tier details below.'
-            : 'Start free with 2,000 daily tokens and 20MB storage with all widgets unlocked, or upgrade to Pro for 10x daily tokens (20,000/day), 100MB storage, and 100% watermark-free overlays.'}
+          {!isWaitingForData && isUltraUser
+            ? 'You are currently on the Ultra Plan with Unlimited Daily Tokens (no token limit), 100MB cloud storage, and zero watermark.'
+            : !isWaitingForData && isProUser
+            ? 'You are currently on the Pro Plan with 10x daily tokens (20,000/day), 20MB cloud storage, and zero watermark.'
+            : 'Start free with 2,000 daily tokens and 5MB storage, upgrade to Pro for 10x tokens (20,000/day) and 20MB storage ($4.99/mo), or choose Ultra for Unlimited Tokens and 100MB storage ($14.99/mo).'}
         </p>
 
         {/* Currency & Billing Controls */}
@@ -255,6 +278,36 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* Active Ultra Banner for Ultra Users */}
+      {!isWaitingForData && isUltraUser && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-cyan-950/80 via-[#0B1528] to-purple-950/80 border border-cyan-400/50 max-w-xl mx-auto shadow-xl shadow-cyan-500/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 flex-shrink-0">
+              <Sparkles size={22} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-400/50 uppercase tracking-wider">
+                  ULTRA VIP SUBSCRIBER
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-bold text-white mt-1">
+                You are currently on the ULTRA PLAN
+              </h3>
+              <p className="text-xs text-slate-400">
+                Unlimited tokens, 100MB cloud storage vault, and zero watermark are active.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate('dashboard')}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400 text-slate-950 text-xs font-extrabold uppercase tracking-wider transition-colors flex-shrink-0 cursor-pointer shadow-md shadow-cyan-500/25"
+          >
+            Dashboard
+          </button>
+        </div>
+      )}
+
       {/* Active Pro Banner for Pro Users */}
       {!isWaitingForData && isProUser && (
         <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-950/70 via-[#120E22] to-cyan-950/70 border border-purple-500/40 max-w-xl mx-auto shadow-xl shadow-purple-500/10 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -277,7 +330,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 You are currently on the PRO PLAN
               </h3>
               <p className="text-xs text-slate-400">
-                All advanced overlays, 100MB storage, and stream assets are active on your account.
+                All advanced overlays, 20MB storage, and stream assets are active on your account.
               </p>
             </div>
           </div>
@@ -292,7 +345,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
 
       {/* Plans Section: Await Data & Trial Settings First */}
       {isWaitingForData ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto items-stretch">
           {/* Skeleton Card 1 */}
           <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-6 sm:p-8 flex flex-col h-[520px] justify-between animate-pulse shadow-xl">
             <div className="space-y-4">
@@ -300,7 +353,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               <div className="h-9 w-32 bg-slate-800 rounded" />
               <div className="h-px bg-slate-800 my-6" />
               <div className="space-y-3.5">
-                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="h-4 bg-slate-800/60 rounded w-full" />
                 ))}
               </div>
@@ -315,16 +368,31 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
               <div className="h-9 w-36 bg-purple-900/40 rounded" />
               <div className="h-px bg-purple-500/20 my-6" />
               <div className="space-y-3.5">
-                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="h-4 bg-purple-900/30 rounded w-full" />
                 ))}
               </div>
             </div>
             <div className="h-11 bg-purple-900/50 rounded-xl w-full" />
           </div>
+
+          {/* Skeleton Card 3 */}
+          <div className="rounded-2xl border border-cyan-500/30 bg-[#0B1528]/60 p-6 sm:p-8 flex flex-col h-[520px] justify-between animate-pulse shadow-xl">
+            <div className="space-y-4">
+              <div className="h-4 w-28 bg-cyan-900/40 rounded" />
+              <div className="h-9 w-36 bg-cyan-900/40 rounded" />
+              <div className="h-px bg-cyan-500/20 my-6" />
+              <div className="space-y-3.5">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="h-4 bg-cyan-900/30 rounded w-full" />
+                ))}
+              </div>
+            </div>
+            <div className="h-11 bg-cyan-900/50 rounded-xl w-full" />
+          </div>
         </div>
       ) : (
-        <div className={`grid grid-cols-1 ${isProUser ? 'max-w-xl' : 'md:grid-cols-2 max-w-5xl'} gap-6 sm:gap-8 mx-auto items-stretch`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 max-w-6xl gap-6 sm:gap-8 mx-auto items-stretch">
           {/* Plan 1: Free Plan */}
           <div className="rounded-2xl border border-slate-800 bg-[#0B0F19] p-5 xs:p-6 sm:p-8 flex flex-col h-full justify-between hover:border-slate-700 transition-colors shadow-xl">
             <div className="flex-1 flex flex-col">
@@ -345,7 +413,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 </li>
                 <li className="flex items-center gap-3 font-semibold text-cyan-300">
                   <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                  <span>20MB Storage Quota</span>
+                  <span>5MB Storage Quota</span>
                 </li>
                 <li className="flex items-center gap-3 text-slate-400">
                   <span className="w-4 text-center font-mono text-slate-500">•</span>
@@ -363,115 +431,192 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 onClick={() => onNavigate('dashboard')}
                 className="w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer"
               >
-                {isProUser ? 'Current Plan: PRO (View in Dashboard)' : 'Start Free'}
+                {!isProUser && !isUltraUser ? 'Current Plan: FREE' : 'Switch to Free'}
               </button>
             </div>
           </div>
 
-          {/* Plan 2: Pro Plan (Shown ONLY if user is NOT on Pro plan) */}
-          {!isProUser && (
-            <div className="rounded-2xl border-2 border-purple-500/80 bg-[#120E22] p-5 xs:p-6 sm:p-8 flex flex-col h-full justify-between relative shadow-2xl shadow-purple-500/10">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[10px] font-extrabold uppercase tracking-widest shadow-lg shadow-purple-500/30 whitespace-nowrap">
-                RECOMMENDED
-              </div>
-
-              <div className="flex-1 flex flex-col">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold">PRO PLAN</span>
-                    {showFreeTrial && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 animate-pulse">
-                        <Sparkles size={11} />
-                        {trialSettings?.durationDays || 7}-Day Free Trial
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-baseline gap-2.5">
-                    <span className="text-3xl font-extrabold text-white">
-                      {showFreeTrial ? '$0' : getProPrice()}
-                    </span>
-                    {showFreeTrial ? (
-                      <span className="text-xs font-mono text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                        for first {trialSettings?.durationDays || 7} days
-                      </span>
-                    ) : (
-                      <>
-                        {promo?.isActive && (
-                          <span className="text-sm font-mono text-slate-500 line-through">
-                            {getOriginalProPrice()}
-                          </span>
-                        )}
-                        <span className="text-sm font-normal text-slate-400">/ month</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="h-px bg-purple-500/20 my-6" />
-
-                <ul className="space-y-3.5 text-xs text-slate-200 flex-1">
-                  <li className="flex items-center gap-3 font-semibold text-purple-300">
-                    <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>20,000 Daily Tokens (10x Usage Allowance • Reset Daily)</span>
-                  </li>
-                  <li className="flex items-center gap-3 font-semibold text-purple-300">
-                    <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>100MB Cloud Storage (5x Storage Quota)</span>
-                  </li>
-                  <li className="flex items-center gap-3 font-semibold text-purple-300">
-                    <Check size={16} className="text-purple-400 flex-shrink-0" />
-                    <span>Removed Watermark (100% Clean Custom Branding)</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-emerald-400 font-semibold pt-1 border-t border-purple-500/20">
-                    <Check size={16} className="text-emerald-400 flex-shrink-0" />
-                    <span>All stream features, alerts &amp; widgets fully accessible</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="mt-8 pt-6 border-t border-purple-500/30 w-full space-y-2.5">
-                {showFreeTrial ? (
-                  <button
-                    type="button"
-                    onClick={handleClaimTrial}
-                    disabled={claimingTrial}
-                    className="w-full py-3.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-slate-950 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300 hover:from-amber-300 hover:to-orange-300 transition-all shadow-lg shadow-amber-500/25 cursor-pointer flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    <Gift size={16} className="text-slate-950 animate-bounce" />
-                    <span>{claimingTrial ? 'Activating Free Trial...' : `Free Trial ${trialSettings?.durationDays || 7} Days`}</span>
-                  </button>
-                ) : (
-                  <a
-                    href="https://t.me/hchenheng"
-                    onClick={() => {
-                      if (typeof window !== 'undefined') {
-                        window.location.href = 'https://t.me/hchenheng';
-                      }
-                    }}
-                    className="w-full block text-center py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-slate-950 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:opacity-95 transition-all shadow-lg shadow-purple-500/25 cursor-pointer"
-                  >
-                    Get Pro Plan
-                  </a>
-                )}
-
-                {trialSuccessMsg && (
-                  <p className="text-center text-xs text-emerald-400 font-semibold animate-pulse">
-                    {trialSuccessMsg}
-                  </p>
-                )}
-                {claimError && (
-                  <p className="text-center text-xs text-rose-400 font-medium">
-                    {claimError}
-                  </p>
-                )}
-                {hasUsedTrialAlready && (
-                  <p className="text-[10px] text-slate-400 text-center font-mono">
-                    • 7-day free trial completed. Upgrade to Pro to unlock all stream assets.
-                  </p>
-                )}
-              </div>
+          {/* Plan 2: Pro Plan */}
+          <div className="rounded-2xl border-2 border-purple-500/80 bg-[#120E22] p-5 xs:p-6 sm:p-8 flex flex-col h-full justify-between relative shadow-2xl shadow-purple-500/10">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[10px] font-extrabold uppercase tracking-widest shadow-lg shadow-purple-500/30 whitespace-nowrap">
+              POPULAR
             </div>
-          )}
+
+            <div className="flex-1 flex flex-col">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold">PRO PLAN</span>
+                  {showFreeTrial && (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 animate-pulse">
+                      <Sparkles size={11} />
+                      {trialSettings?.durationDays || 7}-Day Free Trial
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline gap-2.5">
+                  <span className="text-3xl font-extrabold text-white">
+                    {showFreeTrial ? '$0' : getProPrice()}
+                  </span>
+                  {showFreeTrial ? (
+                    <span className="text-xs font-mono text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      for first {trialSettings?.durationDays || 7} days
+                    </span>
+                  ) : (
+                    <>
+                      {promo?.isActive && (
+                        <span className="text-sm font-mono text-slate-500 line-through">
+                          {getOriginalProPrice()}
+                        </span>
+                      )}
+                      <span className="text-sm font-normal text-slate-400">/ month</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="h-px bg-purple-500/20 my-6" />
+
+              <ul className="space-y-3.5 text-xs text-slate-200 flex-1">
+                <li className="flex items-center gap-3 font-semibold text-purple-300">
+                  <Check size={16} className="text-purple-400 flex-shrink-0" />
+                  <span>20,000 Daily Tokens (10x Usage Allowance • Reset Daily)</span>
+                </li>
+                <li className="flex items-center gap-3 font-semibold text-purple-300">
+                  <Check size={16} className="text-purple-400 flex-shrink-0" />
+                  <span>20MB Cloud Storage Quota</span>
+                </li>
+                <li className="flex items-center gap-3 font-semibold text-purple-300">
+                  <Check size={16} className="text-purple-400 flex-shrink-0" />
+                  <span>Removed Watermark (100% Clean Custom Branding)</span>
+                </li>
+                <li className="flex items-center gap-3 text-emerald-400 font-semibold pt-1 border-t border-purple-500/20">
+                  <Check size={16} className="text-emerald-400 flex-shrink-0" />
+                  <span>All stream features, alerts &amp; widgets fully accessible</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-purple-500/30 w-full space-y-2.5">
+              {showFreeTrial ? (
+                <button
+                  type="button"
+                  onClick={handleClaimTrial}
+                  disabled={claimingTrial}
+                  className="w-full py-3.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-slate-950 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300 hover:from-amber-300 hover:to-orange-300 transition-all shadow-lg shadow-amber-500/25 cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <Gift size={16} className="text-slate-950 animate-bounce" />
+                  <span>{claimingTrial ? 'Activating Free Trial...' : `Free Trial ${trialSettings?.durationDays || 7} Days`}</span>
+                </button>
+              ) : isProUser ? (
+                <button
+                  onClick={() => onNavigate('dashboard')}
+                  className="w-full py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-purple-300 bg-purple-500/20 border border-purple-500/40 transition-all cursor-pointer"
+                >
+                  Current Plan: PRO
+                </button>
+              ) : (
+                <a
+                  href="https://t.me/hchenheng"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.location.href = 'https://t.me/hchenheng';
+                    }
+                  }}
+                  className="w-full block text-center py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-slate-950 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-400 hover:opacity-95 transition-all shadow-lg shadow-purple-500/25 cursor-pointer"
+                >
+                  Get Pro Plan ($4.99)
+                </a>
+              )}
+
+              {trialSuccessMsg && (
+                <p className="text-center text-xs text-emerald-400 font-semibold animate-pulse">
+                  {trialSuccessMsg}
+                </p>
+              )}
+              {claimError && (
+                <p className="text-center text-xs text-rose-400 font-medium">
+                  {claimError}
+                </p>
+              )}
+              {hasUsedTrialAlready && (
+                <p className="text-[10px] text-slate-400 text-center font-mono">
+                  • 7-day free trial completed. Upgrade to Pro to unlock all stream assets.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Plan 3: Ultra Plan */}
+          <div className="rounded-2xl border-2 border-cyan-400/90 bg-gradient-to-b from-[#0B1528] to-[#0A0D18] p-5 xs:p-6 sm:p-8 flex flex-col h-full justify-between relative shadow-2xl shadow-cyan-500/20 ring-1 ring-cyan-400/30">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-purple-500 text-slate-950 font-mono text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/40 whitespace-nowrap">
+              NO TOKEN LIMIT • MAX POWER
+            </div>
+
+            <div className="flex-1 flex flex-col">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase tracking-wider text-cyan-400 font-bold">ULTRA PLAN</span>
+                  <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[10px] font-extrabold uppercase border border-cyan-400/40">
+                    VIP
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2.5">
+                  <span className="text-3xl font-extrabold text-white">
+                    {getUltraPrice()}
+                  </span>
+                  <span className="text-sm font-normal text-slate-400">/ month</span>
+                </div>
+              </div>
+
+              <div className="h-px bg-cyan-500/20 my-6" />
+
+              <ul className="space-y-3.5 text-xs text-slate-200 flex-1">
+                <li className="flex items-center gap-3 font-bold text-cyan-300">
+                  <Zap size={16} className="text-cyan-400 flex-shrink-0" />
+                  <span>Unlimited Daily Tokens (No Token Limit • ∞ Usage)</span>
+                </li>
+                <li className="flex items-center gap-3 font-semibold text-cyan-300">
+                  <Check size={16} className="text-cyan-400 flex-shrink-0" />
+                  <span>100MB Cloud Storage Vault</span>
+                </li>
+                <li className="flex items-center gap-3 font-semibold text-cyan-300">
+                  <Check size={16} className="text-cyan-400 flex-shrink-0" />
+                  <span>Removed Watermark (100% Clean Custom Branding)</span>
+                </li>
+                <li className="flex items-center gap-3 font-semibold text-purple-300">
+                  <ShieldCheck size={16} className="text-purple-400 flex-shrink-0" />
+                  <span>24/7 Dedicated VIP Priority Telegram SLA</span>
+                </li>
+                <li className="flex items-center gap-3 text-emerald-400 font-semibold pt-1 border-t border-cyan-500/20">
+                  <Check size={16} className="text-emerald-400 flex-shrink-0" />
+                  <span>All stream features, alerts &amp; widgets fully accessible</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-cyan-500/30 w-full space-y-2.5">
+              {isUltraUser ? (
+                <button
+                  onClick={() => onNavigate('dashboard')}
+                  className="w-full py-3 px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider text-cyan-300 bg-cyan-500/20 border border-cyan-400/50 transition-all cursor-pointer"
+                >
+                  Current Plan: ULTRA
+                </button>
+              ) : (
+                <a
+                  href="https://t.me/hchenheng"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.location.href = 'https://t.me/hchenheng';
+                    }
+                  }}
+                  className="w-full block text-center py-3.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-slate-950 bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 hover:opacity-95 transition-all shadow-xl shadow-cyan-500/30 cursor-pointer"
+                >
+                  Get Ultra Plan ($14.99)
+                </a>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -492,26 +637,38 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                     </span>
                   )}
                 </th>
+                <th className="py-4 px-6 font-semibold text-center text-cyan-400 font-bold">
+                  Ultra ({getUltraPrice()}/mo)
+                  {!isWaitingForData && isUltraUser && (
+                    <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-mono inline-flex items-center gap-1">
+                      <Sparkles size={10} /> Active
+                    </span>
+                  )}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Daily Usage Allowance (Global Reset at 2:00 PM SGT)</td>
-                <td className="py-3.5 px-6 text-center text-cyan-400 font-bold">2,000 Tokens</td>
+                <td className="py-3.5 px-6 font-medium text-white">Daily Usage Allowance (Reset at 2:00 PM SGT)</td>
+                <td className="py-3.5 px-6 text-center text-slate-300 font-semibold">2,000 Tokens</td>
                 <td className="py-3.5 px-6 text-center text-purple-400 font-bold">20,000 Tokens (10x Usage)</td>
+                <td className="py-3.5 px-6 text-center text-cyan-300 font-black">Unlimited Tokens (No Limit)</td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Media Storage Limit (MP4, GIF, MP3, WAV, All Formats)</td>
-                <td className="py-3.5 px-6 text-center text-cyan-400 font-bold">20MB</td>
-                <td className="py-3.5 px-6 text-center text-purple-400 font-bold">100MB (5x Storage)</td>
+                <td className="py-3.5 px-6 font-medium text-white">Media Storage Limit (All Formats Supported)</td>
+                <td className="py-3.5 px-6 text-center text-slate-300 font-semibold">5MB</td>
+                <td className="py-3.5 px-6 text-center text-purple-400 font-bold">20MB Quota</td>
+                <td className="py-3.5 px-6 text-center text-cyan-400 font-bold">100MB Vault</td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Removed Watermark (Clean Donation Page)</td>
+                <td className="py-3.5 px-6 font-medium text-white">Removed Watermark (Clean Donation Page &amp; Overlays)</td>
                 <td className="py-3.5 px-6 text-center text-slate-500">Shows Branding</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
-                <td className="py-3.5 px-6 font-medium text-white">Payment Gateway (ABA PayWay &amp; Bakong KHQR)</td>
+                <td className="py-3.5 px-6 font-medium text-white">Payment Gateway (ABA PayWay &amp; Bakong KHQR - 0% Fee)</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
@@ -519,9 +676,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 font-medium text-white">Telegram Bot &amp; GramJS Listener</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Alertbox &amp; OBS 60FPS Browser Overlay</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
@@ -529,9 +688,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 font-medium text-white">Donor Leaderboard (20 Unique Styles)</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Goal Progress Bar &amp; Subathon Timer</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
@@ -539,9 +700,11 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 font-medium text-white">PC Hotkey Soundboard Engine</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Video Share (YouTube Media Share)</td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
@@ -549,16 +712,19 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onNavigate }) => {
                 <td className="py-3.5 px-6 font-medium text-white">Interactive Spinning Wheels Widget</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Text-to-Speech (TTS) Voice Donor Reader</td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
                 <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
+                <td className="py-3.5 px-6 text-center"><Check size={16} className="inline text-emerald-400" /></td>
               </tr>
               <tr>
                 <td className="py-3.5 px-6 font-medium text-white">Support SLA</td>
-                <td className="py-3.5 px-6 text-center text-cyan-400 font-semibold">24/7 Community &amp; Telegram</td>
+                <td className="py-3.5 px-6 text-center text-slate-400 font-semibold">24/7 Community &amp; Telegram</td>
                 <td className="py-3.5 px-6 text-center text-purple-400 font-semibold">24/7 Priority Telegram SLA</td>
+                <td className="py-3.5 px-6 text-center text-cyan-400 font-semibold">24/7 Dedicated VIP Support SLA</td>
               </tr>
             </tbody>
           </table>

@@ -234,6 +234,7 @@ export async function PUT(req: NextRequest) {
           avatarUrl: newAvatarUrl,
           bannerUrl: newBannerUrl,
           plan: newPlan,
+          dailyTokensLimit: newPlan === 'ultra' ? -1 : newPlan === 'pro' ? 20000 : 2000,
           customThanksMessage: newThanks,
           liveStreamUrl: newLiveStreamUrl,
           broadcastUrls: finalBroadcastUrls,

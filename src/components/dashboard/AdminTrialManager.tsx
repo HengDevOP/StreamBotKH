@@ -385,7 +385,7 @@ export const AdminTrialManager: React.FC = () => {
             </label>
             <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-cyan-300 flex items-center gap-2">
               <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
-              <span>Full Pro Access (100MB, Overlays, Chat)</span>
+              <span>Full Pro Access (20MB, Overlays, Chat)</span>
             </div>
           </div>
 

@@ -58,6 +58,7 @@ import {
   Trash2,
   Users,
   GitPullRequest,
+  Zap,
   MessageSquare,
   Tag,
   Link as LinkIcon,
@@ -169,6 +170,10 @@ export type DashboardTab =
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initialTab, initialSelectedId }) => {
   const { user, loading: authLoading, refreshUser, logout } = useAuth();
+
+  useEffect(() => {
+    document.title = 'StreamWidgets - Creator Panel';
+  }, []);
   const { socket, joinDashboardRoom, joinOverlayRoom, connected } = useSocket();
   const { playSynthNeonChime } = useAudio();
   const { showConfirm, showAlert } = useModal();
@@ -379,7 +384,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState<'free' | 'pro'>('free');
+  const [currentPlan, setCurrentPlan] = useState<'free' | 'pro' | 'ultra'>('free');
 
   // Streamer Data State
   const [stats, setStats] = useState<StreamerDashboardStats | null>(null);
@@ -781,7 +786,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('streamer_plan') as any;
-      if (saved === 'free' || saved === 'pro') {
+      if (saved === 'free' || saved === 'pro' || saved === 'ultra') {
         setCurrentPlan(saved);
       } else if (saved === 'starter') {
         setCurrentPlan('pro');
@@ -807,7 +812,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       );
       if (user.plan || trialOn) {
         const p = (user.plan || '').toLowerCase();
-        const resolved = (p === 'pro' || p === 'studio' || p === 'starter' || trialOn) ? 'pro' : 'free';
+        const resolved = p === 'ultra' ? 'ultra' : (p === 'pro' || p === 'studio' || p === 'starter' || trialOn) ? 'pro' : 'free';
         setCurrentPlan(resolved);
       }
     }
@@ -820,7 +825,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const hasUsedTrial = Boolean(user?.hasUsedTrial || trialSettings?.hasUsedTrial);
   const trialRemainingDays = trialSettings?.remainingDays || user?.trialRemainingDays || 7;
 
-  const setPlan = async (plan: 'free' | 'pro') => {
+  const setPlan = async (plan: 'free' | 'pro' | 'ultra') => {
     setCurrentPlan(plan);
     if (typeof window !== 'undefined') {
       localStorage.setItem('streamer_plan', plan);
@@ -1923,8 +1928,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Fixed Sidebar Footer: Single Fixed "Settings" Button with Animated Dropup Menu (Profile & Log Out)
   const renderSidebarFooter = (isCollapsed: boolean) => {
     const isSettingsActive = activeTab === 'account';
-    const isPro = currentPlan === 'pro' || user?.plan === 'pro';
-    const planBadgeText = isPro ? 'PRO' : 'FREE';
+    const isUltra = currentPlan === 'ultra' || user?.plan === 'ultra';
+    const isPro = !isUltra && (currentPlan === 'pro' || user?.plan === 'pro');
+    const planBadgeText = isUltra ? 'ULTRA' : isPro ? 'PRO' : 'FREE';
 
     // Free token bucket
     const freeBucket = currentTokenStats.free;
@@ -1988,7 +1994,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   </span>
                   <span
                     className={`px-1.5 py-0.5 rounded font-mono text-[9px] font-bold shrink-0 ${
-                      planBadgeText === 'PRO'
+                      planBadgeText === 'ULTRA'
+                        ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 border border-cyan-400/40'
+                        : planBadgeText === 'PRO'
                         ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                         : 'bg-slate-800 text-slate-400 border border-slate-700/60'
                     }`}
@@ -2005,8 +2013,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             {/* Subtle Divider */}
             <div className="my-1 border-t border-slate-800/70" />
 
-            {/* Usage Limit Card: Dual progress bars for Pro users, single progress bar for Free users */}
-            {isPro ? (
+            {/* Usage Limit Card: Ultra / Pro / Free */}
+            {isUltra ? (
+              <div className="mx-0.5 my-1 p-2 rounded-xl bg-cyan-950/40 border border-cyan-500/40 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[11px] font-bold text-cyan-300 font-['Chakra_Petch'] flex items-center gap-1.5">
+                    <Zap size={12} className="text-cyan-400" />
+                    <span>Ultra Tokens</span>
+                    <span className="text-[9px] font-mono text-cyan-300 font-black px-1 rounded bg-cyan-500/20 border border-cyan-400/40">NO LIMIT</span>
+                  </span>
+                  <span className="text-[11px] font-mono text-cyan-300 font-bold">
+                    ∞ Unlimited
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-purple-400 transition-all duration-300 ease-out"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-cyan-400/80 font-mono mt-0.5">
+                  <span>Unlimited AI token allowance</span>
+                </div>
+              </div>
+            ) : isPro ? (
               <div className="mx-0.5 my-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70 space-y-2.5">
                 {/* 1. Free Usage Limit */}
                 <div className="space-y-1">
@@ -3797,12 +3827,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   Plans &amp; Upgrades
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Switch your plan anytime. Pro ($4.99/mo) unlocks advanced interactive widgets, expanded 100MB media vault, and removes donation page watermark.
+                  Switch your plan anytime. Pro ($4.99/mo) unlocks 20,000 daily tokens and 20MB media vault. Ultra ($14.99/mo) unlocks Unlimited Daily Tokens (no limit) and 100MB storage.
                 </p>
               </div>
 
-              {/* 2 Tier Pricing Cards Grid with Aligned Buttons */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl items-stretch">
+              {/* 3 Tier Pricing Cards Grid with Aligned Buttons */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl items-stretch">
                 {/* 1. Free Plan */}
                 <div
                   className={`rounded-2xl border p-6 flex flex-col h-full justify-between transition-colors ${
@@ -3824,20 +3854,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <div className="text-3xl font-extrabold text-white font-mono">$0</div>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Ideal for new streamers starting out. Includes Alertbox, Payment Gateway, and 20MB storage.
+                      Ideal for new streamers starting out. Includes Alertbox, Payment Gateway, and 5MB storage.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-300 flex-1">
                       <li className="flex items-center gap-2 font-semibold text-cyan-300">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>2,000 Daily Tokens (Global Reset at 2:00 PM SGT)</span>
+                        <span>2,000 Daily Tokens (Reset at 2:00 PM SGT)</span>
                       </li>
                       <li className="flex items-center gap-2 font-semibold text-cyan-300">
                         <Check size={14} className="text-cyan-400 flex-shrink-0" />
-                        <span>20MB Media Storage Quota</span>
+                        <span>5MB Media Storage Quota</span>
                       </li>
                       <li className="flex items-center gap-2 text-slate-400">
                         <span className="w-3.5 text-center font-mono text-slate-500">•</span>
-                        <span>Shows StreamWidgets watermark on donation page</span>
+                        <span>Shows StreamWidgets watermark</span>
                       </li>
                       <li className="flex items-center gap-2 text-emerald-400 font-semibold pt-1 border-t border-slate-800/80">
                         <Check size={14} className="text-emerald-400 flex-shrink-0" />
@@ -3870,7 +3900,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   }`}
                 >
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 text-slate-950 font-mono text-[9px] font-bold uppercase tracking-widest shadow-md shadow-purple-500/20 whitespace-nowrap">
-                    RECOMMENDED
+                    POPULAR
                   </div>
 
                   <div className="flex-1 flex flex-col space-y-4">
@@ -3900,11 +3930,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           <span className="text-sm font-mono text-slate-500 line-through">
                             ${activePromo.originalPriceUsd.toFixed(2)}
                           </span>
-                          <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days (1 month)</span>
+                          <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days</span>
                         </div>
                       ) : (
                         <div className="text-3xl font-extrabold text-white font-mono">
-                          $4.99 <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days (1 month)</span>
+                          $4.99 <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days</span>
                         </div>
                       )}
                       {isTrialActive ? (
@@ -3919,16 +3949,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       ) : null}
                     </div>
                     <p className="text-xs text-slate-400">
-                      Unlocks 100MB storage, all interactive stream widgets (Leaderboard, Goals, Timer, Soundboard, Video Share, Wheels), and removed watermark.
+                      Unlocks 20MB storage, 20,000 daily tokens (10x boost), and removed watermark.
                     </p>
                     <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
                       <li className="flex items-center gap-2 font-semibold text-purple-300">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
-                        <span>20,000 Daily Tokens (10x Usage Allowance • Reset Daily)</span>
+                        <span>20,000 Daily Tokens (10x Usage Allowance)</span>
                       </li>
                       <li className="flex items-center gap-2 font-semibold text-purple-300">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
-                        <span>100MB Media Cloud Storage (5x Storage Quota)</span>
+                        <span>20MB Media Cloud Storage Quota</span>
                       </li>
                       <li className="flex items-center gap-2 font-semibold text-purple-300">
                         <Check size={14} className="text-purple-400 flex-shrink-0" />
@@ -3978,6 +4008,91 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <p className="text-[10px] text-slate-400 text-center font-mono">
                         • 7-day free trial completed. Upgrade to Pro to unlock all stream assets.
                       </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Ultra Plan ($14.99/mo) */}
+                <div
+                  className={`rounded-2xl border-2 p-6 flex flex-col h-full justify-between transition-colors relative shadow-2xl shadow-cyan-500/10 ${
+                    currentPlan === 'ultra'
+                      ? 'border-cyan-400 bg-[#0B1528]'
+                      : 'border-slate-800 bg-[#0B0F19]'
+                  }`}
+                >
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-purple-500 text-slate-950 font-mono text-[9px] font-black uppercase tracking-widest shadow-md shadow-cyan-500/30 whitespace-nowrap">
+                    NO TOKEN LIMIT • MAX POWER
+                  </div>
+
+                  <div className="flex-1 flex flex-col space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold uppercase text-cyan-400">ULTRA PLAN (31 DAYS)</span>
+                      {currentPlan === 'ultra' && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-400/40">
+                          ACTIVE • ULTRA VIP
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-3xl font-extrabold text-white font-mono">
+                        $14.99 <span className="text-xs font-normal text-slate-400 font-sans">/ 31 days</span>
+                      </div>
+                      {currentPlan === 'ultra' && user.planExpiresAt && (
+                        <div className="text-[11px] text-cyan-300 font-mono mt-1">
+                          Expires: {new Date(user.planExpiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Unlocks Unlimited Daily Tokens (no token limit), 100MB cloud vault, and 24/7 dedicated VIP priority support.
+                    </p>
+                    <ul className="space-y-2.5 text-xs text-slate-200 flex-1">
+                      <li className="flex items-center gap-2 font-bold text-cyan-300">
+                        <Zap size={14} className="text-cyan-400 flex-shrink-0" />
+                        <span>Unlimited Daily Tokens (No Token Limit • ∞)</span>
+                      </li>
+                      <li className="flex items-center gap-2 font-semibold text-cyan-300">
+                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
+                        <span>100MB Media Cloud Storage Vault</span>
+                      </li>
+                      <li className="flex items-center gap-2 font-semibold text-cyan-300">
+                        <Check size={14} className="text-cyan-400 flex-shrink-0" />
+                        <span>Removed Watermark (Clean Custom Branding)</span>
+                      </li>
+                      <li className="flex items-center gap-2 font-semibold text-purple-300">
+                        <ShieldCheck size={14} className="text-purple-400 flex-shrink-0" />
+                        <span>24/7 Dedicated VIP Priority Telegram SLA</span>
+                      </li>
+                      <li className="flex items-center gap-2 text-emerald-400 font-semibold pt-1 border-t border-cyan-500/20">
+                        <Check size={14} className="text-emerald-400 flex-shrink-0" />
+                        <span>All stream alerts, features &amp; widgets fully accessible</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-6 pt-5 border-t border-cyan-500/30 w-full space-y-2.5">
+                    {currentPlan === 'ultra' ? (
+                      <button
+                        disabled
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 cursor-default"
+                      >
+                        Active Plan (Ultra VIP)
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (isAdmin) {
+                            setPlan('ultra');
+                          } else {
+                            if (typeof window !== 'undefined') {
+                              window.open('https://t.me/hchenheng', '_blank');
+                            }
+                          }
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 hover:opacity-95 text-slate-950 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"
+                      >
+                        {isAdmin ? 'Set Ultra Plan ($14.99/mo)' : 'Upgrade to Ultra ($14.99/31d)'}
+                      </button>
                     )}
                   </div>
                 </div>

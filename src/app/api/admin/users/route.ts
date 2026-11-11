@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       let planDurationDays = r.planDurationDays || r.plan_duration_days || 0;
       let remainingDays = 0;
 
-      if (currentPlan === 'pro' && planExpiresAt) {
+      if ((currentPlan === 'pro' || currentPlan === 'ultra') && planExpiresAt) {
         const expMs = new Date(planExpiresAt).getTime();
         if (!isNaN(expMs)) {
           if (expMs < now) {
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
             remainingDays = Math.max(1, Math.ceil((expMs - now) / (1000 * 60 * 60 * 24)));
           }
         }
-      } else if (currentPlan === 'pro' && !planExpiresAt) {
+      } else if ((currentPlan === 'pro' || currentPlan === 'ultra') && !planExpiresAt) {
         remainingDays = 31;
       }
 
@@ -118,8 +118,9 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const ultraUsers = allUsers.filter((u) => u.plan === 'ultra').length;
     const proUsers = allUsers.filter((u) => u.plan === 'pro').length;
-    const freeUsers = allUsers.length - proUsers;
+    const freeUsers = allUsers.length - proUsers - ultraUsers;
 
     const filteredUsers = allUsers.filter((u) => {
       const matchesSearch =
@@ -149,6 +150,7 @@ export async function GET(req: NextRequest) {
       },
       summary: {
         totalUsers: allUsers.length,
+        ultraUsers,
         proUsers,
         freeUsers
       }
@@ -215,18 +217,19 @@ export async function PUT(req: NextRequest) {
 
     // 2. Handle plan change if plan is provided
     if (plan !== undefined) {
-      const normalizedPlan = String(plan).toLowerCase() === 'pro' ? 'pro' : 'free';
+      const lower = String(plan).toLowerCase();
+      const normalizedPlan = lower === 'ultra' ? 'ultra' : lower === 'pro' ? 'pro' : 'free';
       const days = Math.max(1, Number(durationDays) || 31);
 
       let planStartedAt: string | null = null;
       let planExpiresAt: string | null = null;
       let planDurationDays = 0;
 
-      if (normalizedPlan === 'pro') {
+      if (normalizedPlan === 'pro' || normalizedPlan === 'ultra') {
         const now = new Date();
         let baseTime = now.getTime();
 
-        if (action === 'extend' && target.plan === 'pro' && (target.planExpiresAt || target.plan_expires_at)) {
+        if (action === 'extend' && target.plan === normalizedPlan && (target.planExpiresAt || target.plan_expires_at)) {
           const existingExp = new Date(target.planExpiresAt || target.plan_expires_at).getTime();
           if (!isNaN(existingExp) && existingExp > baseTime) {
             baseTime = existingExp;
@@ -239,15 +242,17 @@ export async function PUT(req: NextRequest) {
       }
 
       updateFields.plan = normalizedPlan;
-      updateFields.dailyTokensLimit = normalizedPlan === 'pro' ? 20000 : 2000;
+      updateFields.dailyTokensLimit = normalizedPlan === 'ultra' ? -1 : normalizedPlan === 'pro' ? 20000 : 2000;
       updateFields.planStartedAt = planStartedAt;
       updateFields.planExpiresAt = planExpiresAt;
       updateFields.planDurationDays = planDurationDays;
 
       successMessage =
-        normalizedPlan === 'pro'
-          ? `Updated @${target.username} to Pro Plan for ${days} days`
-          : `Updated @${target.username} to Free Plan`;
+        normalizedPlan === 'ultra'
+          ? `Updated @${target.username} to Ultra Plan (Unlimited tokens, 100MB) for ${days} days`
+          : normalizedPlan === 'pro'
+          ? `Updated @${target.username} to Pro Plan (20MB) for ${days} days`
+          : `Updated @${target.username} to Free Plan (5MB)`;
     }
 
     await usersCol.updateOne(

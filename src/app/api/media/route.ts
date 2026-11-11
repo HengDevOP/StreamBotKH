@@ -21,10 +21,11 @@ function safeBroadcastMediaUpdate(userId: string, data: { media: any[]; storage:
 
 // Media storage limits per user plan (no per-upload limit, only bounded by total remaining plan quota)
 export const PLAN_STORAGE_LIMITS: Record<string, { label: string; limitBytes: number }> = {
-  free: { label: 'Free (20MB)', limitBytes: 20 * 1024 * 1024 }, // 20MB
-  starter: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
-  pro: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 }, // 100MB
-  studio: { label: 'Pro (100MB)', limitBytes: 100 * 1024 * 1024 } // backwards compatibility
+  free: { label: 'Free (5MB)', limitBytes: 5 * 1024 * 1024 }, // 5MB
+  pro: { label: 'Pro (20MB)', limitBytes: 20 * 1024 * 1024 }, // 20MB
+  starter: { label: 'Pro (20MB)', limitBytes: 20 * 1024 * 1024 }, // backwards compatibility
+  studio: { label: 'Pro (20MB)', limitBytes: 20 * 1024 * 1024 }, // backwards compatibility
+  ultra: { label: 'Ultra (100MB)', limitBytes: 100 * 1024 * 1024 } // 100MB
 };
 
 export interface CachedMediaResult {

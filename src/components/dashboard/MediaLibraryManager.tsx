@@ -652,7 +652,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
               </div>
 
               <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
-                <span>Free: 20MB • Pro: 100MB</span>
+                <span>Free: 5MB • Pro: 20MB • Ultra: 100MB</span>
                 <span>{formatFileSize(storageInfo.remainingBytes)} available</span>
               </div>
             </div>
