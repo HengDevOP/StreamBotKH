@@ -38,6 +38,7 @@ import {
   EyeOff,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Download,
   Search,
   Filter,
@@ -402,9 +403,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [selectedMediaForOverlay, setSelectedMediaForOverlay] = useState<MediaItem | null>(null);
   const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
   const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(false);
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
   const [videoHasUnsavedChanges, setVideoHasUnsavedChanges] = useState(false);
   const [unsavedTabs, setUnsavedTabs] = useState<Record<string, boolean>>({});
+
+  // Close dropup menu on outside clicks
+  useEffect(() => {
+    if (!isSettingsMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('[data-settings-menu]')) {
+        setIsSettingsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSettingsMenuOpen]);
 
   // Theme Mode (Night / Day Mode)
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
@@ -482,6 +497,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
   // Safe tab navigation interceptor: blocks switching away if current tab has unsaved changes
   const handleTabNavigation = (targetTab: DashboardTab) => {
+    setIsSettingsMenuOpen(false);
     if (targetTab === activeTab) return;
     if (isCurrentTabDirty) {
       triggerBlockedNavigationEarthquake();
@@ -1792,52 +1808,38 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     </div>
   );
 
-  // Fixed Sidebar Footer (Settings & Streamer Profile / Logout)
+  // Fixed Sidebar Footer: Single Fixed "Settings" Button with Animated Dropup Menu (Profile & Log Out)
   const renderSidebarFooter = (isCollapsed: boolean) => {
     const isSettingsActive = activeTab === 'account';
 
     return (
-      <div className="flex-shrink-0 border-t border-slate-800/80 bg-[#0B0F19] p-2 space-y-1">
-        {/* Fixed "Settings" Navigation Item */}
-        <button
-          type="button"
-          onClick={() => {
-            handleTabNavigation('account');
-            if (mobileDrawerOpen) setMobileDrawerOpen(false);
-          }}
-          title={isCollapsed ? 'Settings' : undefined}
-          className={`w-full flex items-center ${
-            isCollapsed ? 'justify-center px-0 py-2.5 relative' : 'justify-between px-3 py-2'
-          } rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-            isSettingsActive
-              ? 'bg-slate-800 text-white font-semibold'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                isSettingsActive ? 'text-white' : 'text-slate-400'
-              }`}
-            >
-              <Settings size={16} />
-            </div>
-            {!isCollapsed && (
-              <span className="whitespace-nowrap truncate">Settings</span>
-            )}
-          </div>
-        </button>
-
-        {/* Streamer Profile Logo & Quick Logout Row */}
-        {!isCollapsed ? (
-          <div className="pt-1.5 border-t border-slate-800/50 flex items-center justify-between gap-2 px-2 py-1">
-            <div
+      <div
+        data-settings-menu="true"
+        className="flex-shrink-0 border-t border-slate-800/80 bg-[#0B0F19] p-2 relative select-none"
+      >
+        {/* Animated Dropup Menu (Profile & Log Out) */}
+        {isSettingsMenuOpen && (
+          <div
+            className={`absolute z-50 bg-[#0F1422] border border-slate-800/90 rounded-2xl shadow-[0_-10px_35px_rgba(0,0,0,0.7)] p-1.5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+              isCollapsed
+                ? 'bottom-2 left-full ml-2.5 w-56'
+                : 'bottom-full left-2 right-2 mb-2'
+            }`}
+          >
+            {/* Menu Item 1: Profile -> Navigates to current Settings / Account design */}
+            <button
+              type="button"
               onClick={() => {
                 handleTabNavigation('account');
+                setIsSettingsMenuOpen(false);
                 if (mobileDrawerOpen) setMobileDrawerOpen(false);
               }}
-              className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer group"
               title="View Profile Settings"
+              className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-all text-left cursor-pointer group ${
+                isSettingsActive
+                  ? 'bg-slate-800 text-white font-semibold'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+              }`}
             >
               <div className="relative flex-shrink-0">
                 <img
@@ -1847,64 +1849,94 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.username}`
                   }
                   alt={user?.displayName || 'Avatar'}
-                  className="w-7 h-7 rounded-xl bg-slate-950 object-cover ring-1 ring-slate-700/60 group-hover:ring-slate-500 transition-all"
+                  className="w-8 h-8 rounded-xl bg-slate-950 object-cover ring-1 ring-slate-700/60 group-hover:ring-cyan-500 transition-all"
                 />
-                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0B0F19]" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0F1422]" />
               </div>
-              <div className="min-w-0 flex-1 text-left">
-                <p className="text-xs font-bold text-slate-200 group-hover:text-white truncate font-['Chakra_Petch'] leading-tight">
-                  {user?.displayName || user?.username}
-                </p>
-                <p className="text-[10px] text-slate-400 font-mono truncate leading-tight">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-xs font-bold text-slate-200 group-hover:text-white truncate font-['Chakra_Petch'] leading-tight">
+                    Profile
+                  </span>
+                  {isSettingsActive && (
+                    <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[9px] font-bold shrink-0">
+                      ACTIVE
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 font-mono truncate leading-tight mt-0.5">
                   @{user?.username}
                 </p>
               </div>
-            </div>
+            </button>
 
+            {/* Subtle Divider */}
+            <div className="my-1 border-t border-slate-800/70" />
+
+            {/* Menu Item 2: Log Out */}
             <button
               type="button"
               onClick={() => {
+                setIsSettingsMenuOpen(false);
                 logout();
                 onNavigate('home');
               }}
-              title="Log Out"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer flex-shrink-0"
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-left cursor-pointer group"
             >
-              <LogOut size={14} />
-            </button>
-          </div>
-        ) : (
-          <div className="pt-1 border-t border-slate-800/50 flex flex-col items-center gap-1.5 py-1">
-            <button
-              type="button"
-              onClick={() => handleTabNavigation('account')}
-              title={`${user?.displayName || user?.username} (@${user?.username})`}
-              className="relative cursor-pointer group"
-            >
-              <img
-                src={
-                  profileAvatar ||
-                  user?.avatarUrl ||
-                  `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.username}`
-                }
-                alt={user?.displayName || 'Avatar'}
-                className="w-7 h-7 rounded-xl bg-slate-950 object-cover ring-1 ring-slate-700/60 group-hover:ring-slate-500 transition-all"
-              />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0B0F19]" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                logout();
-                onNavigate('home');
-              }}
-              title="Log Out"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-            >
-              <LogOut size={13} />
+              <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center flex-shrink-0 text-rose-400 group-hover:bg-rose-500/20 transition-colors">
+                <LogOut size={15} className="transition-transform group-hover:-translate-x-0.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-xs font-bold font-['Chakra_Petch'] block leading-tight">
+                  Log Out
+                </span>
+                <span className="text-[10px] text-rose-400/70 font-mono block leading-tight mt-0.5">
+                  End session
+                </span>
+              </div>
             </button>
           </div>
         )}
+
+        {/* Fixed "Settings" Trigger Button */}
+        <button
+          type="button"
+          onClick={() => setIsSettingsMenuOpen((prev) => !prev)}
+          title={isCollapsed ? 'Settings' : undefined}
+          aria-expanded={isSettingsMenuOpen}
+          className={`w-full flex items-center ${
+            isCollapsed ? 'justify-center px-0 py-2.5 relative' : 'justify-between px-3 py-2.5'
+          } rounded-xl text-xs font-medium transition-all cursor-pointer ${
+            isSettingsMenuOpen || isSettingsActive
+              ? 'bg-slate-800 text-white font-semibold shadow-inner'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                isSettingsMenuOpen || isSettingsActive ? 'text-white' : 'text-slate-400'
+              }`}
+            >
+              <Settings
+                size={16}
+                className={isSettingsMenuOpen ? 'rotate-45 transition-transform duration-300' : 'transition-transform duration-300'}
+              />
+            </div>
+            {!isCollapsed && (
+              <span className="whitespace-nowrap truncate font-medium">Settings</span>
+            )}
+          </div>
+
+          {!isCollapsed && (
+            <ChevronUp
+              size={14}
+              className={`text-slate-400 transition-transform duration-200 shrink-0 ${
+                isSettingsMenuOpen ? 'rotate-180 text-white' : ''
+              }`}
+            />
+          )}
+        </button>
       </div>
     );
   };
