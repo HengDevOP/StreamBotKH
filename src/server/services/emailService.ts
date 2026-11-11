@@ -1,7 +1,25 @@
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+// Lazy-load nodemailer dynamically so routes won't crash Express startup if nodemailer isn't installed yet
+let _nodemailer: any = null;
+async function getNodemailer(): Promise<any> {
+  if (_nodemailer) return _nodemailer;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _nodemailer = require('nodemailer');
+    return _nodemailer;
+  } catch {
+    try {
+      const mod = await import('nodemailer');
+      _nodemailer = mod.default || mod;
+      return _nodemailer;
+    } catch {
+      return null;
+    }
+  }
+}
 
 export interface AccountDeletionEmailParams {
   toEmail: string;
@@ -73,6 +91,68 @@ function getSmtpConfig(customFromName?: string) {
       user !== 'your_email@gmail.com' &&
       pass !== 'your_16_char_app_password'
   };
+}
+
+/**
+ * Centralized mail sender that verifies SMTP configuration & nodemailer availability safely
+ */
+async function sendMailSafely(
+  smtp: ReturnType<typeof getSmtpConfig>,
+  options: {
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+  },
+  label: string
+): Promise<{ sent: boolean; simulated?: boolean; error?: string }> {
+  if (!smtp.isConfigured) {
+    console.warn(`⚠️ [Nodemailer] SMTP credentials not configured in .env. Simulated ${label} for ${options.to}.`);
+    return {
+      sent: false,
+      simulated: true,
+      error: 'SMTP credentials not configured in .env'
+    };
+  }
+
+  const nodemailer = await getNodemailer();
+  if (!nodemailer) {
+    console.warn(`⚠️ [Nodemailer] "nodemailer" package not found in node_modules. Simulated ${label} for ${options.to}. Run "npm install nodemailer" on VPS.`);
+    return {
+      sent: false,
+      simulated: true,
+      error: 'nodemailer module not installed on server'
+    };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: {
+        user: smtp.user,
+        pass: smtp.pass
+      }
+    });
+
+    await transporter.sendMail({
+      from: smtp.from,
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html
+    });
+
+    console.log(`📧 [Nodemailer] Successfully sent ${label} to ${options.to}`);
+    return { sent: true };
+  } catch (err: any) {
+    console.error(`❌ [Nodemailer] Failed to send ${label} to ${options.to}:`, err?.message || err);
+    return {
+      sent: false,
+      error: err?.message || 'Failed to send email via SMTP'
+    };
+  }
 }
 
 /**
@@ -261,46 +341,11 @@ ${appUrl}
   `.trim();
 
   const smtp = getSmtpConfig();
-
-  if (!smtp.isConfigured) {
-    console.warn(
-      `⚠️ [Nodemailer] SMTP credentials (SMTP_USER / SMTP_PASS) are not configured in .env. Logged security email for ${toEmail} (@${username}).`
-    );
-    return {
-      sent: false,
-      simulated: true,
-      error: 'SMTP credentials not configured in .env'
-    };
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      auth: {
-        user: smtp.user,
-        pass: smtp.pass
-      }
-    });
-
-    await transporter.sendMail({
-      from: smtp.from,
-      to: toEmail,
-      subject,
-      text: textBody,
-      html: htmlBody
-    });
-
-    console.log(`📧 [Nodemailer] Sent account deletion security alert email to ${toEmail}`);
-    return { sent: true };
-  } catch (err: any) {
-    console.error(`❌ [Nodemailer] Failed to send account deletion email to ${toEmail}:`, err?.message || err);
-    return {
-      sent: false,
-      error: err?.message || 'Failed to send email via SMTP'
-    };
-  }
+  return sendMailSafely(
+    smtp,
+    { to: toEmail, subject, text: textBody, html: htmlBody },
+    `account deletion security alert email (@${username})`
+  );
 }
 
 /**
@@ -601,46 +646,11 @@ ${appUrl}
   `.trim();
 
   const smtp = getSmtpConfig('StreamWidgets');
-
-  if (!smtp.isConfigured) {
-    console.warn(
-      `⚠️ [Nodemailer] SMTP credentials (SMTP_USER / SMTP_PASS) not configured in .env. Logged Pro upgrade email for ${toEmail} (@${username}).`
-    );
-    return {
-      sent: false,
-      simulated: true,
-      error: 'SMTP credentials not configured in .env'
-    };
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      auth: {
-        user: smtp.user,
-        pass: smtp.pass
-      }
-    });
-
-    await transporter.sendMail({
-      from: smtp.from,
-      to: toEmail,
-      subject,
-      text: textBody,
-      html: htmlBody
-    });
-
-    console.log(`📧 [Nodemailer] Sent Pro Plan upgrade email to ${toEmail} (@${username})`);
-    return { sent: true };
-  } catch (err: any) {
-    console.error(`❌ [Nodemailer] Failed to send Pro Plan email to ${toEmail}:`, err?.message || err);
-    return {
-      sent: false,
-      error: err?.message || 'Failed to send email via SMTP'
-    };
-  }
+  return sendMailSafely(
+    smtp,
+    { to: toEmail, subject, text: textBody, html: htmlBody },
+    `Pro Plan upgrade email (@${username})`
+  );
 }
 
 /**
@@ -852,34 +862,11 @@ ${appUrl}
   `.trim();
 
   const smtp = getSmtpConfig('StreamWidgets');
-
-  if (!smtp.isConfigured) {
-    console.warn(`⚠️ [Nodemailer] SMTP credentials not configured. Logged Welcome email for ${toEmail} (@${username}).`);
-    return { sent: false, simulated: true, error: 'SMTP credentials not configured in .env' };
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      auth: { user: smtp.user, pass: smtp.pass }
-    });
-
-    await transporter.sendMail({
-      from: smtp.from,
-      to: toEmail,
-      subject,
-      text: textBody,
-      html: htmlBody
-    });
-
-    console.log(`📧 [Nodemailer] Sent Welcome email to ${toEmail} (@${username})`);
-    return { sent: true };
-  } catch (err: any) {
-    console.error(`❌ [Nodemailer] Failed to send Welcome email to ${toEmail}:`, err?.message || err);
-    return { sent: false, error: err?.message || 'Failed to send email via SMTP' };
-  }
+  return sendMailSafely(
+    smtp,
+    { to: toEmail, subject, text: textBody, html: htmlBody },
+    `Welcome email (@${username})`
+  );
 }
 
 /**
@@ -1045,34 +1032,11 @@ ${appUrl}
   `.trim();
 
   const smtp = getSmtpConfig('StreamWidgets');
-
-  if (!smtp.isConfigured) {
-    console.warn(`⚠️ [Nodemailer] SMTP credentials not configured. Logged Pro expiry reminder email for ${toEmail} (@${username}).`);
-    return { sent: false, simulated: true, error: 'SMTP credentials not configured in .env' };
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      auth: { user: smtp.user, pass: smtp.pass }
-    });
-
-    await transporter.sendMail({
-      from: smtp.from,
-      to: toEmail,
-      subject,
-      text: textBody,
-      html: htmlBody
-    });
-
-    console.log(`📧 [Nodemailer] Sent Pro Plan 3-day reminder email to ${toEmail} (@${username})`);
-    return { sent: true };
-  } catch (err: any) {
-    console.error(`❌ [Nodemailer] Failed to send Pro Plan reminder email to ${toEmail}:`, err?.message || err);
-    return { sent: false, error: err?.message || 'Failed to send email via SMTP' };
-  }
+  return sendMailSafely(
+    smtp,
+    { to: toEmail, subject, text: textBody, html: htmlBody },
+    `Pro Plan 3-day reminder email (@${username})`
+  );
 }
 
 /**
@@ -1251,32 +1215,9 @@ ${appUrl}
   `.trim();
 
   const smtp = getSmtpConfig('StreamWidgets');
-
-  if (!smtp.isConfigured) {
-    console.warn(`⚠️ [Nodemailer] SMTP credentials not configured. Logged Pro expired email for ${toEmail} (@${username}).`);
-    return { sent: false, simulated: true, error: 'SMTP credentials not configured in .env' };
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      auth: { user: smtp.user, pass: smtp.pass }
-    });
-
-    await transporter.sendMail({
-      from: smtp.from,
-      to: toEmail,
-      subject,
-      text: textBody,
-      html: htmlBody
-    });
-
-    console.log(`📧 [Nodemailer] Sent Pro Plan expired notification email to ${toEmail} (@${username})`);
-    return { sent: true };
-  } catch (err: any) {
-    console.error(`❌ [Nodemailer] Failed to send Pro Plan expired email to ${toEmail}:`, err?.message || err);
-    return { sent: false, error: err?.message || 'Failed to send email via SMTP' };
-  }
+  return sendMailSafely(
+    smtp,
+    { to: toEmail, subject, text: textBody, html: htmlBody },
+    `Pro Plan expired notification email (@${username})`
+  );
 }
