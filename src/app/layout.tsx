@@ -6,7 +6,7 @@ import { ModalProvider } from '@/context/ModalContext';
 import { AppShell } from '@/components/common/AppShell';
 
 export const metadata: Metadata = {
-  title: 'streambotkh.com - Livestream Donation Alerts & ABA Bakong KHQR',
+  title: 'StreamWidget',
   description:
     'The all-in-one donation gateway built for Cambodian streamers. Accept instant tips via ABA Mobile and Bakong KHQR with zero-latency OBS screen animations, TTS audio, and Telegram notifications.',
   icons: {

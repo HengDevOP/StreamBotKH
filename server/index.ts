@@ -285,7 +285,7 @@ if (distDir) {
       <html lang="en">
         <head>
           <meta charset="utf-8">
-          <title>StreamBotKH Core API</title>
+          <title>StreamWidget Core API</title>
         </head>
         <body style="background:#070A12;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;padding:60px 20px;text-align:center;">
           <h1 style="color:#00F0FF;margin-bottom:8px;">⚡ StreamBotKH Server Active</h1>
