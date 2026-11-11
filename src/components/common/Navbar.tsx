@@ -562,20 +562,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentPage }) => {
                       onNavigate('creator');
                     }
                   }}
-                  className="p-1 sm:p-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:shadow-[0_0_15px_rgba(0,240,255,0.25)] transition-all flex items-center justify-center group"
+                  className="p-1 rounded-full bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:shadow-[0_0_15px_rgba(0,240,255,0.25)] transition-all flex items-center justify-center group"
                 >
                   <img
                     src={user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`}
                     alt={user.displayName || 'Profile'}
-                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-slate-800 object-cover ring-1 ring-white/10 group-hover:scale-105 transition-transform"
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 object-cover ring-1 ring-white/10 group-hover:scale-105 transition-transform"
                   />
                 </Link>
               </div>
             ) : loading ? (
               /* Sleek Avatar Skeleton while verifying auth */
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center justify-center p-1 sm:p-1.5">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-slate-800 animate-pulse" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center justify-center p-1">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 animate-pulse" />
                 </div>
               </div>
             ) : (
