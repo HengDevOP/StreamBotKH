@@ -183,6 +183,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
   // Payment Gateway health status (displays red exclamation mark if any prerequisite is missing)
   const [isPaymentGatewayIncomplete, setIsPaymentGatewayIncomplete] = useState<boolean>(false);
+  const [isPaymentGatewayHealthChecked, setIsPaymentGatewayHealthChecked] = useState<boolean>(false);
 
   // Check Payment Gateway health on mount & tab switches
   const loadPaymentGatewayHealth = React.useCallback(async () => {
@@ -191,7 +192,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       if (res && res.success) {
         setIsPaymentGatewayIncomplete(Boolean(res.isIncomplete));
       }
-    } catch (e) {}
+    } catch (e) {
+    } finally {
+      setIsPaymentGatewayHealthChecked(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -203,8 +207,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Listen for real-time payment gateway status updates from PaymentGatewayAdmin
   useEffect(() => {
     const handlePgStatus = (e: any) => {
-      if (e.detail) {
+      if (e.detail && typeof e.detail.isIncomplete === 'boolean') {
         setIsPaymentGatewayIncomplete(Boolean(e.detail.isIncomplete));
+        setIsPaymentGatewayHealthChecked(true);
       }
     };
     window.addEventListener('payment-gateway-status', handlePgStatus);
@@ -1845,7 +1850,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                   {!isCollapsed && (
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {item.id === 'payments' && isPaymentGatewayIncomplete && (
+                      {item.id === 'payments' && isPaymentGatewayHealthChecked && isPaymentGatewayIncomplete && (
                         <span
                           title="Action Required"
                           className="flex items-center justify-center ml-2 text-rose-500"
@@ -1876,7 +1881,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       <Lock size={10} className="text-amber-400" />
                     </span>
                   )}
-                  {isCollapsed && !(item as any).isLocked && item.id === 'payments' && isPaymentGatewayIncomplete && (
+                  {isCollapsed && !(item as any).isLocked && item.id === 'payments' && isPaymentGatewayHealthChecked && isPaymentGatewayIncomplete && (
                     <span
                       title="Action Required"
                       className="absolute top-1.5 right-1.5 flex items-center justify-center text-rose-500"
@@ -2696,7 +2701,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {/* ============================================================== */}
           {(activeTab === 'payments' || activeTab === 'telegram') && (
             <PaymentGatewayAdmin
-              onStatusChange={(isIncomplete) => setIsPaymentGatewayIncomplete(isIncomplete)}
+              onStatusChange={(isIncomplete) => {
+                setIsPaymentGatewayIncomplete(isIncomplete);
+                setIsPaymentGatewayHealthChecked(true);
+              }}
             />
           )}
 

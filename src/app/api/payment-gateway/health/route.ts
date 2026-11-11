@@ -38,33 +38,34 @@ export async function GET(req: NextRequest) {
       console.warn('[Payment Gateway Health] GramJS check error:', e);
     }
 
-    // 2. Master KHQR Image Uploaded Status
-    let hasKhqrImage = false;
+    // 2. Step 2 KHQR Data Configured Status (Requires client to have added KHQR items)
+    let hasKhqrConfigured = false;
     try {
-      const restoreResult = await restoreMasterKhqrImage(streamerId, streamerUsername || undefined);
-      if (restoreResult.restored && restoreResult.khqrImageUrl) {
-        hasKhqrImage = true;
-      } else {
-        const gatewayCol = await getGatewayConfigCollection();
-        const mongoConfig = await gatewayCol.findOne({
-          $or: [
-            { _id: `khqr_${streamerId}` },
-            { streamerId: streamerId },
-            ...(streamerUsername ? [{ _id: `khqr_${streamerUsername}` }, { streamerId: streamerUsername }] : [])
-          ]
-        });
+      const gatewayCol = await getGatewayConfigCollection();
+      const mongoConfig = await gatewayCol.findOne({
+        $or: [
+          { _id: `khqr_${streamerId}` },
+          { streamerId: streamerId },
+          ...(streamerUsername ? [{ _id: `khqr_${streamerUsername}` }, { streamerId: streamerUsername }] : [])
+        ]
+      });
 
-        if (mongoConfig && typeof mongoConfig.khqrImageUrl === 'string' && mongoConfig.khqrImageUrl.trim() !== '') {
-          hasKhqrImage = true;
-        } else {
-          const payCol = await getPaymentSettingsCollection();
-          const mongoPaymentSettings = await payCol.findOne({ streamerId });
-          if (mongoPaymentSettings && typeof mongoPaymentSettings.masterKhqrImage === 'string' && mongoPaymentSettings.masterKhqrImage.trim() !== '') {
-            hasKhqrImage = true;
-          } else if (streamerId === 'demo-streamer-id-1001') {
-            const globalConfig = await gatewayCol.findOne({ _id: 'master_khqr_config', khqrImageUrl: { $exists: true, $ne: '' } }) as any;
-            if (globalConfig?.khqrImageUrl) hasKhqrImage = true;
-          }
+      const payCol = await getPaymentSettingsCollection();
+      const mongoPaymentSettings = await payCol.findOne({ streamerId });
+
+      const items: any[] = Array.isArray(mongoConfig?.khqrItems)
+        ? mongoConfig.khqrItems
+        : Array.isArray(mongoPaymentSettings?.khqrItems)
+        ? mongoPaymentSettings.khqrItems
+        : [];
+
+      // Step 2 is considered complete ONLY if the client has actually added at least 1 KHQR item
+      if (items.length > 0) {
+        hasKhqrConfigured = true;
+      } else if (streamerId === 'demo-streamer-id-1001') {
+        const globalConfig = (await gatewayCol.findOne({ _id: 'master_khqr_config' })) as any;
+        if (Array.isArray(globalConfig?.khqrItems) && globalConfig.khqrItems.length > 0) {
+          hasKhqrConfigured = true;
         }
       }
     } catch (e) {
@@ -84,10 +85,10 @@ export async function GET(req: NextRequest) {
 
     const missing: string[] = [];
     if (!isGramjsConnected) missing.push('gramjs');
-    if (!hasKhqrImage) missing.push('khqr');
+    if (!hasKhqrConfigured) missing.push('khqr');
     if (!hasGroupConnected) missing.push('group');
 
-    const isComplete = isGramjsConnected && hasKhqrImage && hasGroupConnected;
+    const isComplete = isGramjsConnected && hasKhqrConfigured && hasGroupConnected;
     const isIncomplete = !isComplete;
 
     return NextResponse.json({
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest) {
       isIncomplete,
       steps: {
         gramjs: isGramjsConnected,
-        khqr: hasKhqrImage,
+        khqr: hasKhqrConfigured,
         group: hasGroupConnected
       },
       missing

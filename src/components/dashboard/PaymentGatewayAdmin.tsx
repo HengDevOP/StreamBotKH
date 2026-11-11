@@ -142,92 +142,84 @@ const isGroupConnected = (dialog: AvailableDialog, groups: TargetGroup[]) => {
 
 export const PaymentGatewaySkeleton: React.FC = () => {
   return (
-    <div className="space-y-6 animate-fadeIn select-none">
+    <div className="space-y-6 select-none animate-fadeIn">
       {/* ============================================================== */}
-      {/* 3-STEP ANIMATED LINE PROGRESS TASK BAR SKELETON                */}
+      {/* 3-STEP PROGRESS TASK BAR SKELETON                              */}
       {/* ============================================================== */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-[#090D18] border border-slate-800/90 shadow-2xl relative overflow-hidden">
-        {/* Subtle Ambient Background Gradient Glow */}
-        <div className="absolute top-0 right-1/4 w-96 h-28 bg-cyan-500/5 blur-3xl pointer-events-none rounded-full" />
-        <div className="absolute bottom-0 left-1/4 w-96 h-28 bg-emerald-500/5 blur-3xl pointer-events-none rounded-full" />
-
-        {/* Stepper with Connecting Line */}
-        <div className="relative flex items-center justify-between px-2 sm:px-8">
+      <div className="p-4 sm:p-5 rounded-xl bg-[#141414] border border-[#262626]">
+        <div className="relative flex items-center justify-between px-4 sm:px-12">
           {/* Connector Line 1 -> 2 */}
-          <div className="absolute left-[16%] right-[50%] top-5 -translate-y-1/2 h-1 bg-slate-800/80 rounded-full overflow-hidden" />
+          <div className="absolute left-[18%] right-[50%] top-5 -translate-y-1/2 h-0.5 bg-[#262626]" />
 
           {/* Connector Line 2 -> 3 */}
-          <div className="absolute left-[50%] right-[16%] top-5 -translate-y-1/2 h-1 bg-slate-800/80 rounded-full overflow-hidden" />
+          <div className="absolute left-[50%] right-[18%] top-5 -translate-y-1/2 h-0.5 bg-[#262626]" />
 
           {/* STEP 1: Connect Node */}
           <div className="relative z-10 flex flex-col items-center text-center">
-            <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 animate-pulse flex items-center justify-center">
-              <div className="w-3.5 h-3.5 rounded-full bg-slate-800 animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-[#1e1e1e] border border-[#262626] animate-pulse flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-[#333333]" />
             </div>
-            <div className="w-14 h-3 rounded bg-slate-800 animate-pulse mt-2.5" />
+            <div className="w-14 h-3 rounded bg-[#262626] animate-pulse mt-2.5" />
           </div>
 
           {/* STEP 2: KHQR Node */}
           <div className="relative z-10 flex flex-col items-center text-center">
-            <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 animate-pulse flex items-center justify-center">
-              <div className="w-3.5 h-3.5 rounded-full bg-slate-800 animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-[#1e1e1e] border border-[#262626] animate-pulse flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-[#333333]" />
             </div>
-            <div className="w-12 h-3 rounded bg-slate-800 animate-pulse mt-2.5" />
+            <div className="w-12 h-3 rounded bg-[#262626] animate-pulse mt-2.5" />
           </div>
 
           {/* STEP 3: GROUP Node */}
           <div className="relative z-10 flex flex-col items-center text-center">
-            <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 animate-pulse flex items-center justify-center">
-              <div className="w-3.5 h-3.5 rounded-full bg-slate-800 animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-[#1e1e1e] border border-[#262626] animate-pulse flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-[#333333]" />
             </div>
-            <div className="w-14 h-3 rounded bg-slate-800 animate-pulse mt-2.5" />
+            <div className="w-14 h-3 rounded bg-[#262626] animate-pulse mt-2.5" />
           </div>
         </div>
       </div>
 
       {/* ============================================================== */}
-      {/* MAIN CARD CONTENT SKELETON                                     */}
+      {/* MAIN CARD WORKBENCH SKELETON                                   */}
       {/* ============================================================== */}
-      <div className="rounded-2xl bg-[#090D18]/90 border border-slate-800/90 shadow-2xl p-5 sm:p-7 space-y-6 relative overflow-hidden">
-        {/* Subtle Ambient Glow */}
-        <div className="absolute top-0 right-0 w-80 h-32 bg-cyan-500/5 blur-3xl pointer-events-none rounded-full" />
-
+      <div className="rounded-xl bg-[#141414] border border-[#262626] p-5 sm:p-7 space-y-6">
         {/* Header Row */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-5 border-b border-slate-800/80 gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-5 border-b border-[#262626] gap-3">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="w-24 h-5 rounded-full bg-cyan-950/40 border border-cyan-500/20 animate-pulse" />
-              <div className="w-48 h-5 rounded-lg bg-slate-800 animate-pulse" />
+              <div className="w-20 h-5 rounded bg-[#262626] animate-pulse" />
+              <div className="w-44 h-5 rounded bg-[#262626] animate-pulse" />
             </div>
-            <div className="w-64 sm:w-96 h-3.5 rounded bg-slate-800/60 animate-pulse" />
+            <div className="w-64 sm:w-80 h-3 rounded bg-[#1e1e1e] animate-pulse" />
           </div>
-          <div className="w-28 h-8 rounded-xl bg-slate-800/60 animate-pulse" />
+          <div className="w-24 h-8 rounded-lg bg-[#262626] animate-pulse" />
         </div>
 
-        {/* Form Inputs & Content Skeletons */}
+        {/* Content Skeletons */}
         <div className="space-y-4 pt-1">
           <div className="space-y-2">
-            <div className="w-32 h-3 rounded bg-slate-800/60 animate-pulse" />
-            <div className="w-full h-12 rounded-xl bg-slate-900/80 border border-slate-800/80 animate-pulse flex items-center px-4">
-              <div className="w-10 h-5 rounded bg-slate-800 animate-pulse" />
-              <div className="w-px h-6 bg-slate-800 mx-3" />
-              <div className="w-40 h-4 rounded bg-slate-800/60 animate-pulse" />
+            <div className="w-28 h-3 rounded bg-[#1e1e1e] animate-pulse" />
+            <div className="w-full h-11 rounded-lg bg-[#1a1a1a] border border-[#262626] animate-pulse flex items-center px-4">
+              <div className="w-10 h-4 rounded bg-[#262626]" />
+              <div className="w-px h-5 bg-[#262626] mx-3" />
+              <div className="w-36 h-3 rounded bg-[#262626]" />
             </div>
           </div>
 
-          {/* Info Banner Box Skeleton */}
-          <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/60 animate-pulse flex items-start gap-3">
-            <div className="w-5 h-5 rounded-full bg-slate-800 shrink-0 mt-0.5" />
+          {/* Info Box Skeleton */}
+          <div className="p-4 rounded-lg bg-[#181818] border border-[#262626] animate-pulse flex items-start gap-3">
+            <div className="w-4 h-4 rounded-full bg-[#262626] shrink-0 mt-0.5" />
             <div className="space-y-2 w-full">
-              <div className="w-48 h-3.5 rounded bg-slate-800" />
-              <div className="w-full max-w-md h-2.5 rounded bg-slate-800/50" />
+              <div className="w-40 h-3 rounded bg-[#262626]" />
+              <div className="w-full max-w-sm h-2.5 rounded bg-[#1e1e1e]" />
             </div>
           </div>
 
-          {/* Action Button Row Skeleton */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
-            <div className="w-28 h-10 rounded-xl bg-slate-900/80 border border-slate-800 animate-pulse" />
-            <div className="w-44 h-10 rounded-xl bg-cyan-950/40 border border-cyan-500/30 animate-pulse" />
+          {/* Action Row Skeleton */}
+          <div className="flex items-center justify-between pt-4 border-t border-[#262626]">
+            <div className="w-24 h-9 rounded-lg bg-[#1e1e1e] border border-[#262626] animate-pulse" />
+            <div className="w-36 h-9 rounded-lg bg-[#262626] animate-pulse" />
           </div>
         </div>
       </div>
@@ -476,7 +468,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
 
         // Direct smart step selection based on verified backend status
         const hasKhqrData = Boolean(
-          (Array.isArray(config?.khqrItems) && config.khqrItems.length > 0) || config?.khqrImageUrl
+          Array.isArray(config?.khqrItems) && config.khqrItems.length > 0
         );
         if (!status?.isConnected) {
           setActiveStep(1);
@@ -496,10 +488,10 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
 
     initializeGateway();
 
-    // 4s fallback timer so UI never freezes in skeleton state under network drop
+    // 15s fallback timer so UI never freezes indefinitely only in case of network drop
     const safetyTimer = setTimeout(() => {
       if (isMounted) setIsInitialLoading(false);
-    }, 4000);
+    }, 15000);
 
     return () => {
       isMounted = false;
@@ -517,7 +509,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
 
   // Step completion flags
   const isStep1Done = Boolean(userClientStatus.isConnected);
-  const isStep2Done = Boolean(khqrItems.length > 0 || gatewayConfig?.khqrImageUrl);
+  const isStep2Done = Boolean(Array.isArray(khqrItems) && khqrItems.length > 0);
   const isStep3Done = Boolean(userClientStatus.isConnected && targetGroups.length > 0);
 
   const completedStepsCount = (isStep1Done ? 1 : 0) + (isStep2Done ? 1 : 0) + (isStep3Done ? 1 : 0);
@@ -525,6 +517,9 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
 
   // Propagate incomplete status upwards to Dashboard navigation and global events
   useEffect(() => {
+    // CRITICAL: Await initial loading before firing any status change to avoid false alerts or premature flashes
+    if (isInitialLoading) return;
+
     if (onStatusChange) {
       onStatusChange(isPaymentGatewayIncomplete);
     }
@@ -544,7 +539,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
         })
       );
     }
-  }, [isPaymentGatewayIncomplete, isStep1Done, isStep2Done, isStep3Done, completedStepsCount, onStatusChange]);
+  }, [isInitialLoading, isPaymentGatewayIncomplete, isStep1Done, isStep2Done, isStep3Done, completedStepsCount, onStatusChange]);
 
   // 2-minute (120s) cooldown timer for resending verification code
   useEffect(() => {
@@ -1357,7 +1352,7 @@ export const PaymentGatewayAdmin: React.FC<PaymentGatewayAdminProps> = ({ onStat
               {isStep2Done ? <Check size={18} className="stroke-[3]" /> : '2'}
               {!isStep2Done && (
                 <span
-                  title="Action Required: KHQR image missing"
+                  title="Action Required: KHQR data missing"
                   className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center ring-2 ring-[#090D18]"
                 >
                   <AlertCircle size={10} className="stroke-[3]" />
