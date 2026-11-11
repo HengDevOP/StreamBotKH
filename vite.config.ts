@@ -34,6 +34,10 @@ export default defineConfig({
     host: '0.0.0.0', // Accessible from any network IP / LAN / VPS
     port: 5173,
     proxy: {
+      '/health': {
+        target: 'http://127.0.0.1:5001',
+        changeOrigin: true
+      },
       '/api': {
         target: 'http://127.0.0.1:5001',
         changeOrigin: true
