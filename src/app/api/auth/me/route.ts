@@ -132,7 +132,8 @@ export async function GET(req: NextRequest) {
       youtube: streamer.liveStreamUrl || streamer.youtubeLiveUrl || '',
       twitch: '',
       tiktok: '',
-      facebook: ''
+      facebook: '',
+      kick: ''
     },
     socialLinks: Array.isArray(streamer.socialLinks) ? streamer.socialLinks : [],
     deletionStatus: streamer.deletionStatus || null,

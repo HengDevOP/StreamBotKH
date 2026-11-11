@@ -109,7 +109,8 @@ export async function GET(req: NextRequest) {
         youtube: streamer.liveStreamUrl || streamer.youtubeLiveUrl || '',
         twitch: '',
         tiktok: '',
-        facebook: ''
+        facebook: '',
+        kick: ''
       }
     });
   } catch (err: any) {
@@ -174,7 +175,8 @@ export async function PUT(req: NextRequest) {
         youtube: incomingBroadcastUrls.youtube !== undefined ? String(incomingBroadcastUrls.youtube).trim() : (finalBroadcastUrls.youtube || ''),
         twitch: incomingBroadcastUrls.twitch !== undefined ? String(incomingBroadcastUrls.twitch).trim() : (finalBroadcastUrls.twitch || ''),
         tiktok: incomingBroadcastUrls.tiktok !== undefined ? String(incomingBroadcastUrls.tiktok).trim() : (finalBroadcastUrls.tiktok || ''),
-        facebook: incomingBroadcastUrls.facebook !== undefined ? String(incomingBroadcastUrls.facebook).trim() : (finalBroadcastUrls.facebook || '')
+        facebook: incomingBroadcastUrls.facebook !== undefined ? String(incomingBroadcastUrls.facebook).trim() : (finalBroadcastUrls.facebook || ''),
+        kick: incomingBroadcastUrls.kick !== undefined ? String(incomingBroadcastUrls.kick).trim() : (finalBroadcastUrls.kick || '')
       };
       if (finalBroadcastUrls.youtube !== undefined) {
         newLiveStreamUrl = finalBroadcastUrls.youtube;

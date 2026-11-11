@@ -38,6 +38,7 @@ export interface Streamer {
     twitch?: string;
     tiktok?: string;
     facebook?: string;
+    kick?: string;
   };
   deletionStatus?: 'pending' | 'deleted' | null;
   deletionRequestedAt?: string | null;

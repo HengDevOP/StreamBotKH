@@ -761,7 +761,7 @@ export const BroadcastSkeleton: React.FC = () => {
   return (
     <div className="space-y-4 max-w-5xl mx-auto pb-12 animate-pulse select-none">
       <div className="space-y-4">
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
             className="rounded-2xl bg-[#090D18] border border-slate-800 p-5 space-y-4 shadow-sm"

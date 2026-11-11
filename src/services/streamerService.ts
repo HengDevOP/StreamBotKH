@@ -63,6 +63,7 @@ export const streamerService = {
       twitch?: string;
       tiktok?: string;
       facebook?: string;
+      kick?: string;
     };
     plan?: string;
     socialLinks?: any[];

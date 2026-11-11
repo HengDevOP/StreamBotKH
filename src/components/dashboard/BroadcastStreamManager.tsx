@@ -16,7 +16,7 @@ export interface BroadcastStreamManagerProps {
 }
 
 interface PlatformItem {
-  id: 'youtube' | 'twitch' | 'tiktok' | 'facebook';
+  id: 'youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick';
   name: string;
   subtitle: string;
   placeholder: string;
@@ -67,6 +67,17 @@ const PLATFORMS: PlatformItem[] = [
         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
       </svg>
     )
+  },
+  {
+    id: 'kick',
+    name: 'Kick',
+    subtitle: 'Kick Live Stream',
+    placeholder: 'https://kick.com/username',
+    logo: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#53FC18] shrink-0" aria-label="Kick">
+        <path d="M2.399 0v24h6.002v-6h2.4v-2.4h2.4v2.4h2.4V24h6.002V0h-6.002v6h-2.4v2.4h-2.4V6h-2.4V0H2.399zm6.002 8.4h2.4v2.4h-2.4V8.4zm2.4 2.4h2.4v2.4h-2.4v-2.4zm-2.4 2.4h2.4v2.4h-2.4v-2.4z" />
+      </svg>
+    )
   }
 ];
 
@@ -79,11 +90,13 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
     twitch: string;
     tiktok: string;
     facebook: string;
+    kick: string;
   }>({
     youtube: user?.broadcastUrls?.youtube || user?.liveStreamUrl || '',
     twitch: user?.broadcastUrls?.twitch || user?.twitchLiveUrl || '',
     tiktok: user?.broadcastUrls?.tiktok || user?.tiktokLiveUrl || '',
-    facebook: user?.broadcastUrls?.facebook || user?.facebookLiveUrl || ''
+    facebook: user?.broadcastUrls?.facebook || user?.facebookLiveUrl || '',
+    kick: user?.broadcastUrls?.kick || ''
   });
 
   const lastSavedUrlsRef = useRef(urls);
@@ -97,7 +110,8 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         youtube: user?.broadcastUrls?.youtube || user?.liveStreamUrl || '',
         twitch: user?.broadcastUrls?.twitch || user?.twitchLiveUrl || '',
         tiktok: user?.broadcastUrls?.tiktok || user?.tiktokLiveUrl || '',
-        facebook: user?.broadcastUrls?.facebook || user?.facebookLiveUrl || ''
+        facebook: user?.broadcastUrls?.facebook || user?.facebookLiveUrl || '',
+        kick: user?.broadcastUrls?.kick || ''
       };
       setUrls(initial);
       lastSavedUrlsRef.current = initial;
@@ -123,7 +137,7 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
   };
 
   const handleAutoSave = async (
-    platformId: 'youtube' | 'twitch' | 'tiktok' | 'facebook',
+    platformId: 'youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick',
     overrideVal?: string
   ) => {
     const currentVal = (overrideVal !== undefined ? overrideVal : (urls[platformId] || '')).trim();
@@ -146,7 +160,8 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         youtube: (nextUrls.youtube || '').trim(),
         twitch: (nextUrls.twitch || '').trim(),
         tiktok: (nextUrls.tiktok || '').trim(),
-        facebook: (nextUrls.facebook || '').trim()
+        facebook: (nextUrls.facebook || '').trim(),
+        kick: (nextUrls.kick || '').trim()
       };
 
       await streamerService.updateProfile({
@@ -164,7 +179,7 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
     }
   };
 
-  const handleClear = (platformId: 'youtube' | 'twitch' | 'tiktok' | 'facebook') => {
+  const handleClear = (platformId: 'youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick') => {
     setUrls((prev) => ({ ...prev, [platformId]: '' }));
     handleAutoSave(platformId, '');
   };
@@ -200,13 +215,12 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
 
                 <div className="flex items-center gap-2">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-medium border ${
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-mono font-medium border ${
                       hasUrl
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                         : 'bg-slate-900 text-slate-500 border-slate-800'
                     }`}
                   >
-                    {hasUrl && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                     <span>{hasUrl ? 'Connected' : 'Disconnected'}</span>
                   </span>
                 </div>
@@ -245,7 +259,7 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
                     href={val.startsWith('http://') || val.startsWith('https://') ? val : `https://${val}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-mono transition-colors shrink-0"
+                    className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 text-xs font-mono transition-colors shrink-0"
                     title="Open live link in new tab"
                   >
                     <ExternalLink size={14} />

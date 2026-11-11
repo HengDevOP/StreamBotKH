@@ -52,6 +52,7 @@ export interface UserDoc {
     twitch?: string;
     tiktok?: string;
     facebook?: string;
+    kick?: string;
   };
   deletionStatus?: 'pending' | 'deleted' | null;
   deletionRequestedAt?: Date | string | null;
