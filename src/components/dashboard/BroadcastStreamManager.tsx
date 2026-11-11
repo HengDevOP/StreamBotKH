@@ -206,7 +206,7 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
                         : 'bg-slate-900 text-slate-500 border-slate-800'
                     }`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${hasUrl ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                    {hasUrl && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                     <span>{hasUrl ? 'Connected' : 'Disconnected'}</span>
                   </span>
                 </div>
