@@ -19,6 +19,7 @@ interface VerifiedCreatorCard {
   username: string;
   tag: string;
   avatar: string;
+  bannerUrl?: string;
   supporters?: string;
   verified: boolean;
   isLive?: boolean;
@@ -127,6 +128,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         username: s.username,
         tag: s.bio || (s.plan === 'pro' ? 'PRO Verified Streamer' : 'Verified Content Creator'),
         avatar: s.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(s.username)}`,
+        bannerUrl: s.bannerUrl || '',
         supporters: s.supporters || (s.totalTips > 0 ? `${s.totalTips} ${s.totalTips === 1 ? 'Tip' : 'Tips'}` : (s.plan === 'pro' ? 'PRO Creator' : 'Verified Creator')),
         verified: true,
         isLive: Boolean(s.isLive),
@@ -156,9 +158,26 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     <div
       key={key}
       onClick={() => onNavigate('donate', { username: creator.username })}
-      className="home-streamer-card w-[250px] xs:w-[280px] sm:w-[320px] flex-shrink-0 p-3.5 sm:p-4 rounded-2xl bg-[#0A0F1E]/80 hover:bg-[#10172C]/90 border border-white/[0.06] hover:border-cyan-500/40 shadow-xl backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer group flex flex-col justify-between space-y-3 sm:space-y-3.5 select-none"
+      className="home-streamer-card relative w-[250px] xs:w-[280px] sm:w-[320px] flex-shrink-0 rounded-2xl overflow-hidden border border-white/[0.08] hover:border-cyan-500/50 shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer group select-none bg-[#0A0F1E]/90"
+      style={
+        creator.bannerUrl
+          ? {
+              backgroundImage: `url("${creator.bannerUrl}")`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }
+          : undefined
+      }
     >
-      <div className="flex items-center gap-3 min-w-0">
+      {/* Frosted Glass Overlay: darkens and softens banner for crisp contrast or defaults to solid card */}
+      <div
+        className={`w-full h-full p-3.5 sm:p-4 flex items-center gap-3 sm:gap-3.5 transition-colors ${
+          creator.bannerUrl
+            ? 'bg-slate-950/80 group-hover:bg-slate-950/70 backdrop-blur-sm'
+            : 'bg-[#0A0F1E]/90 group-hover:bg-[#10172C]/95'
+        }`}
+      >
+        {/* Left Side: Profile Logo (Avatar) */}
         <div className="relative flex-shrink-0">
           <div className="w-12 h-12 rounded-xl p-0.5 bg-gradient-to-tr from-cyan-500 via-indigo-500 to-pink-500 shadow-md">
             <img
@@ -167,37 +186,27 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               className="w-full h-full rounded-[10px] bg-slate-900 object-cover"
             />
           </div>
-          <div className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-slate-950">
+          <div className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-slate-950 shadow-sm">
             <BadgeCheck size={14} className="text-cyan-400 fill-cyan-400/20" />
           </div>
         </div>
 
+        {/* Right Side: Creator Identity Info */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
             <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] truncate group-hover:text-cyan-300 transition-colors">
               {creator.name}
             </h4>
-            <BadgeCheck size={14} className="text-cyan-400 fill-cyan-400/20 flex-shrink-0" />
+            <BadgeCheck size={13} className="text-cyan-400 fill-cyan-400/20 flex-shrink-0" />
             {creator.isLive && (
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/50 text-[9px] font-mono text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
+              <span className="px-1.5 py-0.2 rounded-full bg-rose-500/20 border border-rose-500/50 text-[9px] font-mono text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1 flex-shrink-0 ml-auto">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
                 LIVE
               </span>
             )}
           </div>
           <p className="text-[11px] font-mono text-cyan-400 truncate">@{creator.username}</p>
-          <p className="text-[11px] text-slate-400 truncate mt-0.5">{creator.tag}</p>
-        </div>
-      </div>
-
-      <div className="pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[11px] font-mono">
-        <div className="flex items-center gap-1.5 text-slate-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-emerald-400 font-semibold">{creator.supporters || 'Active Live'}</span>
-        </div>
-        <div className="flex items-center gap-1 text-cyan-400 font-bold group-hover:translate-x-0.5 transition-transform">
-          <span>Tip Page</span>
-          <ArrowRight size={12} />
+          <p className="text-[11px] text-slate-300/80 truncate mt-0.5">{creator.tag}</p>
         </div>
       </div>
     </div>

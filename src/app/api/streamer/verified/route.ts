@@ -86,6 +86,7 @@ export async function GET(_req: NextRequest) {
         username: u.username,
         displayName: u.displayName || u.username,
         avatarUrl: u.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.username)}`,
+        bannerUrl: u.bannerUrl || (u as any).banner_url || '',
         bio,
         plan: u.plan || 'free',
         isVerified: true,
