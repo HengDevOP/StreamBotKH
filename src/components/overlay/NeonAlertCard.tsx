@@ -94,6 +94,7 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded, cl
 
   let formattedHeadline = headlineTemplate
     .replace(/\{donator\}/gi, donorName)
+    .replace(/\{donor\}/gi, donorName)
     .replace(/\{name\}/gi, donorName)
     .replace(/\{tier\}/gi, tierNameFromAlert)
     .replace(/\{amount\}/gi, formattedAmount)
@@ -123,12 +124,12 @@ export const NeonAlertCard: React.FC<NeonAlertCardProps> = ({ alert, onEnded, cl
     const activeTierColor = (alert as any).tierColor || activeAmountColor || '#F59E0B';
     const activeTextColor = textColor || '#FFFFFF';
 
-    const tokenRegex = /(\{(?:donator|name|tier|amount|currency|message|donor_message|context)\})/gi;
+    const tokenRegex = /(\{(?:donator|donor|name|tier|amount|currency|message|donor_message|context)\})/gi;
     const tokens = headlineTemplate.split(tokenRegex);
 
     return tokens.map((part, idx) => {
       const lower = part.toLowerCase();
-      if (lower === '{donator}' || lower === '{name}') {
+      if (lower === '{donator}' || lower === '{donor}' || lower === '{name}') {
         return (
           <span
             key={idx}

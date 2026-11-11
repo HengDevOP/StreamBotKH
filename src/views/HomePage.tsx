@@ -258,10 +258,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       <div className="absolute inset-0 obs-studio-dot-grid pointer-events-none opacity-40 z-0" />
 
       {/* ===================== HERO SECTION ===================== */}
-      {/* Desktop: Side-by-side 2-column grid (Left Content + Right Canvas) */}
-      {/* Mobile/Device: Stage 1 = Fullscreen Left Content Spotlight */}
-      <section className="relative max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-6 sm:px-10 lg:px-12 xl:px-16 2xl:px-20 z-10 min-h-[calc(100dvh-5rem)] lg:min-h-0 flex flex-col justify-center lg:block py-10 sm:py-14 lg:py-14 xl:py-18">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 xl:gap-16 items-center">
+      {/* Unified 2-column grid: Left Content + Right Interactive Stream Canvas (No Fullscreen Trapping) */}
+      <section className="relative max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-4 xs:px-6 sm:px-10 lg:px-12 xl:px-16 2xl:px-20 z-10 py-8 sm:py-12 lg:py-14 xl:py-16">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 lg:gap-12 xl:gap-16 items-center">
             {/* Left Column: Hero Headline, Swiping Keyword, Description, CTA Buttons */}
             <div className="w-full lg:col-span-5 xl:col-span-5 text-center lg:text-left space-y-6 sm:space-y-8 flex flex-col items-center lg:items-start">
               {/* Hero Headline */}
@@ -320,9 +319,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 {/* 2nd Button: Explore Features -> */}
                 <button
                   onClick={() => {
-                    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-                    const targetId = isMobile ? 'card-animation' : 'features';
-                    const target = document.getElementById(targetId);
+                    const target = document.getElementById('features');
                     if (target) {
                       target.scrollIntoView({ behavior: 'smooth' });
                     }
@@ -335,34 +332,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* Right Column (Desktop Only): Connected Cards to Central Live Stream Screen */}
-            <div className="hidden lg:flex lg:col-span-7 xl:col-span-7 relative w-full items-center justify-end pt-4 lg:pt-0">
+            {/* Right Column: Connected Cards to Central Live Stream Screen (Fully responsive) */}
+            <div className="w-full lg:col-span-7 xl:col-span-7 relative flex items-center justify-center lg:justify-end pt-4 lg:pt-0 min-w-0">
               <HomeHeroStreamCanvas />
             </div>
-          </div>
-
-          {/* Smooth Scroll Cue to Stage 2 (Mobile / Device screens Only) */}
-          <div className="lg:hidden pt-8 sm:pt-12 opacity-80 hover:opacity-100 transition-opacity flex justify-center">
-            <button
-              onClick={() => {
-                document.getElementById('card-animation')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="inline-flex flex-col items-center gap-1.5 text-slate-400 hover:text-cyan-400 text-xs font-mono uppercase tracking-widest cursor-pointer transition-colors"
-              aria-label="Scroll to interactive broadcast screen"
-            >
-              <span>Scroll To Explore</span>
-              <ChevronDown size={18} className="animate-bounce text-cyan-400" />
-            </button>
-          </div>
-        </section>
-
-        {/* ===================== STAGE 2 (MOBILE / DEVICE SCREENS ONLY): CARD ANIMATION SCROLL ===================== */}
-        <section
-          id="card-animation"
-          className="lg:hidden relative min-h-[90dvh] flex flex-col justify-center items-center w-full px-4 sm:px-6 z-10 py-12 sm:py-16 scroll-mt-16"
-        >
-          <div className="w-full max-w-[620px] mx-auto flex flex-col items-center justify-center">
-            <HomeHeroStreamCanvas />
           </div>
         </section>
 
@@ -477,7 +450,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       <div className="w-full max-w-full min-w-0 space-y-28 sm:space-y-36 pt-16 sm:pt-24 relative z-10 overflow-hidden">
 
       {/* ===================== STAGE 4: FOURTH SCROLL (INTERACTIVE 60 FPS OVERLAY SHOWCASE) ===================== */}
-      <div id="features" className="w-full max-w-full min-w-0 scroll-mt-24 min-h-[85dvh] flex flex-col justify-center overflow-hidden">
+      <div id="features" className="w-full max-w-full min-w-0 scroll-mt-24 flex flex-col justify-center overflow-hidden">
         <HomeFeatureShowcase />
       </div>
 

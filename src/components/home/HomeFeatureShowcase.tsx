@@ -31,16 +31,21 @@ interface ShowcaseAlertCombo {
   amount: number;
   currency: 'USD' | 'KHR';
   layoutMode: 'top' | 'left' | 'right' | 'bottom';
-  animationStyle: 'zoom' | 'bounce' | 'glitch' | 'shake' | 'flip' | 'slide' | 'pulse';
+  animationStyle: 'zoom' | 'bounce' | 'glitch' | 'shake' | 'flip' | 'slide' | 'pulse' | 'pop';
   donorColor: string;
   amountColor: string;
   glowColor: string;
   fontFamily: string;
   mediaUrl: string;
+  textTemplate: string;
+  badgeText?: string;
+  badgeColor?: string;
+  badgeBg?: string;
+  badgeBorder?: string;
 }
 
 const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
-  // 1. TOP LAYOUT (Mascot Top, Pikachu, Zoom In)
+  // 1. Superchat Alert (Solid White & Gold, SBKH Celebrate Sticker, Zoom)
   {
     id: 'combo-1',
     donorName: 'Sophea Gaming',
@@ -49,116 +54,180 @@ const DONATION_SHOWCASE_COMBOS: ShowcaseAlertCombo[] = [
     currency: 'USD',
     layoutMode: 'top',
     animationStyle: 'zoom',
-    donorColor: 'linear-gradient(135deg, #FFE600 0%, #FF8C00 100%)',
-    amountColor: 'linear-gradient(135deg, #00F0FF 0%, #38BDF8 100%)',
+    donorColor: '#FFFFFF',
+    amountColor: '#FACC15',
     glowColor: '#00F0FF',
     fontFamily: 'Chakra Petch',
-    mediaUrl: '/assets/pokemon/25.gif'
+    mediaUrl: '/sbkh/sbkh_party_celebrate.gif',
+    textTemplate: '{donor} donated {amount} through superchat!'
   },
-  // 2. TOP LAYOUT (Mascot Top, Lucario, Glitch Split)
+  // 2. Just Subscribed Alert (SBKH Subscribe Button Sticker, Slide Up)
   {
     id: 'combo-2',
     donorName: 'Dara_Esports',
-    donorMessage: 'That AWM 400m sniper shot was illegal! Chicken dinner tonight squad 🍗⚡',
-    amount: 50,
+    donorMessage: 'Just hit that follow & sub button! Best esports live caster in town 🎮✨',
+    amount: 0,
     currency: 'USD',
     layoutMode: 'top',
-    animationStyle: 'glitch',
-    donorColor: 'linear-gradient(135deg, #EC4899 0%, #F43F5E 100%)',
-    amountColor: 'linear-gradient(135deg, #A855F7 0%, #C084FC 100%)',
-    glowColor: '#EC4899',
-    fontFamily: 'Orbitron',
-    mediaUrl: '/assets/pokemon/448.gif'
+    animationStyle: 'slide',
+    donorColor: '#FFFFFF',
+    amountColor: '#38BDF8',
+    glowColor: '#38BDF8',
+    fontFamily: 'Chakra Petch',
+    mediaUrl: '/sbkh/sbkh_subscribe_button.gif',
+    textTemplate: '{donor} just subscribed!',
+    badgeText: 'NEW SUB',
+    badgeColor: '#38BDF8',
+    badgeBg: 'rgba(56, 189, 248, 0.15)',
+    badgeBorder: 'rgba(56, 189, 248, 0.35)'
   },
-  // 3. TOP LAYOUT (Mascot Top, Charmander, Wobble Bounce)
+  // 3. Participation Club Alert (SBKH King Crown Sticker, Wobble Bounce)
   {
     id: 'combo-3',
     donorName: 'Vannak Pro',
+    donorMessage: 'Proud to be a member of the squad! Let’s crush the seasonal tournament 👑⚡',
+    amount: 0,
+    currency: 'KHR',
+    layoutMode: 'top',
+    animationStyle: 'bounce',
+    donorColor: '#FFFFFF',
+    amountColor: '#F59E0B',
+    glowColor: '#F59E0B',
+    fontFamily: 'Kanit',
+    mediaUrl: '/sbkh/sbkh_king_crown.gif',
+    textTemplate: '{donor} has joined the participation club!',
+    badgeText: 'VIP CLUB',
+    badgeColor: '#FBBF24',
+    badgeBg: 'rgba(245, 158, 11, 0.15)',
+    badgeBorder: 'rgba(245, 158, 11, 0.35)'
+  },
+  // 4. Tip Alert (Solid White & Cyan, SBKH Thumbs Up Sticker, Pop Spring)
+  {
+    id: 'combo-4',
+    donorName: 'Bopha_Cute',
     donorMessage: 'Coffee on me bro! Road to Mythical Glory let’s gooo and keep it hype ☕💖',
     amount: 40000,
     currency: 'KHR',
     layoutMode: 'top',
-    animationStyle: 'bounce',
-    donorColor: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
-    amountColor: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
-    glowColor: '#10B981',
-    fontFamily: 'Kanit',
-    mediaUrl: '/assets/pokemon/4.gif'
-  },
-  // 4. TOP LAYOUT (Mascot Top, Gengar, 3D Flip)
-  {
-    id: 'combo-4',
-    donorName: 'Bopha_Cute',
-    donorMessage: 'Insane reaction time right there! Keep grinding the late night stream 🎮🔥',
-    amount: 25,
-    currency: 'USD',
-    layoutMode: 'top',
-    animationStyle: 'flip',
-    donorColor: 'linear-gradient(135deg, #8B5CF6 0%, #D946EF 100%)',
-    amountColor: 'linear-gradient(135deg, #00F0FF 0%, #10B981 100%)',
-    glowColor: '#8B5CF6',
+    animationStyle: 'pop',
+    donorColor: '#FFFFFF',
+    amountColor: '#38BDF8',
+    glowColor: '#38BDF8',
     fontFamily: 'Chakra Petch',
-    mediaUrl: '/assets/pokemon/94.gif'
+    mediaUrl: '/sbkh/sbkh_thumbs_up.gif',
+    textTemplate: '{donor} sent {amount} tip alert!'
   },
-  // 5. TOP LAYOUT (Mascot Top, Mew, Slide Up Bounce)
+  // 5. Resubscription Alert (SBKH Star Eyes Sticker, Heartbeat Pulse)
   {
     id: 'combo-5',
     donorName: 'Meng MLBB',
-    donorMessage: 'That 1v5 clutch had the whole chat screaming! Unstoppable carry tonight 👑⚡',
-    amount: 100000,
-    currency: 'KHR',
-    layoutMode: 'top',
-    animationStyle: 'slide',
-    donorColor: 'linear-gradient(135deg, #00F0FF 0%, #06B6D4 100%)',
-    amountColor: 'linear-gradient(135deg, #22C55E 0%, #4ADE80 100%)',
-    glowColor: '#00F0FF',
-    fontFamily: 'Bebas Neue',
-    mediaUrl: '/assets/pokemon/151.gif'
-  },
-  // 6. TOP LAYOUT (Mascot Top, Dragonite, Camera Shake)
-  {
-    id: 'combo-6',
-    donorName: 'Chhay_FPS',
-    donorMessage: 'Savage kill right there! MVP of the tournament, keep shredding bro! 🔥🔥🔥',
-    amount: 100,
-    currency: 'USD',
-    layoutMode: 'top',
-    animationStyle: 'shake',
-    donorColor: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-    amountColor: 'linear-gradient(135deg, #FACC15 0%, #F59E0B 100%)',
-    glowColor: '#EF4444',
-    fontFamily: 'Orbitron',
-    mediaUrl: '/assets/pokemon/149.gif'
-  },
-  // 7. TOP LAYOUT (Mascot Top, Eevee, Heartbeat Pulse)
-  {
-    id: 'combo-7',
-    donorName: 'Ah_Lin_Live',
-    donorMessage: 'Thank you for the pro gameplay tips, learned so much from today’s stream 🌟🎮',
-    amount: 5,
+    donorMessage: 'Tier 1 sub for 3 months! That 1v5 clutch had the whole chat screaming 👑⚡',
+    amount: 0,
     currency: 'USD',
     layoutMode: 'top',
     animationStyle: 'pulse',
-    donorColor: 'linear-gradient(135deg, #F43F5E 0%, #FB7185 100%)',
-    amountColor: 'linear-gradient(135deg, #38BDF8 0%, #818CF8 100%)',
-    glowColor: '#F43F5E',
-    fontFamily: 'Kanit',
-    mediaUrl: '/assets/pokemon/133.gif'
+    donorColor: '#FFFFFF',
+    amountColor: '#A855F7',
+    glowColor: '#A855F7',
+    fontFamily: 'Bebas Neue',
+    mediaUrl: '/sbkh/sbkh_star_eyes.gif',
+    textTemplate: '{donor} just subscribed!',
+    badgeText: '3 MO RESUB',
+    badgeColor: '#C084FC',
+    badgeBg: 'rgba(168, 85, 247, 0.15)',
+    badgeBorder: 'rgba(168, 85, 247, 0.35)'
   },
-  // 8. TOP LAYOUT (Mascot Top, Snorlax, CapCut Zoom-In)
+  // 6. Participation Club Alert (SBKH Gamer Fire Sticker, Glitch Split)
+  {
+    id: 'combo-6',
+    donorName: 'Chhay_FPS',
+    donorMessage: 'Club pass unlocked! Cambodia esports to the absolute top 🔥🔥🔥',
+    amount: 0,
+    currency: 'USD',
+    layoutMode: 'top',
+    animationStyle: 'glitch',
+    donorColor: '#FFFFFF',
+    amountColor: '#EC4899',
+    glowColor: '#EC4899',
+    fontFamily: 'Orbitron',
+    mediaUrl: '/sbkh/sbkh_gamer_fire.gif',
+    textTemplate: '{donor} has joined the participation club!',
+    badgeText: 'CHAMPION',
+    badgeColor: '#F472B6',
+    badgeBg: 'rgba(236, 72, 153, 0.15)',
+    badgeBorder: 'rgba(236, 72, 153, 0.35)'
+  },
+  // 7. High Roller Superchat (Solid White & Emerald, SBKH Trophy Sticker, 3D Flip)
+  {
+    id: 'combo-7',
+    donorName: 'Ah_Lin_Live',
+    donorMessage: 'Savage kill right there! MVP of the match, keep shredding bro! 🏆✨',
+    amount: 50,
+    currency: 'USD',
+    layoutMode: 'top',
+    animationStyle: 'flip',
+    donorColor: '#FFFFFF',
+    amountColor: '#4ADE80',
+    glowColor: '#10B981',
+    fontFamily: 'Kanit',
+    mediaUrl: '/sbkh/sbkh_champion_trophy.gif',
+    textTemplate: '{donor} donated {amount} through superchat!'
+  },
+  // 8. Cheers Tip Alert (Solid White & Amber, SBKH Rich Coins Sticker, Camera Shake)
   {
     id: 'combo-8',
     donorName: 'Socheat Carry',
-    donorMessage: 'Good luck in the MPL tournament! Cambodia esports to the absolute top 🏆✨',
-    amount: 20000,
+    donorMessage: 'High roller donation incoming! Good luck in the MPL tournament 🚀💰',
+    amount: 100000,
     currency: 'KHR',
     layoutMode: 'top',
-    animationStyle: 'zoom',
-    donorColor: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-    amountColor: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+    animationStyle: 'shake',
+    donorColor: '#FFFFFF',
+    amountColor: '#FACC15',
     glowColor: '#F59E0B',
     fontFamily: 'Chakra Petch',
-    mediaUrl: '/assets/pokemon/143.gif'
+    mediaUrl: '/sbkh/sbkh_rich_coins.gif',
+    textTemplate: '{donor} cheered with {amount}!'
+  },
+  // 9. Just Subscribed Alert (SBKH Love Heart Sticker, CapCut Zoom)
+  {
+    id: 'combo-9',
+    donorName: 'Rithy_Pro',
+    donorMessage: 'Love the stream vibes & positive energy every single night! 💖💖',
+    amount: 0,
+    currency: 'USD',
+    layoutMode: 'top',
+    animationStyle: 'zoom',
+    donorColor: '#FFFFFF',
+    amountColor: '#F43F5E',
+    glowColor: '#F43F5E',
+    fontFamily: 'Chakra Petch',
+    mediaUrl: '/sbkh/sbkh_love_heart.gif',
+    textTemplate: '{donor} just subscribed!',
+    badgeText: 'SUBSCRIBER',
+    badgeColor: '#FB7185',
+    badgeBg: 'rgba(244, 63, 94, 0.15)',
+    badgeBorder: 'rgba(244, 63, 94, 0.35)'
+  },
+  // 10. Participation Club Alert (SBKH Let\'s Go Sticker, Wobble Bounce)
+  {
+    id: 'combo-10',
+    donorName: 'Piseth_KH',
+    donorMessage: 'Joined the elite streamers circle! Let’s reach the next milestone! 🌟🎯',
+    amount: 0,
+    currency: 'KHR',
+    layoutMode: 'top',
+    animationStyle: 'bounce',
+    donorColor: '#FFFFFF',
+    amountColor: '#00F0FF',
+    glowColor: '#00F0FF',
+    fontFamily: 'Orbitron',
+    mediaUrl: '/sbkh/sbkh_lets_go.gif',
+    textTemplate: '{donor} has joined the participation club!',
+    badgeText: 'ELITE CLUB',
+    badgeColor: '#38BDF8',
+    badgeBg: 'rgba(0, 240, 255, 0.15)',
+    badgeBorder: 'rgba(0, 240, 255, 0.35)'
   }
 ];
 
@@ -201,8 +270,8 @@ const MEDIA_SHARE_SHOWCASE_CLIPS: MediaShareClip[] = [
     donorMessage: 'Legendary Chou freestyle kick! Best carry in Cambodia 🏆',
     amount: 5,
     currency: 'USD',
-    donorColor: 'linear-gradient(135deg, #00F0FF 0%, #38BDF8 100%)',
-    amountColor: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
+    donorColor: '#FFFFFF',
+    amountColor: '#FACC15',
     glowColor: '#00F0FF',
     animationStyle: 'animate-showcase-flip-media',
     themeGradient: 'from-blue-950/40 via-slate-950 to-black'
@@ -215,8 +284,8 @@ const MEDIA_SHARE_SHOWCASE_CLIPS: MediaShareClip[] = [
     donorMessage: 'Insane bullet lead calculation! Winner Winner Chicken Dinner 🍗🔥',
     amount: 10,
     currency: 'USD',
-    donorColor: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
-    amountColor: 'linear-gradient(135deg, #00F0FF 0%, #06B6D4 100%)',
+    donorColor: '#FFFFFF',
+    amountColor: '#38BDF8',
     glowColor: '#10B981',
     animationStyle: 'animate-capcut-zoom-in',
     themeGradient: 'from-emerald-950/40 via-slate-950 to-black'
@@ -229,8 +298,8 @@ const MEDIA_SHARE_SHOWCASE_CLIPS: MediaShareClip[] = [
     donorMessage: 'Clean drift through Vinewood hills while 5 stars chase! Keep the stream hype 🚗💨',
     amount: 40000,
     currency: 'KHR',
-    donorColor: 'linear-gradient(135deg, #EC4899 0%, #F43F5E 100%)',
-    amountColor: 'linear-gradient(135deg, #A855F7 0%, #C084FC 100%)',
+    donorColor: '#FFFFFF',
+    amountColor: '#F472B6',
     glowColor: '#EC4899',
     animationStyle: 'animate-capcut-glitch-split',
     themeGradient: 'from-pink-950/40 via-slate-950 to-black'
@@ -243,8 +312,8 @@ const MEDIA_SHARE_SHOWCASE_CLIPS: MediaShareClip[] = [
     donorMessage: 'That cable speed is superhuman! Unstoppable assassin play ⚡👑',
     amount: 15,
     currency: 'USD',
-    donorColor: 'linear-gradient(135deg, #8B5CF6 0%, #D946EF 100%)',
-    amountColor: 'linear-gradient(135deg, #FACC15 0%, #F59E0B 100%)',
+    donorColor: '#FFFFFF',
+    amountColor: '#FACC15',
     glowColor: '#8B5CF6',
     animationStyle: 'animate-capcut-3d-flip-x',
     themeGradient: 'from-purple-950/40 via-slate-950 to-black'
@@ -257,8 +326,8 @@ const MEDIA_SHARE_SHOWCASE_CLIPS: MediaShareClip[] = [
     donorMessage: 'Whole chat was screaming! Best clutch of the night bro 🔥🔥🔥',
     amount: 100000,
     currency: 'KHR',
-    donorColor: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-    amountColor: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
+    donorColor: '#FFFFFF',
+    amountColor: '#4ADE80',
     glowColor: '#EF4444',
     animationStyle: 'animate-capcut-slide-up-bounce',
     themeGradient: 'from-rose-950/40 via-slate-950 to-black'
@@ -271,8 +340,8 @@ const MEDIA_SHARE_SHOWCASE_CLIPS: MediaShareClip[] = [
     donorMessage: 'National pride right here! Blast this anthem for the squad 🇰🇭🎵',
     amount: 25,
     currency: 'USD',
-    donorColor: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
-    amountColor: 'linear-gradient(135deg, #EC4899 0%, #F43F5E 100%)',
+    donorColor: '#FFFFFF',
+    amountColor: '#38BDF8',
     glowColor: '#06B6D4',
     animationStyle: 'animate-capcut-origami-fold',
     themeGradient: 'from-cyan-950/40 via-slate-950 to-black'
@@ -393,8 +462,8 @@ const ScrollSwipeSection: React.FC<{
         }
       },
       {
-        threshold: 0.15,
-        rootMargin: '0px 0px -50px 0px'
+        threshold: 0.08,
+        rootMargin: '0px 0px -40px 0px'
       }
     );
 
@@ -409,11 +478,12 @@ const ScrollSwipeSection: React.FC<{
   return (
     <div
       ref={sectionRef}
-      className={`w-full max-w-full min-w-0 transition-all duration-1000 ease-out transform ${
+      className={`w-full max-w-full min-w-0 transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform-gpu ${
         isVisible
-          ? 'opacity-100 translate-y-0 filter-none'
-          : 'opacity-0 translate-y-20 blur-[2px]'
+          ? 'opacity-100 translate-y-0 scale-100'
+          : 'opacity-0 translate-y-8 scale-[0.985] pointer-events-none'
       } ${className}`}
+      style={{ willChange: isVisible ? 'auto' : 'transform, opacity' }}
     >
       {children}
     </div>
@@ -572,11 +642,6 @@ export const HomeFeatureShowcase: React.FC = () => {
       <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
         {/* Left Side: Rich Detailed Donation Alert Overview */}
         <div className="w-full lg:w-1/2 space-y-4 min-w-0">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 font-mono text-xs font-bold tracking-wider uppercase">
-            <Bell size={13} className="text-cyan-400" />
-            <span>LIVE DONATION ALERTS ENGINE</span>
-          </div>
-
           <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Fully Customizable 60 FPS Live Donation Alerts
           </h3>
@@ -589,10 +654,10 @@ export const HomeFeatureShowcase: React.FC = () => {
             Personalize your broadcast with customizable entrance animations, dynamic mascot positions (Top, Left, Right, Bottom), dual USD &amp; Cambodian Riel currency formatting, and neural KiriTTS voice cheers with automatic stream audio ducking.
           </p>
 
-          {/* Feature Highlights Grid - No element outlines */}
+          {/* Feature Highlights Grid - Clean Default Icons */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 w-full min-w-0">
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0 text-cyan-400 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
                 <Zap size={14} />
               </div>
               <div className="min-w-0">
@@ -602,7 +667,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
                 <CheckCircle2 size={14} />
               </div>
               <div className="min-w-0">
@@ -612,7 +677,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-rose-500/15 flex items-center justify-center shrink-0 text-rose-400 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
                 <Volume2 size={14} />
               </div>
               <div className="min-w-0">
@@ -622,7 +687,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 text-amber-400 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
                 <Star size={14} />
               </div>
               <div className="min-w-0">
@@ -648,7 +713,7 @@ export const HomeFeatureShowcase: React.FC = () => {
                     donorMessage: currentAlert.donorMessage,
                     amount: currentAlert.amount,
                     currency: currentAlert.currency,
-                    textTemplate: '{donator} donated {amount} through superchat!',
+                    textTemplate: currentAlert.textTemplate || '{donor} donated {amount} through superchat!',
                     textColor: '#FFFFFF',
                     donorColor: currentAlert.donorColor,
                     amountColor: currentAlert.amountColor,
@@ -659,7 +724,11 @@ export const HomeFeatureShowcase: React.FC = () => {
                     fontSize: 22,
                     layoutMode: 'top',
                     animationStyle: currentAlert.animationStyle,
-                    glowColor: currentAlert.glowColor
+                    glowColor: currentAlert.glowColor,
+                    badgeText: currentAlert.badgeText,
+                    badgeColor: currentAlert.badgeColor,
+                    badgeBg: currentAlert.badgeBg,
+                    badgeBorder: currentAlert.badgeBorder
                   }}
                 />
               </div>
@@ -669,18 +738,13 @@ export const HomeFeatureShowcase: React.FC = () => {
       </ScrollSwipeSection>
 
       {/* ========================================================================= */}
-      {/* FEATURE 2: VIDEO ALERTS (LEFT: 3D CARD, RIGHT: TEXT)                      */}
+      {/* FEATURE 2: VIDEO ALERTS (LEFT: CARD, RIGHT: TEXT)                         */}
       {/* Smoothly rotates 15° when video clip changes                              */}
       {/* Zero element outline: clean border-0 with soft translucent glass          */}
       {/* ========================================================================= */}
       <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row-reverse items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
         {/* Right Side: Title & Description */}
         <div className="w-full lg:w-1/2 space-y-4 min-w-0">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-300 font-mono text-xs font-bold tracking-wider uppercase">
-            <Video size={13} className="text-cyan-400" />
-            <span>YOUTUBE &amp; MEDIA SHARE ENGINE</span>
-          </div>
-
           <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
             Media Share &amp; Video Alerts with Live Scrubber
           </h3>
@@ -689,10 +753,10 @@ export const HomeFeatureShowcase: React.FC = () => {
             Allow your viewers to share hype gameplay moments, music tracks, or funny clips on stream. Our video alert engine synchronizes YouTube playback with live progress scrubbers, volume leveling, and automatic game audio ducking.
           </p>
 
-          {/* Feature Highlights Grid - No outlines */}
+          {/* Feature Highlights Grid - Clean Default Icons */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 w-full min-w-0">
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0 text-cyan-400 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
                 <Tv size={14} />
               </div>
               <div className="min-w-0">
@@ -702,7 +766,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0 text-emerald-400 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
                 <Volume2 size={14} />
               </div>
               <div className="min-w-0">
@@ -712,7 +776,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-rose-500/15 flex items-center justify-center shrink-0 text-rose-400 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
                 <Flame size={14} />
               </div>
               <div className="min-w-0">
@@ -722,7 +786,7 @@ export const HomeFeatureShowcase: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-purple-500/15 flex items-center justify-center shrink-0 text-purple-400 mt-0.5">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
                 <ShieldCheck size={14} />
               </div>
               <div className="min-w-0">

@@ -9,6 +9,8 @@
     max-width: 100%;
     overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
   }
   body {
     color: #F8FAFC;
