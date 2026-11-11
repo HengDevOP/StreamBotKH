@@ -414,6 +414,49 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [liveTokenUsage, setLiveTokenUsage] = useState<TokenUsage | null>(null);
 
+  // Global Reset Countdown: 2:00 PM Singapore Time (14:00 SGT = 06:00 UTC)
+  const computeResetCountdown = useCallback(() => {
+    const now = new Date();
+    // 06:00 UTC = 14:00 Singapore Time (2:00 PM SGT)
+    const resetToday = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      6,
+      0,
+      0,
+      0
+    ));
+    const nextReset = now.getTime() >= resetToday.getTime()
+      ? new Date(Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate() + 1,
+          6,
+          0,
+          0,
+          0
+        ))
+      : resetToday;
+
+    const diffMs = Math.max(0, nextReset.getTime() - now.getTime());
+    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  }, []);
+
+  const [resetCountdown, setResetCountdown] = useState<string>(computeResetCountdown);
+
+  useEffect(() => {
+    setResetCountdown(computeResetCountdown());
+    const timer = setInterval(() => {
+      setResetCountdown(computeResetCountdown());
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [computeResetCountdown]);
+
   const currentTokenStats: TokenUsage = liveTokenUsage || user?.tokenUsage || {
     limit: 2000,
     used: 0,
@@ -1951,9 +1994,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   {tokenRemaining.toLocaleString()}{' '}
                   <span className="text-slate-500 font-normal">/ {tokenLimit.toLocaleString()}</span>
                 </span>
-                <span className="text-slate-500 flex items-center gap-1 text-[9px]">
-                  <RotateCcw size={9} className="text-slate-500" />
-                  Daily Reset
+                <span
+                  title="Global reset at 2:00 PM Singapore Time (Asia/Singapore, UTC+8)"
+                  className="text-slate-500 flex items-center gap-1 text-[9px] font-mono tracking-tight"
+                >
+                  <RotateCcw size={9} className="text-slate-500 shrink-0" />
+                  Resets in {resetCountdown}
                 </span>
               </div>
             </div>

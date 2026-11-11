@@ -12,6 +12,7 @@ export interface TokenUsage {
   remaining: number;
   percentage: number;
   lastResetDate?: string;
+  nextResetAt?: string;
 }
 
 export interface Streamer {

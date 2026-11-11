@@ -1981,19 +1981,92 @@ export async function processExpiredAccountDeletions(): Promise<number> {
 export const DEFAULT_DAILY_TOKENS = 2000;
 
 /**
- * Returns today's date in YYYY-MM-DD format using Asia/Bangkok (UTC+7) or fallback.
+ * Global Daily Reset Time: 2:00 PM (14:00) Singapore Time (Asia/Singapore, UTC+8).
+ * In UTC, this is exactly 06:00:00 UTC (14:00 - 8 hours).
+ */
+export const GLOBAL_RESET_HOUR_UTC = 6;
+
+/**
+ * Returns the Date timestamp of the NEXT 2:00 PM Singapore Time (06:00 UTC) reset.
+ */
+export function getNextSingaporeResetTime(now = new Date()): Date {
+  const resetToday = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    GLOBAL_RESET_HOUR_UTC,
+    0,
+    0,
+    0
+  ));
+
+  if (now.getTime() >= resetToday.getTime()) {
+    return new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + 1,
+      GLOBAL_RESET_HOUR_UTC,
+      0,
+      0,
+      0
+    ));
+  }
+
+  return resetToday;
+}
+
+/**
+ * Returns the current cycle identifier (YYYY-MM-DD) anchored at 2:00 PM Singapore Time (06:00 UTC).
+ * If current time is before 2:00 PM SGT, it belongs to yesterday's cycle.
+ * If current time is at or after 2:00 PM SGT, it belongs to today's cycle.
+ */
+export function getGlobalResetCycleKey(now = new Date()): string {
+  const resetToday = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    GLOBAL_RESET_HOUR_UTC,
+    0,
+    0,
+    0
+  ));
+
+  if (now.getTime() < resetToday.getTime()) {
+    const yesterday = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - 1,
+      GLOBAL_RESET_HOUR_UTC,
+      0,
+      0,
+      0
+    ));
+    return yesterday.toISOString().slice(0, 10);
+  }
+
+  return resetToday.toISOString().slice(0, 10);
+}
+
+/**
+ * Returns the current daily cycle key anchored at 2:00 PM Singapore Time.
  */
 export function getTodayDateString(): string {
-  try {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Bangkok',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(new Date());
-  } catch {
-    return new Date().toISOString().slice(0, 10);
+  return getGlobalResetCycleKey();
+}
+
+/**
+ * Formats duration until next reset (e.g. "14h 47m", "45m").
+ */
+export function formatResetDuration(targetDate: Date, now = new Date()): string {
+  const diffMs = Math.max(0, targetDate.getTime() - now.getTime());
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
   }
+  return `${minutes}m`;
 }
 
 export interface UserTokenStats {
@@ -2002,6 +2075,7 @@ export interface UserTokenStats {
   remaining: number;
   percentage: number;
   lastResetDate: string;
+  nextResetAt: string;
 }
 
 /**
@@ -2010,6 +2084,7 @@ export interface UserTokenStats {
  */
 export function computeUserTokenStats(user: any): UserTokenStats {
   const today = getTodayDateString();
+  const nextResetDate = getNextSingaporeResetTime();
   const limit =
     typeof user?.dailyTokensLimit === 'number' && user.dailyTokensLimit > 0
       ? user.dailyTokensLimit
@@ -2026,7 +2101,8 @@ export function computeUserTokenStats(user: any): UserTokenStats {
     used,
     remaining,
     percentage,
-    lastResetDate: isDifferentDay ? today : (user?.lastTokenResetDate || today)
+    lastResetDate: isDifferentDay ? today : (user?.lastTokenResetDate || today),
+    nextResetAt: nextResetDate.toISOString()
   };
 }
 
@@ -2035,12 +2111,14 @@ export function computeUserTokenStats(user: any): UserTokenStats {
  * Automatically synchronizes daily reset in the database if a new day has arrived.
  */
 export async function getUserTokenStats(userIdOrOverlayToken: string): Promise<UserTokenStats> {
+  const nextResetDate = getNextSingaporeResetTime();
   const defaultStats: UserTokenStats = {
     limit: DEFAULT_DAILY_TOKENS,
     used: 0,
     remaining: DEFAULT_DAILY_TOKENS,
     percentage: 100,
-    lastResetDate: getTodayDateString()
+    lastResetDate: getTodayDateString(),
+    nextResetAt: nextResetDate.toISOString()
   };
 
   if (!userIdOrOverlayToken) return defaultStats;
@@ -2093,12 +2171,14 @@ export async function deductUserTokens(
   cost: number
 ): Promise<{ success: boolean; stats: UserTokenStats; error?: string }> {
   const today = getTodayDateString();
+  const nextResetDate = getNextSingaporeResetTime();
   const defaultStats: UserTokenStats = {
     limit: DEFAULT_DAILY_TOKENS,
     used: 0,
     remaining: DEFAULT_DAILY_TOKENS,
     percentage: 100,
-    lastResetDate: today
+    lastResetDate: today,
+    nextResetAt: nextResetDate.toISOString()
   };
 
   if (!streamerIdOrToken || cost <= 0) {
@@ -2143,7 +2223,8 @@ export async function deductUserTokens(
       used: newUsed,
       remaining,
       percentage: remainingPercentage,
-      lastResetDate: today
+      lastResetDate: today,
+      nextResetAt: nextResetDate.toISOString()
     };
 
     await usersCol.updateOne(
