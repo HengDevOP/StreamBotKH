@@ -427,7 +427,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
 
         {paidDonations.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center py-10 text-center text-slate-500 gap-2 min-h-[140px]">
-            <Radio size={18} className="animate-pulse text-emerald-400" />
+            <Radio size={18} className="animate-pulse text-slate-400" />
             <p className="font-mono text-xs">No Data</p>
           </div>
         )}

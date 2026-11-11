@@ -500,7 +500,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
           {selectedTimeframe === 'custom' && (
             <div className="hidden xs:flex items-center gap-1.5 bg-[#090D18] border border-slate-800 rounded-xl px-2.5 py-1.5 shadow-sm text-xs font-mono">
-              <Calendar size={13} className="text-cyan-400 shrink-0" />
+              <Calendar size={13} className="text-slate-400 shrink-0" />
               <input
                 type="date"
                 value={customRange.startDate}
@@ -619,7 +619,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
         {/* Left (3 cols): Revenue Analytics Graph */}
         <div className="lg:col-span-3 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-800/80">
-            <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+            <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400">
               <TrendingUp size={15} />
             </div>
             <div>
@@ -776,7 +776,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
         {/* Right (2 cols): Pie / Donut Breakdown Chart */}
         <div className="lg:col-span-2 rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 flex flex-col justify-between shadow-sm">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-800/80">
-            <div className="p-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20 text-pink-400">
+            <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400">
               <PieChartIcon size={15} />
             </div>
             <div>
