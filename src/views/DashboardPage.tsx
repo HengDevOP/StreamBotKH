@@ -418,7 +418,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     limit: 2000,
     used: 0,
     remaining: 2000,
-    percentage: 0
+    percentage: 100
   };
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
   const [videoHasUnsavedChanges, setVideoHasUnsavedChanges] = useState(false);
@@ -1836,6 +1836,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Fixed Sidebar Footer: Single Fixed "Settings" Button with Animated Dropup Menu (Profile & Log Out)
   const renderSidebarFooter = (isCollapsed: boolean) => {
     const isSettingsActive = activeTab === 'account';
+    const tokenLimit = currentTokenStats.limit || 2000;
+    const tokenRemaining = typeof currentTokenStats.remaining === 'number'
+      ? currentTokenStats.remaining
+      : Math.max(0, tokenLimit - (currentTokenStats.used || 0));
+    // 2,000 tokens count as 100%; progress bar drains down as client uses tokens
+    const remainingPercentage = Math.max(
+      0,
+      Math.min(100, Math.round((tokenRemaining / tokenLimit) * 100))
+    );
 
     return (
       <div
@@ -1898,7 +1907,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             {/* Subtle Divider */}
             <div className="my-1 border-t border-slate-800/70" />
 
-            {/* Daily Token Usage Card (Percentage Design) */}
+            {/* Daily Token Usage Card (Progress Down from 100% / 2,000 Tokens) */}
             <div className="mx-0.5 my-1 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-inner">
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <div className="flex items-center gap-1.5 text-slate-300">
@@ -1910,35 +1919,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 <div className="flex items-center gap-1">
                   <span
                     className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                      currentTokenStats.percentage >= 90
+                      remainingPercentage <= 15
                         ? 'text-rose-400 bg-rose-500/10 border border-rose-500/20'
-                        : currentTokenStats.percentage >= 70
+                        : remainingPercentage <= 40
                         ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20'
                         : 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20'
                     }`}
                   >
-                    {currentTokenStats.percentage}%
+                    {remainingPercentage}%
                   </span>
                 </div>
               </div>
 
-              {/* Percentage Progress Bar */}
+              {/* Progress Bar (2000 tokens = 100%, drains down as client uses tokens) */}
               <div className="w-full h-2 rounded-full bg-slate-950 border border-slate-800/80 overflow-hidden relative">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ease-out ${
-                    currentTokenStats.percentage >= 90
-                      ? 'bg-gradient-to-r from-amber-500 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                    remainingPercentage <= 15
+                      ? 'bg-gradient-to-r from-rose-600 to-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                      : remainingPercentage <= 40
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-400 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
                       : 'bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 shadow-[0_0_8px_rgba(6,182,212,0.4)]'
                   }`}
-                  style={{ width: `${Math.min(100, Math.max(0, currentTokenStats.percentage))}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, remainingPercentage))}%` }}
                 />
               </div>
 
               {/* Tokens numeric breakdown & Daily Reset Indicator */}
               <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-1.5">
                 <span className="text-slate-300 font-semibold">
-                  {currentTokenStats.used.toLocaleString()}{' '}
-                  <span className="text-slate-500 font-normal">/ {currentTokenStats.limit.toLocaleString()}</span>
+                  {tokenRemaining.toLocaleString()}{' '}
+                  <span className="text-slate-500 font-normal">/ {tokenLimit.toLocaleString()}</span>
                 </span>
                 <span className="text-slate-500 flex items-center gap-1 text-[9px]">
                   <RotateCcw size={9} className="text-slate-500" />

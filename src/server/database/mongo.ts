@@ -2018,7 +2018,8 @@ export function computeUserTokenStats(user: any): UserTokenStats {
   const isDifferentDay = !user?.lastTokenResetDate || user.lastTokenResetDate !== today;
   const used = isDifferentDay ? 0 : Math.max(0, Number(user?.dailyTokensUsed || 0));
   const remaining = Math.max(0, limit - used);
-  const percentage = Math.min(100, Math.round((used / limit) * 100));
+  // 2,000 tokens count as 100%; percentage progress decreases down as tokens are used
+  const percentage = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
 
   return {
     limit,
@@ -2038,7 +2039,7 @@ export async function getUserTokenStats(userIdOrOverlayToken: string): Promise<U
     limit: DEFAULT_DAILY_TOKENS,
     used: 0,
     remaining: DEFAULT_DAILY_TOKENS,
-    percentage: 0,
+    percentage: 100,
     lastResetDate: getTodayDateString()
   };
 
@@ -2096,7 +2097,7 @@ export async function deductUserTokens(
     limit: DEFAULT_DAILY_TOKENS,
     used: 0,
     remaining: DEFAULT_DAILY_TOKENS,
-    percentage: 0,
+    percentage: 100,
     lastResetDate: today
   };
 
@@ -2135,11 +2136,13 @@ export async function deductUserTokens(
     }
 
     const newUsed = currentStats.used + cost;
+    const remaining = Math.max(0, currentStats.limit - newUsed);
+    const remainingPercentage = Math.max(0, Math.min(100, Math.round((remaining / currentStats.limit) * 100)));
     const newStats: UserTokenStats = {
       limit: currentStats.limit,
       used: newUsed,
-      remaining: Math.max(0, currentStats.limit - newUsed),
-      percentage: Math.min(100, Math.round((newUsed / currentStats.limit) * 100)),
+      remaining,
+      percentage: remainingPercentage,
       lastResetDate: today
     };
 
