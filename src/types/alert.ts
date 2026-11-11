@@ -128,5 +128,7 @@ export interface LiveAlertPayload {
   tierName?: string;
   badgeText?: string;
   badgeColor?: string;
+  badgeBg?: string;
+  badgeBorder?: string;
   clonedVoiceSampleUrl?: string;
 }

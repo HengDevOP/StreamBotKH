@@ -446,8 +446,8 @@ export const TimerTemplateRenderer: React.FC<TimerRenderProps> = ({
     );
   };
 
-  // Common root width class that gives plenty of room and prevents text wrapping
-  const baseCardWidth = 'w-full max-w-xl min-w-[340px] sm:min-w-[440px] p-4 sm:p-5 relative transition-all duration-300 flex flex-col items-center space-y-2.5';
+  // Common root width class that gives plenty of room and prevents text wrapping (fully responsive on mobile)
+  const baseCardWidth = 'w-full max-w-xl min-w-0 p-3 sm:p-5 relative transition-all duration-300 flex flex-col items-center space-y-2 sm:space-y-2.5 overflow-hidden';
 
   // =========================================================================
   // 1. CYBERPUNK ELECTRIC NEON

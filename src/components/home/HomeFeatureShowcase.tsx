@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Sparkles,
   Zap,
@@ -19,10 +19,16 @@ import {
   Award,
   Tv,
   VolumeX,
-  Bell
+  Bell,
+  RotateCw,
+  Clock,
+  Timer,
+  Disc,
+  Gift
 } from 'lucide-react';
 import { NeonAlertCard } from '../overlay/NeonAlertCard';
 import { GoalTemplateRenderer } from '../overlay/goalTemplates';
+import { TimerTemplateRenderer } from '../overlay/timerTemplates';
 
 interface ShowcaseAlertCombo {
   id: string;
@@ -443,6 +449,84 @@ const SHOWCASE_GOAL_PRESETS: ShowcaseGoalPreset[] = [
   }
 ];
 
+export interface ShowcaseWheelSlice {
+  id: string;
+  label: string;
+  color: string;
+  icon: string;
+}
+
+const SHOWCASE_WHEEL_SLICES: ShowcaseWheelSlice[] = [
+  { id: '1', label: '1v1 MLBB Match', color: '#00F0FF', icon: '🎮' },
+  { id: '2', label: 'Custom Song', color: '#A855F7', icon: '🎵' },
+  { id: '3', label: 'Voice Shoutout', color: '#10B981', icon: '📢' },
+  { id: '4', label: 'VIP Discord', color: '#F59E0B', icon: '👑' },
+  { id: '5', label: 'Wheel Reroll', color: '#EC4899', icon: '🎲' },
+  { id: '6', label: '10,000 ៛ Bonus', color: '#3B82F6', icon: '💵' },
+  { id: '7', label: '50 Pushups', color: '#F97316', icon: '💪' },
+  { id: '8', label: 'Jackpot 🏆', color: '#EF4444', icon: '✨' }
+];
+
+export interface ShowcaseTimerPreset {
+  id: string;
+  name: string;
+  title: string;
+  glowColor: string;
+  style: string;
+  description: string;
+}
+
+const SHOWCASE_TIMER_PRESETS: ShowcaseTimerPreset[] = [
+  {
+    id: 'cyber-neon',
+    name: 'Cyber Neon',
+    title: 'SUBATHON COUNTDOWN 🔥',
+    glowColor: '#00F0FF',
+    style: 'cyber-neon',
+    description: '$1 = +10m • 4,000៛ = +10m • KHQR Instant Sync'
+  },
+  {
+    id: 'chroma-rgb',
+    name: 'Chroma RGB',
+    title: '24-HOUR CHARITY CHALLENGE ⚡',
+    glowColor: '#10B981',
+    style: 'chroma-rgb',
+    description: '$1 = +15m • 4,000៛ = +15m • Goal: $2,500'
+  },
+  {
+    id: 'matrix-terminal',
+    name: 'Matrix CRT',
+    title: 'SPEEDRUN CLOCK // ANY% 🎮',
+    glowColor: '#10B981',
+    style: 'matrix-terminal',
+    description: 'SYS_TICK: 60Hz • LIVE TELEMETRY OVERLAY'
+  },
+  {
+    id: 'blood-moon',
+    name: 'Blood Moon',
+    title: 'ELITE BOSS MARATHON 💀',
+    glowColor: '#DC2626',
+    style: 'blood-moon',
+    description: 'DEATH = +30m • TIP = EXTEND TIME'
+  },
+  {
+    id: 'quantum-core',
+    name: 'Quantum Core',
+    title: 'COMMUNITY STREAM GOAL 🚀',
+    glowColor: '#2563EB',
+    style: 'quantum-core',
+    description: 'HARD CAP: 48:00:00 • 1,280 BACKERS'
+  },
+  {
+    id: 'synthwave-1984',
+    name: 'Synthwave',
+    title: 'MIDNIGHT RETRO VIBES 🌆',
+    glowColor: '#EC4899',
+    style: 'synthwave-1984',
+    description: 'SUB = +10m • SUPERCHAT = +25m'
+  }
+];
+
 /**
  * Scroll Swipe-Up Reveal Wrapper:
  * Observes when the element scrolls into view and triggers a smooth GPU-accelerated swipe-up animation.
@@ -627,6 +711,134 @@ export const HomeFeatureShowcase: React.FC = () => {
     }, 3800);
     return () => clearInterval(chatTimer);
   }, [isSectionVisible]);
+
+  // 6. Wheel Spin Engine (Random spins + User click triggers)
+  const [wheelRotation, setWheelRotation] = useState<number>(0);
+  const [isWheelSpinning, setIsWheelSpinning] = useState<boolean>(false);
+  const [wheelWinner, setWheelWinner] = useState<string | null>(null);
+
+  const svgWheelSlices = useMemo(() => {
+    const count = SHOWCASE_WHEEL_SLICES.length;
+    const anglePerSlice = 360 / count;
+    const r = 160;
+    const cx = 175;
+    const cy = 175;
+
+    return SHOWCASE_WHEEL_SLICES.map((slice, i) => {
+      const startAngle = i * anglePerSlice;
+      const endAngle = (i + 1) * anglePerSlice;
+
+      const rad1 = ((startAngle - 90) * Math.PI) / 180;
+      const rad2 = ((endAngle - 90) * Math.PI) / 180;
+
+      const x1 = cx + r * Math.cos(rad1);
+      const y1 = cy + r * Math.sin(rad1);
+      const x2 = cx + r * Math.cos(rad2);
+      const y2 = cy + r * Math.sin(rad2);
+
+      const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`;
+
+      const midAngle = (startAngle + endAngle) / 2;
+      const midRad = ((midAngle - 90) * Math.PI) / 180;
+      const textR = 108;
+      const tx = cx + textR * Math.cos(midRad);
+      const ty = cy + textR * Math.sin(midRad);
+
+      return {
+        ...slice,
+        pathData,
+        tx,
+        ty,
+        midAngle
+      };
+    });
+  }, []);
+
+  const triggerWheelSpin = useCallback(() => {
+    if (isWheelSpinning) return;
+    setIsWheelSpinning(true);
+    setWheelWinner(null);
+
+    // 4 to 6 full rotations (1440 - 2160 deg) + random angle offset
+    const randomExtra = 1440 + Math.floor(Math.random() * 720);
+    const nextRotation = wheelRotation + randomExtra;
+    setWheelRotation(nextRotation);
+
+    // Accurate winning slice calculation based on top arrow pointer
+    const sliceAngle = 360 / SHOWCASE_WHEEL_SLICES.length;
+    const normalized = (360 - (nextRotation % 360)) % 360;
+    const winningIndex = Math.floor(normalized / sliceAngle) % SHOWCASE_WHEEL_SLICES.length;
+    const winningSlice = SHOWCASE_WHEEL_SLICES[winningIndex];
+
+    setTimeout(() => {
+      setIsWheelSpinning(false);
+      setWheelWinner(`${winningSlice.icon} ${winningSlice.label}`);
+
+      // Celebration outcome popup display for 2.6 seconds
+      setTimeout(() => {
+        setWheelWinner(null);
+      }, 2600);
+    }, 3600);
+  }, [isWheelSpinning, wheelRotation]);
+
+  useEffect(() => {
+    if (!isSectionVisible) return;
+    const autoSpinInterval = setInterval(() => {
+      triggerWheelSpin();
+    }, 8500);
+    return () => clearInterval(autoSpinInterval);
+  }, [isSectionVisible, triggerWheelSpin]);
+
+  // 7. Subathon & Event Countdown Timer (Ticking second-by-second + Style rotation + Simulated donor additions)
+  const [timerSeconds, setTimerSeconds] = useState<number>(9932); // 02h 45m 32s
+  const [timerPresetIndex, setTimerPresetIndex] = useState<number>(0);
+  const [recentTimeBonus, setRecentTimeBonus] = useState<{ donor: string; minutes: number } | null>(null);
+
+  // 1s countdown tick
+  useEffect(() => {
+    const tickInterval = setInterval(() => {
+      setTimerSeconds((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(tickInterval);
+  }, []);
+
+  // Theme style rotation every 8.5 seconds
+  useEffect(() => {
+    if (!isSectionVisible) return;
+    const styleInterval = setInterval(() => {
+      setTimerPresetIndex((prev) => (prev + 1) % SHOWCASE_TIMER_PRESETS.length);
+    }, 8500);
+    return () => clearInterval(styleInterval);
+  }, [isSectionVisible]);
+
+  // Simulated live donor time extension every 6 seconds
+  useEffect(() => {
+    if (!isSectionVisible) return;
+    const donorSimulations = [
+      { donor: 'Piseth_Pro', minutes: 15 },
+      { donor: 'Sophea_MLBB', minutes: 10 },
+      { donor: 'Bopha_Gamer', minutes: 25 },
+      { donor: 'DaraEsports', minutes: 20 },
+      { donor: 'Vannak_99', minutes: 30 }
+    ];
+    let simIdx = 0;
+
+    const bonusInterval = setInterval(() => {
+      const sim = donorSimulations[simIdx % donorSimulations.length];
+      simIdx++;
+
+      setTimerSeconds((prev) => prev + sim.minutes * 60);
+      setRecentTimeBonus({ donor: sim.donor, minutes: sim.minutes });
+
+      setTimeout(() => {
+        setRecentTimeBonus(null);
+      }, 3000);
+    }, 6000);
+
+    return () => clearInterval(bonusInterval);
+  }, [isSectionVisible]);
+
+  const currentTimerPreset = SHOWCASE_TIMER_PRESETS[timerPresetIndex];
 
   return (
     <section ref={showcaseSectionRef} className="w-full max-w-[1720px] 2xl:max-w-[1840px] mx-auto px-4 xs:px-5 sm:px-10 lg:px-12 xl:px-16 2xl:px-20 space-y-20 sm:space-y-36 relative overflow-hidden min-w-0">
@@ -1211,6 +1423,296 @@ export const HomeFeatureShowcase: React.FC = () => {
                 <span key={i} className="text-base sm:text-lg animate-bounce" style={{ animationDelay: `${i * 150}ms` }}>
                   {emoji}
                 </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </ScrollSwipeSection>
+
+      {/* ========================================================================= */}
+      {/* FEATURE 6: INTERACTIVE SPINNING WHEEL (LEFT: CARD, RIGHT: TEXT)           */}
+      {/* ========================================================================= */}
+      <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row-reverse items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
+        {/* Right Side: Title & Description */}
+        <div className="w-full lg:w-1/2 space-y-4 min-w-0">
+          <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
+            Interactive Wheel of Fortune &amp; Chat Rewards
+          </h3>
+
+          <p className="text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed text-justify [text-align-last:left]">
+            Boost audience retention and superchat excitement with an interactive Spinning Wheel widget. Streamers can configure custom rewards—from 1v1 viewer matches, song requests, pushup challenges, to cash jackpots—with fully customizable slice odds, sound triggers, and instant zero-latency spin animations directly in OBS.
+          </p>
+
+          {/* Feature Highlights Grid - Clean Default Icons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 w-full min-w-0">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+                <Disc size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate">Custom Odds &amp; Slices</span>
+                <span className="text-[11px] text-slate-400 truncate block">Weighted percentages</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+                <Sparkles size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate">Real-Time OBS Animation</span>
+                <span className="text-[11px] text-slate-400 truncate block">60 FPS GPU acceleration</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+                <Trophy size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate">Superchat Triggers</span>
+                <span className="text-[11px] text-slate-400 truncate block">Spin on donor tips</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+                <Volume2 size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate">Audio SFX &amp; Alerts</span>
+                <span className="text-[11px] text-slate-400 truncate block">Cyber chime victory triggers</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Left Side: Clean Default Flat Preview (No 3D rotation, pure borderless card) */}
+        <div className="w-full lg:w-1/2 flex justify-center min-w-0">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center min-w-0">
+            {/* Wheel Header Status */}
+            <div className="flex items-center justify-between pb-2 mb-2 w-full max-w-[380px] min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Disc size={15} className="text-purple-400 animate-spin shrink-0" style={{ animationDuration: '6s' }} />
+                <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
+                  STREAM WHEEL OVERLAY
+                </span>
+                <span className="px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 text-[9px] font-mono font-bold shrink-0">
+                  60 FPS
+                </span>
+              </div>
+              <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1 shrink-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>OBS Ready</span>
+              </div>
+            </div>
+
+            {/* Circular Spinning Wheel Preview Container */}
+            <div className="relative w-64 h-64 xs:w-72 xs:h-72 sm:w-80 sm:h-80 md:w-84 md:h-84 flex items-center justify-center select-none my-1">
+              {/* Pointer Arrow at Top Center */}
+              <div className="absolute -top-3 z-30 w-0 h-0 border-l-[12px] sm:border-l-[14px] border-l-transparent border-r-[12px] sm:border-r-[14px] border-r-transparent border-t-[22px] sm:border-t-[26px] border-t-amber-400 filter drop-shadow-[0_4px_12px_rgba(245,158,11,0.9)] pointer-events-none" />
+
+              {/* Vector SVG Circular Wheel */}
+              <svg
+                viewBox="0 0 350 350"
+                className="w-full h-full drop-shadow-[0_0_35px_rgba(168,85,247,0.35)] select-none cursor-pointer"
+                onClick={triggerWheelSpin}
+                style={{
+                  transform: `rotate(${wheelRotation}deg)`,
+                  transition: isWheelSpinning
+                    ? 'transform 3.6s cubic-bezier(0.12, 0.8, 0.32, 1)'
+                    : 'none',
+                  filter: wheelWinner ? 'blur(2px) brightness(0.7)' : 'none'
+                }}
+              >
+                {svgWheelSlices.map((s) => (
+                  <g key={s.id}>
+                    <path d={s.pathData} fill={s.color} stroke="#090D18" strokeWidth="3" />
+                    <text
+                      x={s.tx}
+                      y={s.ty}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      transform={`rotate(${s.midAngle - 90}, ${s.tx}, ${s.ty})`}
+                      fill="#FFFFFF"
+                      fontWeight="bold"
+                      fontSize="11"
+                      fontFamily="Chakra Petch"
+                      className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]"
+                    >
+                      {s.label}
+                    </text>
+                  </g>
+                ))}
+
+                {/* Center Hub */}
+                <circle cx="175" cy="175" r="30" fill="#090D18" stroke="#1E293B" strokeWidth="4" />
+                <circle cx="175" cy="175" r="16" fill="#8B5CF6" />
+                <circle cx="175" cy="175" r="6" fill="#FFFFFF" opacity="0.95" />
+              </svg>
+
+              {/* Outcome Celebration Popup (Centered over the blurred wheel) */}
+              {wheelWinner && (
+                <div className="absolute inset-0 z-40 flex items-center justify-center p-3 pointer-events-none animate-in fade-in zoom-in-95 duration-300">
+                  <div className="w-full max-w-[260px] px-4 py-3 rounded-2xl bg-[#090D18]/95 border-2 border-purple-500/80 shadow-[0_0_40px_rgba(168,85,247,0.8)] text-center backdrop-blur-md">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-purple-300 font-bold block">
+                      REWARD OUTCOME
+                    </span>
+                    <span className="text-base sm:text-lg font-black text-white font-['Chakra_Petch'] break-words">
+                      {wheelWinner}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Test Spin Controls */}
+            <div className="mt-2.5 flex items-center justify-center gap-2.5 w-full">
+              <button
+                type="button"
+                onClick={triggerWheelSpin}
+                disabled={isWheelSpinning}
+                className="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-xs font-mono font-bold flex items-center gap-2 border-0 transition-all active:scale-95 disabled:opacity-50"
+              >
+                <RotateCw size={13} className={isWheelSpinning ? 'animate-spin' : ''} />
+                <span>{isWheelSpinning ? 'Spinning Wheel...' : 'Test Spin Wheel'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </ScrollSwipeSection>
+
+      {/* ========================================================================= */}
+      {/* FEATURE 7: SUBATHON & COUNTDOWN TIMER (LEFT: TEXT, RIGHT: CARD)           */}
+      {/* ========================================================================= */}
+      <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
+        {/* Left Side: Title & Description */}
+        <div className="w-full lg:w-1/2 space-y-4 min-w-0">
+          <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
+            Dynamic Subathon &amp; Event Countdown Timer
+          </h3>
+
+          <p className="text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed text-justify [text-align-last:left]">
+            Supercharge your marathon streams and charity events with an automated Subathon Countdown Timer. Automatically extend stream duration for every Superchat, Bakong KHQR tip, or tier subscription. Featuring over 40+ high-energy cyber, RGB, and retro themes with customizable soft/hard caps and synchronized low-latency overlay integration.
+          </p>
+
+          {/* Feature Highlights Grid - Clean Default Icons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-2 w-full min-w-0">
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+                <Timer size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate">Auto Time Extension</span>
+                <span className="text-[11px] text-slate-400 truncate block">+Minutes per $1 or 4,000 ៛</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+                <Sparkles size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate">40+ Cyber &amp; Gaming Styles</span>
+                <span className="text-[11px] text-slate-400 truncate block">Neon, Chroma RGB, Mecha HUD</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+                <ShieldCheck size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate">Soft &amp; Hard Time Caps</span>
+                <span className="text-[11px] text-slate-400 truncate block">Max marathon boundaries</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
+                <Zap size={14} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block truncate">Zero CPU Browser Source</span>
+                <span className="text-[11px] text-slate-400 truncate block">60 FPS lightweight sync</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Clean Default Flat Preview (No 3D rotation) */}
+        <div className="w-full lg:w-1/2 flex justify-center min-w-0">
+          <div className="w-full max-w-lg bg-transparent border-0 shadow-none p-0 relative flex flex-col items-center min-w-0">
+            {/* Timer Header Status */}
+            <div className="flex items-center justify-between pb-2 mb-2 w-full max-w-xl min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Timer size={15} className="text-cyan-400 animate-pulse shrink-0" />
+                <span className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
+                  SUBATHON COUNTDOWN OVERLAY
+                </span>
+                <span className="px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 text-[9px] font-mono font-bold shrink-0">
+                  LIVE TICK
+                </span>
+              </div>
+              <div className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 shrink-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>+10m / $1 Added</span>
+              </div>
+            </div>
+
+            {/* Real Dashboard & Overlay Timer Asset (Dynamic Style Rotation & Live Second Countdown) */}
+            <div
+              key={`timer-card-${timerPresetIndex}-${currentTimerPreset.id}`}
+              className="w-full max-w-full overflow-hidden flex justify-center select-none min-w-0 animate-fade-in"
+            >
+              <TimerTemplateRenderer
+                title={currentTimerPreset.title}
+                remainingSeconds={timerSeconds}
+                isRunning={true}
+                rateMinutesPerUsd={10}
+                glowColor={currentTimerPreset.glowColor}
+                templateStyle={currentTimerPreset.style}
+                showBackground={true}
+                showAnimation={true}
+                showTitle={true}
+                showDescription={true}
+                description={currentTimerPreset.description}
+              />
+            </div>
+
+            {/* Simulated Live Donor Time Extension Badge */}
+            <div className="h-8 mt-3 flex items-center justify-center w-full">
+              {recentTimeBonus ? (
+                <div className="px-3 py-1 rounded-full bg-emerald-500/20 border-0 text-emerald-300 text-[11px] font-mono flex items-center gap-1.5 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <Zap size={12} className="text-emerald-400 animate-bounce" />
+                  <span className="font-bold">{recentTimeBonus.donor}</span>
+                  <span>added</span>
+                  <span className="font-bold text-white">+{recentTimeBonus.minutes}m</span>
+                  <span>via Superchat!</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-mono text-slate-400">
+                  <Clock size={12} />
+                  <span>Cycles across 40+ themes automatically • Real-time sync</span>
+                </div>
+              )}
+            </div>
+
+            {/* Interactive Theme Style Switcher Pills */}
+            <div className="mt-2 flex items-center justify-center gap-1.5 flex-wrap">
+              {SHOWCASE_TIMER_PRESETS.map((p, idx) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setTimerPresetIndex(idx)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-mono transition-all border-0 ${
+                    idx === timerPresetIndex
+                      ? 'bg-white/20 text-white font-bold'
+                      : 'bg-white/[0.04] text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {p.name}
+                </button>
               ))}
             </div>
           </div>
