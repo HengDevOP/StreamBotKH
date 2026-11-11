@@ -640,18 +640,14 @@ export const HomeFeatureShowcase: React.FC = () => {
       {/* Positions: Top, Left, Right, Bottom with dynamic names, amounts & colors  */}
       {/* ========================================================================= */}
       <ScrollSwipeSection className="w-full max-w-full min-w-0 flex flex-col lg:flex-row items-center gap-8 sm:gap-10 lg:gap-14 relative z-10">
-        {/* Left Side: Rich Detailed Donation Alert Overview */}
+        {/* Left Side: Rich Detailed Alert Widgets Overview */}
         <div className="w-full lg:w-1/2 space-y-4 min-w-0">
           <h3 className="text-2xl xs:text-3xl sm:text-4xl font-extrabold text-white font-['Chakra_Petch'] leading-tight">
-            Fully Customizable 60 FPS Live Donation Alerts
+            ALERT WIDGETS
           </h3>
 
           <p className="text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed text-justify [text-align-last:left]">
-            When a viewer scans your Bakong KHQR code with ABA Mobile, ACLEDA, or Wing, alerts flash instantaneously onto your stream screen in full 60 FPS without dropping a single frame. Money deposits straight into your personal bank account with 0% platform cuts and zero waiting period.
-          </p>
-
-          <p className="text-slate-400 text-xs sm:text-sm leading-relaxed text-justify [text-align-last:left]">
-            Personalize your broadcast with customizable entrance animations, dynamic mascot positions (Top, Left, Right, Bottom), dual USD &amp; Cambodian Riel currency formatting, and neural KiriTTS voice cheers with automatic stream audio ducking.
+            Bring your livestream to life with stunning Alert Widgets designed to make every interaction unforgettable. Customize eye-catching entrance animations, dynamic mascot positions, expressive visual effects, and personalized KiriTTS voice cheers with intelligent audio ducking. Make every viewer interaction feel unique with beautifully animated alerts that add personality, excitement, and engagement to your broadcast.
           </p>
 
           {/* Feature Highlights Grid - Clean Default Icons */}
