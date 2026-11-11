@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/server/auth';
 import { getUsersCollection, getGatewayConfigCollection, getTemporaryDonationsCollection, getStreamChatSettingsCollection, computeUserTokenStats, getTodayDateString } from '@/server/database/mongo';
 import { sanitizeSocialLinks } from '@/utils/socialPlatforms';
 import { extractYoutubeId, getYoutubeLiveStats } from '@/utils/youtube';
-import { broadcastTvStreamerUpdated } from '@/server/services/socketService';
+import { broadcastTvStreamerUpdated, broadcastToAllStreamerRooms } from '@/server/services/socketService';
 
 const RESERVED_USERNAMES = new Set([
   'admin',
@@ -128,6 +128,13 @@ export async function GET(req: NextRequest) {
         tiktok: '',
         facebook: '',
         kick: ''
+      },
+      broadcastViewCount: (streamer as any).broadcastViewCount || {
+        enabledPlatforms: ['youtube', 'facebook'],
+        manualViewers: 1420,
+        showLiveDot: true,
+        showLabel: true,
+        theme: 'glass-dark'
       }
     });
   } catch (err: any) {
@@ -221,6 +228,34 @@ export async function PUT(req: NextRequest) {
       finalLinks = sanitizeSocialLinks(incomingLinks, true);
     }
 
+    // 3.5. Process multi-platform broadcast view count settings
+    const incomingViewCount = body.broadcastViewCount;
+    let finalViewCount = (current as any).broadcastViewCount || {
+      enabledPlatforms: ['youtube', 'facebook'],
+      manualViewers: 1420,
+      showLiveDot: true,
+      showLabel: true,
+      theme: 'glass-dark'
+    };
+    if (incomingViewCount && typeof incomingViewCount === 'object') {
+      finalViewCount = {
+        ...finalViewCount,
+        enabledPlatforms: Array.isArray(incomingViewCount.enabledPlatforms)
+          ? incomingViewCount.enabledPlatforms
+          : finalViewCount.enabledPlatforms,
+        manualViewers: typeof incomingViewCount.manualViewers === 'number'
+          ? Math.max(0, incomingViewCount.manualViewers)
+          : (incomingViewCount.manualViewers !== undefined ? Math.max(0, Number(incomingViewCount.manualViewers) || 0) : finalViewCount.manualViewers),
+        showLiveDot: incomingViewCount.showLiveDot !== undefined
+          ? Boolean(incomingViewCount.showLiveDot)
+          : finalViewCount.showLiveDot,
+        showLabel: incomingViewCount.showLabel !== undefined
+          ? Boolean(incomingViewCount.showLabel)
+          : finalViewCount.showLabel,
+        theme: incomingViewCount.theme || finalViewCount.theme || 'glass-dark'
+      };
+    }
+
     const now = new Date();
 
     // 4. Update MongoDB users collection
@@ -238,11 +273,18 @@ export async function PUT(req: NextRequest) {
           customThanksMessage: newThanks,
           liveStreamUrl: newLiveStreamUrl,
           broadcastUrls: finalBroadcastUrls,
+          broadcastViewCount: finalViewCount,
           socialLinks: finalLinks,
           updatedAt: now
         }
       }
     );
+
+    if (incomingViewCount !== undefined && current.overlayToken) {
+      broadcastToAllStreamerRooms(current.overlayToken, 'view_count:update', {
+        settings: finalViewCount
+      }).catch(() => {});
+    }
 
     // 5. Cascade username changes to related collections
     if (newUsername !== current.username) {
@@ -339,7 +381,8 @@ export async function PUT(req: NextRequest) {
         telegramChatId: (updated as any)?.telegramChatId || (updated as any)?.telegram_chat_id,
         telegramPairingCode: updated?.telegramPairingCode || (updated as any)?.telegram_pairing_code,
         liveStreamUrl: updated?.liveStreamUrl || newLiveStreamUrl || '',
-        broadcastUrls: updated?.broadcastUrls || finalBroadcastUrls
+        broadcastUrls: updated?.broadcastUrls || finalBroadcastUrls,
+        broadcastViewCount: updated?.broadcastViewCount || finalViewCount
       }
     });
   } catch (err: any) {

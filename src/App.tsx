@@ -33,6 +33,7 @@ import { StreamWheelOverlay } from './components/overlay/StreamWheelOverlay';
 import { StreamChatOverlay } from './components/overlay/StreamChatOverlay';
 import { CustomStreamOverlay } from './components/overlay/CustomStreamOverlay';
 import { AvatarStreamOverlay } from './components/overlay/AvatarStreamOverlay';
+import { StreamViewCountOverlay } from './components/overlay/StreamViewCountOverlay';
 
 // Wrapper for Dashboard Page reading query parameters (?tab=...&id=...)
 function DashboardRouteWrapper() {
@@ -300,6 +301,23 @@ function AvatarOverlayRouteWrapper() {
   );
 }
 
+// Wrapper for Concurrent View Count OBS Browser Source Overlay
+function ViewCountOverlayRouteWrapper() {
+  const { token } = useParams<{ token?: string }>();
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0 flex items-center justify-start p-4">
+      <style>{`
+        html, body, #root, main {
+          background: transparent !important;
+          background-color: transparent !important;
+          background-image: none !important;
+        }
+      `}</style>
+      <StreamViewCountOverlay token={token || 'demo-token'} />
+    </div>
+  );
+}
+
 // Layout wrapper determining whether to display Navbar and Footer
 function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -471,8 +489,16 @@ function AppRoutes() {
         <Route path="/overlay/qr" element={<TipQrOverlayRouteWrapper />} />
         <Route path="/overlay/qr/:token" element={<TipQrOverlayRouteWrapper />} />
         <Route path="/overlay/tip-qr/:token" element={<TipQrOverlayRouteWrapper />} />
+        <Route path="/overlay/view-count" element={<ViewCountOverlayRouteWrapper />} />
+        <Route path="/overlay/view-count/:token" element={<ViewCountOverlayRouteWrapper />} />
+        <Route path="/overlay/views" element={<ViewCountOverlayRouteWrapper />} />
+        <Route path="/overlay/views/:token" element={<ViewCountOverlayRouteWrapper />} />
 
         {/* Widget Aliases */}
+        <Route path="/widget/view-count" element={<ViewCountOverlayRouteWrapper />} />
+        <Route path="/widget/view-count/:token" element={<ViewCountOverlayRouteWrapper />} />
+        <Route path="/widget/views" element={<ViewCountOverlayRouteWrapper />} />
+        <Route path="/widget/views/:token" element={<ViewCountOverlayRouteWrapper />} />
         <Route path="/widget/avatars/:token" element={<AvatarOverlayRouteWrapper />} />
         <Route path="/widget/avatar/:token" element={<AvatarOverlayRouteWrapper />} />
         <Route path="/widget/custom" element={<CustomOverlayRouteWrapper />} />

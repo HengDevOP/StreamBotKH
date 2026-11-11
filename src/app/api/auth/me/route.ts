@@ -152,6 +152,13 @@ export async function GET(req: NextRequest) {
       facebook: '',
       kick: ''
     },
+    broadcastViewCount: (streamer as any).broadcastViewCount || {
+      enabledPlatforms: ['youtube', 'facebook'],
+      manualViewers: 1420,
+      showLiveDot: true,
+      showLabel: true,
+      theme: 'glass-dark'
+    },
     tokenUsage: tokenStats,
     socialLinks: Array.isArray(streamer.socialLinks) ? streamer.socialLinks : [],
     deletionStatus: streamer.deletionStatus || null,

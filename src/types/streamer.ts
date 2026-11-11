@@ -59,6 +59,13 @@ export interface Streamer {
     facebook?: string;
     kick?: string;
   };
+  broadcastViewCount?: {
+    enabledPlatforms?: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick')[];
+    manualViewers?: number;
+    showLiveDot?: boolean;
+    showLabel?: boolean;
+    theme?: string;
+  };
   tokenUsage?: TokenUsage;
   deletionStatus?: 'pending' | 'deleted' | null;
   deletionRequestedAt?: string | null;
