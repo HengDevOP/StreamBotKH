@@ -637,23 +637,23 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
   const otherTiers = allTiers.filter((t) => t.id !== tier.id);
 
   return (
-    <div className="flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col bg-[#070A12] text-slate-100 antialiased animate-in fade-in duration-200">
-      {/* 1. TOP DEDICATED STUDIO HEADER (MATCHING DONATION ALERTS) */}
-      <header className="flex-shrink-0 h-14 sm:h-16 border-b border-slate-800/90 bg-[#090D18]/95 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 z-20 backdrop-blur-md">
+    <div className="flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col bg-[#0f0f0f] text-neutral-100 antialiased animate-in fade-in duration-150">
+      {/* 1. TOP DEDICATED STUDIO HEADER */}
+      <header className="flex-shrink-0 h-14 sm:h-16 border-b border-[#262626] bg-[#141414] px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 z-20">
         <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 text-slate-200 hover:text-white text-xs font-mono font-bold transition-all shadow-md group flex-shrink-0 cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] hover:bg-[#222] text-neutral-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
           >
-            <ArrowLeft size={15} className="text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
-            <span className="hidden sm:inline">Back to Dashboard</span>
+            <ArrowLeft size={15} />
+            <span className="hidden sm:inline">Back to Memberships</span>
           </button>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800/90">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-[#181818] border border-[#262626]">
             <button
               type="button"
               onClick={() => {
@@ -663,13 +663,13 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
               }}
               title={copiedUrl ? 'Copied OBS Overlay URL!' : 'Copy OBS Overlay URL'}
               aria-label="Copy OBS Overlay URL"
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                 copiedUrl
                   ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-900'
+                  : 'text-neutral-400 hover:text-white'
               }`}
             >
-              {copiedUrl ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
+              {copiedUrl ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
             </button>
             <a
               href={overlayUrl}
@@ -677,19 +677,19 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
               rel="noopener noreferrer"
               title="Open Target Overlay in New Tab"
               aria-label="Open Target Overlay"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-900 transition-colors flex items-center justify-center"
+              className="p-1.5 rounded-md text-neutral-400 hover:text-white transition-colors flex items-center justify-center"
             >
-              <ExternalLink size={15} />
+              <ExternalLink size={14} />
             </a>
             {onRegenerateToken && (
               <button
                 type="button"
                 onClick={onRegenerateToken}
-                className="p-1.5 rounded-lg hover:bg-red-950/40 text-slate-400 hover:text-red-400 transition-all cursor-pointer group"
+                className="p-1.5 rounded-md text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
                 title="Regenerate Security Token"
                 aria-label="Regenerate Security Token"
               >
-                <RefreshCw size={15} className="group-hover:rotate-180 transition-transform duration-500" />
+                <RefreshCw size={14} />
               </button>
             )}
           </div>
@@ -699,9 +699,9 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
             variant="outline"
             disabled={testingAlert}
             onClick={() => handleTriggerSimulatedAlert(true)}
-            className="text-xs font-mono font-bold px-3 py-1.5 sm:py-2 rounded-xl border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white bg-cyan-950/20 hover:bg-cyan-950/40 flex items-center gap-1.5 transition-all cursor-pointer"
+            className="text-xs px-3 py-1.5 rounded-lg border-[#262626] text-neutral-300 hover:text-white bg-[#1a1a1a] hover:bg-[#222] flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Eye className="w-3.5 h-3.5 text-cyan-400" />
+            <Eye size={13} />
             <span className="hidden sm:inline">Test on OBS</span>
             <span className="sm:hidden">Test</span>
           </Button>
@@ -710,13 +710,9 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
             type="button"
             loading={saving}
             onClick={handleSaveAlertSettings}
-            className={`text-xs font-mono font-bold px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-md cursor-pointer ${
-              hasChanges
-                ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-            }`}
+            className="text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer bg-white hover:bg-neutral-200 text-black"
           >
-            <Save className="w-3.5 h-3.5" />
+            <Save size={13} />
             <span>Save Changes</span>
           </Button>
         </div>

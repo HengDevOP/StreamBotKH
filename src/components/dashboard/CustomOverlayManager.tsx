@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Layers,
   Check,
@@ -24,8 +24,10 @@ import {
   Monitor,
   CheckCircle2,
   ArrowRight,
-  Zap,
-  Maximize2
+  Maximize2,
+  Copy,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { CustomStreamOverlay, CustomOverlayConfig, LiveGoalData } from '../overlay/CustomStreamOverlay';
@@ -51,89 +53,81 @@ const FONT_OPTIONS = [
 ];
 
 const PRESET_COLORS = [
+  { name: 'Pure White', hex: '#FFFFFF' },
+  { name: 'Neutral Gray', hex: '#A3A3A3' },
   { name: 'Emerald', hex: '#10B981' },
   { name: 'Cyan', hex: '#06B6D4' },
-  { name: 'Sky', hex: '#38BDF8' },
+  { name: 'Sky Blue', hex: '#38BDF8' },
   { name: 'Violet', hex: '#8B5CF6' },
   { name: 'Rose', hex: '#F43F5E' },
-  { name: 'Amber', hex: '#F59E0B' },
-  { name: 'Pure White', hex: '#FFFFFF' }
+  { name: 'Amber', hex: '#F59E0B' }
 ];
 
 const ANIMATION_FLOWS = [
   {
     id: 'marquee',
     label: 'Marquee Ticker',
-    desc: 'Classic smooth horizontal broadcast crawl loop',
-    badge: 'Popular'
+    desc: 'Classic horizontal broadcast crawl loop'
   },
   {
     id: 'typewriter',
     label: 'Typewriter Flow',
-    desc: 'Letter-by-letter live terminal typing with blinking cursor',
-    badge: 'Dynamic'
+    desc: 'Letter-by-letter live terminal typing'
   },
   {
     id: 'fade-slide',
     label: 'Fade & Slide',
-    desc: 'Smooth vertical entrance and exit cycling through messages',
-    badge: 'Smooth'
+    desc: 'Smooth vertical entrance and exit cycling'
   },
   {
     id: 'float-bounce',
     label: 'Float & Bounce',
-    desc: 'Gentle rhythmic floating sinusoidal wave motion',
-    badge: 'Chill'
+    desc: 'Gentle rhythmic floating sinusoidal motion'
   },
   {
     id: 'wave-glow',
     label: 'Wave Glow',
-    desc: 'Animated iridescent light shimmer sweeping across text',
-    badge: 'Glow'
+    desc: 'Light shimmer sweeping across text'
   },
   {
     id: 'cyber-glitch',
-    label: 'Cyber Glitch',
-    desc: 'Neon cybernetic pulse breathing with digital aesthetic',
-    badge: 'Cyber'
+    label: 'Glitch Pulse',
+    desc: 'Digital breathing and pulse animation'
   },
   {
     id: 'flip-3d',
     label: 'Flip 3D',
-    desc: 'Perspective billboard 3D flip card transition',
-    badge: '3D'
+    desc: 'Perspective 3D flip card transition'
   }
 ];
 
 const LAYOUT_POSITIONS = [
-  { id: 'top-ticker', label: 'Top Bar Ticker', desc: 'Full-width banner fixed at the top edge' },
-  { id: 'bottom-ticker', label: 'Bottom Dock Ticker', desc: 'Full-width dock fixed at the bottom edge' },
-  { id: 'top-left', label: 'Top-Left Card', desc: 'Modern floating card pinned to upper-left' },
-  { id: 'top-right', label: 'Top-Right Card', desc: 'Modern floating card pinned to upper-right' },
-  { id: 'bottom-left', label: 'Bottom-Left Card', desc: 'Stream lower-third pinned to bottom-left' },
-  { id: 'bottom-right', label: 'Bottom-Right Card', desc: 'Stream lower-third pinned to bottom-right' },
-  { id: 'center-lower', label: 'Center Lower-Third', desc: 'Centered broadcast presentation banner' }
+  { id: 'top-ticker', label: 'Top Bar Ticker', desc: 'Full-width banner at top' },
+  { id: 'bottom-ticker', label: 'Bottom Dock Ticker', desc: 'Full-width dock at bottom' },
+  { id: 'top-left', label: 'Top-Left Card', desc: 'Floating card upper-left' },
+  { id: 'top-right', label: 'Top-Right Card', desc: 'Floating card upper-right' },
+  { id: 'bottom-left', label: 'Bottom-Left Card', desc: 'Lower-third bottom-left' },
+  { id: 'bottom-right', label: 'Bottom-Right Card', desc: 'Lower-third bottom-right' },
+  { id: 'center-lower', label: 'Center Lower-Third', desc: 'Centered banner' }
 ];
 
 const BADGE_ICONS = [
-  { id: 'radio', label: 'Radio / Live', icon: Radio },
-  { id: 'sparkles', label: 'Sparkles', icon: Sparkles },
+  { id: 'radio', label: 'Live', icon: Radio },
   { id: 'bell', label: 'Bell', icon: Bell },
   { id: 'flame', label: 'Flame', icon: Flame },
   { id: 'crown', label: 'Crown', icon: Crown },
   { id: 'star', label: 'Star', icon: Star },
   { id: 'heart', label: 'Heart', icon: Heart },
-  { id: 'tv', label: 'TV Screen', icon: Tv },
-  { id: 'none', label: 'None (Text Only)', icon: null }
+  { id: 'tv', label: 'TV', icon: Tv },
+  { id: 'none', label: 'None', icon: null }
 ];
 
 const DIMENSION_PRESETS = [
-  { label: '1920 × 1080 (Full 1080p)', w: 1920, h: 1080 },
-  { label: '1920 × 80 (Standard Ticker)', w: 1920, h: 80 },
-  { label: '1920 × 120 (Tall Ticker Bar)', w: 1920, h: 120 },
-  { label: '800 × 200 (Lower-Third Banner)', w: 800, h: 200 },
-  { label: '600 × 250 (Corner Card)', w: 600, h: 250 },
-  { label: '400 × 150 (Compact Dock)', w: 400, h: 150 }
+  { label: '1920 × 1080 (Full HD)', w: 1920, h: 1080 },
+  { label: '1920 × 80 (Ticker)', w: 1920, h: 80 },
+  { label: '800 × 200 (Banner)', w: 800, h: 200 },
+  { label: '600 × 250 (Corner)', w: 600, h: 250 },
+  { label: '400 × 150 (Dock)', w: 400, h: 150 }
 ];
 
 export const CustomOverlayManager: React.FC<CustomOverlayManagerProps> = ({
@@ -148,13 +142,13 @@ export const CustomOverlayManager: React.FC<CustomOverlayManagerProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [testSent, setTestSent] = useState(false);
+  const [copiedObs, setCopiedObs] = useState(false);
 
-  // Preview canvas background mode: 'grid' | 'dark' | 'gameplay'
+  // Preview canvas background mode
   const [previewBg, setPreviewBg] = useState<'grid' | 'dark' | 'gameplay'>('grid');
-  // Bounds line toggle
   const [showBoundsLine, setShowBoundsLine] = useState<boolean>(true);
 
-  // 1920x1080 Virtual Canvas Responsive Scale Engine
+  // Scaled preview observer
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [canvasScale, setCanvasScale] = useState<number>(0.5);
 
@@ -205,8 +199,8 @@ export const CustomOverlayManager: React.FC<CustomOverlayManagerProps> = ({
     textColor: '#FFFFFF',
     accentColor: '#10B981',
     glowColor: '#10B981',
-    backgroundColor: 'rgba(11, 15, 25, 0.88)',
-    borderColor: 'rgba(16, 185, 129, 0.35)',
+    backgroundColor: 'rgba(15, 15, 15, 0.92)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     backgroundStyle: 'glass',
     showBackground: true,
     isActive: true
@@ -222,7 +216,16 @@ export const CustomOverlayManager: React.FC<CustomOverlayManagerProps> = ({
 
   const [newTickerInput, setNewTickerInput] = useState('');
 
-  // 1. Load configuration from API
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const obsUrl = `${origin}/overlay/custom/${token}`;
+
+  const handleCopyObs = () => {
+    navigator.clipboard.writeText(obsUrl);
+    setCopiedObs(true);
+    setTimeout(() => setCopiedObs(false), 2000);
+  };
+
+  // Load configuration from API
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -267,487 +270,362 @@ export const CustomOverlayManager: React.FC<CustomOverlayManagerProps> = ({
     }));
   };
 
-  // Save changes to backend
+  // Save Settings
   const handleSave = async () => {
     setIsSaving(true);
-    setSaveSuccess(false);
-
     try {
       const res = await fetch('/api/widgets/custom-overlay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...config,
-          token
-        })
+        body: JSON.stringify({ token, config })
       });
-
       const data = await res.json();
       if (data.success) {
         setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
+        setTimeout(() => setSaveSuccess(false), 2500);
       } else {
-        alert(data.error || 'Failed to save overlay settings');
+        alert(data.error || 'Failed to save configuration.');
       }
     } catch (err: any) {
-      console.error('Error saving overlay config:', err);
-      alert('Error saving overlay settings');
+      alert(err.message || 'Error saving overlay config');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Test broadcast / pulse OBS
-  const handleTestBroadcast = () => {
-    if (socket) {
-      socket.emit('custom-overlay:test', { token });
-    }
-    setTestSent(true);
-    setTimeout(() => setTestSent(false), 2000);
-  };
-
-  // Reset to default configuration
-  const handleReset = () => {
-    if (window.confirm('Reset overlay settings to defaults?')) {
-      setConfig({
-        badgeText: '🔴 LIVE STREAM',
-        badgeIcon: 'radio',
-        headline: 'Welcome to the Stream! Don’t forget to follow & share!',
-        subtext: '💬 Type !socials in chat • 🎁 Support via KHQR / ABA live • ⚡ Daily Gaming & Chill',
-        tickerMessages: [
-          'Welcome to the Stream! Don’t forget to follow & share!',
-          '💬 Type !socials in chat for Discord & Telegram links',
-          '🎁 Support via KHQR / ABA live on screen with instant alert',
-          '⚡ Daily Gaming, chill vibes & community giveaways'
-        ],
-        animationFlow: 'marquee',
-        animationSpeed: 'normal',
-        showGoal: true,
-        goalLayout: 'compact-pill',
-        customWidth: 1920,
-        customHeight: 1080,
-        layoutPosition: 'top-ticker',
-        fontFamily: 'Inter',
-        fontSize: 18,
-        textColor: '#FFFFFF',
-        accentColor: '#10B981',
-        glowColor: '#10B981',
-        backgroundColor: 'rgba(11, 15, 25, 0.88)',
-        borderColor: 'rgba(16, 185, 129, 0.35)',
-        backgroundStyle: 'glass',
-        showBackground: true,
-        isActive: true
+  // Test pulse broadcast
+  const handleTestBroadcast = async () => {
+    try {
+      const res = await fetch('/api/widgets/custom-overlay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, action: 'test_alert', config })
       });
+      const data = await res.json();
+      if (data.success) {
+        setTestSent(true);
+        setTimeout(() => setTestSent(false), 2500);
+      }
+    } catch (err) {
+      console.error('Failed to trigger test broadcast:', err);
     }
   };
 
-  // Resolved custom bounds (1080p stream space)
-  const targetW = Math.min(1920, Math.max(100, Number(config.customWidth) || 1920));
-  const targetH = Math.min(1080, Math.max(30, Number(config.customHeight) || 1080));
+  // Reset to default
+  const handleReset = () => {
+    if (!confirm('Reset custom overlay to standard defaults?')) return;
+    setConfig({
+      badgeText: '🔴 LIVE STREAM',
+      badgeIcon: 'radio',
+      headline: 'Welcome to the Stream! Don’t forget to follow & share!',
+      subtext: '💬 Type !socials in chat • 🎁 Support via KHQR / ABA live • ⚡ Daily Gaming',
+      tickerMessages: [
+        'Welcome to the Stream! Don’t forget to follow & share!',
+        '💬 Type !socials in chat for Discord & Telegram links',
+        '🎁 Support via KHQR / ABA live on screen with instant alert'
+      ],
+      animationFlow: 'marquee',
+      animationSpeed: 'normal',
+      showGoal: true,
+      goalLayout: 'compact-pill',
+      customWidth: 1920,
+      customHeight: 1080,
+      layoutPosition: 'top-ticker',
+      fontFamily: 'Inter',
+      fontSize: 18,
+      textColor: '#FFFFFF',
+      accentColor: '#10B981',
+      glowColor: '#10B981',
+      backgroundColor: 'rgba(15, 15, 15, 0.92)',
+      borderColor: 'rgba(255, 255, 255, 0.15)',
+      backgroundStyle: 'glass',
+      showBackground: true,
+      isActive: true
+    });
+  };
 
-  // Compute position of custom box inside 1920x1080 canvas
+  const targetW = config.customWidth || 1920;
+  const targetH = config.customHeight || 1080;
+
   const getCustomBoxPositionStyle = (): React.CSSProperties => {
-    if (targetW >= 1920 && targetH >= 1080) {
-      return {
-        top: 0,
-        left: 0,
-        width: 1920,
-        height: 1080,
-        position: 'absolute'
-      };
-    }
-
-    const leftCenter = Math.max(0, (1920 - targetW) / 2);
+    const leftCenter = (1920 - targetW) / 2;
+    const topCenter = (1080 - targetH) / 2;
 
     switch (config.layoutPosition) {
       case 'top-ticker':
-        return {
-          top: 0,
-          left: leftCenter,
-          width: targetW,
-          height: targetH,
-          position: 'absolute'
-        };
+        return { top: 0, left: leftCenter, width: targetW, height: targetH, position: 'absolute' };
       case 'bottom-ticker':
-        return {
-          top: 1080 - targetH,
-          left: leftCenter,
-          width: targetW,
-          height: targetH,
-          position: 'absolute'
-        };
+        return { top: 1080 - targetH, left: leftCenter, width: targetW, height: targetH, position: 'absolute' };
       case 'top-left':
-        return {
-          top: 40,
-          left: 40,
-          width: targetW,
-          height: targetH,
-          position: 'absolute'
-        };
+        return { top: 40, left: 40, width: targetW, height: targetH, position: 'absolute' };
       case 'top-right':
-        return {
-          top: 40,
-          left: 1920 - targetW - 40,
-          width: targetW,
-          height: targetH,
-          position: 'absolute'
-        };
+        return { top: 40, left: 1920 - targetW - 40, width: targetW, height: targetH, position: 'absolute' };
       case 'bottom-left':
-        return {
-          top: 1080 - targetH - 40,
-          left: 40,
-          width: targetW,
-          height: targetH,
-          position: 'absolute'
-        };
+        return { top: 1080 - targetH - 40, left: 40, width: targetW, height: targetH, position: 'absolute' };
       case 'bottom-right':
-        return {
-          top: 1080 - targetH - 40,
-          left: 1920 - targetW - 40,
-          width: targetW,
-          height: targetH,
-          position: 'absolute'
-        };
+        return { top: 1080 - targetH - 40, left: 1920 - targetW - 40, width: targetW, height: targetH, position: 'absolute' };
       case 'center-lower':
       default:
-        return {
-          top: 1080 - targetH - 60,
-          left: leftCenter,
-          width: targetW,
-          height: targetH,
-          position: 'absolute'
-        };
+        return { top: 1080 - targetH - 60, left: leftCenter, width: targetW, height: targetH, position: 'absolute' };
     }
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 pb-16">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800 rounded-2xl p-5 backdrop-blur-md">
-        <div className="flex items-start gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/10">
-            <Layers className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold text-white tracking-tight">Custom Overlay Studio</h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                PRO ACTIVE
+    <div className="space-y-6">
+      {/* 1. Header Card */}
+      <div className="bg-[#141414] border border-[#262626] rounded-xl p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-white tracking-wide">Custom Overlay</h2>
+              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-[#262626]">
+                Overlay Widget
               </span>
             </div>
-            <p className="text-sm text-slate-400 mt-0.5">
-              Design animated on-screen tickers, cards & lower-thirds with real-time text flow and live stream goal integration.
+            <p className="text-xs text-neutral-400">
+              Design animated on-screen tickers, cards &amp; lower-thirds with real-time text flow and live stream goal integration.
             </p>
           </div>
-        </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleReset}
-            icon={<RotateCcw className="w-4 h-4" />}
-          >
-            Reset
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleTestBroadcast}
-            icon={testSent ? <Check className="w-4 h-4 text-emerald-400" /> : <Play className="w-4 h-4 text-cyan-400" />}
-          >
-            {testSent ? 'Pulsed OBS!' : 'Test OBS'}
-          </Button>
-
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleSave}
-            loading={isSaving}
-            icon={saveSuccess ? <CheckCircle2 className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
-            className="shadow-lg shadow-cyan-500/20"
-          >
-            {saveSuccess ? 'Saved to OBS!' : 'Save & Broadcast'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Interactive 1920x1080 OBS Stream Preview Screen */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-        {/* Preview Control & Custom Dimensions Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-slate-800/90 bg-slate-950/70">
-          <div className="flex items-center gap-2.5">
-            <Monitor className="w-4 h-4 text-cyan-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              OBS 1080p Canvas Preview
-            </span>
-            <span className="text-[11px] text-cyan-400 font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/30">
-              1920 × 1080
-            </span>
-          </div>
-
-          {/* Quick Custom W & H Inputs */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-750 text-xs shadow-inner">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">W:</span>
-              <input
-                type="number"
-                min="100"
-                max="1920"
-                step="10"
-                value={config.customWidth || 1920}
-                onChange={(e) => setConfig({ ...config, customWidth: Number(e.target.value) || 100 })}
-                className="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white font-mono text-center focus:outline-none focus:border-cyan-400"
-                title="Custom Overlay Width in pixels"
-              />
-              <span className="text-[10px] text-slate-500 font-mono">px</span>
-
-              <span className="text-slate-600 mx-1">×</span>
-
-              <span className="text-[11px] font-bold text-slate-400 uppercase">H:</span>
-              <input
-                type="number"
-                min="30"
-                max="1080"
-                step="10"
-                value={config.customHeight || 1080}
-                onChange={(e) => setConfig({ ...config, customHeight: Number(e.target.value) || 40 })}
-                className="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white font-mono text-center focus:outline-none focus:border-cyan-400"
-                title="Custom Overlay Height in pixels"
-              />
-              <span className="text-[10px] text-slate-500 font-mono">px</span>
-            </div>
-
-            {/* Guide line toggle */}
+          <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={() => setShowBoundsLine(!showBoundsLine)}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                showBoundsLine
-                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-              title="Toggle Custom W x H Boundary Guide Line"
+              onClick={handleReset}
+              className="text-xs px-3 py-2 rounded-lg bg-[#1a1a1a] border border-[#262626] hover:bg-[#222] text-neutral-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Maximize2 className="w-3.5 h-3.5" />
-              <span>Bounds Line: {showBoundsLine ? 'ON' : 'OFF'}</span>
+              <RotateCcw size={13} />
+              <span>Reset</span>
             </button>
-
-            {/* Background Toggle */}
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
-              <button
-                onClick={() => setPreviewBg('grid')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                  previewBg === 'grid'
-                    ? 'bg-slate-800 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Grid
-              </button>
-              <button
-                onClick={() => setPreviewBg('dark')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                  previewBg === 'dark'
-                    ? 'bg-slate-800 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Dark
-              </button>
-              <button
-                onClick={() => setPreviewBg('gameplay')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                  previewBg === 'gameplay'
-                    ? 'bg-slate-800 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Stream Room
-              </button>
-            </div>
+            <button
+              onClick={handleTestBroadcast}
+              className="text-xs px-3 py-2 rounded-lg bg-[#1a1a1a] border border-[#262626] hover:bg-[#222] text-neutral-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              {testSent ? <Check size={13} className="text-emerald-400" /> : <Play size={13} />}
+              <span>{testSent ? 'Pulsed OBS' : 'Test OBS'}</span>
+            </button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-white hover:bg-neutral-200 text-black font-semibold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              {isSaving ? (
+                <>
+                  <RefreshCw size={13} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : saveSuccess ? (
+                <>
+                  <Check size={14} className="text-emerald-600" />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <span>Save Changes</span>
+              )}
+            </Button>
           </div>
         </div>
 
-        {/* Live Canvas Viewport (1920x1080 Scaled Viewport) */}
-        <div
-          ref={previewContainerRef}
-          className={`relative w-full aspect-video min-h-[300px] max-h-[540px] overflow-hidden select-none transition-all duration-300 ${
-            previewBg === 'grid'
-              ? 'bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] bg-[#050811]'
-              : previewBg === 'dark'
-              ? 'bg-[#060911]'
-              : 'bg-gradient-to-tr from-slate-950 via-[#0B132B] to-[#1C2541]'
-          }`}
-        >
-          {/* Virtual 1920x1080 Native Canvas Scaled to Fit Container */}
-          <div
-            style={{
-              width: 1920,
-              height: 1080,
-              transform: `scale(${canvasScale})`,
-              transformOrigin: 'top left',
-              position: 'absolute',
-              top: 0,
-              left: 0
-            }}
-          >
-            {/* Gameplay Backdrop */}
-            {previewBg === 'gameplay' && (
-              <div className="absolute inset-0 opacity-20 flex items-center justify-center pointer-events-none">
-                <div className="text-center space-y-4">
-                  <Tv className="w-36 h-36 mx-auto text-slate-500" />
-                  <p className="text-xl font-mono uppercase tracking-widest text-slate-400">
-                    1080p Stream Gameplay / Broadcast Canvas (1920 × 1080)
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Grid Crosshairs for 1080p Canvas */}
-            {previewBg === 'grid' && (
-              <div className="absolute inset-0 pointer-events-none opacity-25">
-                <div className="absolute top-1/2 left-0 w-full h-[1px] bg-slate-700/60" />
-                <div className="absolute top-0 left-1/2 h-full w-[1px] bg-slate-700/60" />
-              </div>
-            )}
-
-            {/* Custom W & H Region with Boundary Line */}
-            <div
-              className="absolute transition-all duration-300"
-              style={getCustomBoxPositionStyle()}
+        {/* OBS Browser Source URL Box */}
+        <div className="pt-3 border-t border-[#262626] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-1 min-w-0 bg-[#0f0f0f] border border-[#262626] rounded-lg px-3 py-2 text-xs font-mono text-neutral-300 truncate">
+            <span className="text-neutral-500 select-none">OBS URL:</span>
+            <span className="truncate">{obsUrl}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleCopyObs}
+              className="text-xs px-3 py-2 border border-[#262626] bg-[#1a1a1a] hover:bg-[#222222] text-white rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              {/* Boundary Guide Line from Custom W & H */}
-              {showBoundsLine && (
-                <div className="absolute -inset-1 border-2 border-dashed border-cyan-400/90 rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.4)] pointer-events-none z-30">
-                  {/* Dimension Badge */}
-                  <div className="absolute -top-4 right-4 px-3 py-1 rounded-full bg-cyan-400 text-slate-950 font-mono font-black text-xs shadow-lg flex items-center gap-1.5 uppercase tracking-wider">
-                    <Maximize2 className="w-3 h-3" />
-                    <span>{targetW} × {targetH} px</span>
-                  </div>
-
-                  {/* Corner Guides */}
-                  <span className="absolute -top-1.5 -left-1.5 w-4 h-4 border-t-2 border-l-2 border-cyan-300" />
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 border-t-2 border-r-2 border-cyan-300" />
-                  <span className="absolute -bottom-1.5 -left-1.5 w-4 h-4 border-b-2 border-l-2 border-cyan-300" />
-                  <span className="absolute -bottom-1.5 -right-1.5 w-4 h-4 border-b-2 border-r-2 border-cyan-300" />
-                </div>
-              )}
-
-              {/* Live Preview Data Rendered INSIDE the Custom W & H Box */}
-              <div className="w-full h-full relative overflow-hidden rounded-xl">
-                <CustomStreamOverlay
-                  token={token}
-                  initialConfig={config}
-                  initialGoal={activeGoal}
-                  isPreview={true}
-                  isInsideCustomBox={true}
-                />
-              </div>
-            </div>
+              {copiedObs ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+              <span>{copiedObs ? 'Copied' : 'Copy Link'}</span>
+            </button>
+            <a
+              href={obsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs px-3 py-2 border border-[#262626] bg-[#1a1a1a] hover:bg-[#222222] text-neutral-300 hover:text-white rounded-lg flex items-center gap-1.5 transition-colors"
+            >
+              <ExternalLink size={14} />
+              <span>Open</span>
+            </a>
           </div>
         </div>
       </div>
 
-      {/* Main Studio Configuration Tabs & Panels */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        {/* Navigation Tabs */}
-        <div className="flex items-center overflow-x-auto border-b border-slate-800/80 bg-slate-950/40 p-1.5 gap-1.5 scrollbar-thin">
-          <button
-            onClick={() => setActiveTab('content')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'content'
-                ? 'bg-slate-800 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
-            }`}
-          >
-            <Type className="w-4 h-4 text-white" />
-            Content & Ticker
-          </button>
+      {/* 2. Studio Workbench with RIGHTBAR Configuration */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Section: Live Stage Canvas Viewport */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+          <div className="bg-[#141414] border border-[#262626] rounded-xl overflow-hidden">
+            {/* Viewport Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[#262626] bg-[#0f0f0f]">
+              <div className="flex items-center gap-2">
+                <Monitor size={14} className="text-neutral-400" />
+                <span className="text-xs font-semibold text-white uppercase tracking-wider">
+                  Live Stage Canvas
+                </span>
+                <span className="text-[10px] font-mono text-neutral-400 px-1.5 py-0.5 rounded bg-[#1c1c1c] border border-[#2c2c2c]">
+                  {targetW} × {targetH} px
+                </span>
+              </div>
 
-          <button
-            onClick={() => setActiveTab('animation')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'animation'
-                ? 'bg-slate-800 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-white" />
-            Flow Animation
-          </button>
+              {/* Viewport Display Options */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBoundsLine(!showBoundsLine)}
+                  className={`px-2.5 py-1 rounded text-xs transition-colors cursor-pointer ${
+                    showBoundsLine
+                      ? 'bg-white text-black font-medium'
+                      : 'bg-[#1a1a1a] text-neutral-400 border border-[#262626]'
+                  }`}
+                  title="Toggle boundary guide outline"
+                >
+                  Guide: {showBoundsLine ? 'ON' : 'OFF'}
+                </button>
 
-          <button
-            onClick={() => setActiveTab('goal')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'goal'
-                ? 'bg-slate-800 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
-            }`}
-          >
-            <Target className="w-4 h-4 text-white" />
-            Goal Integration
-            {config.showGoal && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            )}
-          </button>
+                <div className="flex items-center gap-1 bg-[#1a1a1a] p-0.5 rounded border border-[#262626] text-xs">
+                  {(['grid', 'dark', 'gameplay'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setPreviewBg(mode)}
+                      className={`px-2 py-0.5 rounded capitalize transition-colors text-[11px] ${
+                        previewBg === mode
+                          ? 'bg-[#2a2a2a] text-white font-medium'
+                          : 'text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      {mode === 'gameplay' ? 'Room' : mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-          <button
-            onClick={() => setActiveTab('layout')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'layout'
-                ? 'bg-slate-800 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
-            }`}
-          >
-            <Layout className="w-4 h-4 text-white" />
-            Layout, W & H
-          </button>
+            {/* Scaled 1920x1080 Viewport */}
+            <div
+              ref={previewContainerRef}
+              className={`relative w-full aspect-video min-h-[300px] overflow-hidden select-none bg-[#0a0a0a]`}
+            >
+              <div
+                style={{
+                  width: 1920,
+                  height: 1080,
+                  transform: `scale(${canvasScale})`,
+                  transformOrigin: 'top left',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0
+                }}
+              >
+                {/* Subtle grid pattern */}
+                {previewBg === 'grid' && (
+                  <div
+                    className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                    style={{
+                      backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+                      backgroundSize: '24px 24px'
+                    }}
+                  />
+                )}
 
-          <button
-            onClick={() => setActiveTab('style')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'style'
-                ? 'bg-slate-800 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
-            }`}
-          >
-            <Palette className="w-4 h-4 text-white" />
-            Typography & Colors
-          </button>
+                {/* Bounds container */}
+                <div
+                  className="absolute transition-all duration-200"
+                  style={getCustomBoxPositionStyle()}
+                >
+                  {showBoundsLine && (
+                    <div className="absolute -inset-0.5 border border-dashed border-white/50 rounded-xl pointer-events-none z-30" />
+                  )}
+
+                  <div className="w-full h-full relative overflow-hidden rounded-xl">
+                    <CustomStreamOverlay
+                      token={token}
+                      initialConfig={config}
+                      initialGoal={activeGoal}
+                      isPreview={true}
+                      isInsideCustomBox={true}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Dimension Presets */}
+          <div className="bg-[#141414] border border-[#262626] rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-neutral-400 font-medium">Quick Dimension Presets:</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {DIMENSION_PRESETS.map((p) => {
+                const isSelected = config.customWidth === p.w && config.customHeight === p.h;
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setConfig({ ...config, customWidth: p.w, customHeight: p.h })}
+                    className={`px-2.5 py-1 rounded text-xs font-mono transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-white text-black font-semibold'
+                        : 'bg-[#1a1a1a] border border-[#262626] text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Tab Contents */}
-        <div className="p-6">
-          {/* ================= TAB 1: CONTENT & TICKER ================= */}
-          {activeTab === 'content' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Badge Tag */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Header Badge / Tag
-                  </label>
+        {/* Right Section: Configuration Rightbar */}
+        <div className="lg:col-span-5 xl:col-span-4 bg-[#141414] border border-[#262626] rounded-xl flex flex-col overflow-hidden">
+          {/* Rightbar Tab Navigation Bar */}
+          <div className="flex items-center overflow-x-auto border-b border-[#262626] bg-[#0f0f0f] p-1 gap-1 scrollbar-none shrink-0">
+            {[
+              { id: 'content', label: 'Content', icon: Type },
+              { id: 'animation', label: 'Flow', icon: Sparkles },
+              { id: 'goal', label: 'Goal', icon: Target },
+              { id: 'layout', label: 'Layout', icon: Layout },
+              { id: 'style', label: 'Style', icon: Palette }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as TabSection)}
+                  className={`flex-1 py-1.5 px-2 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? 'bg-white text-black font-semibold'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  <Icon size={13} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Rightbar Scrollable Body */}
+          <div className="p-4 sm:p-5 space-y-4 max-h-[580px] overflow-y-auto text-xs">
+            {/* TAB 1: CONTENT */}
+            {activeTab === 'content' && (
+              <div className="space-y-4">
+                {/* Badge Text & Icon */}
+                <div className="space-y-1.5">
+                  <label className="font-medium text-neutral-300">Header Badge Text</label>
                   <input
                     type="text"
                     value={config.badgeText || ''}
                     onChange={(e) => setConfig({ ...config, badgeText: e.target.value })}
-                    placeholder="e.g. 🔴 LIVE STREAM, 📢 ANNOUNCEMENT"
-                    className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    placeholder="e.g. 🔴 LIVE STREAM"
+                    className="w-full bg-[#181818] border border-[#262626] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-400"
                   />
-                  <p className="text-[11px] text-slate-400">
-                    A prominent pill tag shown on the left of your overlay.
-                  </p>
                 </div>
 
-                {/* Badge Icon */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Badge Icon
-                  </label>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <div className="space-y-1.5">
+                  <label className="font-medium text-neutral-300">Badge Icon</label>
+                  <div className="grid grid-cols-4 gap-1.5">
                     {BADGE_ICONS.map((b) => {
                       const IconComp = b.icon;
                       const isSelected = config.badgeIcon === b.id;
@@ -756,611 +634,365 @@ export const CustomOverlayManager: React.FC<CustomOverlayManagerProps> = ({
                           key={b.id}
                           type="button"
                           onClick={() => setConfig({ ...config, badgeIcon: b.id })}
-                          className={`flex flex-col items-center justify-center p-2 rounded-xl border text-xs transition-all cursor-pointer ${
+                          className={`p-2 rounded-lg border text-center transition-colors cursor-pointer flex flex-col items-center gap-1 ${
                             isSelected
-                              ? 'bg-slate-800 border-cyan-400 text-cyan-300 shadow-md shadow-cyan-500/10'
-                              : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                              ? 'bg-white text-black font-semibold border-white'
+                              : 'bg-[#181818] border-[#262626] text-neutral-400 hover:text-white'
                           }`}
                         >
-                          {IconComp ? <IconComp className="w-4 h-4 mb-1" /> : <span className="text-xs mb-1">—</span>}
-                          <span className="text-[10px] truncate max-w-full">{b.label}</span>
+                          {IconComp ? <IconComp size={14} /> : <span className="text-xs">—</span>}
+                          <span className="text-[10px] truncate">{b.label}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
-              </div>
 
-              {/* Primary Headline */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                  Primary Headline / Announcement
-                </label>
-                <input
-                  type="text"
-                  value={config.headline}
-                  onChange={(e) => setConfig({ ...config, headline: e.target.value })}
-                  placeholder="Welcome to the Stream! Don’t forget to follow & share!"
-                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-
-              {/* Subtext / Details */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                  Subtext / Secondary Info
-                </label>
-                <input
-                  type="text"
-                  value={config.subtext || ''}
-                  onChange={(e) => setConfig({ ...config, subtext: e.target.value })}
-                  placeholder="💬 Type !socials in chat • 🎁 Support via KHQR / ABA • ⚡ Daily Gaming"
-                  className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-
-              {/* Rotating Ticker Messages */}
-              <div className="space-y-3 pt-3 border-t border-slate-800">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Rotating Ticker Messages ({config.tickerMessages?.length || 0})
-                  </label>
-                  <span className="text-[11px] text-slate-400">
-                    Cycles seamlessly across marquee, typewriter & fade animations
-                  </span>
-                </div>
-
-                <div className="flex gap-2">
+                {/* Primary Headline */}
+                <div className="space-y-1.5">
+                  <label className="font-medium text-neutral-300">Primary Headline</label>
                   <input
                     type="text"
-                    value={newTickerInput}
-                    onChange={(e) => setNewTickerInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddTickerMessage();
-                      }
-                    }}
-                    placeholder="Add a new message to the ticker rotation..."
-                    className="flex-1 bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    value={config.headline}
+                    onChange={(e) => setConfig({ ...config, headline: e.target.value })}
+                    placeholder="Welcome to the Stream!"
+                    className="w-full bg-[#181818] border border-[#262626] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-400"
                   />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleAddTickerMessage}
-                    icon={<Plus className="w-4 h-4" />}
-                  >
-                    Add
-                  </Button>
                 </div>
 
-                {/* Messages List */}
-                <div className="space-y-2 mt-2">
-                  {(config.tickerMessages || []).map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 text-sm text-slate-200"
-                    >
-                      <div className="flex items-center gap-2.5 truncate">
-                        <span className="w-5 h-5 rounded-md bg-slate-800 text-[11px] font-bold text-slate-400 flex items-center justify-center shrink-0">
-                          {idx + 1}
-                        </span>
-                        <span className="truncate">{msg}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTickerMessage(idx)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                        title="Delete Message"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ================= TAB 2: ANIMATION & FLOW ================= */}
-          {activeTab === 'animation' && (
-            <div className="space-y-6">
-              <div>
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 block">
-                  Select Flow Display Animation
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {ANIMATION_FLOWS.map((flow) => {
-                    const isSelected = config.animationFlow === flow.id;
-                    return (
-                      <button
-                        key={flow.id}
-                        type="button"
-                        onClick={() => setConfig({ ...config, animationFlow: flow.id as any })}
-                        className={`text-left p-4 rounded-xl border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-slate-800/90 border-cyan-400 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-400'
-                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-sm font-bold text-white">{flow.label}</span>
-                          <span
-                            className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                              isSelected
-                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                                : 'bg-slate-800 text-slate-400'
-                            }`}
-                          >
-                            {flow.badge}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 leading-relaxed">{flow.desc}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Animation Speed */}
-              <div className="space-y-2.5 pt-4 border-t border-slate-800">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                  Animation Flow Speed
-                </label>
-                <div className="grid grid-cols-3 gap-3 max-w-md">
-                  {[
-                    { id: 'slow', label: 'Slow (Relaxed)', desc: 'Gentle, easy to read' },
-                    { id: 'normal', label: 'Normal (Balanced)', desc: 'Standard broadcast pace' },
-                    { id: 'fast', label: 'Fast (Dynamic)', desc: 'High energy stream pace' }
-                  ].map((speed) => {
-                    const isSelected = config.animationSpeed === speed.id;
-                    return (
-                      <button
-                        key={speed.id}
-                        type="button"
-                        onClick={() => setConfig({ ...config, animationSpeed: speed.id as any })}
-                        className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-slate-800 border-cyan-400 text-white shadow-md shadow-cyan-500/10'
-                            : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{speed.label}</div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">{speed.desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ================= TAB 3: GOAL INTEGRATION ================= */}
-          {activeTab === 'goal' && (
-            <div className="space-y-6">
-              {/* Master Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950/70 border border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                    <Target className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">
-                      Show Stream Goal on Overlay Screen
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Automatically displays and updates your active live donation goal alongside the text in real-time.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Switch */}
-                <button
-                  type="button"
-                  onClick={() => setConfig({ ...config, showGoal: !config.showGoal })}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    config.showGoal ? 'bg-emerald-500' : 'bg-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                      config.showGoal ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                {/* Subtext */}
+                <div className="space-y-1.5">
+                  <label className="font-medium text-neutral-300">Subtext Information</label>
+                  <input
+                    type="text"
+                    value={config.subtext || ''}
+                    onChange={(e) => setConfig({ ...config, subtext: e.target.value })}
+                    placeholder="💬 Type !socials in chat..."
+                    className="w-full bg-[#181818] border border-[#262626] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-400"
                   />
-                </button>
-              </div>
+                </div>
 
-              {config.showGoal && (
-                <div className="space-y-5 animate-in fade-in duration-300">
-                  {/* Connected Live Goal Status */}
-                  <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                          Connected Stream Goal: {activeGoal?.title || 'Active Goal'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400">
-                        Current: <strong className="text-emerald-400">${activeGoal?.currentAmount || 0}</strong> / Target: <strong className="text-white">${activeGoal?.targetAmount || 100}</strong> ({Math.min(100, Math.round(((activeGoal?.currentAmount || 0) / (activeGoal?.targetAmount || 100)) * 100))}%)
-                      </p>
-                    </div>
-
-                    {onNavigateToGoals && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onNavigateToGoals}
-                        icon={<ArrowRight className="w-4 h-4" />}
-                      >
-                        Edit Goals in Goals Studio
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Goal Display Layout Mode */}
-                  <div className="space-y-3">
-                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                      Goal Presentation Style
-                    </label>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {[
-                        {
-                          id: 'compact-pill',
-                          title: 'Compact Neon Pill',
-                          desc: 'Sleek mini-progress pill embedded seamlessly into ticker or header bar. Highly space-efficient.'
-                        },
-                        {
-                          id: 'docked',
-                          title: 'Docked Side Card',
-                          desc: 'Dedicated goal stats box docked neatly on the right side of the ticker stream.'
-                        },
-                        {
-                          id: 'stacked',
-                          title: 'Stacked Underneath',
-                          desc: 'Progress bar anchored directly beneath the custom text card. Ideal for corner floating cards.'
+                {/* Ticker Messages List */}
+                <div className="space-y-2 pt-2 border-t border-[#262626]">
+                  <label className="font-medium text-neutral-300">Ticker Rotation Messages ({config.tickerMessages?.length || 0})</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newTickerInput}
+                      onChange={(e) => setNewTickerInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTickerMessage();
                         }
-                      ].map((layout) => {
-                        const isSelected = config.goalLayout === layout.id;
-                        return (
-                          <button
-                            key={layout.id}
-                            type="button"
-                            onClick={() => setConfig({ ...config, goalLayout: layout.id as any })}
-                            className={`text-left p-4 rounded-xl border transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-slate-800/90 border-emerald-400 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-400'
-                                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300'
-                            }`}
-                          >
-                            <div className="text-sm font-bold text-white mb-1">{layout.title}</div>
-                            <div className="text-xs text-slate-400 leading-relaxed">{layout.desc}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ================= TAB 4: LAYOUT, W & H ================= */}
-          {activeTab === 'layout' && (
-            <div className="space-y-6">
-              {/* Canvas Custom Dimensions Section */}
-              <div className="space-y-4 p-5 rounded-2xl bg-slate-950/70 border border-slate-800 shadow-md">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Maximize2 className="w-4 h-4 text-cyan-400" />
-                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                        Custom Dimensions (Width & Height)
-                      </h3>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Sets the exact W × H bounds for OBS Studio. Displayed inside the 1920×1080 canvas with a cyan dashed guide line.
-                    </p>
-                  </div>
-                  <div className="text-xs font-mono font-black text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1.5 rounded-xl shadow-inner shrink-0">
-                    {targetW} × {targetH} px
-                  </div>
-                </div>
-
-                {/* Range Sliders & Inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  {/* Width Input */}
-                  <div className="space-y-2 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-slate-300">Custom Width (W)</span>
-                      <div className="flex items-center gap-1 font-mono text-cyan-400 font-bold">
-                        <input
-                          type="number"
-                          min="100"
-                          max="1920"
-                          step="10"
-                          value={config.customWidth || 1920}
-                          onChange={(e) => setConfig({ ...config, customWidth: Number(e.target.value) || 100 })}
-                          className="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white font-mono text-center focus:outline-none focus:border-cyan-400"
-                        />
-                        <span>px</span>
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min="200"
-                      max="1920"
-                      step="10"
-                      value={config.customWidth || 1920}
-                      onChange={(e) => setConfig({ ...config, customWidth: Number(e.target.value) })}
-                      className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                      }}
+                      placeholder="Add rotating message..."
+                      className="flex-1 bg-[#181818] border border-[#262626] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-neutral-400"
                     />
-                    <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                      <span>200px</span>
-                      <span>1280px (720p)</span>
-                      <span>1920px (Full HD)</span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddTickerMessage}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs cursor-pointer"
+                    >
+                      Add
+                    </button>
                   </div>
 
-                  {/* Height Input */}
-                  <div className="space-y-2 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-slate-300">Custom Height (H)</span>
-                      <div className="flex items-center gap-1 font-mono text-cyan-400 font-bold">
-                        <input
-                          type="number"
-                          min="30"
-                          max="1080"
-                          step="10"
-                          value={config.customHeight || 1080}
-                          onChange={(e) => setConfig({ ...config, customHeight: Number(e.target.value) || 30 })}
-                          className="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white font-mono text-center focus:outline-none focus:border-cyan-400"
-                        />
-                        <span>px</span>
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min="30"
-                      max="1080"
-                      step="10"
-                      value={config.customHeight || 1080}
-                      onChange={(e) => setConfig({ ...config, customHeight: Number(e.target.value) })}
-                      className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                    />
-                    <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                      <span>30px</span>
-                      <span>80px (Standard Ticker)</span>
-                      <span>1080px (Full HD)</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Dimension Presets */}
-                <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                  <span className="text-[11px] font-semibold text-slate-400">Quick Dimension Presets:</span>
-                  <div className="flex flex-wrap gap-2">
-                    {DIMENSION_PRESETS.map((p) => {
-                      const isSelected = config.customWidth === p.w && config.customHeight === p.h;
-                      return (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {(config.tickerMessages || []).map((msg, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#181818] border border-[#262626]"
+                      >
+                        <span className="truncate text-neutral-300">{msg}</span>
                         <button
-                          key={p.label}
                           type="button"
-                          onClick={() => setConfig({ ...config, customWidth: p.w, customHeight: p.h })}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-mono transition-colors cursor-pointer ${
+                          onClick={() => handleRemoveTickerMessage(idx)}
+                          className="text-neutral-500 hover:text-red-400 p-0.5"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: ANIMATION */}
+            {activeTab === 'animation' && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="font-medium text-neutral-300">Flow Style</label>
+                  <div className="space-y-1.5">
+                    {ANIMATION_FLOWS.map((flow) => {
+                      const isSelected = config.animationFlow === flow.id;
+                      return (
+                        <div
+                          key={flow.id}
+                          onClick={() => setConfig({ ...config, animationFlow: flow.id as any })}
+                          className={`p-2.5 rounded-lg border text-left cursor-pointer transition-colors ${
                             isSelected
-                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                              ? 'bg-white text-black border-white'
+                              : 'bg-[#181818] border-[#262626] text-neutral-400 hover:text-white'
                           }`}
                         >
-                          {p.label}
+                          <div className="font-semibold text-xs">{flow.label}</div>
+                          <div className="text-[10px] opacity-75">{flow.desc}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-[#262626]">
+                  <label className="font-medium text-neutral-300">Flow Speed</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'slow', label: 'Slow' },
+                      { id: 'normal', label: 'Normal' },
+                      { id: 'fast', label: 'Fast' }
+                    ].map((sp) => (
+                      <button
+                        key={sp.id}
+                        type="button"
+                        onClick={() => setConfig({ ...config, animationSpeed: sp.id as any })}
+                        className={`py-2 rounded-lg border text-xs text-center transition-colors cursor-pointer ${
+                          config.animationSpeed === sp.id
+                            ? 'bg-white text-black font-semibold border-white'
+                            : 'bg-[#181818] border-[#262626] text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        {sp.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: GOAL */}
+            {activeTab === 'goal' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-[#181818] border border-[#262626]">
+                  <div>
+                    <div className="font-medium text-white">Show Stream Goal</div>
+                    <div className="text-[11px] text-neutral-400">Display active donation goal on overlay</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={config.showGoal}
+                    onChange={(e) => setConfig({ ...config, showGoal: e.target.checked })}
+                    className="w-4 h-4 accent-white cursor-pointer"
+                  />
+                </div>
+
+                {config.showGoal && (
+                  <div className="space-y-3 pt-2">
+                    <label className="font-medium text-neutral-300">Goal Presentation Layout</label>
+                    <div className="space-y-1.5">
+                      {[
+                        { id: 'compact-pill', title: 'Compact Pill', desc: 'Mini progress pill embedded inside banner' },
+                        { id: 'docked', title: 'Docked Side Card', desc: 'Goal box docked on the side' },
+                        { id: 'stacked', title: 'Stacked Underneath', desc: 'Progress bar anchored below text' }
+                      ].map((lay) => (
+                        <div
+                          key={lay.id}
+                          onClick={() => setConfig({ ...config, goalLayout: lay.id as any })}
+                          className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                            config.goalLayout === lay.id
+                              ? 'bg-white text-black font-semibold border-white'
+                              : 'bg-[#181818] border-[#262626] text-neutral-400 hover:text-white'
+                          }`}
+                        >
+                          <div className="text-xs">{lay.title}</div>
+                          <div className="text-[10px] opacity-75">{lay.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: LAYOUT & DIMENSIONS */}
+            {activeTab === 'layout' && (
+              <div className="space-y-4">
+                {/* Custom Dimensions */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-medium text-neutral-300">Custom Width</label>
+                    <span className="font-mono text-neutral-400">{config.customWidth || 1920} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="200"
+                    max="1920"
+                    step="10"
+                    value={config.customWidth || 1920}
+                    onChange={(e) => setConfig({ ...config, customWidth: Number(e.target.value) })}
+                    className="w-full accent-white cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-medium text-neutral-300">Custom Height</label>
+                    <span className="font-mono text-neutral-400">{config.customHeight || 1080} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="30"
+                    max="1080"
+                    step="10"
+                    value={config.customHeight || 1080}
+                    onChange={(e) => setConfig({ ...config, customHeight: Number(e.target.value) })}
+                    className="w-full accent-white cursor-pointer"
+                  />
+                </div>
+
+                {/* Canvas Anchor Placement */}
+                <div className="space-y-1.5 pt-2 border-t border-[#262626]">
+                  <label className="font-medium text-neutral-300">Canvas Anchor Placement</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {LAYOUT_POSITIONS.map((pos) => {
+                      const isSelected = config.layoutPosition === pos.id;
+                      return (
+                        <button
+                          key={pos.id}
+                          type="button"
+                          onClick={() => {
+                            const isTicker = pos.id === 'top-ticker' || pos.id === 'bottom-ticker';
+                            setConfig({
+                              ...config,
+                              layoutPosition: pos.id as any,
+                              customHeight: isTicker && config.customHeight === 1080 ? 80 : config.customHeight
+                            });
+                          }}
+                          className={`p-2 rounded-lg border text-left transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-white text-black font-semibold border-white'
+                              : 'bg-[#181818] border-[#262626] text-neutral-400 hover:text-white'
+                          }`}
+                        >
+                          <div className="text-xs truncate">{pos.label}</div>
                         </button>
                       );
                     })}
                   </div>
                 </div>
-              </div>
 
-              {/* Layout Placement */}
-              <div>
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 block">
-                  Canvas Position & Anchor
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {LAYOUT_POSITIONS.map((pos) => {
-                    const isSelected = config.layoutPosition === pos.id;
-                    return (
+                {/* Backdrop Style */}
+                <div className="space-y-1.5 pt-2 border-t border-[#262626]">
+                  <label className="font-medium text-neutral-300">Backdrop Style</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { id: 'glass', label: 'Translucent Glass' },
+                      { id: 'deep', label: 'Solid Dark' },
+                      { id: 'neon-border', label: 'Clean Border' },
+                      { id: 'transparent', label: 'Transparent' }
+                    ].map((st) => (
                       <button
-                        key={pos.id}
+                        key={st.id}
                         type="button"
-                        onClick={() => {
-                          const isTicker = pos.id === 'top-ticker' || pos.id === 'bottom-ticker';
-                          setConfig({
-                            ...config,
-                            layoutPosition: pos.id as any,
-                            // If switching to ticker and height is default 1080, suggest 80px
-                            customHeight: isTicker && config.customHeight === 1080 ? 80 : config.customHeight
-                          });
-                        }}
-                        className={`text-left p-4 rounded-xl border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-slate-800/90 border-cyan-400 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-400'
-                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300'
+                        onClick={() => setConfig({ ...config, backgroundStyle: st.id as any })}
+                        className={`p-2 rounded-lg border text-center transition-colors cursor-pointer text-xs ${
+                          config.backgroundStyle === st.id
+                            ? 'bg-white text-black font-semibold border-white'
+                            : 'bg-[#181818] border-[#262626] text-neutral-400 hover:text-white'
                         }`}
                       >
-                        <div className="text-sm font-bold text-white mb-1">{pos.label}</div>
-                        <div className="text-xs text-slate-400 leading-relaxed">{pos.desc}</div>
+                        {st.label}
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Background Glass Style */}
-              <div className="space-y-3 pt-4 border-t border-slate-800">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                  Backdrop & Border Style
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  {[
-                    { id: 'glass', label: 'Frosted Glassmorphism', desc: 'Modern translucent backdrop with soft blur' },
-                    { id: 'deep', label: 'Deep Dark (#0B0F19)', desc: 'High contrast solid dark backdrop' },
-                    { id: 'neon-border', label: 'Cyber Neon Border', desc: 'Glowing perimeter box shadow with accent glow' },
-                    { id: 'transparent', label: 'Pure Transparent', desc: 'Text & goal floating cleanly with no box background' }
-                  ].map((style) => {
-                    const isSelected = config.backgroundStyle === style.id;
-                    return (
-                      <button
-                        key={style.id}
-                        type="button"
-                        onClick={() => setConfig({ ...config, backgroundStyle: style.id as any })}
-                        className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-slate-800 border-cyan-400 text-white shadow-md shadow-cyan-500/10'
-                            : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="text-xs font-bold text-white mb-0.5">{style.label}</div>
-                        <div className="text-[11px] text-slate-400">{style.desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ================= TAB 5: TYPOGRAPHY & COLORS ================= */}
-          {activeTab === 'style' && (
-            <div className="space-y-6">
-              {/* Font Family & Size */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Font Family
-                  </label>
+            {/* TAB 5: STYLE */}
+            {activeTab === 'style' && (
+              <div className="space-y-4">
+                {/* Font Family */}
+                <div className="space-y-1.5">
+                  <label className="font-medium text-neutral-300">Font Family</label>
                   <select
                     value={config.fontFamily}
                     onChange={(e) => setConfig({ ...config, fontFamily: e.target.value })}
-                    className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full bg-[#181818] border border-[#262626] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-neutral-400 cursor-pointer"
                   >
                     {FONT_OPTIONS.map((f) => (
-                      <option key={f.value} value={f.value}>
-                        {f.label}
-                      </option>
+                      <option key={f.value} value={f.value}>{f.label}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* Font Size */}
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                      Font Size ({config.fontSize}px)
-                    </label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-medium text-neutral-300">Font Size</label>
+                    <span className="font-mono text-neutral-400">{config.fontSize || 18} px</span>
                   </div>
                   <input
                     type="range"
-                    min="14"
-                    max="36"
-                    step="1"
-                    value={config.fontSize}
+                    min="12"
+                    max="48"
+                    value={config.fontSize || 18}
                     onChange={(e) => setConfig({ ...config, fontSize: Number(e.target.value) })}
-                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 mt-2"
+                    className="w-full accent-white cursor-pointer"
                   />
-                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                    <span>14px (Compact)</span>
-                    <span>20px (Medium)</span>
-                    <span>36px (Huge)</span>
+                </div>
+
+                {/* Accent Color Swatches */}
+                <div className="space-y-1.5 pt-2 border-t border-[#262626]">
+                  <label className="font-medium text-neutral-300">Theme Color</label>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map((c) => (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() =>
+                          setConfig({
+                            ...config,
+                            accentColor: c.hex,
+                            glowColor: c.hex
+                          })
+                        }
+                        className={`w-6 h-6 rounded-full border transition-transform cursor-pointer ${
+                          config.accentColor === c.hex ? 'scale-125 border-white ring-2 ring-white/50' : 'border-neutral-700'
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                        title={c.name}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
+            )}
+          </div>
 
-              {/* Color Controls */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-4 border-t border-slate-800">
-                {/* Text Color */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Text Color
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={config.textColor || '#FFFFFF'}
-                      onChange={(e) => setConfig({ ...config, textColor: e.target.value })}
-                      className="w-10 h-10 rounded-xl bg-transparent border border-slate-700 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={config.textColor || '#FFFFFF'}
-                      onChange={(e) => setConfig({ ...config, textColor: e.target.value })}
-                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase"
-                    />
-                  </div>
-                </div>
-
-                {/* Accent Color */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Accent Color
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={config.accentColor || '#10B981'}
-                      onChange={(e) => setConfig({ ...config, accentColor: e.target.value })}
-                      className="w-10 h-10 rounded-xl bg-transparent border border-slate-700 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={config.accentColor || '#10B981'}
-                      onChange={(e) => setConfig({ ...config, accentColor: e.target.value })}
-                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase"
-                    />
-                  </div>
-                </div>
-
-                {/* Glow Color */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                    Glow & Shadow Color
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={config.glowColor || '#10B981'}
-                      onChange={(e) => setConfig({ ...config, glowColor: e.target.value })}
-                      className="w-10 h-10 rounded-xl bg-transparent border border-slate-700 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={config.glowColor || '#10B981'}
-                      onChange={(e) => setConfig({ ...config, glowColor: e.target.value })}
-                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Preset Palette Swatches */}
-              <div className="space-y-2 pt-2">
-                <span className="text-[11px] font-semibold text-slate-400">Quick Palette Swatches:</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c.name}
-                      type="button"
-                      onClick={() => setConfig({ ...config, accentColor: c.hex, glowColor: c.hex })}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 transition-colors cursor-pointer"
-                    >
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: c.hex }} />
-                      <span>{c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Sticky Rightbar Bottom Save Button */}
+          <div className="p-4 border-t border-[#262626] bg-[#0f0f0f] shrink-0">
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full bg-white hover:bg-neutral-200 text-black font-semibold text-xs py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+            >
+              {isSaving ? (
+                <>
+                  <RefreshCw size={13} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : saveSuccess ? (
+                <>
+                  <Check size={14} className="text-emerald-600" />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <span>Save Configuration</span>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
