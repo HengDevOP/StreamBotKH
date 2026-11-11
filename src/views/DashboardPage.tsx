@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   LayoutDashboard,
@@ -1956,7 +1956,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 <div className="flex items-center gap-1.5 text-slate-300">
                   <Zap size={13} className="text-cyan-400 fill-cyan-400/20" />
                   <span className="text-[11px] font-bold font-['Chakra_Petch'] tracking-wide uppercase text-slate-200">
-                    Daily Tokens
+                    Usage Limit
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
