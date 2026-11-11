@@ -32,6 +32,7 @@ import { StreamTipQrOverlay } from './components/overlay/StreamTipQrOverlay';
 import { StreamWheelOverlay } from './components/overlay/StreamWheelOverlay';
 import { StreamChatOverlay } from './components/overlay/StreamChatOverlay';
 import { CustomStreamOverlay } from './components/overlay/CustomStreamOverlay';
+import { AvatarStreamOverlay } from './components/overlay/AvatarStreamOverlay';
 
 // Wrapper for Dashboard Page reading query parameters (?tab=...&id=...)
 function DashboardRouteWrapper() {
@@ -278,6 +279,23 @@ function CustomOverlayRouteWrapper() {
   );
 }
 
+// Wrapper for Stream Avatars Overlay
+function AvatarOverlayRouteWrapper() {
+  const { token } = useParams<{ token?: string }>();
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0 flex flex-col justify-end">
+      <style>{`
+        html, body, #root, main {
+          background: transparent !important;
+          background-color: transparent !important;
+          background-image: none !important;
+        }
+      `}</style>
+      <AvatarStreamOverlay token={token || 'demo-token'} />
+    </div>
+  );
+}
+
 // Layout wrapper determining whether to display Navbar and Footer
 function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -429,6 +447,9 @@ function AppRoutes() {
         <Route path="/overlay/timer" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/timer/:token" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />
+        <Route path="/overlay/avatars" element={<AvatarOverlayRouteWrapper />} />
+        <Route path="/overlay/avatars/:token" element={<AvatarOverlayRouteWrapper />} />
+        <Route path="/overlay/avatar/:token" element={<AvatarOverlayRouteWrapper />} />
         <Route path="/overlay/wheel" element={<WheelOverlayRouteWrapper />} />
         <Route path="/overlay/wheel/:token" element={<WheelOverlayRouteWrapper />} />
         <Route path="/overlay/chat" element={<ChatOverlayRouteWrapper />} />
@@ -440,6 +461,8 @@ function AppRoutes() {
         <Route path="/overlay/tip-qr/:token" element={<TipQrOverlayRouteWrapper />} />
 
         {/* Widget Aliases */}
+        <Route path="/widget/avatars/:token" element={<AvatarOverlayRouteWrapper />} />
+        <Route path="/widget/avatar/:token" element={<AvatarOverlayRouteWrapper />} />
         <Route path="/widget/custom" element={<CustomOverlayRouteWrapper />} />
         <Route path="/widget/custom/:token" element={<CustomOverlayRouteWrapper />} />
         <Route path="/widget/alert/:token" element={<OverlayRouteWrapper mode="alert-only" />} />

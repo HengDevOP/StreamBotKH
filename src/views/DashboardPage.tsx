@@ -106,6 +106,7 @@ import { CustomOverlayManager } from '../components/dashboard/CustomOverlayManag
 import { SpinningWheelManager } from '../components/dashboard/SpinningWheelManager';
 import { VideoAlertsManager } from '../components/dashboard/VideoAlertsManager';
 import { PokemonWidgetManager } from '../components/dashboard/PokemonWidgetManager';
+import { AvatarsWidgetManager } from '../components/dashboard/AvatarsWidgetManager';
 import { LiveChatWidgetManager } from '../components/dashboard/LiveChatWidgetManager';
 import { BroadcastStreamManager } from '../components/dashboard/BroadcastStreamManager';
 import { SubscribersManager } from '../components/dashboard/SubscribersManager';
@@ -149,6 +150,7 @@ export type DashboardTab =
   | 'chat'
   | 'subscribers'
   | 'pokemon'
+  | 'avatars'
   | 'fireworks'
   | 'minecraft'
   | 'clone-tts'
@@ -1013,6 +1015,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
       'video-alerts',
       'wheel',
       'pokemon',
+      'avatars',
       'chat',
       'subscribers',
       'account'
@@ -1130,6 +1133,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           color: '#10B981', // Bulbasaur Emerald/Cyan
           bgGlow: 'hover:border-emerald-500/50',
           copyMessage: 'Copied 2D Pokémon OBS URL!'
+        };
+      case 'avatars':
+        return {
+          featureKey: 'avatars',
+          label: 'Avatars OBS',
+          shortLabel: 'Avatars',
+          url: `${origin}/overlay/avatars/${effectiveToken}`,
+          icon: Bot,
+          color: '#ffffff',
+          bgGlow: 'hover:border-neutral-500/50',
+          copyMessage: 'Copied Avatars OBS URL!'
         };
       case 'subscribers':
         return {
@@ -1701,6 +1715,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           id: 'pokemon' as DashboardTab,
           label: '2D Pokémon',
           icon: Gamepad2,
+          badge: null,
+          isLocked: false
+        },
+        {
+          id: 'avatars' as DashboardTab,
+          label: 'Avatars',
+          icon: Bot,
           badge: null,
           isLocked: false
         },
@@ -2652,6 +2673,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
           {activeTab === 'pokemon' && (
             <PokemonWidgetManager streamerToken={user?.overlayToken} />
+          )}
+
+          {activeTab === 'avatars' && (
+            <AvatarsWidgetManager streamerToken={user?.overlayToken} />
           )}
 
           {activeTab === 'clone-tts' && (

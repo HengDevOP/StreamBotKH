@@ -416,6 +416,28 @@ export interface PokemonWidgetSettingsDoc {
   updatedAt: Date;
 }
 
+export interface AvatarWidgetSettingsDoc {
+  _id?: ObjectId;
+  streamerToken: string;
+  enabled: boolean;
+  defaultAvatarId: string;
+  customAvatarUrl?: string;
+  customAvatarName?: string;
+  allowedAvatars: string[];
+  walkSpeed: string; // 'stationary' | 'slow' | 'normal' | 'fast'
+  scale: string; // 'small' | 'medium' | 'large' | 'xlarge'
+  bubbleDuration: number;
+  maxOnScreen: number;
+  showName: boolean;
+  reactToDonations: boolean;
+  reactToChat: boolean;
+  soundEnabled: boolean;
+  overlayWidth?: number;
+  overlayHeight?: number;
+  createdAt?: Date;
+  updatedAt: Date;
+}
+
 export interface PlatformPromotionDoc {
   _id?: ObjectId;
   id: string;
@@ -979,6 +1001,11 @@ export async function getSoundboardItemsCollection(): Promise<Collection<StreamS
 export async function getPokemonSettingsCollection(): Promise<Collection<PokemonWidgetSettingsDoc>> {
   const db = await getMongoDb();
   return db.collection<PokemonWidgetSettingsDoc>('pokemon_widget_settings');
+}
+
+export async function getAvatarSettingsCollection(): Promise<Collection<AvatarWidgetSettingsDoc>> {
+  const db = await getMongoDb();
+  return db.collection<AvatarWidgetSettingsDoc>('avatar_widget_settings');
 }
 
 export async function getStreamChatSettingsCollection(): Promise<Collection<StreamChatSettingsDoc>> {
