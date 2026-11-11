@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Play, CheckCircle2, MessageSquare, Trash2, Loader2, Radio } from 'lucide-react';
-import { Button } from '../common/Button';
+import { CheckCircle2, MessageSquare, Trash2, Loader2, Radio, Receipt, X, Copy, Check } from 'lucide-react';
 import type { TimeframeOption } from './OverviewStats';
 
 export interface DonationRecord {
@@ -20,7 +19,7 @@ export interface DonationRecord {
 
 interface RecentDonationsTableProps {
   donations?: DonationRecord[];
-  limit?: number; // Capped at latest 10 records by default
+  limit?: number;
   title?: string;
   subtitle?: string;
   timeframe?: TimeframeOption;
@@ -52,10 +51,32 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
   subtitle,
   timeframe,
   customRange,
-  onReplayAlert,
   onDeleteDonation,
   deletingId
 }) => {
+  // Modal preview state for full receipt view
+  const [selectedReceipt, setSelectedReceipt] = useState<DonationRecord | null>(null);
+  const [copiedId, setCopiedId] = useState(false);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!selectedReceipt) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedReceipt(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedReceipt]);
+
+  const handleCopyId = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(id).catch(() => {});
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    }
+  };
+
   // Filter strictly for PAID status and active timeframe filter, sorted newest first, and sliced to `limit`
   const paidDonations = useMemo(() => {
     const nowDate = new Date();
@@ -146,26 +167,6 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
     }
   }, [paidDonations]);
 
-  const getBankBadgeStyle = (bankingName?: string, paymentMethod?: string) => {
-    const text = `${bankingName || ''} ${paymentMethod || ''}`.toLowerCase();
-    if (text.includes('aba')) {
-      return 'bg-cyan-950/70 text-cyan-300 border-cyan-700/60';
-    }
-    if (text.includes('bakong') || text.includes('khqr')) {
-      return 'bg-red-950/70 text-red-300 border-red-700/60';
-    }
-    if (text.includes('wing')) {
-      return 'bg-lime-950/70 text-lime-300 border-lime-700/60';
-    }
-    if (text.includes('acleda')) {
-      return 'bg-blue-950/70 text-blue-300 border-blue-700/60';
-    }
-    if (text.includes('canadia')) {
-      return 'bg-orange-950/70 text-orange-300 border-orange-700/60';
-    }
-    return 'bg-slate-800 text-slate-300 border-slate-700/80';
-  };
-
   const formatBankName = (bankingName?: string, paymentMethod?: string) => {
     if (bankingName) return bankingName;
     if (paymentMethod === 'ABA_PAYWAY') return 'ABA PayWay';
@@ -179,7 +180,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
     try {
       const date = new Date(target);
       if (isNaN(date.getTime())) return 'Just now';
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch {
       return 'Just now';
     }
@@ -197,12 +198,30 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
     }
   };
 
+  const formatFullDateTime = (target?: string) => {
+    if (!target) return 'N/A';
+    try {
+      const d = new Date(target);
+      if (isNaN(d.getTime())) return target;
+      return d.toLocaleString([], {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch {
+      return target;
+    }
+  };
+
   return (
     <div className="w-full flex-1 flex flex-col p-0 overflow-hidden rounded-2xl border border-slate-800 shadow-sm bg-[#090D18]">
       {/* Header Bar */}
-      <div className="p-4 sm:p-5 border-b border-slate-800/80 flex items-center justify-between gap-3 shrink-0">
+      <div className="p-3.5 sm:p-4 border-b border-slate-800/80 flex items-center justify-between gap-3 shrink-0">
         <div>
-          <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
+          <h3 className="text-sm sm:text-base font-bold text-white font-['Chakra_Petch']">
             {title}{timeframe ? ` (${TIMEFRAME_LABELS[timeframe]})` : ''}
           </h3>
           {subtitle ? <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p> : null}
@@ -214,7 +233,7 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
         {paidDonations.length === 0 ? (
           <div className="py-10 text-center text-xs text-slate-500 font-mono px-4 space-y-2">
             <div className="w-8 h-8 rounded-full bg-slate-800/60 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400">
-              <Radio size={14} className="animate-pulse text-emerald-400" />
+              <Radio size={14} className="animate-pulse text-slate-400" />
             </div>
             <p>No Data</p>
           </div>
@@ -224,85 +243,72 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
             return (
               <div
                 key={d.id}
-                className={`p-3.5 space-y-2.5 transition-all duration-500 ${
+                onClick={() => setSelectedReceipt(d)}
+                className={`p-3.5 space-y-2 transition-colors cursor-pointer select-none ${
                   isNew
-                    ? 'bg-emerald-950/25 border-l-4 border-emerald-400'
-                    : 'hover:bg-slate-900/40'
+                    ? 'bg-emerald-950/20 border-l-2 border-emerald-400'
+                    : 'hover:bg-slate-800/30 active:bg-slate-800/50'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-pink-600 flex items-center justify-center text-xs font-bold text-white uppercase flex-shrink-0 shadow-sm">
-                      {d.donor_name.slice(0, 1)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-white truncate block">
-                          {d.donor_name}
-                        </span>
-                        {isNew && (
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
-                            LIVE
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {formatTime(d.paid_at, d.created_at)}
-                        {formatDate(d.paid_at, d.created_at) ? ` • ${formatDate(d.paid_at, d.created_at)}` : ''}
+                {/* Row 1: Donor Name & Amount */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-slate-100 truncate block">
+                        {d.donor_name}
                       </span>
+                      {isNew && (
+                        <span className="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          LIVE
+                        </span>
+                      )}
                     </div>
+                    <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                      {formatTime(d.paid_at, d.created_at)}
+                      {formatDate(d.paid_at, d.created_at) ? ` • ${formatDate(d.paid_at, d.created_at)}` : ''}
+                    </span>
                   </div>
 
-                  <div className="text-right flex-shrink-0 font-mono font-black text-sm">
-                    {d.currency === 'KHR' ? (
-                      <span className="text-pink-400">{Number(d.amount).toLocaleString()} ៛</span>
-                    ) : (
-                      <span className="text-cyan-400">${Number(d.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    )}
+                  <div className="text-right flex-shrink-0 font-mono font-bold text-xs sm:text-sm text-white">
+                    {d.currency === 'KHR'
+                      ? `${Number(d.amount).toLocaleString()} ៛`
+                      : `$${Number(d.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   </div>
                 </div>
 
+                {/* Row 2: Message preview (if any) */}
                 {d.donor_message && (
-                  <div className="text-xs text-slate-300 italic bg-slate-950/70 p-2 rounded-lg border border-slate-800/80 flex items-start gap-1.5">
-                    <MessageSquare size={12} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                    <span className="break-words line-clamp-3">"{d.donor_message}"</span>
+                  <div className="text-[11px] text-slate-300 italic bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 flex items-start gap-1.5">
+                    <MessageSquare size={11} className="text-slate-500 mt-0.5 flex-shrink-0" />
+                    <span className="break-words line-clamp-2">"{d.donor_message}"</span>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-1 text-[11px] font-mono">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`px-2 py-0.5 rounded text-[10px] border ${getBankBadgeStyle(d.banking_name, d.payment_method)}`}>
+                {/* Row 3: Method Badge & Status */}
+                <div className="flex items-center justify-between pt-0.5 text-[10px] font-mono">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/70">
                       {formatBankName(d.banking_name, d.payment_method)}
                     </span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      <CheckCircle2 size={10} /> PAID
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-slate-400 bg-slate-800/60">
+                      <CheckCircle2 size={10} className="text-emerald-400" /> PAID
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {onReplayAlert && (
-                      <button
-                        type="button"
-                        onClick={() => onReplayAlert(d)}
-                        className="px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/80 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Replay Alert on OBS"
-                      >
-                        <Play size={10} />
-                        <span>Replay</span>
-                      </button>
-                    )}
-                    {onDeleteDonation && (
-                      <button
-                        type="button"
-                        onClick={() => onDeleteDonation(d.id)}
-                        disabled={deletingId === d.id}
-                        className="p-1 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/25 text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
-                        title="Delete record"
-                      >
-                        {deletingId === d.id ? <Loader2 size={12} className="animate-spin text-red-400" /> : <Trash2 size={12} />}
-                      </button>
-                    )}
-                  </div>
+                  {onDeleteDonation && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteDonation(d.id);
+                      }}
+                      disabled={deletingId === d.id}
+                      className="p-1 rounded text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Delete record"
+                    >
+                      {deletingId === d.id ? <Loader2 size={12} className="animate-spin text-red-400" /> : <Trash2 size={12} />}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -312,112 +318,111 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
 
       {/* Desktop & Tablet Table View (>= 640px) */}
       <div className="hidden sm:flex sm:flex-col flex-1 w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-800">
-        <table className="w-full min-w-[640px] table-fixed text-left border-collapse">
+        <table className="w-full min-w-[580px] table-fixed text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-800 bg-slate-950/40 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              <th className="py-3 px-5 w-[22%]">Donor</th>
-              <th className="py-3 px-5 w-[14%]">Amount</th>
-              <th className="py-3 px-5 w-[28%]">Message</th>
-              <th className="py-3 px-5 w-[14%]">Method</th>
-              <th className="py-3 px-5 w-[12%]">Status</th>
-              <th className="py-3 px-5 w-[10%] text-right">Action</th>
+            <tr className="border-b border-slate-800 bg-slate-950/40 text-[11px] font-semibold tracking-wider text-slate-400">
+              <th className="py-2.5 px-4 w-[28%]">Donor</th>
+              <th className="py-2.5 px-4 w-[18%]">Amount</th>
+              <th className="py-2.5 px-4 w-[30%]">Message</th>
+              <th className="py-2.5 px-4 w-[14%]">Method</th>
+              <th className="py-2.5 px-4 w-[10%]">Status</th>
+              {onDeleteDonation && <th className="py-2.5 px-3 w-[40px] text-right"></th>}
             </tr>
           </thead>
           {paidDonations.length > 0 && (
-            <tbody className="divide-y divide-slate-800/60 text-sm">
+            <tbody className="divide-y divide-slate-800/60 text-xs sm:text-sm">
               {paidDonations.map((d) => {
                 const isNew = newlyArrivedId === d.id;
                 return (
                   <tr
                     key={d.id}
-                    className={`transition-all duration-500 group ${
+                    onClick={() => setSelectedReceipt(d)}
+                    title="Click to view receipt"
+                    className={`transition-colors cursor-pointer group ${
                       isNew
-                        ? 'bg-emerald-950/25 border-l-4 border-emerald-400'
-                        : 'hover:bg-slate-800/30'
+                        ? 'bg-emerald-950/20 border-l-2 border-emerald-400'
+                        : 'hover:bg-slate-800/40'
                     }`}
                   >
-                    <td className="py-3.5 px-5 font-semibold text-slate-100">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-pink-600 flex items-center justify-center text-xs font-bold text-white uppercase flex-shrink-0 shadow-sm">
-                          {d.donor_name.slice(0, 1)}
+                    {/* Donor Column (No logo, only donor name) */}
+                    <td className="py-3 px-4 text-slate-100">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-100 truncate block text-xs sm:text-sm">
+                            {d.donor_name}
+                          </span>
+                          {isNew && (
+                            <span className="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              LIVE
+                            </span>
+                          )}
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-slate-100 truncate block text-sm">{d.donor_name}</span>
-                            {isNew && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">
-                                LIVE
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 font-normal">
-                            <span>{formatTime(d.paid_at, d.created_at)}</span>
-                            {formatDate(d.paid_at, d.created_at) && (
-                              <>
-                                <span className="text-slate-600">•</span>
-                                <span>{formatDate(d.paid_at, d.created_at)}</span>
-                              </>
-                            )}
-                          </div>
+                        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-mono text-slate-400 font-normal mt-0.5">
+                          <span>{formatTime(d.paid_at, d.created_at)}</span>
+                          {formatDate(d.paid_at, d.created_at) && (
+                            <>
+                              <span className="text-slate-600">•</span>
+                              <span>{formatDate(d.paid_at, d.created_at)}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </td>
-                    <td className="py-3.5 px-5 font-mono font-bold text-white whitespace-nowrap">
-                      {d.currency === 'KHR' ? (
-                        <span className="text-pink-400 font-black">{Number(d.amount).toLocaleString()} ៛</span>
-                      ) : (
-                        <span className="text-cyan-400 font-black">${Number(d.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      )}
+
+                    {/* Amount Column (Clean, simple text) */}
+                    <td className="py-3 px-4 font-mono font-bold text-white whitespace-nowrap text-xs sm:text-sm">
+                      {d.currency === 'KHR'
+                        ? `${Number(d.amount).toLocaleString()} ៛`
+                        : `$${Number(d.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </td>
-                    <td className="py-3.5 px-5 truncate text-slate-300">
+
+                    {/* Message Column */}
+                    <td className="py-3 px-4 truncate text-slate-300">
                       {d.donor_message ? (
-                        <span className="flex items-center gap-1.5 text-xs italic text-slate-300" title={d.donor_message}>
-                          <MessageSquare size={13} className="text-slate-500 flex-shrink-0" />
-                          <span className="truncate">"{d.donor_message}"</span>
+                        <span className="flex items-center gap-1.5 text-xs text-slate-300 truncate" title={d.donor_message}>
+                          <MessageSquare size={12} className="text-slate-500 flex-shrink-0" />
+                          <span className="truncate italic">"{d.donor_message}"</span>
                         </span>
                       ) : (
                         <span className="text-xs text-slate-600 italic">No message</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-5 text-xs font-mono whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-medium ${getBankBadgeStyle(d.banking_name, d.payment_method)}`}>
+
+                    {/* Method Column */}
+                    <td className="py-3 px-4 text-xs font-mono whitespace-nowrap">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700/60 font-medium">
                         {formatBankName(d.banking_name, d.payment_method)}
                       </span>
                     </td>
-                    <td className="py-3.5 px-5 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        <CheckCircle2 size={12} /> PAID
+
+                    {/* Status Column */}
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono text-slate-300 bg-slate-800/80 border border-slate-700/60">
+                        <CheckCircle2 size={10} className="text-emerald-400" /> PAID
                       </span>
                     </td>
-                    <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onReplayAlert?.(d)}
-                          icon={<Play size={12} />}
-                          title="Replay Alert on OBS"
-                        >
-                          Replay
-                        </Button>
 
-                        {onDeleteDonation && (
-                          <button
-                            type="button"
-                            onClick={() => onDeleteDonation(d.id)}
-                            disabled={deletingId === d.id}
-                            className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/25 text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 cursor-pointer"
-                            title="Delete donation record"
-                          >
-                            {deletingId === d.id ? (
-                              <Loader2 size={13} className="animate-spin text-red-400" />
-                            ) : (
-                              <Trash2 size={13} />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    {/* Optional Delete Column */}
+                    {onDeleteDonation && (
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteDonation(d.id);
+                          }}
+                          disabled={deletingId === d.id}
+                          className="p-1 rounded text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
+                          title="Delete donation record"
+                        >
+                          {deletingId === d.id ? (
+                            <Loader2 size={12} className="animate-spin text-red-400" />
+                          ) : (
+                            <Trash2 size={12} />
+                          )}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -427,11 +432,134 @@ export const RecentDonationsTable: React.FC<RecentDonationsTableProps> = ({
 
         {paidDonations.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center py-10 text-center text-slate-500 gap-2 min-h-[140px]">
-            <Radio size={18} className="animate-pulse text-slate-400" />
+            <Radio size={16} className="animate-pulse text-slate-500" />
             <p className="font-mono text-xs">No Data</p>
           </div>
         )}
       </div>
+
+      {/* ============================================================== */}
+      {/* SIMPLE, DEFAULT RECEIPT MODAL (NO COLOR / AI EFFECTS)           */}
+      {/* ============================================================== */}
+      {selectedReceipt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setSelectedReceipt(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-sm sm:max-w-md bg-[#0F1422] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden text-slate-200"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-800/80">
+              <div className="flex items-center gap-2 text-slate-300">
+                <Receipt size={16} className="text-slate-400" />
+                <h4 className="text-sm font-semibold font-['Chakra_Petch'] tracking-wide">
+                  Donation Receipt
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedReceipt(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+                aria-label="Close receipt"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4">
+              {/* Amount Centerpiece */}
+              <div className="text-center py-2 space-y-1.5">
+                <div className="text-3xl sm:text-4xl font-mono font-bold text-white tracking-tight">
+                  {selectedReceipt.currency === 'KHR'
+                    ? `${Number(selectedReceipt.amount).toLocaleString()} ៛`
+                    : `$${Number(selectedReceipt.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-slate-800 text-slate-300 border border-slate-700/80">
+                  <CheckCircle2 size={12} className="text-emerald-400" />
+                  <span>PAID</span>
+                </div>
+              </div>
+
+              {/* Dashed Receipt Line */}
+              <div className="border-t border-dashed border-slate-800" />
+
+              {/* Key-Value Details */}
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500 font-medium">Donor Name</span>
+                  <span className="font-semibold text-slate-200 text-right truncate">
+                    {selectedReceipt.donor_name}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500 font-medium">Payment Method</span>
+                  <span className="font-mono text-slate-300 text-right">
+                    {formatBankName(selectedReceipt.banking_name, selectedReceipt.payment_method)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500 font-medium">Date & Time</span>
+                  <span className="font-mono text-slate-300 text-right">
+                    {formatFullDateTime(selectedReceipt.paid_at || selectedReceipt.created_at)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500 font-medium">Currency</span>
+                  <span className="font-mono text-slate-300">
+                    {selectedReceipt.currency}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500 font-medium">Transaction ID</span>
+                  <div className="flex items-center gap-1 font-mono text-[11px] text-slate-400">
+                    <span>{selectedReceipt.id.slice(0, 18)}...</span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyId(selectedReceipt.id, e)}
+                      className="p-1 rounded hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                      title="Copy Transaction ID"
+                    >
+                      {copiedId ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Donor Message (if present) */}
+              {selectedReceipt.donor_message && (
+                <>
+                  <div className="border-t border-dashed border-slate-800" />
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-medium text-slate-500">Donor Message</span>
+                    <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 italic break-words leading-relaxed">
+                      "{selectedReceipt.donor_message}"
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Dashed Receipt Line */}
+              <div className="border-t border-dashed border-slate-800" />
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setSelectedReceipt(null)}
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

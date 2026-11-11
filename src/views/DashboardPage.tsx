@@ -2420,7 +2420,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   title="Recent Donations"
                   timeframe={overviewTimeframe}
                   customRange={overviewCustomRange}
-                  onReplayAlert={handleReplayAlert}
                   onDeleteDonation={handleDeleteDonation}
                   deletingId={deletingDonationId}
                 />
@@ -2520,7 +2519,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 limit={50}
                 title="Donation Ledger"
                 subtitle="Audit log of all verified tips matching selected filters (Paid Only)"
-                onReplayAlert={handleReplayAlert}
                 onDeleteDonation={handleDeleteDonation}
                 deletingId={deletingDonationId}
               />
