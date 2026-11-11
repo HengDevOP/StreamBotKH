@@ -265,11 +265,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             <div className="w-full lg:col-span-5 xl:col-span-5 text-center lg:text-left space-y-6 sm:space-y-8 flex flex-col items-center lg:items-start">
               {/* Hero Headline */}
               <div className="space-y-4 sm:space-y-5">
-                <h1 className="text-3xl xs:text-4xl sm:text-5xl lg:text-5xl xl:text-6xl font-extrabold tracking-tight text-white uppercase leading-[1.08] font-['Chakra_Petch']">
-                  LEVEL UP YOUR LIVESTREAM <br />
-                  <span className="inline-flex items-center justify-center lg:justify-start flex-wrap gap-x-2.5 sm:gap-x-4">
-                    <span>WITH</span>
-                    <span className="relative inline-flex items-center overflow-hidden h-[1.18em] align-top transition-[width] duration-300 ease-out">
+                <h1 className="text-2xl xs:text-[1.85rem] sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-extrabold tracking-tight text-white uppercase leading-[1.08] font-['Chakra_Petch']">
+                  <span className="block">LEVEL UP YOUR LIVESTREAM</span>
+                  <span className="inline-flex items-center justify-center lg:justify-start flex-nowrap whitespace-nowrap gap-x-2 sm:gap-x-3.5 max-w-full">
+                    <span className="shrink-0">WITH</span>
+                    <span className="relative inline-flex items-center overflow-hidden h-[1.18em] align-top transition-[width] duration-300 ease-out whitespace-nowrap shrink-0">
                       {/* Invisible sizer to naturally reserve exact width */}
                       <span className="invisible select-none pointer-events-none whitespace-nowrap px-0.5">
                         {HERO_SWIPE_WORDS[featureIndex]}
@@ -281,7 +281,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                           key={`prev-${prevFeatureIndex}`}
                           className="absolute inset-0 flex items-center justify-center lg:justify-start whitespace-nowrap px-0.5 animate-hero-swipe-out pointer-events-none"
                         >
-                          <span className="hero-swipe-blue font-extrabold text-[#00F0FF]">
+                          <span className="hero-swipe-blue font-extrabold text-[#00F0FF] whitespace-nowrap">
                             {HERO_SWIPE_WORDS[prevFeatureIndex]}
                           </span>
                         </span>
@@ -294,7 +294,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                           isFeatureSwiping ? 'animate-hero-swipe-in' : ''
                         }`}
                       >
-                        <span className="hero-swipe-blue font-extrabold text-[#00F0FF]">
+                        <span className="hero-swipe-blue font-extrabold text-[#00F0FF] whitespace-nowrap">
                           {HERO_SWIPE_WORDS[featureIndex]}
                         </span>
                       </span>
