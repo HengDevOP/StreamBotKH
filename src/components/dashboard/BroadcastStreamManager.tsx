@@ -259,23 +259,23 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
 
       {/* BOTTOM FLOATING TOAST MESSAGE */}
       <div
-        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-out pointer-events-none ${
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-200 ease-out pointer-events-none ${
           toast
-            ? 'translate-y-0 opacity-100 scale-100'
-            : 'translate-y-4 opacity-0 scale-95 pointer-events-none'
+            ? 'translate-y-0 opacity-100'
+            : 'translate-y-2 opacity-0 pointer-events-none'
         }`}
       >
         <div
-          className={`px-4 py-2.5 rounded-xl border font-mono text-xs font-semibold flex items-center gap-2 shadow-2xl backdrop-blur-md ${
+          className={`px-3.5 py-2 rounded-xl border font-mono text-xs flex items-center gap-2 ${
             toast?.type === 'error'
-              ? 'bg-red-950/90 border-red-500/40 text-red-200 shadow-[0_10px_30px_rgba(239,68,68,0.3)]'
-              : 'bg-[#0B101E]/95 border-emerald-500/40 text-emerald-300 shadow-[0_10px_30px_rgba(16,185,129,0.25)]'
+              ? 'bg-slate-900 border-red-500/40 text-red-300'
+              : 'bg-slate-900 border-slate-800 text-slate-200'
           }`}
         >
           {toast?.type === 'error' ? (
-            <AlertCircle size={15} className="text-red-400 shrink-0" />
+            <AlertCircle size={14} className="text-red-400 shrink-0" />
           ) : (
-            <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
+            <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
           )}
           <span>{toast?.message}</span>
         </div>
