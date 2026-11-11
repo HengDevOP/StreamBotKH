@@ -664,11 +664,11 @@ export const HomeFeatureShowcase: React.FC = () => {
 
             <div className="p-3 rounded-xl bg-white/[0.04] flex items-start gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center shrink-0 text-slate-300 mt-0.5">
-                <CheckCircle2 size={14} />
+                <Sparkles size={14} />
               </div>
               <div className="min-w-0">
-                <span className="text-xs font-bold text-white block truncate">0% Platform Cut</span>
-                <span className="text-[11px] text-slate-400 truncate block">Direct bank payout</span>
+                <span className="text-xs font-bold text-white block truncate">Fully Customization</span>
+                <span className="text-[11px] text-slate-400 truncate block">Animations & layout</span>
               </div>
             </div>
 
