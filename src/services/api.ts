@@ -1,7 +1,12 @@
 const API_BASE = '/api';
 
+export function getStoredAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_auth_token');
+}
+
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('streamneon_auth_token') : null;
+  const token = getStoredAuthToken();
   const headers = new Headers(options.headers || {});
 
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {

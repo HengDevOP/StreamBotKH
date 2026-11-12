@@ -24,12 +24,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Synchronous initialization from localStorage prevents flash-of-unauthenticated-state on window refresh
+  // Synchronous initialization from sessionStorage / localStorage prevents flash-of-unauthenticated-state
   const [user, setUser] = useState<Streamer | null>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const storedToken = localStorage.getItem('streamneon_auth_token');
-        const storedUser = localStorage.getItem('streamneon_user');
+        const storedToken = sessionStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_auth_token');
+        const storedUser = sessionStorage.getItem('streamneon_user') || localStorage.getItem('streamneon_user');
         if (storedToken && storedUser) {
           const parsed = JSON.parse(storedUser);
           if (parsed && !parsed.id && parsed.userId) {
@@ -44,19 +44,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('streamneon_auth_token');
+      return sessionStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_auth_token');
     }
     return null;
   });
 
   const [loading, setLoading] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem('streamneon_auth_token');
+      const storedToken = sessionStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_auth_token');
       const params = new URLSearchParams(window.location.search);
-      const hasToken = Boolean(storedToken || params.get('token'));
+      const hasToken = Boolean(storedToken || params.get('token') || params.get('impersonate_token'));
       if (hasToken) {
         // If user profile is already cached synchronously, not loading
-        const storedUser = localStorage.getItem('streamneon_user');
+        const storedUser = sessionStorage.getItem('streamneon_user') || localStorage.getItem('streamneon_user');
         return !storedUser;
       }
       return false;
@@ -66,7 +66,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [isImpersonating, setIsImpersonating] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return Boolean(localStorage.getItem('streamneon_impersonator_admin_token'));
+      return Boolean(
+        sessionStorage.getItem('streamneon_is_impersonating') ||
+        sessionStorage.getItem('streamneon_impersonator_admin_user') ||
+        localStorage.getItem('streamneon_impersonator_admin_token')
+      );
     }
     return false;
   });
@@ -74,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [impersonatorAdmin, setImpersonatorAdmin] = useState<{ id?: string; email: string } | null>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('streamneon_impersonator_admin_user');
+        const stored = sessionStorage.getItem('streamneon_impersonator_admin_user') || localStorage.getItem('streamneon_impersonator_admin_user');
         return stored ? JSON.parse(stored) : null;
       } catch (_) {}
     }
@@ -88,22 +92,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isRefreshingRef.current = true;
 
     try {
-      if (typeof window !== 'undefined' && localStorage.getItem('streamneon_auth_token')) {
+      const activeToken = typeof window !== 'undefined'
+        ? (sessionStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_auth_token'))
+        : null;
+
+      if (activeToken) {
         const profile = await authService.getMe();
         if (profile && !(profile as any).id && (profile as any).userId) {
           (profile as any).id = (profile as any).userId;
         }
         if ((profile as any)?.token && typeof window !== 'undefined') {
-          localStorage.setItem('streamneon_auth_token', (profile as any).token);
+          if (sessionStorage.getItem('streamneon_auth_token')) {
+            sessionStorage.setItem('streamneon_auth_token', (profile as any).token);
+          } else {
+            localStorage.setItem('streamneon_auth_token', (profile as any).token);
+          }
           setToken((profile as any).token);
         }
         setUser(profile);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('streamneon_user', JSON.stringify(profile));
+          if (sessionStorage.getItem('streamneon_auth_token')) {
+            sessionStorage.setItem('streamneon_user', JSON.stringify(profile));
+          } else {
+            localStorage.setItem('streamneon_user', JSON.stringify(profile));
+          }
         }
       } else {
         setUser(null);
         if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('streamneon_user');
           localStorage.removeItem('streamneon_user');
         }
       }
@@ -124,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(null);
         setUser(null);
         if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('streamneon_user');
           localStorage.removeItem('streamneon_user');
         }
       } else {
@@ -139,9 +157,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
+      const impersonateToken = params.get('impersonate_token');
+      const impersonatorEmail = params.get('impersonator_email');
+      const impersonatorId = params.get('impersonator_id');
       const callbackToken = params.get('token');
 
-      if (callbackToken) {
+      if (impersonateToken) {
+        // Window-isolated impersonation session: write ONLY to sessionStorage so parent/admin window is preserved
+        sessionStorage.setItem('streamneon_auth_token', impersonateToken);
+        sessionStorage.setItem('streamneon_is_impersonating', 'true');
+        if (impersonatorEmail || impersonatorId) {
+          const adminInfo = {
+            id: impersonatorId || '',
+            email: impersonatorEmail || 'Admin'
+          };
+          sessionStorage.setItem('streamneon_impersonator_admin_user', JSON.stringify(adminInfo));
+          setImpersonatorAdmin(adminInfo);
+        }
+        setToken(impersonateToken);
+        setIsImpersonating(true);
+
+        // Clean ?impersonate_token=... from URL
+        params.delete('impersonate_token');
+        params.delete('impersonator_email');
+        params.delete('impersonator_id');
+        const newQuery = params.toString();
+        const cleanUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}${window.location.hash}`;
+        window.history.replaceState({}, '', cleanUrl);
+      } else if (callbackToken) {
         localStorage.setItem('streamneon_auth_token', callbackToken);
         setToken(callbackToken);
 
@@ -151,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cleanUrl = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}${window.location.hash}`;
         window.history.replaceState({}, '', cleanUrl);
       } else {
-        const stored = localStorage.getItem('streamneon_auth_token');
+        const stored = sessionStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_auth_token');
         if (stored) {
           setToken(stored);
         }
@@ -250,6 +293,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('streamneon_auth_token');
+        sessionStorage.removeItem('streamneon_user');
+        sessionStorage.removeItem('streamneon_is_impersonating');
+        sessionStorage.removeItem('streamneon_impersonator_admin_user');
+
         const storedAdminToken = localStorage.getItem('streamneon_impersonator_admin_token');
         const storedAdminUser = localStorage.getItem('streamneon_impersonator_admin_user');
 
@@ -267,6 +315,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } catch (_) {}
           }
           await refreshUser();
+        } else {
+          // If this was a sessionStorage-isolated window, check if localStorage has an admin token
+          const existingLocalToken = localStorage.getItem('streamneon_auth_token');
+          if (existingLocalToken) {
+            setToken(existingLocalToken);
+            await refreshUser();
+          }
         }
       }
       setIsImpersonating(false);
@@ -279,6 +334,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     authService.logout();
     if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('streamneon_auth_token');
+      sessionStorage.removeItem('streamneon_user');
+      sessionStorage.removeItem('streamneon_is_impersonating');
+      sessionStorage.removeItem('streamneon_impersonator_admin_user');
       localStorage.removeItem('streamneon_user');
       localStorage.removeItem('streamneon_impersonator_admin_token');
       localStorage.removeItem('streamneon_impersonator_admin_user');

@@ -37,6 +37,10 @@ export const authService = {
 
   logout() {
     if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('streamneon_auth_token');
+      sessionStorage.removeItem('streamneon_user');
+      sessionStorage.removeItem('streamneon_is_impersonating');
+      sessionStorage.removeItem('streamneon_impersonator_admin_user');
       localStorage.removeItem('streamneon_auth_token');
       localStorage.removeItem('streamneon_user');
     }

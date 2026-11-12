@@ -85,7 +85,7 @@ function saveSessionCache(media: MediaItem[], storage: StorageInfo | null, etag:
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('streamneon_auth_token');
+  const token = sessionStorage.getItem('streamneon_auth_token') || localStorage.getItem('streamneon_auth_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

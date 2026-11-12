@@ -13,7 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Eye,
+  ExternalLink,
   Loader2
 } from 'lucide-react';
 import { request } from '../../services/api';
@@ -71,7 +71,7 @@ interface AdminUsersManagerProps {
 
 export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentUserPlanUpdated }) => {
   const { showConfirm } = useModal();
-  const { user: currentUser, impersonateUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [summary, setSummary] = useState({ totalUsers: 0, ultraUsers: 0, proUsers: 0, freeUsers: 0 });
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -279,25 +279,54 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
     });
   };
 
-  const handleInteractAsUser = (targetUser: AdminUserItem) => {
-    showConfirm({
-      title: `Interact as @${targetUser.username}?`,
-      message: `Switch session and access the creator dashboard as @${targetUser.username} (${targetUser.displayName || targetUser.username}). You can return to admin anytime via the top banner.`,
-      type: 'info',
-      confirmText: `Interact as @${targetUser.username}`,
-      cancelText: 'Cancel',
-      onConfirm: async () => {
-        try {
-          setImpersonatingId(targetUser.id);
-          setErrorMsg(null);
-          await impersonateUser(targetUser.id);
-          window.location.href = '/creator?tab=overview';
-        } catch (err: any) {
-          setErrorMsg(err.message || 'Failed to switch into user session');
-          setImpersonatingId(null);
-        }
+  const handleInteractAsUser = async (targetUser: AdminUserItem) => {
+    // Open blank window immediately on user gesture to prevent browser popup blockers
+    const newWindow = window.open('about:blank', '_blank');
+    if (newWindow) {
+      try {
+        newWindow.document.title = `Connecting to @${targetUser.username}...`;
+      } catch (_) {}
+    }
+
+    try {
+      setImpersonatingId(targetUser.id);
+      setErrorMsg(null);
+
+      // Issue impersonation token specifically for the new window without affecting current admin window state
+      const res = await request<{
+        success: boolean;
+        token: string;
+        user: any;
+        impersonatorAdmin: { id?: string; email: string };
+      }>('/admin/impersonate', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId: targetUser.id })
+      });
+
+      if (!res?.token) {
+        throw new Error('Failed to obtain impersonation session token');
       }
-    });
+
+      const adminEmail = res.impersonatorAdmin?.email || currentUser?.email || 'admin';
+      const adminId = res.impersonatorAdmin?.id || currentUser?.id || '';
+      const targetUrl = `/creator?tab=overview&impersonate_token=${encodeURIComponent(res.token)}&impersonator_email=${encodeURIComponent(adminEmail)}&impersonator_id=${encodeURIComponent(adminId)}`;
+
+      if (newWindow && !newWindow.closed) {
+        newWindow.location.href = targetUrl;
+      } else {
+        window.open(targetUrl, '_blank');
+      }
+
+      setToastMsg(`Opened @${targetUser.username}'s creator dashboard in a new window`);
+      setTimeout(() => setToastMsg(null), 3000);
+    } catch (err: any) {
+      if (newWindow && !newWindow.closed) {
+        newWindow.close();
+      }
+      setErrorMsg(err.message || 'Failed to open user session in new window');
+    } finally {
+      setImpersonatingId(null);
+    }
   };
 
   const handleToggleVerified = (targetUser: AdminUserItem) => {
@@ -635,18 +664,18 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
-                          {/* Interact As */}
+                          {/* Interact As (Open in New Window) */}
                           <button
                             type="button"
                             onClick={() => handleInteractAsUser(u)}
                             disabled={isUpdating || impersonatingId === u.id || u.id === currentUser?.id}
-                            title={u.id === currentUser?.id ? 'Your admin account' : `Interact as @${u.username}`}
+                            title={u.id === currentUser?.id ? 'Your admin account' : `Open creator dashboard in new window as @${u.username}`}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-mono transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             {impersonatingId === u.id ? (
                               <Loader2 size={12} className="animate-spin text-slate-400" />
                             ) : (
-                              <Eye size={12} className="text-slate-400" />
+                              <ExternalLink size={12} className="text-slate-400" />
                             )}
                             <span>Interact</span>
                           </button>
@@ -790,12 +819,12 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                     onClick={() => handleInteractAsUser(u)}
                     disabled={isUpdating || impersonatingId === u.id || u.id === currentUser?.id}
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-mono transition-colors shrink-0 disabled:opacity-40"
-                    title={`Interact as @${u.username}`}
+                    title={u.id === currentUser?.id ? 'Your admin account' : `Open creator dashboard in new window as @${u.username}`}
                   >
                     {impersonatingId === u.id ? (
                       <Loader2 size={12} className="animate-spin text-slate-400" />
                     ) : (
-                      <Eye size={12} className="text-slate-400" />
+                      <ExternalLink size={12} className="text-slate-400" />
                     )}
                     <span>Interact</span>
                   </button>
