@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getIO, broadcastToAllStreamerRooms } from '@/server/services/socketService';
 import { getUsersCollection, getOverlayTokenHistoryCollection } from '@/server/database/mongo';
-import { extractYoutubeId, getYoutubeLiveStats } from '@/utils/youtube';
+import { aggregateBroadcastChannelViewers } from '@/utils/streamStats';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,10 +29,7 @@ export async function GET(req: NextRequest) {
     const defaultPlatforms: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick')[] = ['youtube', 'facebook'];
     const defaultSettings = {
       enabledPlatforms: defaultPlatforms,
-      manualViewers: 1420,
-      theme: 'glass-dark',
-      showLiveDot: true,
-      showLabel: true
+      manualViewers: 1420
     };
 
     if (!streamer) {
@@ -55,9 +52,9 @@ export async function GET(req: NextRequest) {
 
     const broadcastUrls = streamer.broadcastUrls || {
       youtube: streamer.liveStreamUrl || '',
-      twitch: '',
-      tiktok: '',
-      facebook: '',
+      twitch: streamer.twitchLiveUrl || '',
+      tiktok: streamer.tiktokLiveUrl || '',
+      facebook: streamer.facebookLiveUrl || '',
       kick: ''
     };
 
@@ -71,58 +68,17 @@ export async function GET(req: NextRequest) {
       ? Math.max(0, userSettings.manualViewers)
       : 1420;
 
-    let youtubeViewers = 0;
-    let isYoutubeLive = false;
-
-    // Check YouTube live viewer count if YouTube is ticked
-    if (enabledPlatforms.includes('youtube') && broadcastUrls.youtube) {
-      const ytId = extractYoutubeId(broadcastUrls.youtube);
-      if (ytId) {
-        try {
-          const ytStats = await getYoutubeLiveStats(ytId);
-          if (ytStats?.isLive) {
-            isYoutubeLive = true;
-            youtubeViewers = Math.max(0, ytStats.viewers || 0);
-          }
-        } catch (e) {
-          // Graceful fallback
-        }
-      }
-    }
-
-    // Calculate total concurrent viewers across ticked platforms
-    // If live YouTube viewers are found, combine with manual/other platform viewers
-    let totalViewers = youtubeViewers;
-    if (manualViewers > 0) {
-      totalViewers += manualViewers;
-    } else if (totalViewers === 0) {
-      totalViewers = 1420; // Default active demo number if no live stream detected yet
-    }
-
-    const platformViewers: Record<string, number> = {};
-    if (enabledPlatforms.includes('youtube')) {
-      platformViewers.youtube = youtubeViewers > 0 ? youtubeViewers : Math.round(totalViewers * 0.6);
-    }
-    if (enabledPlatforms.includes('facebook')) {
-      platformViewers.facebook = Math.round(totalViewers * 0.4);
-    }
-    if (enabledPlatforms.includes('twitch')) {
-      platformViewers.twitch = Math.round(totalViewers * 0.3);
-    }
-    if (enabledPlatforms.includes('tiktok')) {
-      platformViewers.tiktok = Math.round(totalViewers * 0.35);
-    }
-    if (enabledPlatforms.includes('kick')) {
-      platformViewers.kick = Math.round(totalViewers * 0.2);
-    }
+    // Fetch real live concurrent viewers from all set broadcast channel URLs
+    const liveStats = await aggregateBroadcastChannelViewers(
+      broadcastUrls,
+      enabledPlatforms,
+      manualViewers
+    );
 
     const settings = {
       enabledPlatforms,
       manualViewers,
-      theme: userSettings.theme || 'glass-dark',
-      showLiveDot: userSettings.showLiveDot !== undefined ? Boolean(userSettings.showLiveDot) : true,
-      showLabel: userSettings.showLabel !== undefined ? Boolean(userSettings.showLabel) : true,
-      isLive: isYoutubeLive || manualViewers > 0
+      isLive: liveStats.isLive
     };
 
     return NextResponse.json({
@@ -132,9 +88,10 @@ export async function GET(req: NextRequest) {
         displayName: streamer.displayName || streamer.username
       },
       settings,
-      totalViewers,
+      totalViewers: liveStats.totalViewers,
       platforms: enabledPlatforms,
-      platformViewers
+      platformViewers: liveStats.platformViewers,
+      isLive: liveStats.isLive
     });
   } catch (err: any) {
     console.error('API /api/widgets/view-count GET error:', err);
@@ -165,10 +122,7 @@ export async function POST(req: NextRequest) {
 
     const currentSettings = streamer?.broadcastViewCount || {
       enabledPlatforms: ['youtube', 'facebook'],
-      manualViewers: 1420,
-      theme: 'glass-dark',
-      showLiveDot: true,
-      showLabel: true
+      manualViewers: 1420
     };
 
     const nextPlatforms = Array.isArray(body.enabledPlatforms)
@@ -181,10 +135,7 @@ export async function POST(req: NextRequest) {
 
     const nextSettings = {
       enabledPlatforms: nextPlatforms,
-      manualViewers: nextManual,
-      theme: body.theme || currentSettings.theme || 'glass-dark',
-      showLiveDot: body.showLiveDot !== undefined ? Boolean(body.showLiveDot) : (currentSettings.showLiveDot ?? true),
-      showLabel: body.showLabel !== undefined ? Boolean(body.showLabel) : (currentSettings.showLabel ?? true)
+      manualViewers: nextManual
     };
 
     if (streamer) {
@@ -199,12 +150,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const totalViewers = nextSettings.manualViewers > 0 ? nextSettings.manualViewers : 1420;
+    const broadcastUrls = streamer?.broadcastUrls || {
+      youtube: streamer?.liveStreamUrl || '',
+      twitch: streamer?.twitchLiveUrl || '',
+      tiktok: streamer?.tiktokLiveUrl || '',
+      facebook: streamer?.facebookLiveUrl || '',
+      kick: ''
+    };
+
+    // Calculate real live concurrent viewers across configured broadcast channels
+    const liveStats = await aggregateBroadcastChannelViewers(
+      broadcastUrls,
+      nextPlatforms,
+      nextSettings.manualViewers
+    );
 
     const payload = {
       settings: nextSettings,
       platforms: nextPlatforms,
-      totalViewers,
+      totalViewers: liveStats.totalViewers,
+      isLive: liveStats.isLive,
+      platformViewers: liveStats.platformViewers,
       isTest: Boolean(body.isTest),
       updatedAt: Date.now()
     };
@@ -221,9 +187,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: body.isTest ? 'Test view count sent to OBS overlay' : 'View count settings saved successfully',
+      message: 'View count settings saved successfully',
       settings: nextSettings,
-      totalViewers
+      totalViewers: liveStats.totalViewers,
+      isLive: liveStats.isLive
     });
   } catch (err: any) {
     console.error('API /api/widgets/view-count POST error:', err);

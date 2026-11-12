@@ -163,6 +163,29 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
     };
   }, []);
 
+  // Sync real-time live viewers detected from configured broadcast channels
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveViewers = async () => {
+      try {
+        const res = await fetch(`/api/widgets/view-count?token=${overlayToken}`);
+        const data = await res.json();
+        if (isMounted && data?.success && typeof data.totalViewers === 'number') {
+          if (data.isLive && data.totalViewers > 0) {
+            setManualViewers(data.totalViewers);
+          }
+        }
+      } catch {}
+    };
+
+    fetchLiveViewers();
+    const interval = setInterval(fetchLiveViewers, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [overlayToken]);
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
@@ -210,6 +233,17 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         await onRefreshUser();
       }
 
+      // Sync updated broadcast channel URLs to real-time view count overlay
+      fetch('/api/widgets/view-count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: overlayToken,
+          enabledPlatforms,
+          manualViewers
+        })
+      }).catch(() => {});
+
       showToast('Saved', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to save', 'error');
@@ -248,6 +282,17 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
       if (onRefreshUser) {
         await onRefreshUser();
       }
+
+      // Sync updated broadcast channel URLs to real-time view count overlay
+      fetch('/api/widgets/view-count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: overlayToken,
+          enabledPlatforms,
+          manualViewers
+        })
+      }).catch(() => {});
 
       showToast('Saved', 'success');
     } catch (err: any) {
