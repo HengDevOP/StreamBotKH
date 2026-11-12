@@ -122,26 +122,29 @@ export async function POST(req: NextRequest) {
       enabledPlatforms: nextPlatforms
     };
 
+    const incomingUrls = (body.broadcastUrls && typeof body.broadcastUrls === 'object') ? body.broadcastUrls : {};
+    const broadcastUrls = {
+      youtube: (incomingUrls.youtube !== undefined ? incomingUrls.youtube : (streamer?.broadcastUrls?.youtube || streamer?.liveStreamUrl || streamer?.youtubeLiveUrl || '')).trim(),
+      twitch: (incomingUrls.twitch !== undefined ? incomingUrls.twitch : (streamer?.broadcastUrls?.twitch || streamer?.twitchLiveUrl || '')).trim(),
+      tiktok: (incomingUrls.tiktok !== undefined ? incomingUrls.tiktok : (streamer?.broadcastUrls?.tiktok || streamer?.tiktokLiveUrl || '')).trim(),
+      facebook: (incomingUrls.facebook !== undefined ? incomingUrls.facebook : (streamer?.broadcastUrls?.facebook || streamer?.facebookLiveUrl || '')).trim(),
+      kick: (incomingUrls.kick !== undefined ? incomingUrls.kick : (streamer?.broadcastUrls?.kick || '')).trim(),
+      instagram: (incomingUrls.instagram !== undefined ? incomingUrls.instagram : (streamer?.broadcastUrls?.instagram || '')).trim()
+    };
+
     if (streamer) {
+      const updateDoc: any = {
+        broadcastViewCount: nextSettings,
+        updatedAt: new Date()
+      };
+      if (body.broadcastUrls && typeof body.broadcastUrls === 'object') {
+        updateDoc.broadcastUrls = broadcastUrls;
+      }
       await usersCol.updateOne(
         { _id: streamer._id },
-        {
-          $set: {
-            broadcastViewCount: nextSettings,
-            updatedAt: new Date()
-          }
-        }
+        { $set: updateDoc }
       );
     }
-
-    const broadcastUrls = {
-      youtube: (streamer?.broadcastUrls?.youtube || streamer?.liveStreamUrl || streamer?.youtubeLiveUrl || '').trim(),
-      twitch: (streamer?.broadcastUrls?.twitch || streamer?.twitchLiveUrl || '').trim(),
-      tiktok: (streamer?.broadcastUrls?.tiktok || streamer?.tiktokLiveUrl || '').trim(),
-      facebook: (streamer?.broadcastUrls?.facebook || streamer?.facebookLiveUrl || '').trim(),
-      kick: (streamer?.broadcastUrls?.kick || '').trim(),
-      instagram: (streamer?.broadcastUrls?.instagram || '').trim()
-    };
 
     // Calculate real live concurrent viewers across configured broadcast channels
     const liveStats = await aggregateBroadcastChannelViewers(

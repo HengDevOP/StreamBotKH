@@ -17,10 +17,11 @@ export function extractTwitchUsername(urlOrName?: string | null): string | null 
   if (!urlOrName || typeof urlOrName !== 'string') return null;
   const trimmed = urlOrName.trim();
   if (!trimmed) return null;
-  if (/^[a-zA-Z0-9_]{2,30}$/.test(trimmed) && !trimmed.includes('.')) {
-    return trimmed.toLowerCase();
+  const stripped = trimmed.replace(/^@/, '');
+  if (/^[a-zA-Z0-9_]{2,30}$/.test(stripped) && !stripped.includes('.')) {
+    return stripped.toLowerCase();
   }
-  const match = trimmed.match(/(?:twitch\.tv\/)([a-zA-Z0-9_]{2,30})/i);
+  const match = stripped.match(/(?:twitch\.tv\/)([a-zA-Z0-9_]{2,30})/i);
   return match ? match[1].toLowerCase() : null;
 }
 
@@ -28,10 +29,11 @@ export function extractKickUsername(urlOrName?: string | null): string | null {
   if (!urlOrName || typeof urlOrName !== 'string') return null;
   const trimmed = urlOrName.trim();
   if (!trimmed) return null;
-  if (/^[a-zA-Z0-9_-]{2,35}$/.test(trimmed) && !trimmed.includes('.')) {
-    return trimmed.toLowerCase();
+  const stripped = trimmed.replace(/^@/, '');
+  if (/^[a-zA-Z0-9_-]{2,35}$/.test(stripped) && !stripped.includes('.')) {
+    return stripped.toLowerCase();
   }
-  const match = trimmed.match(/(?:kick\.com\/)([a-zA-Z0-9_-]{2,35})/i);
+  const match = stripped.match(/(?:kick\.com\/)([a-zA-Z0-9_-]{2,35})/i);
   return match ? match[1].toLowerCase() : null;
 }
 
@@ -42,8 +44,12 @@ export function extractKickUsername(urlOrName?: string | null): string | null {
  */
 export async function resolveYoutubeLiveStats(urlOrId: string): Promise<{ isLive: boolean; viewers: number }> {
   if (!urlOrId || typeof urlOrId !== 'string') return { isLive: false, viewers: 0 };
-  const cleanUrl = urlOrId.trim();
+  let cleanUrl = urlOrId.trim();
   if (!cleanUrl) return { isLive: false, viewers: 0 };
+
+  if (cleanUrl.startsWith('@')) {
+    cleanUrl = `https://www.youtube.com/${cleanUrl}/live`;
+  }
 
   // 1. Check for direct 11-char video ID or standard video URL
   let videoId = extractYoutubeId(cleanUrl);

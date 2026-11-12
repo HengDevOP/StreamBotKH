@@ -140,6 +140,7 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
     user?.broadcastViewCount?.enabledPlatforms || ['youtube', 'facebook']
   );
   const [realViewers, setRealViewers] = useState<number>(0);
+  const [platformViewers, setPlatformViewers] = useState<Record<string, number>>({});
   const [isChannelLive, setIsChannelLive] = useState<boolean>(false);
   const [hasConfiguredChannels, setHasConfiguredChannels] = useState<boolean>(false);
 
@@ -197,6 +198,9 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
           setRealViewers(data.totalViewers);
           setIsChannelLive(Boolean(data.isLive));
           setHasConfiguredChannels(Boolean(data.hasChannels));
+          if (data.platformViewers && typeof data.platformViewers === 'object') {
+            setPlatformViewers(data.platformViewers);
+          }
         }
       } catch {}
     };
@@ -263,7 +267,8 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: overlayToken,
-          enabledPlatforms
+          enabledPlatforms,
+          broadcastUrls: sanitizedUrls
         })
       })
         .then((res) => res.json())
@@ -272,6 +277,9 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
             setRealViewers(data.totalViewers);
             setIsChannelLive(Boolean(data.isLive));
             setHasConfiguredChannels(Boolean(data.hasChannels));
+            if (data.platformViewers && typeof data.platformViewers === 'object') {
+              setPlatformViewers(data.platformViewers);
+            }
           }
         })
         .catch(() => {});
@@ -305,7 +313,8 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: overlayToken,
-          ...nextSettings
+          ...nextSettings,
+          broadcastUrls: urls
         })
       });
       const data = await res.json();
@@ -313,6 +322,9 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         setRealViewers(data.totalViewers);
         setIsChannelLive(Boolean(data.isLive));
         setHasConfiguredChannels(Boolean(data.hasChannels));
+        if (data.platformViewers && typeof data.platformViewers === 'object') {
+          setPlatformViewers(data.platformViewers);
+        }
       }
 
       if (onRefreshUser) {
@@ -439,7 +451,17 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
             <div className="text-[11px] font-mono">
               {isChannelLive ? (
                 <span className="text-emerald-400 font-medium">
-                  ● Live ({realViewers.toLocaleString()} watching)
+                  ● Live ({realViewers.toLocaleString()} watching
+                  {enabledPlatforms.filter((p) => (platformViewers[p] || 0) > 0).length > 1 && (
+                    <span className="text-slate-400 ml-1">
+                      —{' '}
+                      {enabledPlatforms
+                        .filter((p) => (platformViewers[p] || 0) > 0)
+                        .map((p) => `${PLATFORMS.find((pl) => pl.id === p)?.name || p}: ${(platformViewers[p] || 0).toLocaleString()}`)
+                        .join(' + ')}
+                    </span>
+                  )}
+                  )
                 </span>
               ) : hasConfiguredChannels ? (
                 <span className="text-slate-500">
@@ -512,12 +534,18 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
                   <div className="flex items-center gap-2">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                        hasUrl
+                        (platformViewers[platform.id] || 0) > 0
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : hasUrl
+                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
                           : 'bg-slate-900 text-slate-500 border-slate-800'
                       }`}
                     >
-                      {hasUrl ? 'Connected' : 'Disconnected'}
+                      {(platformViewers[platform.id] || 0) > 0
+                        ? `● Live (${platformViewers[platform.id].toLocaleString()})`
+                        : hasUrl
+                        ? 'Connected'
+                        : 'Disconnected'}
                     </span>
                   </div>
                 </div>
