@@ -112,11 +112,9 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
   const [enabledPlatforms, setEnabledPlatforms] = useState<PlatformId[]>(
     user?.broadcastViewCount?.enabledPlatforms || ['youtube', 'facebook']
   );
-  const [manualViewers, setManualViewers] = useState<number>(
-    typeof user?.broadcastViewCount?.manualViewers === 'number'
-      ? user.broadcastViewCount.manualViewers
-      : 1420
-  );
+  const [realViewers, setRealViewers] = useState<number>(0);
+  const [isChannelLive, setIsChannelLive] = useState<boolean>(false);
+  const [hasConfiguredChannels, setHasConfiguredChannels] = useState<boolean>(false);
 
   const [showOverlayToken, setShowOverlayToken] = useState(false);
   const [copiedOverlay, setCopiedOverlay] = useState(false);
@@ -148,9 +146,6 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         if (Array.isArray(user.broadcastViewCount.enabledPlatforms) && user.broadcastViewCount.enabledPlatforms.length > 0) {
           setEnabledPlatforms(user.broadcastViewCount.enabledPlatforms);
         }
-        if (typeof user.broadcastViewCount.manualViewers === 'number') {
-          setManualViewers(user.broadcastViewCount.manualViewers);
-        }
       }
     }
   }, [user]);
@@ -171,15 +166,15 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         const res = await fetch(`/api/widgets/view-count?token=${overlayToken}`);
         const data = await res.json();
         if (isMounted && data?.success && typeof data.totalViewers === 'number') {
-          if (data.isLive && data.totalViewers > 0) {
-            setManualViewers(data.totalViewers);
-          }
+          setRealViewers(data.totalViewers);
+          setIsChannelLive(Boolean(data.isLive));
+          setHasConfiguredChannels(Boolean(data.hasChannels));
         }
       } catch {}
     };
 
     fetchLiveViewers();
-    const interval = setInterval(fetchLiveViewers, 15000);
+    const interval = setInterval(fetchLiveViewers, 10000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -239,10 +234,18 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: overlayToken,
-          enabledPlatforms,
-          manualViewers
+          enabledPlatforms
         })
-      }).catch(() => {});
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.success && typeof data.totalViewers === 'number') {
+            setRealViewers(data.totalViewers);
+            setIsChannelLive(Boolean(data.isLive));
+            setHasConfiguredChannels(Boolean(data.hasChannels));
+          }
+        })
+        .catch(() => {});
 
       showToast('Saved', 'success');
     } catch (err: any) {
@@ -258,11 +261,9 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
   // Save view count settings
   const saveViewCountSettings = async (overrides: Partial<{
     enabledPlatforms: PlatformId[];
-    manualViewers: number;
   }> = {}) => {
     const nextSettings = {
-      enabledPlatforms: overrides.enabledPlatforms || enabledPlatforms,
-      manualViewers: overrides.manualViewers !== undefined ? overrides.manualViewers : manualViewers
+      enabledPlatforms: overrides.enabledPlatforms || enabledPlatforms
     };
 
     try {
@@ -270,7 +271,7 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
         broadcastViewCount: nextSettings
       });
 
-      await fetch('/api/widgets/view-count', {
+      const res = await fetch('/api/widgets/view-count', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -278,21 +279,16 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
           ...nextSettings
         })
       });
+      const data = await res.json();
+      if (data?.success && typeof data.totalViewers === 'number') {
+        setRealViewers(data.totalViewers);
+        setIsChannelLive(Boolean(data.isLive));
+        setHasConfiguredChannels(Boolean(data.hasChannels));
+      }
 
       if (onRefreshUser) {
         await onRefreshUser();
       }
-
-      // Sync updated broadcast channel URLs to real-time view count overlay
-      fetch('/api/widgets/view-count', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: overlayToken,
-          enabledPlatforms,
-          manualViewers
-        })
-      }).catch(() => {});
 
       showToast('Saved', 'success');
     } catch (err: any) {
@@ -405,33 +401,28 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
           </div>
         </div>
 
-        {/* Concurrent Viewers Count Input */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-slate-400">
-            Concurrent Viewers
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={manualViewers}
-            onChange={(e) => {
-              const val = Math.max(0, parseInt(e.target.value, 10) || 0);
-              setManualViewers(val);
-            }}
-            onBlur={() => saveViewCountSettings({ manualViewers })}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur();
-            }}
-            className="w-full max-w-xs px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-slate-600"
-            placeholder="1420"
-          />
-        </div>
-
         {/* Clean Live Preview */}
         <div className="space-y-2 pt-2 border-t border-slate-800/80">
-          <label className="text-xs font-medium text-slate-400">
-            Preview
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-slate-400">
+              Preview
+            </label>
+            <div className="text-[11px] font-mono">
+              {isChannelLive ? (
+                <span className="text-emerald-400 font-medium">
+                  ● Live ({realViewers.toLocaleString()} watching)
+                </span>
+              ) : hasConfiguredChannels ? (
+                <span className="text-slate-500">
+                  Channels offline (0 watching)
+                </span>
+              ) : (
+                <span className="text-slate-500">
+                  No channel set
+                </span>
+              )}
+            </div>
+          </div>
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-center">
             <div className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-black/80 border border-white/10 text-white">
               <div className="flex items-center gap-2">
@@ -442,7 +433,7 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
                 ))}
               </div>
               <AnimatedCounter
-                value={manualViewers}
+                value={realViewers}
                 className="text-lg font-bold font-mono tracking-tight text-white"
               />
             </div>

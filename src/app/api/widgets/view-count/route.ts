@@ -27,35 +27,32 @@ export async function GET(req: NextRequest) {
     }
 
     const defaultPlatforms: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick')[] = ['youtube', 'facebook'];
-    const defaultSettings = {
-      enabledPlatforms: defaultPlatforms,
-      manualViewers: 1420
-    };
 
     if (!streamer) {
-      // Demo fallback
+      // Demo fallback when no account exists
       return NextResponse.json({
         success: true,
         streamer: {
           username: 'demo_streamer',
           displayName: 'Demo Creator'
         },
-        settings: defaultSettings,
-        totalViewers: 1420,
+        settings: {
+          enabledPlatforms: defaultPlatforms
+        },
+        totalViewers: 0,
+        isLive: false,
+        hasChannels: false,
         platforms: defaultPlatforms,
-        platformViewers: {
-          youtube: 820,
-          facebook: 600
-        }
+        platformViewers: {}
       });
     }
 
-    const broadcastUrls = streamer.broadcastUrls || {
-      youtube: streamer.liveStreamUrl || '',
-      twitch: streamer.twitchLiveUrl || '',
-      tiktok: streamer.tiktokLiveUrl || '',
-      facebook: streamer.facebookLiveUrl || '',
-      kick: ''
+    const broadcastUrls = {
+      youtube: (streamer.broadcastUrls?.youtube || streamer.liveStreamUrl || streamer.youtubeLiveUrl || '').trim(),
+      twitch: (streamer.broadcastUrls?.twitch || streamer.twitchLiveUrl || '').trim(),
+      tiktok: (streamer.broadcastUrls?.tiktok || streamer.tiktokLiveUrl || '').trim(),
+      facebook: (streamer.broadcastUrls?.facebook || streamer.facebookLiveUrl || '').trim(),
+      kick: (streamer.broadcastUrls?.kick || '').trim()
     };
 
     const userSettings = streamer.broadcastViewCount || {};
@@ -64,22 +61,11 @@ export async function GET(req: NextRequest) {
         ? userSettings.enabledPlatforms
         : defaultPlatforms;
 
-    const manualViewers = typeof userSettings.manualViewers === 'number'
-      ? Math.max(0, userSettings.manualViewers)
-      : 1420;
-
-    // Fetch real live concurrent viewers from all set broadcast channel URLs
+    // Fetch real live concurrent viewers strictly from configured broadcast channel URLs
     const liveStats = await aggregateBroadcastChannelViewers(
       broadcastUrls,
-      enabledPlatforms,
-      manualViewers
+      enabledPlatforms
     );
-
-    const settings = {
-      enabledPlatforms,
-      manualViewers,
-      isLive: liveStats.isLive
-    };
 
     return NextResponse.json({
       success: true,
@@ -87,11 +73,14 @@ export async function GET(req: NextRequest) {
         username: streamer.username,
         displayName: streamer.displayName || streamer.username
       },
-      settings,
+      settings: {
+        enabledPlatforms
+      },
       totalViewers: liveStats.totalViewers,
+      isLive: liveStats.isLive,
+      hasChannels: liveStats.hasChannels,
       platforms: enabledPlatforms,
-      platformViewers: liveStats.platformViewers,
-      isLive: liveStats.isLive
+      platformViewers: liveStats.platformViewers
     });
   } catch (err: any) {
     console.error('API /api/widgets/view-count GET error:', err);
@@ -121,21 +110,15 @@ export async function POST(req: NextRequest) {
     }
 
     const currentSettings = streamer?.broadcastViewCount || {
-      enabledPlatforms: ['youtube', 'facebook'],
-      manualViewers: 1420
+      enabledPlatforms: ['youtube', 'facebook']
     };
 
     const nextPlatforms = Array.isArray(body.enabledPlatforms)
       ? body.enabledPlatforms
       : currentSettings.enabledPlatforms || ['youtube', 'facebook'];
 
-    const nextManual = typeof body.manualViewers === 'number'
-      ? Math.max(0, body.manualViewers)
-      : (body.manualViewers !== undefined ? Math.max(0, Number(body.manualViewers) || 0) : currentSettings.manualViewers);
-
     const nextSettings = {
-      enabledPlatforms: nextPlatforms,
-      manualViewers: nextManual
+      enabledPlatforms: nextPlatforms
     };
 
     if (streamer) {
@@ -150,19 +133,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const broadcastUrls = streamer?.broadcastUrls || {
-      youtube: streamer?.liveStreamUrl || '',
-      twitch: streamer?.twitchLiveUrl || '',
-      tiktok: streamer?.tiktokLiveUrl || '',
-      facebook: streamer?.facebookLiveUrl || '',
-      kick: ''
+    const broadcastUrls = {
+      youtube: (streamer?.broadcastUrls?.youtube || streamer?.liveStreamUrl || streamer?.youtubeLiveUrl || '').trim(),
+      twitch: (streamer?.broadcastUrls?.twitch || streamer?.twitchLiveUrl || '').trim(),
+      tiktok: (streamer?.broadcastUrls?.tiktok || streamer?.tiktokLiveUrl || '').trim(),
+      facebook: (streamer?.broadcastUrls?.facebook || streamer?.facebookLiveUrl || '').trim(),
+      kick: (streamer?.broadcastUrls?.kick || '').trim()
     };
 
     // Calculate real live concurrent viewers across configured broadcast channels
     const liveStats = await aggregateBroadcastChannelViewers(
       broadcastUrls,
-      nextPlatforms,
-      nextSettings.manualViewers
+      nextPlatforms
     );
 
     const payload = {
@@ -170,8 +152,8 @@ export async function POST(req: NextRequest) {
       platforms: nextPlatforms,
       totalViewers: liveStats.totalViewers,
       isLive: liveStats.isLive,
+      hasChannels: liveStats.hasChannels,
       platformViewers: liveStats.platformViewers,
-      isTest: Boolean(body.isTest),
       updatedAt: Date.now()
     };
 
@@ -190,7 +172,8 @@ export async function POST(req: NextRequest) {
       message: 'View count settings saved successfully',
       settings: nextSettings,
       totalViewers: liveStats.totalViewers,
-      isLive: liveStats.isLive
+      isLive: liveStats.isLive,
+      hasChannels: liveStats.hasChannels
     });
   } catch (err: any) {
     console.error('API /api/widgets/view-count POST error:', err);
