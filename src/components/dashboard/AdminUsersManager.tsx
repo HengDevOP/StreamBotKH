@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Users,
-  Crown,
   Search,
   RefreshCw,
   Calendar,
@@ -11,13 +10,9 @@ import {
   CheckCircle2,
   ShieldCheck,
   BadgeCheck,
-  Sparkles,
-  Plus,
   ChevronLeft,
   ChevronRight,
-  Database,
   X,
-  CornerDownLeft,
   Eye,
   Loader2
 } from 'lucide-react';
@@ -26,7 +21,7 @@ import { useModal } from '../../context/ModalContext';
 import { useAuth } from '../../context/AuthContext';
 
 const USERS_PER_PAGE = 20;
-const CLIENT_CACHE_TTL_MS = 60 * 1000; // 60s client-side page cache to prevent server overload
+const CLIENT_CACHE_TTL_MS = 60 * 1000;
 
 export interface AdminUserItem {
   id: string;
@@ -59,7 +54,7 @@ interface PaginationInfo {
 interface AdminUsersResponse {
   users: AdminUserItem[];
   pagination?: PaginationInfo;
-  summary: { totalUsers: number; proUsers: number; freeUsers: number };
+  summary: { totalUsers: number; ultraUsers?: number; proUsers: number; freeUsers: number };
   fromCache?: boolean;
 }
 
@@ -68,7 +63,6 @@ interface CachedPageEntry {
   data: AdminUsersResponse;
 }
 
-// Persistent client-side cache across tab switches to prevent redundant server hits
 const clientUsersPageCache = new Map<string, CachedPageEntry>();
 
 interface AdminUsersManagerProps {
@@ -90,13 +84,11 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
   });
 
   const [currentPage, setCurrentPage] = useState(1);
-  // Input state vs committed query state (only queries when Enter is pressed)
   const [searchInput, setSearchInput] = useState('');
   const [committedSearch, setCommittedSearch] = useState('');
   const [planFilter, setPlanFilter] = useState<'ALL' | 'ultra' | 'pro' | 'free'>('ALL');
 
   const [loading, setLoading] = useState(true);
-  const [servedFromCache, setServedFromCache] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -114,22 +106,19 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
       const normalizedQuery = query.trim().toLowerCase();
       const cacheKey = `${targetPage}:${USERS_PER_PAGE}:${normalizedQuery}:${plan}`;
 
-      // 1. Serve immediately from client cache if fresh and not force-refreshing
       if (!options?.forceRefresh) {
         const cached = clientUsersPageCache.get(cacheKey);
         if (cached && Date.now() - cached.timestamp < CLIENT_CACHE_TTL_MS) {
           setUsers(cached.data.users || []);
-          setSummary(cached.data.summary || { totalUsers: 0, proUsers: 0, freeUsers: 0 });
+          setSummary(cached.data.summary || { totalUsers: 0, ultraUsers: 0, proUsers: 0, freeUsers: 0 });
           if (cached.data.pagination) {
             setPagination(cached.data.pagination);
           }
-          setServedFromCache(true);
           setLoading(false);
           return;
         }
       }
 
-      // 2. Prevent duplicate concurrent requests for the same page/query
       if (inFlightKeyRef.current === cacheKey && !options?.forceRefresh) {
         return;
       }
@@ -165,7 +154,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
         const normalizedData: AdminUsersResponse = {
           users: (data.users || []).slice(0, USERS_PER_PAGE),
           pagination: safePagination,
-          summary: data.summary || { totalUsers: 0, proUsers: 0, freeUsers: 0 },
+          summary: data.summary || { totalUsers: 0, ultraUsers: 0, proUsers: 0, freeUsers: 0 },
           fromCache: data.fromCache
         };
 
@@ -177,7 +166,6 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
         setUsers(normalizedData.users);
         setSummary(normalizedData.summary);
         setPagination(safePagination);
-        setServedFromCache(Boolean(data.fromCache));
       } catch (err: any) {
         setErrorMsg(err.message || 'Failed to load users');
       } finally {
@@ -194,7 +182,6 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
     loadUsersPage(currentPage, committedSearch, planFilter);
   }, [currentPage, committedSearch, planFilter, loadUsersPage]);
 
-  // Trigger search ONLY when Enter is pressed (or Search button clicked)
   const handleExecuteSearch = () => {
     const trimmed = searchInput.trim();
     if (trimmed === committedSearch && currentPage === 1) {
@@ -237,18 +224,18 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
     const modalTitle = isExtend
       ? `Extend ${plan.toUpperCase()} Plan (+${durationDays} Days)?`
       : isUltraUpgrade
-      ? `Upgrade @${targetUser.username} to Ultra Plan (Unlimited tokens, 100MB)?`
+      ? `Upgrade @${targetUser.username} to Ultra Plan?`
       : isProUpgrade
-      ? `Upgrade @${targetUser.username} to Pro Plan (20,000 tokens, 20MB)?`
-      : `Downgrade @${targetUser.username} to Free Plan (2,000 tokens, 5MB)?`;
+      ? `Upgrade @${targetUser.username} to Pro Plan?`
+      : `Switch @${targetUser.username} to Free Plan?`;
 
     const modalMessage = isExtend
-      ? `Are you sure you want to add +${durationDays} days to @${targetUser.username} (${targetUser.email})'s active ${plan.toUpperCase()} subscription?`
+      ? `Add +${durationDays} days to @${targetUser.username} (${targetUser.email})'s active ${plan.toUpperCase()} plan.`
       : isUltraUpgrade
-      ? `Are you sure you want to upgrade @${targetUser.username} (${targetUser.email}) to the Ultra Plan (Unlimited tokens, 100MB storage) for ${durationDays} days?`
+      ? `Upgrade @${targetUser.username} (${targetUser.email}) to Ultra Plan (Unlimited tokens, 100MB storage) for ${durationDays} days.`
       : isProUpgrade
-      ? `Are you sure you want to upgrade @${targetUser.username} (${targetUser.email}) to the Pro Plan (20MB storage, 20,000 daily tokens) for ${durationDays} days?`
-      : `Are you sure you want to switch @${targetUser.username} (${targetUser.email}) back to the Free Plan (5MB storage, 2,000 tokens)?`;
+      ? `Upgrade @${targetUser.username} (${targetUser.email}) to Pro Plan (20,000 tokens, 20MB storage) for ${durationDays} days.`
+      : `Switch @${targetUser.username} (${targetUser.email}) back to the Free Plan (2,000 tokens, 5MB storage).`;
 
     showConfirm({
       title: modalTitle,
@@ -275,9 +262,8 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
           );
 
           setToastMsg(res.message);
-          setTimeout(() => setToastMsg(null), 3500);
+          setTimeout(() => setToastMsg(null), 3000);
 
-          // Invalidate client cache and reload current page
           clientUsersPageCache.clear();
           await loadUsersPage(currentPage, committedSearch, planFilter, { forceRefresh: true });
 
@@ -296,7 +282,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
   const handleInteractAsUser = (targetUser: AdminUserItem) => {
     showConfirm({
       title: `Interact as @${targetUser.username}?`,
-      message: `You are about to switch session and interact as @${targetUser.username} (${targetUser.displayName || targetUser.username}). You will access their live dashboard, overlays, soundboard, and settings as they see them. You can return to your admin account at any time using the banner at the top.`,
+      message: `Switch session and access the creator dashboard as @${targetUser.username} (${targetUser.displayName || targetUser.username}). You can return to admin anytime via the top banner.`,
       type: 'info',
       confirmText: `Interact as @${targetUser.username}`,
       cancelText: 'Cancel',
@@ -305,7 +291,6 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
           setImpersonatingId(targetUser.id);
           setErrorMsg(null);
           await impersonateUser(targetUser.id);
-          // Redirect to the streamer creator panel
           window.location.href = '/creator?tab=overview';
         } catch (err: any) {
           setErrorMsg(err.message || 'Failed to switch into user session');
@@ -318,18 +303,18 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
   const handleToggleVerified = (targetUser: AdminUserItem) => {
     const nextVerified = !targetUser.isVerified;
     const modalTitle = nextVerified
-      ? `Verify Creator @${targetUser.username}?`
-      : `Remove Verification from @${targetUser.username}?`;
+      ? `Verify @${targetUser.username}?`
+      : `Remove verification from @${targetUser.username}?`;
 
     const modalMessage = nextVerified
-      ? `Are you sure you want to grant the official Verified Creator Tick Badge to @${targetUser.username} (${targetUser.email})? This displays the verified tick label on their public donation page, profile, and receipts.`
-      : `Are you sure you want to revoke the Verified Creator Tick Badge from @${targetUser.username} (${targetUser.email})?`;
+      ? `Grant official Verified Creator badge to @${targetUser.username} (${targetUser.email}).`
+      : `Revoke Verified Creator badge from @${targetUser.username} (${targetUser.email}).`;
 
     showConfirm({
       title: modalTitle,
       message: modalMessage,
       type: nextVerified ? 'info' : 'danger',
-      confirmText: nextVerified ? 'Grant Verification' : 'Remove Verification',
+      confirmText: nextVerified ? 'Verify Creator' : 'Remove Badge',
       cancelText: 'Cancel',
       onConfirm: async () => {
         try {
@@ -344,7 +329,7 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
           );
 
           setToastMsg(res.message);
-          setTimeout(() => setToastMsg(null), 3500);
+          setTimeout(() => setToastMsg(null), 3000);
 
           clientUsersPageCache.clear();
           await loadUsersPage(currentPage, committedSearch, planFilter, { forceRefresh: true });
@@ -372,98 +357,83 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
   const endRow = Math.min(pagination.page * USERS_PER_PAGE, pagination.totalMatched);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-5 max-w-7xl mx-auto pb-12">
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-bold text-white font-['Chakra_Petch']">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg sm:text-xl font-bold text-white font-['Chakra_Petch'] tracking-wide">
               Users Management
             </h2>
-            <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 font-bold uppercase">
-              Admin • hchenheng@gmail.com
-            </span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 border border-slate-800">
-              <Database size={10} className={servedFromCache ? 'text-emerald-400' : 'text-cyan-400'} />
-              <span>{servedFromCache ? 'Cached • 20/page' : '20 users / page'}</span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+              {summary.totalUsers} accounts
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Displays 20 cached users per page to prevent server overload. Type a search and press <strong className="text-slate-200 font-mono">Enter</strong> to query.
+            Manage streamer accounts, plan subscriptions, and verification badges.
           </p>
         </div>
 
         <button
           onClick={handleManualRefresh}
           disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 transition-colors cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer self-start sm:self-auto"
         >
-          <RefreshCw size={14} className={loading ? 'animate-spin text-cyan-400' : 'text-cyan-400'} />
-          <span>Refresh Cache</span>
+          <RefreshCw size={13} className={loading ? 'animate-spin text-slate-400' : 'text-slate-400'} />
+          <span>Refresh</span>
         </button>
       </div>
 
-      {/* Toast / Error feedback */}
+      {/* ── Feedback Banners ── */}
       {toastMsg && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2">
-          <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
+        <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-center gap-2">
+          <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
           <span>{toastMsg}</span>
         </div>
       )}
       {errorMsg && (
-        <div className="p-3.5 rounded-xl bg-red-950/50 border border-red-500/40 text-red-300 text-xs font-mono">
+        <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs font-mono">
           {errorMsg}
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-mono uppercase text-slate-400">Total Users</div>
-            <div className="text-2xl font-extrabold text-white font-mono mt-1">{summary.totalUsers}</div>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300">
-            <Users size={20} />
-          </div>
+      {/* ── Summary Metrics Cards (2x2 Mobile, 4x1 Desktop) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="p-4 rounded-xl bg-[#090D18] border border-slate-800">
+          <div className="text-[11px] font-medium text-slate-400">Total Users</div>
+          <div className="text-xl sm:text-2xl font-bold text-white font-mono mt-1">{summary.totalUsers}</div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#090D18] border border-cyan-500/30 flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-mono uppercase text-cyan-300">Ultra VIP (∞ Tokens)</div>
-            <div className="text-2xl font-extrabold text-cyan-400 font-mono mt-1">{(summary as any).ultraUsers || 0}</div>
+        <div className="p-4 rounded-xl bg-[#090D18] border border-slate-800">
+          <div className="text-[11px] font-medium text-cyan-400 flex items-center justify-between">
+            <span>Ultra</span>
+            <span className="text-[10px] text-slate-500 font-mono">100MB • ∞</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-            <Sparkles size={20} />
-          </div>
+          <div className="text-xl sm:text-2xl font-bold text-cyan-400 font-mono mt-1">{(summary as any).ultraUsers || 0}</div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#090D18] border border-purple-500/30 flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-mono uppercase text-purple-300">Active Pro Plan (20MB)</div>
-            <div className="text-2xl font-extrabold text-purple-400 font-mono mt-1">{summary.proUsers}</div>
+        <div className="p-4 rounded-xl bg-[#090D18] border border-slate-800">
+          <div className="text-[11px] font-medium text-purple-400 flex items-center justify-between">
+            <span>Pro</span>
+            <span className="text-[10px] text-slate-500 font-mono">20MB</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
-            <Crown size={20} />
-          </div>
+          <div className="text-xl sm:text-2xl font-bold text-purple-400 font-mono mt-1">{summary.proUsers}</div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-mono uppercase text-slate-400">Free Users (5MB)</div>
-            <div className="text-2xl font-extrabold text-slate-200 font-mono mt-1">{summary.freeUsers}</div>
+        <div className="p-4 rounded-xl bg-[#090D18] border border-slate-800">
+          <div className="text-[11px] font-medium text-slate-400 flex items-center justify-between">
+            <span>Free</span>
+            <span className="text-[10px] text-slate-500 font-mono">5MB</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
-            <Users size={20} />
-          </div>
+          <div className="text-xl sm:text-2xl font-bold text-slate-300 font-mono mt-1">{summary.freeUsers}</div>
         </div>
       </div>
 
-      {/* Search (Enter Key to Query) & Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-[#090D18] p-4 rounded-2xl border border-slate-800">
+      {/* ── Search & Filter Controls ── */}
+      <div className="flex flex-col md:flex-row gap-2.5 items-stretch md:items-center justify-between bg-[#090D18] p-3 sm:p-3.5 rounded-xl border border-slate-800">
         <div className="relative flex-1 flex items-center gap-2">
           <div className="relative flex-1">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
               value={searchInput}
@@ -474,23 +444,17 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                   handleExecuteSearch();
                 }
               }}
-              placeholder="Search by email, @username, or display name (Press Enter to search)..."
-              className="w-full pl-9 pr-20 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-400"
+              placeholder="Search by email, username, or display name..."
+              className="w-full pl-8 pr-8 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-600"
             />
-            {searchInput ? (
+            {searchInput && (
               <button
                 type="button"
                 onClick={handleClearSearch}
-                title="Clear search"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 <X size={13} />
               </button>
-            ) : (
-              <span className="hidden sm:inline-flex items-center gap-1 absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-500 pointer-events-none">
-                <CornerDownLeft size={10} />
-                Enter
-              </span>
             )}
           </div>
 
@@ -498,94 +462,82 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
             type="button"
             onClick={handleExecuteSearch}
             disabled={loading}
-            className="px-3.5 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold transition-colors cursor-pointer flex items-center gap-1.5 flex-shrink-0"
+            className="px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-slate-200 transition-colors cursor-pointer shrink-0"
           >
-            <Search size={13} />
-            <span>Search</span>
+            Search
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           {(['ALL', 'ultra', 'pro', 'free'] as const).map((f) => (
             <button
               key={f}
               onClick={() => handlePlanFilterChange(f)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer shrink-0 ${
                 planFilter === f
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  ? 'bg-slate-800 text-white border border-slate-700'
+                  : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800/80'
               }`}
             >
-              {f === 'ALL' ? 'All Plans' : f === 'ultra' ? 'Ultra (100MB)' : f === 'pro' ? 'Pro (20MB)' : 'Free (5MB)'}
+              {f === 'ALL' ? 'All' : f === 'ultra' ? 'Ultra' : f === 'pro' ? 'Pro' : 'Free'}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Active Search Badge */}
+      {/* Active Search Filter Badge */}
       {committedSearch && (
-        <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs font-mono text-cyan-300">
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-slate-900/60 border border-slate-800 text-xs font-mono text-slate-300">
           <span>
-            Showing results for query: <strong className="text-white">&ldquo;{committedSearch}&rdquo;</strong> ({pagination.totalMatched} found)
+            Query: <strong className="text-white">&ldquo;{committedSearch}&rdquo;</strong> ({pagination.totalMatched} matches)
           </span>
           <button
             type="button"
             onClick={handleClearSearch}
             className="text-slate-400 hover:text-white flex items-center gap-1 text-[11px] cursor-pointer"
           >
-            <X size={13} />
-            <span>Reset</span>
+            <X size={12} />
+            <span>Clear</span>
           </button>
         </div>
       )}
 
-      {/* Users Table (20 Users Per Page) */}
-      <div className="rounded-2xl bg-[#090D18] border border-slate-800 overflow-hidden">
+      {/* ── Desktop Table View (≥ md screens) ── */}
+      <div className="hidden md:block rounded-xl bg-[#090D18] border border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400 bg-slate-950/60">
-                <th className="py-3.5 px-4">Streamer / Account</th>
-                <th className="py-3.5 px-4">Email</th>
-                <th className="py-3.5 px-4">Verified Badge</th>
-                <th className="py-3.5 px-4">Current Plan</th>
-                <th className="py-3.5 px-4">Duration (31d Cycle)</th>
-                <th className="py-3.5 px-4 text-right">Actions &amp; Plan</th>
+                <th className="py-3 px-4">Account</th>
+                <th className="py-3 px-4">Email</th>
+                <th className="py-3 px-4">Plan &amp; Duration</th>
+                <th className="py-3 px-4">Badge</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/70 text-xs">
+            <tbody className="divide-y divide-slate-800/60 text-xs">
               {loading && users.length === 0 ? (
                 Array.from({ length: 6 }).map((_, idx) => (
                   <tr key={idx} className="animate-pulse">
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-800/80" />
+                        <div className="w-8 h-8 rounded-lg bg-slate-800/80" />
                         <div className="space-y-1.5">
-                          <div className="w-28 h-3 rounded bg-slate-800/80" />
-                          <div className="w-20 h-2.5 rounded bg-slate-800/50" />
+                          <div className="w-24 h-3 rounded bg-slate-800/80" />
+                          <div className="w-16 h-2.5 rounded bg-slate-800/50" />
                         </div>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <div className="w-40 h-3 rounded bg-slate-800/70" />
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="w-20 h-7 rounded-xl bg-slate-800/70" />
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="w-24 h-6 rounded-lg bg-slate-800/70" />
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="w-32 h-3 rounded bg-slate-800/60" />
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="w-24 h-7 rounded-xl bg-slate-800/70 ml-auto" />
-                    </td>
+                    <td className="py-3.5 px-4"><div className="w-32 h-3 rounded bg-slate-800/70" /></td>
+                    <td className="py-3.5 px-4"><div className="w-24 h-4 rounded bg-slate-800/70" /></td>
+                    <td className="py-3.5 px-4"><div className="w-16 h-5 rounded bg-slate-800/70" /></td>
+                    <td className="py-3.5 px-4 text-right"><div className="w-24 h-6 rounded bg-slate-800/70 ml-auto" /></td>
                   </tr>
                 ))
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 font-mono">
+                  <td colSpan={5} className="py-12 text-center text-slate-500 font-mono text-xs">
                     No matching users found.
                   </td>
                 </tr>
@@ -597,162 +549,131 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                   const isSubscribed = isUltra || isPro;
 
                   return (
-                    <tr key={u.id} className="hover:bg-slate-900/40 transition-colors">
-                      {/* Streamer Info */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
+                    <tr key={u.id} className="hover:bg-slate-900/30 transition-colors">
+                      {/* User Info */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5">
                           <img
                             src={u.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}
                             alt={u.displayName}
-                            className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 object-cover flex-shrink-0"
+                            className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 object-cover shrink-0"
                           />
-                          <div>
-                            <div className="font-bold text-white flex items-center gap-1.5">
-                              <span>{u.displayName || u.username}</span>
+                          <div className="min-w-0">
+                            <div className="font-medium text-white flex items-center gap-1.5 truncate">
+                              <span className="truncate">{u.displayName || u.username}</span>
                               {u.isVerified && (
-                                <span title="Verified Creator" className="inline-flex items-center text-cyan-400 flex-shrink-0">
-                                  <BadgeCheck size={14} className="text-cyan-400 fill-cyan-400/20" />
-                                </span>
+                                <BadgeCheck size={14} className="text-blue-400 shrink-0" />
                               )}
                               {u.isAdmin && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[9px] font-mono uppercase">
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[9px] font-mono uppercase shrink-0">
                                   <ShieldCheck size={10} />
                                   Admin
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] font-mono text-cyan-400">@{u.username}</div>
+                            <div className="text-[11px] font-mono text-slate-400 truncate">@{u.username}</div>
                           </div>
                         </div>
                       </td>
 
                       {/* Email */}
-                      <td className="py-3.5 px-4 font-mono text-slate-300">
+                      <td className="py-3 px-4 font-mono text-slate-300 truncate max-w-[200px]">
                         {u.email}
                       </td>
 
-                      {/* Verified Creator Status & Action */}
-                      <td className="py-3.5 px-4">
+                      {/* Plan & Duration */}
+                      <td className="py-3 px-4">
+                        <div className="space-y-1">
+                          <div>
+                            {isUltra ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px] font-mono font-medium">
+                                Ultra (100MB)
+                              </span>
+                            ) : u.trialActive ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-mono font-medium">
+                                Trial ({u.trialRemainingDays || 7}d)
+                              </span>
+                            ) : isPro ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[11px] font-mono font-medium">
+                                Pro (20MB)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 text-[11px] font-mono font-medium">
+                                Free (5MB)
+                              </span>
+                            )}
+                          </div>
+                          {isSubscribed && (
+                            <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                              <Clock size={10} className="text-emerald-400 shrink-0" />
+                              <span>{u.remainingDays || 31}d remaining</span>
+                              {u.planExpiresAt && (
+                                <span className="text-slate-500">· exp {formatDate(u.planExpiresAt)}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Verified Badge */}
+                      <td className="py-3 px-4">
                         <button
                           type="button"
                           onClick={() => handleToggleVerified(u)}
                           disabled={isUpdating}
-                          title={u.isVerified ? 'Click to revoke verification' : 'Click to grant Verified Creator badge'}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono transition-colors cursor-pointer ${
                             u.isVerified
-                              ? 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/15'
-                              : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'
+                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20'
+                              : 'bg-slate-900 text-slate-500 border border-slate-800 hover:text-slate-300'
                           }`}
                         >
-                          <BadgeCheck
-                            size={14}
-                            className={u.isVerified ? 'text-cyan-400 fill-cyan-400/20' : 'text-slate-500'}
-                          />
+                          <BadgeCheck size={13} className={u.isVerified ? 'text-blue-400' : 'text-slate-500'} />
                           <span>{u.isVerified ? 'Verified' : 'Verify'}</span>
                         </button>
                       </td>
 
-                      {/* Plan Badge */}
-                      <td className="py-3.5 px-4">
-                        {isUltra ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-mono text-[11px] font-bold uppercase">
-                            <Sparkles size={12} className="text-cyan-400" />
-                            <span>ULTRA (∞ Tokens, 100MB)</span>
-                          </span>
-                        ) : u.trialActive ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[11px] font-bold uppercase animate-pulse">
-                            <Sparkles size={12} className="text-amber-400" />
-                            <span>TRIAL ({u.trialRemainingDays || 7}d left)</span>
-                          </span>
-                        ) : isPro ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono text-[11px] font-bold uppercase">
-                            <Crown size={12} className="text-purple-400" />
-                            <span>PRO PLAN (20MB)</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[11px] font-semibold uppercase">
-                            <span>FREE (5MB)</span>
-                            {u.hasUsedTrial && <span className="text-[9px] text-amber-500 font-normal ml-1">• Trial Used</span>}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Duration / Expiration */}
-                      <td className="py-3.5 px-4">
-                        {isSubscribed ? (
-                          <div className="space-y-0.5 font-mono">
-                            <div className="text-emerald-400 font-bold flex items-center gap-1.5 text-xs">
-                              <Clock size={12} />
-                              <span>{u.remainingDays || 31}d remaining (31d/mo)</span>
-                            </div>
-                            {u.planExpiresAt && (
-                              <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                <Calendar size={10} />
-                                <span>Expires: {formatDate(u.planExpiresAt)}</span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-500 font-mono text-[11px]">No active subscription</span>
-                        )}
-                      </td>
-
                       {/* Actions */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="inline-flex items-center justify-end gap-2">
-                          {/* Interact As User Button */}
+                      <td className="py-3 px-4 text-right">
+                        <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+                          {/* Interact As */}
                           <button
                             type="button"
                             onClick={() => handleInteractAsUser(u)}
                             disabled={isUpdating || impersonatingId === u.id || u.id === currentUser?.id}
-                            title={
-                              u.id === currentUser?.id
-                                ? 'This is your own admin account'
-                                : `Interact and test live dashboard as @${u.username}`
-                            }
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-[11px] font-mono transition-all cursor-pointer shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
-                              u.id === currentUser?.id
-                                ? 'bg-slate-900 text-slate-500 border border-slate-800'
-                                : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 hover:text-white border border-cyan-500/40 hover:border-cyan-400'
-                            }`}
+                            title={u.id === currentUser?.id ? 'Your admin account' : `Interact as @${u.username}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-mono transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             {impersonatingId === u.id ? (
-                              <>
-                                <Loader2 size={12} className="animate-spin text-cyan-300" />
-                                <span>Switching...</span>
-                              </>
+                              <Loader2 size={12} className="animate-spin text-slate-400" />
                             ) : (
-                              <>
-                                <Eye size={12} className="text-cyan-400" />
-                                <span>Interact As</span>
-                              </>
+                              <Eye size={12} className="text-slate-400" />
                             )}
+                            <span>Interact</span>
                           </button>
 
+                          {/* Plan Actions */}
                           {isUltra ? (
                             <>
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'extend')}
                                 disabled={isUpdating}
-                                title="Add +31 days to Ultra Plan"
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 font-bold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
+                                className="px-2 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-medium transition-colors cursor-pointer disabled:opacity-50"
                               >
-                                <Plus size={12} />
-                                <span>31d</span>
+                                +31d
                               </button>
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}
                                 disabled={isUpdating}
-                                className="px-2.5 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 font-semibold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
+                                className="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-mono transition-colors cursor-pointer disabled:opacity-50"
                               >
-                                Set Pro
+                                Pro
                               </button>
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'free', 0, 'set')}
                                 disabled={isUpdating}
-                                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-red-950/60 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/40 font-semibold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
+                                className="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 hover:border-red-500/30 text-xs font-mono transition-colors cursor-pointer disabled:opacity-50"
                               >
-                                Set Free
+                                Free
                               </button>
                             </>
                           ) : isPro ? (
@@ -760,25 +681,23 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'set')}
                                 disabled={isUpdating}
-                                className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-400 hover:opacity-95 text-slate-950 font-black text-[11px] font-mono uppercase transition-all cursor-pointer disabled:opacity-50"
+                                className="px-2 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-medium transition-colors cursor-pointer disabled:opacity-50"
                               >
-                                Set Ultra
+                                Ultra
                               </button>
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'extend')}
                                 disabled={isUpdating}
-                                title="Add +31 days to current expiration"
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 font-bold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
+                                className="px-2 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono font-medium transition-colors cursor-pointer disabled:opacity-50"
                               >
-                                <Plus size={12} />
-                                <span>31d</span>
+                                +31d
                               </button>
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'free', 0, 'set')}
                                 disabled={isUpdating}
-                                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-red-950/60 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-500/40 font-semibold text-[11px] font-mono transition-colors cursor-pointer disabled:opacity-50"
+                                className="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 hover:border-red-500/30 text-xs font-mono transition-colors cursor-pointer disabled:opacity-50"
                               >
-                                Set Free
+                                Free
                               </button>
                             </>
                           ) : (
@@ -786,16 +705,16 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'set')}
                                 disabled={isUpdating}
-                                className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-400 to-purple-400 hover:opacity-95 text-slate-950 font-black text-[11px] font-mono uppercase transition-all cursor-pointer disabled:opacity-50"
+                                className="px-2.5 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-medium transition-colors cursor-pointer disabled:opacity-50"
                               >
-                                Set Ultra
+                                Ultra (31d)
                               </button>
                               <button
                                 onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}
                                 disabled={isUpdating}
-                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-400 hover:from-purple-400 hover:to-cyan-300 text-slate-950 font-extrabold text-[11px] font-mono uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50"
+                                className="px-2.5 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono font-medium transition-colors cursor-pointer disabled:opacity-50"
                               >
-                                {isUpdating ? 'Updating...' : 'Set Pro (31d)'}
+                                Pro (31d)
                               </button>
                             </>
                           )}
@@ -808,42 +727,238 @@ export const AdminUsersManager: React.FC<AdminUsersManagerProps> = ({ onCurrentU
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Pagination Footer (20 Users Per Page) */}
-        <div className="px-4 py-3.5 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
-          <div className="text-slate-400">
-            Showing <strong className="text-white">{startRow}</strong>–<strong className="text-white">{endRow}</strong> of{' '}
-            <strong className="text-white">{pagination.totalMatched}</strong> users{' '}
-            <span className="text-slate-500">({USERS_PER_PAGE} per page)</span>
+      {/* ── Mobile Stacked Card View (< md screens) ── */}
+      <div className="block md:hidden space-y-3">
+        {loading && users.length === 0 ? (
+          Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="p-4 rounded-xl bg-[#090D18] border border-slate-800 animate-pulse space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-800" />
+                <div className="space-y-1.5 flex-1">
+                  <div className="w-28 h-3.5 rounded bg-slate-800" />
+                  <div className="w-20 h-2.5 rounded bg-slate-800/60" />
+                </div>
+              </div>
+              <div className="w-36 h-3 rounded bg-slate-800/70" />
+              <div className="w-full h-8 rounded bg-slate-800/40" />
+            </div>
+          ))
+        ) : users.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 font-mono text-xs bg-[#090D18] rounded-xl border border-slate-800">
+            No matching users found.
           </div>
+        ) : (
+          users.map((u) => {
+            const isUpdating = updatingId === u.id;
+            const isUltra = u.plan === 'ultra';
+            const isPro = !isUltra && u.plan === 'pro';
+            const isSubscribed = isUltra || isPro;
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={!pagination.hasPrevPage || loading}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-300 transition-colors cursor-pointer disabled:cursor-default"
-            >
-              <ChevronLeft size={14} />
-              <span>Prev</span>
-            </button>
+            return (
+              <div
+                key={u.id}
+                className="p-4 rounded-xl bg-[#090D18] border border-slate-800 space-y-3 shadow-sm"
+              >
+                {/* Header: User avatar & details */}
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img
+                      src={u.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.username}`}
+                      alt={u.displayName}
+                      className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 object-cover shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className="font-bold text-white text-sm flex items-center gap-1.5 truncate">
+                        <span className="truncate">{u.displayName || u.username}</span>
+                        {u.isVerified && (
+                          <BadgeCheck size={14} className="text-blue-400 shrink-0" />
+                        )}
+                        {u.isAdmin && (
+                          <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[9px] font-mono uppercase shrink-0">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-mono text-slate-400 truncate">@{u.username}</div>
+                    </div>
+                  </div>
 
-            <span className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-cyan-400 font-bold">
-              Page {pagination.page} of {pagination.totalPages}
-            </span>
+                  <button
+                    type="button"
+                    onClick={() => handleInteractAsUser(u)}
+                    disabled={isUpdating || impersonatingId === u.id || u.id === currentUser?.id}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-mono transition-colors shrink-0 disabled:opacity-40"
+                    title={`Interact as @${u.username}`}
+                  >
+                    {impersonatingId === u.id ? (
+                      <Loader2 size={12} className="animate-spin text-slate-400" />
+                    ) : (
+                      <Eye size={12} className="text-slate-400" />
+                    )}
+                    <span>Interact</span>
+                  </button>
+                </div>
 
-            <button
-              type="button"
-              disabled={!pagination.hasNextPage || loading}
-              onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-300 transition-colors cursor-pointer disabled:cursor-default"
-            >
-              <span>Next</span>
-              <ChevronRight size={14} />
-            </button>
-          </div>
+                {/* Info row: Email & Verified toggle */}
+                <div className="flex items-center justify-between text-xs font-mono text-slate-400 gap-2 border-t border-slate-800/60 pt-2.5">
+                  <span className="truncate text-slate-300">{u.email}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleVerified(u)}
+                    disabled={isUpdating}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono transition-colors shrink-0 ${
+                      u.isVerified
+                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                        : 'bg-slate-900 text-slate-500 border border-slate-800'
+                    }`}
+                  >
+                    <BadgeCheck size={12} className={u.isVerified ? 'text-blue-400' : 'text-slate-500'} />
+                    <span>{u.isVerified ? 'Verified' : 'Verify'}</span>
+                  </button>
+                </div>
+
+                {/* Plan status & days */}
+                <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                  <div>
+                    {isUltra ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px] font-medium">
+                        Ultra (100MB)
+                      </span>
+                    ) : u.trialActive ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-medium">
+                        Trial ({u.trialRemainingDays || 7}d)
+                      </span>
+                    ) : isPro ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[11px] font-medium">
+                        Pro (20MB)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 text-[11px] font-medium">
+                        Free (5MB)
+                      </span>
+                    )}
+                  </div>
+
+                  {isSubscribed && (
+                    <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+                      <Clock size={11} />
+                      <span>{u.remainingDays || 31}d left</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Plan Actions Buttons Grid */}
+                <div className="flex items-center gap-2 pt-1">
+                  {isUltra ? (
+                    <>
+                      <button
+                        onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'extend')}
+                        disabled={isUpdating}
+                        className="flex-1 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-medium text-center transition-colors cursor-pointer"
+                      >
+                        +31d Ultra
+                      </button>
+                      <button
+                        onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}
+                        disabled={isUpdating}
+                        className="flex-1 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-mono text-center transition-colors cursor-pointer"
+                      >
+                        Set Pro
+                      </button>
+                      <button
+                        onClick={() => handleUpdateUserPlan(u, 'free', 0, 'set')}
+                        disabled={isUpdating}
+                        className="py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 hover:border-red-500/30 text-xs font-mono text-center transition-colors cursor-pointer"
+                      >
+                        Free
+                      </button>
+                    </>
+                  ) : isPro ? (
+                    <>
+                      <button
+                        onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'set')}
+                        disabled={isUpdating}
+                        className="flex-1 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-medium text-center transition-colors cursor-pointer"
+                      >
+                        Set Ultra
+                      </button>
+                      <button
+                        onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'extend')}
+                        disabled={isUpdating}
+                        className="flex-1 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono font-medium text-center transition-colors cursor-pointer"
+                      >
+                        +31d Pro
+                      </button>
+                      <button
+                        onClick={() => handleUpdateUserPlan(u, 'free', 0, 'set')}
+                        disabled={isUpdating}
+                        className="py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 hover:border-red-500/30 text-xs font-mono text-center transition-colors cursor-pointer"
+                      >
+                        Free
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleUpdateUserPlan(u, 'ultra', 31, 'set')}
+                        disabled={isUpdating}
+                        className="flex-1 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-medium text-center transition-colors cursor-pointer"
+                      >
+                        Set Ultra (31d)
+                      </button>
+                      <button
+                        onClick={() => handleUpdateUserPlan(u, 'pro', 31, 'set')}
+                        disabled={isUpdating}
+                        className="flex-1 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono font-medium text-center transition-colors cursor-pointer"
+                      >
+                        Set Pro (31d)
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ── Pagination Footer ── */}
+      <div className="px-4 py-3 rounded-xl bg-[#090D18] border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
+        <div className="text-slate-400 text-center sm:text-left">
+          Showing <strong className="text-white">{startRow}</strong>–<strong className="text-white">{endRow}</strong> of{' '}
+          <strong className="text-white">{pagination.totalMatched}</strong> users
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            disabled={!pagination.hasPrevPage || loading}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-300 transition-colors cursor-pointer disabled:cursor-default"
+          >
+            <ChevronLeft size={14} />
+            <span>Prev</span>
+          </button>
+
+          <span className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-medium">
+            {pagination.page} / {pagination.totalPages}
+          </span>
+
+          <button
+            type="button"
+            disabled={!pagination.hasNextPage || loading}
+            onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-300 transition-colors cursor-pointer disabled:cursor-default"
+          >
+            <span>Next</span>
+            <ChevronRight size={14} />
+          </button>
         </div>
       </div>
     </div>
   );
 };
+
+export default AdminUsersManager;
