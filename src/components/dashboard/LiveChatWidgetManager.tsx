@@ -867,7 +867,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
       return (
         <div
           key={item.id}
-          className={`w-full mb-2 p-2.5 rounded-lg bg-[#0e1217]/92 border border-slate-800 shadow-[0_4px_16px_rgba(0,0,0,0.65)] backdrop-blur-md relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'slide-left'} text-left`}
+          className={`w-full mb-2 p-2.5 rounded-lg bg-[#0e1217]/94 border border-slate-800 shadow-[0_4px_16px_rgba(0,0,0,0.65)] backdrop-blur-md relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'slide-left'} text-left`}
           style={{
             borderLeft: `4px solid ${settings.authorColor || '#48BB78'}`
           }}
@@ -884,7 +884,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                 className="font-black uppercase tracking-wider text-sm truncate"
                 style={{
                   color: settings.authorColor || '#48BB78',
-                  fontFamily: settings.authorFontFamily || settings.fontFamily || 'Bebas Neue, Montserrat, sans-serif',
+                  fontFamily: settings.authorFontFamily || 'Pricedown Bl, Bebas Neue, Montserrat, sans-serif',
                   WebkitTextStroke: getTextStrokeCSS(),
                   paintOrder: 'stroke fill',
                   textShadow: getTextShadowCSS()
@@ -924,59 +924,78 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
     }
 
     // ==============================================================
-    // 2. TEMPLATE: GTA 6 (VICE CITY NEON SUNSET)
+    // 2. TEMPLATE: GTA 6 (VICE CITY SUNSET GRADIENT CARD)
     // ==============================================================
     if (activeTheme === 'gta-6') {
       return (
         <div
           key={item.id}
-          className={`w-full mb-2.5 p-3 rounded-2xl bg-gradient-to-br from-[#1b082e]/92 via-[#100722]/92 to-[#071326]/92 border border-pink-500/40 shadow-[0_0_25px_rgba(255,42,133,0.22),0_6px_28px_rgba(0,0,0,0.8)] backdrop-blur-xl relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'zoom-in'} text-left`}
+          className={`w-full mb-3 p-3 sm:p-3.5 rounded-2xl relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'zoom-in'} text-left transition-all`}
+          style={{
+            // Authentic GTA VI Vice City Sunset Gradient (Violet -> Magenta/Pink -> Coral -> Sunset Gold)
+            background: 'linear-gradient(135deg, rgba(62, 10, 88, 0.94) 0%, rgba(162, 28, 93, 0.92) 42%, rgba(217, 72, 15, 0.90) 82%, rgba(245, 158, 11, 0.88) 100%)',
+            border: '1.5px solid rgba(255, 115, 195, 0.55)',
+            boxShadow: '0 0 25px rgba(255, 42, 133, 0.4), 0 8px 32px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.4), inset 0 0 20px rgba(255, 122, 0, 0.18)',
+            backdropFilter: 'blur(16px)'
+          }}
         >
-          {/* Vice City Neon Top Accent Line */}
-          <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#FF2A85] via-[#A855F7] to-[#00F0FF]" />
+          {/* Top Edge Neon Sunset Light Beam */}
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#00F0FF] via-[#FF2A85] to-[#FFB800] shadow-[0_0_8px_#FF2A85]" />
 
-          <div className="flex items-center justify-between gap-1.5 mb-1.5 select-none">
+          {/* Subtle Ambient Palm Tree Watermark */}
+          <div className="absolute -right-2 -bottom-2 text-4xl opacity-15 select-none pointer-events-none filter drop-shadow">
+            🌴
+          </div>
+
+          {/* Row 1: VI Sunset Badge + Platform + Author (Pricedown / GTA Font) + Badges + Timestamp */}
+          <div className="flex items-center justify-between gap-1.5 mb-1.5 select-none relative z-10">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs select-none" title="Vice City">🌴</span>
+              {/* Official GTA 6 Roman Numeral "VI" Sunset Gradient Badge */}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-black italic text-xs tracking-tight bg-gradient-to-b from-[#FF7CD6] via-[#FF2A85] to-[#FFA234] text-white shadow-[0_0_12px_rgba(255,42,133,0.65)] border border-white/40 select-none flex-shrink-0">
+                <span className="leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">VI</span>
+                <span className="text-[8px] uppercase tracking-widest not-italic font-sans opacity-95">VICE</span>
+              </span>
+
               <span className="inline-flex items-center justify-center flex-shrink-0">
                 {renderPlatformIcon((item as any).platform || 'youtube')}
               </span>
+
+              {/* Author Username with GTA / Pricedown Typography & Neon Accent */}
               <span
-                className="font-extrabold tracking-wide text-sm truncate"
+                className="font-black italic tracking-wide text-sm truncate uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
                 style={{
-                  color: settings.authorColor || '#00F0FF',
-                  fontFamily: settings.authorFontFamily || settings.fontFamily || 'Kanit, sans-serif',
+                  color: settings.authorColor && settings.authorColor !== '#000000' ? settings.authorColor : '#00F0FF',
+                  fontFamily: settings.authorFontFamily || 'Pricedown Bl, Righteous, Montserrat, sans-serif',
                   WebkitTextStroke: getTextStrokeCSS(),
                   paintOrder: 'stroke fill',
                   textShadow: settings.textShadowStyle !== 'none'
                     ? getTextShadowCSS()
-                    : '0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(255, 42, 133, 0.3)'
+                    : '0 0 10px rgba(0, 240, 255, 0.7), 0 2px 4px rgba(0, 0, 0, 0.9)'
                 }}
               >
                 {item.author}
               </span>
+
               {renderBadgeElement(item)}
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-pink-500/25 to-cyan-500/25 text-pink-300 border border-pink-500/40 shadow-[0_0_8px_rgba(255,42,133,0.3)] select-none">
-                VICE
-              </span>
             </div>
 
             {settings.showTimestamp && (
-              <span className="text-[10px] text-pink-300/80 select-none opacity-80 font-mono flex-shrink-0">
+              <span className="text-[10px] text-amber-200/90 select-none font-mono font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] flex-shrink-0">
                 {item.time}
               </span>
             )}
           </div>
 
+          {/* Row 2: Message Text (Ultra-crisp readability over the sunset gradient) */}
           <div
-            className="w-full text-left font-medium text-white/95 leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+            className="w-full text-left font-semibold text-white leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] relative z-10"
             style={{
               fontSize: settings.fontSize === 'sm' ? '12px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
-              color: settings.messageColor || '#FFFFFF',
-              fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter, sans-serif',
+              color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
+              fontFamily: settings.messageFontFamily || 'Inter, sans-serif',
               WebkitTextStroke: getTextStrokeCSS(),
               paintOrder: 'stroke fill',
-              textShadow: getTextShadowCSS()
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.95)'
             }}
           >
             {item.message}

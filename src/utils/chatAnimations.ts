@@ -34,6 +34,9 @@ export interface ChatFontOption {
 }
 
 export const CHAT_FONTS: ChatFontOption[] = [
+  { id: 'Pricedown Bl', name: 'Pricedown (GTA Official)' },
+  { id: 'Righteous', name: 'Righteous (Vice City Synth)' },
+  { id: 'Russo One', name: 'Russo One (Heavy Impact)' },
   { id: 'Chakra Petch', name: 'Chakra Petch (Cyberpunk)' },
   { id: 'Inter', name: 'Inter (Clean & Modern)' },
   { id: 'JetBrains Mono', name: 'JetBrains Mono (Code / Tech)' },
@@ -49,7 +52,8 @@ export const CHAT_FONTS: ChatFontOption[] = [
 ];
 
 export const CHAT_ANIMATIONS_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Poppins:wght@400;600;700;800&display=swap');
+@import url('https://fonts.cdnfonts.com/css/pricedown');
+@import url('https://fonts.googleapis.com/css2?family=Righteous&family=Russo+One&family=Outfit:wght@400;600;700;800;900&family=Poppins:wght@400;600;700;800&display=swap');
 
 /* Completely hide all scrollbars in chat overlay & preview containers */
 .no-scrollbar::-webkit-scrollbar,
