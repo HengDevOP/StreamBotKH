@@ -1,7 +1,7 @@
 import { extractYoutubeId, getYoutubeLiveStats } from './youtube';
 
 export interface PlatformLiveStat {
-  platform: 'youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick';
+  platform: 'youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick' | 'instagram';
   isLive: boolean;
   viewers: number;
 }
@@ -201,8 +201,9 @@ export async function aggregateBroadcastChannelViewers(
     tiktok?: string;
     facebook?: string;
     kick?: string;
+    instagram?: string;
   },
-  enabledPlatforms: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick')[]
+  enabledPlatforms: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick' | 'instagram')[]
 ): Promise<{
   totalViewers: number;
   isLive: boolean;

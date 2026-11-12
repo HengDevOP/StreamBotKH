@@ -58,9 +58,10 @@ export interface Streamer {
     tiktok?: string;
     facebook?: string;
     kick?: string;
+    instagram?: string;
   };
   broadcastViewCount?: {
-    enabledPlatforms?: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick')[];
+    enabledPlatforms?: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick' | 'instagram')[];
     manualViewers?: number;
     showLiveDot?: boolean;
     showLabel?: boolean;

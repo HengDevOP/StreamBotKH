@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const defaultPlatforms: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick')[] = ['youtube', 'facebook'];
+    const defaultPlatforms: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick' | 'instagram')[] = ['youtube', 'facebook'];
 
     if (!streamer) {
       // Demo fallback when no account exists
@@ -52,11 +52,12 @@ export async function GET(req: NextRequest) {
       twitch: (streamer.broadcastUrls?.twitch || streamer.twitchLiveUrl || '').trim(),
       tiktok: (streamer.broadcastUrls?.tiktok || streamer.tiktokLiveUrl || '').trim(),
       facebook: (streamer.broadcastUrls?.facebook || streamer.facebookLiveUrl || '').trim(),
-      kick: (streamer.broadcastUrls?.kick || '').trim()
+      kick: (streamer.broadcastUrls?.kick || '').trim(),
+      instagram: (streamer.broadcastUrls?.instagram || '').trim()
     };
 
     const userSettings = streamer.broadcastViewCount || {};
-    const enabledPlatforms: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick')[] =
+    const enabledPlatforms: ('youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick' | 'instagram')[] =
       Array.isArray(userSettings.enabledPlatforms) && userSettings.enabledPlatforms.length > 0
         ? userSettings.enabledPlatforms
         : defaultPlatforms;
@@ -138,7 +139,8 @@ export async function POST(req: NextRequest) {
       twitch: (streamer?.broadcastUrls?.twitch || streamer?.twitchLiveUrl || '').trim(),
       tiktok: (streamer?.broadcastUrls?.tiktok || streamer?.tiktokLiveUrl || '').trim(),
       facebook: (streamer?.broadcastUrls?.facebook || streamer?.facebookLiveUrl || '').trim(),
-      kick: (streamer?.broadcastUrls?.kick || '').trim()
+      kick: (streamer?.broadcastUrls?.kick || '').trim(),
+      instagram: (streamer?.broadcastUrls?.instagram || '').trim()
     };
 
     // Calculate real live concurrent viewers across configured broadcast channels

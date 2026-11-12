@@ -57,6 +57,7 @@ export interface UserDoc {
     tiktok?: string;
     facebook?: string;
     kick?: string;
+    instagram?: string;
   };
   dailyTokensLimit?: number;
   dailyTokensUsed?: number;

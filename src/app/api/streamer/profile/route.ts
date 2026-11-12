@@ -127,7 +127,8 @@ export async function GET(req: NextRequest) {
         twitch: '',
         tiktok: '',
         facebook: '',
-        kick: ''
+        kick: '',
+        instagram: ''
       },
       broadcastViewCount: (streamer as any).broadcastViewCount || {
         enabledPlatforms: ['youtube', 'facebook'],
@@ -200,7 +201,8 @@ export async function PUT(req: NextRequest) {
         twitch: incomingBroadcastUrls.twitch !== undefined ? String(incomingBroadcastUrls.twitch).trim() : (finalBroadcastUrls.twitch || ''),
         tiktok: incomingBroadcastUrls.tiktok !== undefined ? String(incomingBroadcastUrls.tiktok).trim() : (finalBroadcastUrls.tiktok || ''),
         facebook: incomingBroadcastUrls.facebook !== undefined ? String(incomingBroadcastUrls.facebook).trim() : (finalBroadcastUrls.facebook || ''),
-        kick: incomingBroadcastUrls.kick !== undefined ? String(incomingBroadcastUrls.kick).trim() : (finalBroadcastUrls.kick || '')
+        kick: incomingBroadcastUrls.kick !== undefined ? String(incomingBroadcastUrls.kick).trim() : (finalBroadcastUrls.kick || ''),
+        instagram: incomingBroadcastUrls.instagram !== undefined ? String(incomingBroadcastUrls.instagram).trim() : (finalBroadcastUrls.instagram || '')
       };
       if (finalBroadcastUrls.youtube !== undefined) {
         newLiveStreamUrl = finalBroadcastUrls.youtube;

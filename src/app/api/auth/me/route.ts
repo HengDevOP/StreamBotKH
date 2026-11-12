@@ -150,7 +150,8 @@ export async function GET(req: NextRequest) {
       twitch: '',
       tiktok: '',
       facebook: '',
-      kick: ''
+      kick: '',
+      instagram: ''
     },
     broadcastViewCount: (streamer as any).broadcastViewCount || {
       enabledPlatforms: ['youtube', 'facebook'],
