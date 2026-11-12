@@ -5,6 +5,7 @@ import { Crown, Star, Flame, Sparkles, ShieldCheck, Zap, Heart } from 'lucide-re
 import { useSocket } from '../../context/SocketContext';
 import { CHAT_ANIMATIONS_CSS } from '../../utils/chatAnimations';
 import { getBadgeIconComponent } from '../../data/badgeIcons';
+import { ChatOverlayTheme, CHAT_THEMES } from '../../data/chatOverlayPresets';
 
 export interface ChatMessage {
   id: string;
@@ -23,6 +24,7 @@ export interface ChatMessage {
 }
 
 export interface StreamChatSettings {
+  theme?: ChatOverlayTheme;
   fontFamily: string;
   authorFontFamily: string;
   messageFontFamily: string;
@@ -50,6 +52,7 @@ export interface StreamChatSettings {
 }
 
 const DEFAULT_SETTINGS: StreamChatSettings = {
+  theme: 'default',
   fontFamily: 'Chakra Petch',
   authorFontFamily: 'Chakra Petch',
   messageFontFamily: 'Inter',
@@ -383,8 +386,203 @@ export const StreamChatOverlay: React.FC<StreamChatOverlayProps> = ({ token }) =
   };
 
   const renderMessageContent = (item: ChatMessage) => {
+    const urlTheme = typeof window !== 'undefined'
+      ? (new URLSearchParams(window.location.search).get('theme') as ChatOverlayTheme | null)
+      : null;
+    const activeTheme: ChatOverlayTheme = urlTheme || settings.theme || 'default';
     const lineStyle = settings.lineStyle || 'inline';
 
+    // ==============================================================
+    // 1. TEMPLATE: GTA V (LOS SANTOS HUD CARD)
+    // ==============================================================
+    if (activeTheme === 'gta-v') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full mb-2 p-2.5 rounded-lg bg-[#0e1217]/92 border border-slate-800 shadow-[0_4px_16px_rgba(0,0,0,0.65)] backdrop-blur-md relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'slide-left'} text-left`}
+          style={{
+            borderLeft: `4px solid ${settings.authorColor || '#48BB78'}`
+          }}
+        >
+          <div className="flex items-center justify-between gap-1.5 mb-1 select-none">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="inline-flex items-center text-[#F6E05E] text-xs font-black select-none drop-shadow-[0_0_4px_rgba(246,224,94,0.6)]" title="Wanted Level">
+                ★
+              </span>
+              <span className="inline-flex items-center justify-center flex-shrink-0">
+                {renderPlatformIcon(item.platform || 'youtube')}
+              </span>
+              <span
+                className="font-black uppercase tracking-wider text-sm truncate"
+                style={{
+                  color: settings.authorColor || '#48BB78',
+                  fontFamily: settings.authorFontFamily || settings.fontFamily || 'Bebas Neue, Montserrat, sans-serif',
+                  WebkitTextStroke: getTextStrokeCSS(),
+                  paintOrder: 'stroke fill',
+                  textShadow: getTextShadowCSS()
+                }}
+              >
+                {item.author}
+              </span>
+              {renderBadgeElement(item)}
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="px-1.5 py-0.5 rounded bg-black/60 text-[9px] font-mono font-bold text-slate-300 uppercase tracking-widest border border-slate-700/60 select-none">
+                L.S.
+              </span>
+              {settings.showTimestamp && (
+                <span className="text-[10px] text-slate-400 select-none opacity-75 font-mono">
+                  {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div
+            className="w-full text-left font-medium text-slate-100 leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word]"
+            style={{
+              fontSize: settings.fontSize === 'sm' ? '12px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
+              color: settings.messageColor || '#F7FAFC',
+              fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter, sans-serif',
+              WebkitTextStroke: getTextStrokeCSS(),
+              paintOrder: 'stroke fill',
+              textShadow: getTextShadowCSS()
+            }}
+          >
+            {item.message}
+          </div>
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 2. TEMPLATE: GTA 6 (VICE CITY NEON SUNSET)
+    // ==============================================================
+    if (activeTheme === 'gta-6') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full mb-2.5 p-3 rounded-2xl bg-gradient-to-br from-[#1b082e]/92 via-[#100722]/92 to-[#071326]/92 border border-pink-500/40 shadow-[0_0_25px_rgba(255,42,133,0.22),0_6px_28px_rgba(0,0,0,0.8)] backdrop-blur-xl relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'zoom-in'} text-left`}
+        >
+          {/* Vice City Neon Top Accent Line */}
+          <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#FF2A85] via-[#A855F7] to-[#00F0FF]" />
+
+          <div className="flex items-center justify-between gap-1.5 mb-1.5 select-none">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs select-none" title="Vice City">🌴</span>
+              <span className="inline-flex items-center justify-center flex-shrink-0">
+                {renderPlatformIcon(item.platform || 'youtube')}
+              </span>
+              <span
+                className="font-extrabold tracking-wide text-sm truncate"
+                style={{
+                  color: settings.authorColor || '#00F0FF',
+                  fontFamily: settings.authorFontFamily || settings.fontFamily || 'Kanit, sans-serif',
+                  WebkitTextStroke: getTextStrokeCSS(),
+                  paintOrder: 'stroke fill',
+                  textShadow: settings.textShadowStyle !== 'none'
+                    ? getTextShadowCSS()
+                    : '0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(255, 42, 133, 0.3)'
+                }}
+              >
+                {item.author}
+              </span>
+              {renderBadgeElement(item)}
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-pink-500/25 to-cyan-500/25 text-pink-300 border border-pink-500/40 shadow-[0_0_8px_rgba(255,42,133,0.3)] select-none">
+                VICE
+              </span>
+            </div>
+
+            {settings.showTimestamp && (
+              <span className="text-[10px] text-pink-300/80 select-none opacity-80 font-mono flex-shrink-0">
+                {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+
+          <div
+            className="w-full text-left font-medium text-white/95 leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+            style={{
+              fontSize: settings.fontSize === 'sm' ? '12px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
+              color: settings.messageColor || '#FFFFFF',
+              fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter, sans-serif',
+              WebkitTextStroke: getTextStrokeCSS(),
+              paintOrder: 'stroke fill',
+              textShadow: getTextShadowCSS()
+            }}
+          >
+            {item.message}
+          </div>
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 3. TEMPLATE: MINECRAFT (8-BIT PIXEL BLOCK HUD)
+    // ==============================================================
+    if (activeTheme === 'minecraft') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full mb-1.5 px-3 py-2 rounded-sm bg-black/70 border border-[#333333] shadow-[2px_2px_0px_#000000] text-left select-none relative overflow-hidden chat-anim-${settings.animationStyle || 'fade-in'}`}
+          style={{
+            fontFamily: `'Press Start 2P', 'VT323', monospace`
+          }}
+        >
+          <div className="flex items-baseline gap-1.5 text-[11px] sm:text-xs leading-loose break-words [overflow-wrap:anywhere] [word-break:break-word]">
+            {/* Minecraft Rank Tag */}
+            <span className="text-[#FFAA00] font-normal flex-shrink-0" style={{ textShadow: '2px 2px 0px #3f2a00' }}>
+              [<span className="text-[#FFFF55] font-bold">VIP</span>]
+            </span>
+
+            <span className="inline-block self-center flex-shrink-0">
+              {renderPlatformIcon(item.platform || 'youtube')}
+            </span>
+
+            {/* Minecraft Player Bracket & Username: <Username> */}
+            <span className="text-white font-normal flex-shrink-0" style={{ textShadow: '2px 2px 0px #000000' }}>
+              &lt;<span
+                style={{
+                  color: settings.authorColor || '#55FF55',
+                  textShadow: '2px 2px 0px #133a13'
+                }}
+              >{item.author}</span>&gt;
+            </span>
+
+            {/* Minecraft Diamond badge */}
+            {settings.showBadges && (
+              <span className="inline-block text-xs select-none flex-shrink-0" title="Player Badge">
+                💎
+              </span>
+            )}
+
+            {/* Message Text with Minecraft Pixel Shadow */}
+            <span
+              className="font-normal text-white flex-1"
+              style={{
+                color: settings.messageColor || '#FFFFFF',
+                textShadow: '2px 2px 0px #000000'
+              }}
+            >
+              {item.message}
+            </span>
+
+            {settings.showTimestamp && (
+              <span
+                className="text-[9px] text-[#AAAAAA] ml-2 opacity-70 flex-shrink-0 font-mono"
+                style={{ textShadow: '1px 1px 0px #000000' }}
+              >
+                {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 4. TEMPLATE: DEFAULT / CYBER NEON (INLINE / INDENTED / STACKED)
+    // ==============================================================
     // 1. STACKED (2-ROW) LAYOUT:
     // Row 1: Platform Icon + Author + Badges + Timestamp
     // Row 2: Message text spans the complete configured width (e.g. 600px) and wraps cleanly at that width

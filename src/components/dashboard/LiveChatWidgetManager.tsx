@@ -44,6 +44,7 @@ import { Button } from '../common/Button';
 import { ANIMATION_STYLES, CHAT_ANIMATIONS_CSS, CHAT_FONTS } from '../../utils/chatAnimations';
 import { useSocket } from '../../context/SocketContext';
 import { MediaPickerModal } from './MediaPickerModal';
+import { CHAT_THEMES, ChatOverlayTheme, ChatThemePreset } from '../../data/chatOverlayPresets';
 
 export interface LiveChatWidgetManagerProps {
   streamerToken?: string;
@@ -55,6 +56,7 @@ export interface LiveChatWidgetManagerProps {
 }
 
 interface ChatSettings {
+  theme?: ChatOverlayTheme;
   fontFamily: string;
   authorFontFamily: string;
   messageFontFamily: string;
@@ -89,6 +91,14 @@ export const CHAT_SOUND_PRESETS = [
     desc: 'Classic tip & ka-ching sound',
     url: '/sounds/cash-register-kaching.mp3',
     icon: '💰'
+  },
+  {
+    id: 'minecraft-oof',
+    name: 'Minecraft OOF',
+    badge: 'MINECRAFT',
+    desc: 'Classic 8-bit player hurt sound',
+    url: '/sounds/memes/oh-minecraft-oof.mp3',
+    icon: '⛏️'
   },
   {
     id: 'mario-coin',
@@ -149,6 +159,7 @@ export const CHAT_SOUND_PRESETS = [
 ];
 
 const DEFAULT_SETTINGS: ChatSettings = {
+  theme: 'default',
   fontFamily: 'Chakra Petch',
   authorFontFamily: 'Chakra Petch',
   messageFontFamily: 'Inter',
@@ -627,6 +638,34 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
     }
   };
 
+  const handleSelectTheme = (themeId: ChatOverlayTheme) => {
+    const preset = CHAT_THEMES.find((t) => t.id === themeId);
+    if (!preset) return;
+
+    setSettings((prev) => ({
+      ...prev,
+      theme: themeId,
+      fontFamily: preset.recommendedSettings.fontFamily,
+      authorFontFamily: preset.recommendedSettings.authorFontFamily,
+      messageFontFamily: preset.recommendedSettings.messageFontFamily,
+      fontSize: preset.recommendedSettings.fontSize,
+      lineStyle: preset.recommendedSettings.lineStyle,
+      authorColor: preset.recommendedSettings.authorColor,
+      messageColor: preset.recommendedSettings.messageColor,
+      animationStyle: preset.recommendedSettings.animationStyle,
+      textShadowStyle: preset.recommendedSettings.textShadowStyle,
+      textShadowColor: preset.recommendedSettings.textShadowColor,
+      textShadowBlur: preset.recommendedSettings.textShadowBlur,
+      textBorderWidth: preset.recommendedSettings.textBorderWidth,
+      textBorderColor: preset.recommendedSettings.textBorderColor,
+      soundUrl: preset.recommendedSettings.soundUrl || prev.soundUrl
+    }));
+
+    if (preset.recommendedSettings.soundUrl) {
+      playPreviewSound(preset.recommendedSettings.soundUrl, settings.soundVolume);
+    }
+  };
+
   const handleSendTestMessage = async (customMsg?: string) => {
     setSendingTest(true);
     setTestSent(false);
@@ -818,8 +857,200 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
   };
 
   const renderMessageContent = (item: LocalChatMessage) => {
+    const activeTheme = settings.theme || 'default';
     const lineStyle = settings.lineStyle || 'inline';
 
+    // ==============================================================
+    // 1. TEMPLATE: GTA V (LOS SANTOS HUD CARD)
+    // ==============================================================
+    if (activeTheme === 'gta-v') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full mb-2 p-2.5 rounded-lg bg-[#0e1217]/92 border border-slate-800 shadow-[0_4px_16px_rgba(0,0,0,0.65)] backdrop-blur-md relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'slide-left'} text-left`}
+          style={{
+            borderLeft: `4px solid ${settings.authorColor || '#48BB78'}`
+          }}
+        >
+          <div className="flex items-center justify-between gap-1.5 mb-1 select-none">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="inline-flex items-center text-[#F6E05E] text-xs font-black select-none drop-shadow-[0_0_4px_rgba(246,224,94,0.6)]" title="Wanted Level">
+                ★
+              </span>
+              <span className="inline-flex items-center justify-center flex-shrink-0">
+                {renderPlatformIcon((item as any).platform || 'youtube')}
+              </span>
+              <span
+                className="font-black uppercase tracking-wider text-sm truncate"
+                style={{
+                  color: settings.authorColor || '#48BB78',
+                  fontFamily: settings.authorFontFamily || settings.fontFamily || 'Bebas Neue, Montserrat, sans-serif',
+                  WebkitTextStroke: getTextStrokeCSS(),
+                  paintOrder: 'stroke fill',
+                  textShadow: getTextShadowCSS()
+                }}
+              >
+                {item.author}
+              </span>
+              {renderBadgeElement(item)}
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="px-1.5 py-0.5 rounded bg-black/60 text-[9px] font-mono font-bold text-slate-300 uppercase tracking-widest border border-slate-700/60 select-none">
+                L.S.
+              </span>
+              {settings.showTimestamp && (
+                <span className="text-[10px] text-slate-400 select-none opacity-75 font-mono">
+                  {item.time}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div
+            className="w-full text-left font-medium text-slate-100 leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word]"
+            style={{
+              fontSize: settings.fontSize === 'sm' ? '12px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
+              color: settings.messageColor || '#F7FAFC',
+              fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter, sans-serif',
+              WebkitTextStroke: getTextStrokeCSS(),
+              paintOrder: 'stroke fill',
+              textShadow: getTextShadowCSS()
+            }}
+          >
+            {item.message}
+          </div>
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 2. TEMPLATE: GTA 6 (VICE CITY NEON SUNSET)
+    // ==============================================================
+    if (activeTheme === 'gta-6') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full mb-2.5 p-3 rounded-2xl bg-gradient-to-br from-[#1b082e]/92 via-[#100722]/92 to-[#071326]/92 border border-pink-500/40 shadow-[0_0_25px_rgba(255,42,133,0.22),0_6px_28px_rgba(0,0,0,0.8)] backdrop-blur-xl relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'zoom-in'} text-left`}
+        >
+          {/* Vice City Neon Top Accent Line */}
+          <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#FF2A85] via-[#A855F7] to-[#00F0FF]" />
+
+          <div className="flex items-center justify-between gap-1.5 mb-1.5 select-none">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs select-none" title="Vice City">🌴</span>
+              <span className="inline-flex items-center justify-center flex-shrink-0">
+                {renderPlatformIcon((item as any).platform || 'youtube')}
+              </span>
+              <span
+                className="font-extrabold tracking-wide text-sm truncate"
+                style={{
+                  color: settings.authorColor || '#00F0FF',
+                  fontFamily: settings.authorFontFamily || settings.fontFamily || 'Kanit, sans-serif',
+                  WebkitTextStroke: getTextStrokeCSS(),
+                  paintOrder: 'stroke fill',
+                  textShadow: settings.textShadowStyle !== 'none'
+                    ? getTextShadowCSS()
+                    : '0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(255, 42, 133, 0.3)'
+                }}
+              >
+                {item.author}
+              </span>
+              {renderBadgeElement(item)}
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-pink-500/25 to-cyan-500/25 text-pink-300 border border-pink-500/40 shadow-[0_0_8px_rgba(255,42,133,0.3)] select-none">
+                VICE
+              </span>
+            </div>
+
+            {settings.showTimestamp && (
+              <span className="text-[10px] text-pink-300/80 select-none opacity-80 font-mono flex-shrink-0">
+                {item.time}
+              </span>
+            )}
+          </div>
+
+          <div
+            className="w-full text-left font-medium text-white/95 leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+            style={{
+              fontSize: settings.fontSize === 'sm' ? '12px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
+              color: settings.messageColor || '#FFFFFF',
+              fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter, sans-serif',
+              WebkitTextStroke: getTextStrokeCSS(),
+              paintOrder: 'stroke fill',
+              textShadow: getTextShadowCSS()
+            }}
+          >
+            {item.message}
+          </div>
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 3. TEMPLATE: MINECRAFT (8-BIT PIXEL BLOCK HUD)
+    // ==============================================================
+    if (activeTheme === 'minecraft') {
+      return (
+        <div
+          key={item.id}
+          className={`w-full mb-1.5 px-3 py-2 rounded-sm bg-black/70 border border-[#333333] shadow-[2px_2px_0px_#000000] text-left select-none relative overflow-hidden chat-anim-${settings.animationStyle || 'fade-in'}`}
+          style={{
+            fontFamily: `'Press Start 2P', 'VT323', monospace`
+          }}
+        >
+          <div className="flex items-baseline gap-1.5 text-[11px] sm:text-xs leading-loose break-words [overflow-wrap:anywhere] [word-break:break-word]">
+            {/* Minecraft Rank Tag */}
+            <span className="text-[#FFAA00] font-normal flex-shrink-0" style={{ textShadow: '2px 2px 0px #3f2a00' }}>
+              [<span className="text-[#FFFF55] font-bold">VIP</span>]
+            </span>
+
+            <span className="inline-block self-center flex-shrink-0">
+              {renderPlatformIcon((item as any).platform || 'youtube')}
+            </span>
+
+            {/* Minecraft Player Bracket & Username: <Username> */}
+            <span className="text-white font-normal flex-shrink-0" style={{ textShadow: '2px 2px 0px #000000' }}>
+              &lt;<span
+                style={{
+                  color: settings.authorColor || '#55FF55',
+                  textShadow: '2px 2px 0px #133a13'
+                }}
+              >{item.author}</span>&gt;
+            </span>
+
+            {/* Minecraft Diamond badge */}
+            {settings.showBadges && (
+              <span className="inline-block text-xs select-none flex-shrink-0" title="Player Badge">
+                💎
+              </span>
+            )}
+
+            {/* Message Text with Minecraft Pixel Shadow */}
+            <span
+              className="font-normal text-white flex-1"
+              style={{
+                color: settings.messageColor || '#FFFFFF',
+                textShadow: '2px 2px 0px #000000'
+              }}
+            >
+              {item.message}
+            </span>
+
+            {settings.showTimestamp && (
+              <span
+                className="text-[9px] text-[#AAAAAA] ml-2 opacity-70 flex-shrink-0 font-mono"
+                style={{ textShadow: '1px 1px 0px #000000' }}
+              >
+                {item.time}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==============================================================
+    // 4. TEMPLATE: DEFAULT / CYBER NEON (INLINE / INDENTED / STACKED)
+    // ==============================================================
     // 1. STACKED (2-ROW) LAYOUT:
     if (lineStyle === 'stacked') {
       return (
@@ -1237,6 +1468,62 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
 
         {/* Scrollable Settings Content Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 no-scrollbar">
+          {/* SECTION 0: CHAT OVERLAY TEMPLATE / THEME */}
+          <div className="space-y-3 pb-4 border-b border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white font-bold text-xs">
+                <Palette className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Chat Overlay Template</span>
+              </div>
+              <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase tracking-wider">
+                {CHAT_THEMES.find((t) => t.id === (settings.theme || 'default'))?.badge || 'CLASSIC'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {CHAT_THEMES.map((themePreset) => {
+                const isSelected = (settings.theme || 'default') === themePreset.id;
+                return (
+                  <button
+                    key={themePreset.id}
+                    type="button"
+                    onClick={() => handleSelectTheme(themePreset.id)}
+                    className={`p-2.5 rounded-xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
+                      isSelected
+                        ? 'border-cyan-400 bg-cyan-950/30 shadow-[0_0_14px_rgba(0,240,255,0.25)] ring-1 ring-cyan-400/50'
+                        : 'border-slate-800 bg-slate-950/70 hover:border-slate-700 hover:bg-slate-900/60'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-1.5 mb-1.5">
+                      <span className="text-lg leading-none select-none">{themePreset.icon}</span>
+                      <span
+                        className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black uppercase tracking-wider"
+                        style={{
+                          color: themePreset.badgeColor,
+                          backgroundColor: themePreset.badgeBg,
+                          border: `1px solid ${themePreset.badgeBorder}`
+                        }}
+                      >
+                        {themePreset.badge}
+                      </span>
+                    </div>
+
+                    <div className="text-xs font-bold text-white truncate group-hover:text-cyan-300 transition-colors">
+                      {themePreset.name}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                      {themePreset.subtitle}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              {CHAT_THEMES.find((t) => t.id === (settings.theme || 'default'))?.description ||
+                'Select an overlay template to instantly style your live chat.'}
+            </p>
+          </div>
+
           {/* SECTION 1: TYPOGRAPHY (2 DIFFERENT FONTS: USERNAME & MESSAGE) */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-white font-bold text-xs">
