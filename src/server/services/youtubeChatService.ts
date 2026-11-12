@@ -226,7 +226,7 @@ class YouTubeChatService {
           const author = textMessage?.authorName?.simpleText || 'Anonymous Viewer';
           const avatar = textMessage?.authorPhoto?.thumbnails?.[0]?.url;
           const messageParts = textMessage?.message?.runs || [];
-          const message = messageParts.map((r: any) => r.text || '').join('');
+          const message = messageParts.map((r: any) => r.text || r.emoji?.shortcuts?.[0] || r.emoji?.emojiId || '').join('');
 
           if (message) {
             const commentPayload = {

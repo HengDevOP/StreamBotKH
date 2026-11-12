@@ -236,6 +236,7 @@ const SAMPLE_BADGE_PRESETS: Record<string, { color: string; icon: string }> = {
 interface LocalChatMessage {
   id: string;
   author: string;
+  avatar?: string;
   message: string;
   badge?: string;
   badgeColor?: string;
@@ -252,6 +253,7 @@ const INITIAL_MESSAGES: LocalChatMessage[] = [
   {
     id: 'p1',
     author: 'NeonSamurai',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=NeonSamurai',
     message: 'Let’s go! Epic live stream today, quality is amazing! 🔥🚀',
     badge: 'VIP',
     badgeColor: '#F59E0B',
@@ -262,6 +264,7 @@ const INITIAL_MESSAGES: LocalChatMessage[] = [
   {
     id: 'p2',
     author: 'DaraGamer',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=DaraGamer',
     message: 'GG clutch win! That play was insane 💯',
     badge: 'MOD',
     badgeColor: '#10B981',
@@ -272,6 +275,7 @@ const INITIAL_MESSAGES: LocalChatMessage[] = [
   {
     id: 'p3',
     author: 'PixelQueen',
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=PixelQueen',
     message: 'Loving the clean live chat overlay! ✨',
     badge: 'MEMBER',
     badgeColor: '#A855F7',
@@ -467,7 +471,8 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
       const newMsg: LocalChatMessage = {
         id: msg.id || 'msg_' + Date.now(),
         author: msg.author || 'Viewer',
-        message: msg.message || '',
+        avatar: msg.avatar,
+        message: msg.message || msg.content || msg.text || '',
         badge: msg.badge,
         badgeColor: msg.badgeColor,
         badgeBg: msg.badgeBg,
@@ -574,11 +579,12 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
       const newSampleMsg: LocalChatMessage = {
         id: 'auto_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
         author: randName,
+        avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(randName)}`,
         message: randText,
         badge: randBadge || undefined,
         badgeColor: badgeConfig?.color,
         badgeIcon: badgeConfig?.icon,
-        platform: 'youtube',
+        platform: Math.random() > 0.5 ? 'youtube' : 'twitch',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
@@ -859,6 +865,8 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
   const renderMessageContent = (item: LocalChatMessage) => {
     const activeTheme = settings.theme || 'default';
     const lineStyle = settings.lineStyle || 'inline';
+    const messageContent = item.message || (item as any).content || (item as any).text || (item as any).comment || '';
+    const avatarUrl = item.avatar || (item as any).avatar;
 
     // ==============================================================
     // 1. TEMPLATE: GTA V (LOS SANTOS HUD CARD)
@@ -867,16 +875,27 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
       return (
         <div
           key={item.id}
-          className={`w-full mb-2 p-2.5 rounded-lg bg-[#0e1217]/94 border border-slate-800 shadow-[0_4px_16px_rgba(0,0,0,0.65)] backdrop-blur-md relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'slide-left'} text-left`}
+          className={`w-full mb-2.5 p-2.5 rounded-lg bg-[#0e1217]/95 border border-slate-800 shadow-[0_4px_16px_rgba(0,0,0,0.65)] backdrop-blur-md relative overflow-hidden select-none chat-anim-${settings.animationStyle || 'slide-left'} text-left`}
           style={{
             borderLeft: `4px solid ${settings.authorColor || '#48BB78'}`
           }}
         >
-          <div className="flex items-center justify-between gap-1.5 mb-1 select-none">
+          {/* Row 1: Header (Wanted Star + Avatar + Platform + Author + Badges + L.S. + Timestamp) */}
+          <div className="flex items-center justify-between gap-1.5 mb-1.5 select-none relative z-10">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="inline-flex items-center text-[#F6E05E] text-xs font-black select-none drop-shadow-[0_0_4px_rgba(246,224,94,0.6)]" title="Wanted Level">
                 ★
               </span>
+
+              {avatarUrl && (
+                <img
+                  src={avatarUrl}
+                  alt={item.author}
+                  className="w-4 h-4 rounded-full object-cover border border-slate-700 flex-shrink-0"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              )}
+
               <span className="inline-flex items-center justify-center flex-shrink-0">
                 {renderPlatformIcon((item as any).platform || 'youtube')}
               </span>
@@ -906,18 +925,23 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
             </div>
           </div>
 
+          {/* Row 2: Tactical HUD Inner Text Card */}
           <div
-            className="w-full text-left font-medium text-slate-100 leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word]"
-            style={{
-              fontSize: settings.fontSize === 'sm' ? '12px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
-              color: settings.messageColor || '#F7FAFC',
-              fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter, sans-serif',
-              WebkitTextStroke: getTextStrokeCSS(),
-              paintOrder: 'stroke fill',
-              textShadow: getTextShadowCSS()
-            }}
+            className="w-full p-2 sm:p-2.5 rounded-md bg-black/55 border border-slate-800/80 shadow-inner relative z-10"
           >
-            {item.message}
+            <div
+              className="w-full text-left font-medium text-slate-100 leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word]"
+              style={{
+                fontSize: settings.fontSize === 'sm' ? '12.5px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
+                color: settings.messageColor || '#F7FAFC',
+                fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter, sans-serif',
+                WebkitTextStroke: getTextStrokeCSS(),
+                paintOrder: 'stroke fill',
+                textShadow: getTextShadowCSS()
+              }}
+            >
+              {messageContent}
+            </div>
           </div>
         </div>
       );
@@ -947,14 +971,24 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
             🌴
           </div>
 
-          {/* Row 1: VI Sunset Badge + Platform + Author (Pricedown / GTA Font) + Badges + Timestamp */}
-          <div className="flex items-center justify-between gap-1.5 mb-1.5 select-none relative z-10">
+          {/* Row 1: Header (VI Sunset Badge + Avatar + Platform + Author + Badges + Timestamp) */}
+          <div className="flex items-center justify-between gap-1.5 mb-2 select-none relative z-10">
             <div className="flex items-center gap-1.5 min-w-0">
               {/* Official GTA 6 Roman Numeral "VI" Sunset Gradient Badge */}
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-black italic text-xs tracking-tight bg-gradient-to-b from-[#FF7CD6] via-[#FF2A85] to-[#FFA234] text-white shadow-[0_0_12px_rgba(255,42,133,0.65)] border border-white/40 select-none flex-shrink-0">
                 <span className="leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">VI</span>
                 <span className="text-[8px] uppercase tracking-widest not-italic font-sans opacity-95">VICE</span>
               </span>
+
+              {/* User Avatar if available */}
+              {avatarUrl && (
+                <img
+                  src={avatarUrl}
+                  alt={item.author}
+                  className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm flex-shrink-0"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              )}
 
               <span className="inline-flex items-center justify-center flex-shrink-0">
                 {renderPlatformIcon((item as any).platform || 'youtube')}
@@ -986,19 +1020,30 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
             )}
           </div>
 
-          {/* Row 2: Message Text (Ultra-crisp readability over the sunset gradient) */}
+          {/* Row 2: Inner Text Card Container (Glassmorphic dark card bubble with subtle gradient for crystal-clear readability) */}
           <div
-            className="w-full text-left font-semibold text-white leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] relative z-10"
+            className="w-full p-2.5 sm:p-3 rounded-xl relative overflow-hidden backdrop-blur-md z-10"
             style={{
-              fontSize: settings.fontSize === 'sm' ? '12px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
-              color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
-              fontFamily: settings.messageFontFamily || 'Inter, sans-serif',
-              WebkitTextStroke: getTextStrokeCSS(),
-              paintOrder: 'stroke fill',
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.95)'
+              background: 'linear-gradient(135deg, rgba(16, 4, 28, 0.65) 0%, rgba(38, 8, 48, 0.55) 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.12), 0 4px 12px rgba(0, 0, 0, 0.4)'
             }}
           >
-            {item.message}
+            <div
+              className="w-full text-left font-medium leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word]"
+              style={{
+                fontSize: settings.fontSize === 'sm' ? '12.5px' : settings.fontSize === 'lg' ? '16px' : settings.fontSize === 'xl' ? '18px' : '14px',
+                color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
+                fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter, sans-serif',
+                WebkitTextStroke: getTextStrokeCSS(),
+                paintOrder: 'stroke fill',
+                textShadow: settings.textShadowStyle !== 'none'
+                  ? getTextShadowCSS()
+                  : '0 1px 2px rgba(0, 0, 0, 0.85)'
+              }}
+            >
+              {messageContent}
+            </div>
           </div>
         </div>
       );
@@ -1045,13 +1090,13 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
 
             {/* Message Text with Minecraft Pixel Shadow */}
             <span
-              className="font-normal text-white flex-1"
+              className="font-normal text-white flex-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
               style={{
                 color: settings.messageColor || '#FFFFFF',
                 textShadow: '2px 2px 0px #000000'
               }}
             >
-              {item.message}
+              {messageContent}
             </span>
 
             {settings.showTimestamp && (
@@ -1078,6 +1123,14 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
           className={`w-full p-1 sm:p-1.5 mb-1.5 select-none chat-anim-${settings.animationStyle || 'slide-left'} ${getFontSizeClass(settings.fontSize)} text-left`}
         >
           <div className="w-full flex items-center gap-1.5 mb-0.5 select-none text-left">
+            {avatarUrl && (
+              <img
+                src={avatarUrl}
+                alt={item.author}
+                className="w-4 h-4 rounded-full object-cover border border-slate-700 flex-shrink-0"
+                onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+              />
+            )}
             <span className="inline-flex items-center justify-center flex-shrink-0">
               {renderPlatformIcon((item as any).platform || 'youtube')}
             </span>
@@ -1101,7 +1154,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
             )}
           </div>
           <div
-            className="w-full text-left font-medium text-white leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word]"
+            className="w-full text-left font-medium text-white leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word]"
             style={{
               color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
               fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
@@ -1112,7 +1165,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               overflowWrap: 'anywhere'
             }}
           >
-            {item.message}
+            {messageContent}
           </div>
         </div>
       );
@@ -1127,6 +1180,14 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         >
           <div className="w-full flex items-baseline gap-1.5 select-none text-left break-words [overflow-wrap:anywhere] [word-break:break-word]">
             <div className="flex-shrink-0 inline-flex items-baseline gap-1 self-baseline select-none whitespace-nowrap">
+              {avatarUrl && (
+                <img
+                  src={avatarUrl}
+                  alt={item.author}
+                  className="w-4 h-4 rounded-full object-cover border border-slate-700 self-center flex-shrink-0"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              )}
               <span className="inline-flex items-center justify-center self-center flex-shrink-0">
                 {renderPlatformIcon((item as any).platform || 'youtube')}
               </span>
@@ -1157,7 +1218,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                 overflowWrap: 'anywhere'
               }}
             >
-              <span>{item.message}</span>
+              <span className="whitespace-pre-wrap">{messageContent}</span>
               {settings.showTimestamp && (
                 <span className="text-[10px] text-slate-400 ml-2 select-none opacity-75 inline-block font-mono">
                   {item.time}
@@ -1170,8 +1231,6 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
     }
 
     // 3. INLINE FLOW LAYOUT (DEFAULT):
-    // Line fits complete configured width (e.g. 600px).
-    // If there is more context, subsequent lines wrap naturally across the full width!
     return (
       <div
         key={item.id}
@@ -1179,6 +1238,14 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
       >
         <span className="inline-flex items-center gap-1 mr-1.5 align-baseline select-none whitespace-nowrap">
+          {avatarUrl && (
+            <img
+              src={avatarUrl}
+              alt={item.author}
+              className="w-4 h-4 rounded-full object-cover border border-slate-700 inline-block self-center flex-shrink-0 align-middle mr-0.5"
+              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+            />
+          )}
           <span className="inline-flex items-center justify-center self-center flex-shrink-0">
             {renderPlatformIcon((item as any).platform || 'youtube')}
           </span>
@@ -1199,7 +1266,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         </span>
 
         <span
-          className="font-medium text-white inline align-baseline"
+          className="font-medium text-white inline align-baseline whitespace-pre-wrap"
           style={{
             color: settings.messageColor && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF',
             fontFamily: settings.messageFontFamily || settings.fontFamily || 'Inter',
@@ -1210,7 +1277,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
             overflowWrap: 'anywhere'
           }}
         >
-          {item.message}
+          {messageContent}
         </span>
 
         {settings.showTimestamp && (
