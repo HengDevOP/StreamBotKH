@@ -451,14 +451,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
 
   return (
     <div className="space-y-6 w-full min-w-0 max-w-full">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800/60">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2 font-['Chakra_Petch']">
-          <ImageIcon size={22} className="text-cyan-400" />
-          <span>Media Library</span>
-        </h2>
-      </div>
-
       {/* Plan Pro Notice Banner for Free Users */}
       {!isProOrTrial && (
         <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-200">
