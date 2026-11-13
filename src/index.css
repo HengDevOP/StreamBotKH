@@ -2114,6 +2114,34 @@ html.light-mode .doc-content-area table tbody tr:hover {
 }
 
 /* ============================================================== */
+/* SETTINGS & MY ACCOUNT DAY MODE REFINEMENTS                    */
+/* ============================================================== */
+html.light-mode [data-settings-menu] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+}
+
+html.light-mode .bg-\[\#0F1422\] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light-mode .bg-\[\#0F1422\] .text-white,
+html.light-mode .bg-\[\#0F1422\] .text-slate-200 {
+  color: #0F172A !important;
+}
+
+html.light-mode .bg-\[\#0F1422\] .text-slate-300,
+html.light-mode .bg-\[\#0F1422\] .text-slate-400 {
+  color: #64748B !important;
+}
+
+html.light-mode .bg-\[\#0F1422\] button:hover {
+  background-color: #F8FAFC !important;
+}
+
+/* ============================================================== */
 /* PRESERVE OBS STREAM PREVIEW CANVAS (KEEP DARK MONITOR FRAME!)  */
 /* ============================================================== */
 html.light-mode .from-slate-950.via-\[\#060911\].to-slate-950,

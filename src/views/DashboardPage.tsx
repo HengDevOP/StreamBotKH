@@ -519,6 +519,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     }
   });
 
+  const isDay = themeMode === 'light';
+
   const toggleThemeMode = () => {
     setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
@@ -1949,12 +1951,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     return (
       <div
         data-settings-menu="true"
-        className="flex-shrink-0 border-t border-slate-800/80 bg-[#0B0F19] p-2 relative select-none"
+        className={`flex-shrink-0 border-t p-2 relative select-none transition-colors ${
+          isDay
+            ? 'bg-white border-slate-200'
+            : 'bg-[#0B0F19] border-slate-800/80'
+        }`}
       >
         {/* Animated Dropup Menu (Profile & Log Out) */}
         {isSettingsMenuOpen && (
           <div
-            className={`absolute z-50 bg-[#0F1422] border border-slate-800/90 rounded-2xl shadow-[0_-10px_35px_rgba(0,0,0,0.7)] p-1.5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+            className={`absolute z-50 rounded-2xl p-1.5 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+              isDay
+                ? 'bg-white border border-slate-200 shadow-[0_10px_35px_rgba(0,0,0,0.12)] text-slate-800'
+                : 'bg-[#0F1422] border border-slate-800/90 shadow-[0_-10px_35px_rgba(0,0,0,0.7)] text-slate-100'
+            } ${
               isCollapsed
                 ? 'bottom-2 left-full ml-2.5 w-64'
                 : 'bottom-full left-2 right-2 mb-2'
@@ -1971,7 +1981,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               title="View Profile Settings"
               className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-all text-left cursor-pointer group ${
                 isSettingsActive
-                  ? 'bg-slate-800 text-white font-semibold'
+                  ? isDay
+                    ? 'bg-slate-100 text-slate-900 font-semibold'
+                    : 'bg-slate-800 text-white font-semibold'
+                  : isDay
+                  ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
               }`}
             >
@@ -1983,133 +1997,205 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.username}`
                   }
                   alt={user?.displayName || 'Avatar'}
-                  className="w-8 h-8 rounded-xl bg-slate-950 object-cover ring-1 ring-slate-700/60 group-hover:ring-cyan-500 transition-all"
+                  className={`w-8 h-8 rounded-xl object-cover ring-1 transition-all ${
+                    isDay
+                      ? 'bg-slate-100 ring-slate-200 group-hover:ring-cyan-600'
+                      : 'bg-slate-950 ring-slate-700/60 group-hover:ring-cyan-500'
+                  }`}
                 />
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0F1422]" />
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ${
+                  isDay ? 'ring-white' : 'ring-[#0F1422]'
+                }`} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-xs font-bold text-slate-200 group-hover:text-white truncate font-['Chakra_Petch'] leading-tight">
+                  <span className={`text-xs font-bold truncate font-['Chakra_Petch'] leading-tight ${
+                    isDay
+                      ? 'text-slate-900 group-hover:text-cyan-700'
+                      : 'text-slate-200 group-hover:text-white'
+                  }`}>
                     Profile
                   </span>
                   <span
                     className={`px-1.5 py-0.5 rounded font-mono text-[9px] font-bold shrink-0 ${
                       planBadgeText === 'ULTRA'
-                        ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 border border-cyan-400/40'
+                        ? isDay
+                          ? 'bg-cyan-50 text-cyan-800 border border-cyan-200'
+                          : 'bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 border border-cyan-400/40'
                         : planBadgeText === 'PRO'
-                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                        ? isDay
+                          ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                          : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                        : isDay
+                        ? 'bg-slate-100 text-slate-600 border border-slate-200'
                         : 'bg-slate-800 text-slate-400 border border-slate-700/60'
                     }`}
                   >
                     {planBadgeText}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 font-mono truncate leading-tight mt-0.5">
+                <p className={`text-[10px] font-mono truncate leading-tight mt-0.5 ${
+                  isDay ? 'text-slate-500' : 'text-slate-400'
+                }`}>
                   @{user?.username}
                 </p>
               </div>
             </button>
 
             {/* Subtle Divider */}
-            <div className="my-1 border-t border-slate-800/70" />
+            <div className={`my-1 border-t ${isDay ? 'border-slate-200' : 'border-slate-800/70'}`} />
 
             {/* Usage Limit Card: Ultra / Pro / Free */}
             {isUltra ? (
-              <div className="mx-0.5 my-1 p-2 rounded-xl bg-cyan-950/40 border border-cyan-500/40 space-y-1.5">
+              <div className={`mx-0.5 my-1 p-2 rounded-xl space-y-1.5 border ${
+                isDay
+                  ? 'bg-cyan-50/70 border-cyan-200 text-cyan-900'
+                  : 'bg-cyan-950/40 border-cyan-500/40'
+              }`}>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-[11px] font-bold text-cyan-300 font-['Chakra_Petch'] flex items-center gap-1.5">
-                    <Zap size={12} className="text-cyan-400" />
+                  <span className={`text-[11px] font-bold font-['Chakra_Petch'] flex items-center gap-1.5 ${
+                    isDay ? 'text-cyan-900' : 'text-cyan-300'
+                  }`}>
+                    <Zap size={12} className={isDay ? "text-cyan-600" : "text-cyan-400"} />
                     <span>Ultra Tokens</span>
-                    <span className="text-[9px] font-mono text-cyan-300 font-black px-1 rounded bg-cyan-500/20 border border-cyan-400/40">NO LIMIT</span>
+                    <span className={`text-[9px] font-mono font-black px-1 rounded border ${
+                      isDay
+                        ? 'bg-cyan-100 text-cyan-800 border-cyan-300'
+                        : 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+                    }`}>NO LIMIT</span>
                   </span>
-                  <span className="text-[11px] font-mono text-cyan-300 font-bold">
+                  <span className={`text-[11px] font-mono font-bold ${
+                    isDay ? 'text-cyan-800' : 'text-cyan-300'
+                  }`}>
                     ∞ Unlimited
                   </span>
                 </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div className={`w-full h-1.5 rounded-full overflow-hidden ${
+                  isDay ? 'bg-cyan-100' : 'bg-slate-800'
+                }`}>
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-purple-400 transition-all duration-300 ease-out"
                     style={{ width: '100%' }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[9px] text-cyan-400/80 font-mono mt-0.5">
+                <div className={`flex items-center justify-between text-[9px] font-mono mt-0.5 ${
+                  isDay ? 'text-cyan-700' : 'text-cyan-400/80'
+                }`}>
                   <span>Unlimited AI token allowance</span>
                 </div>
               </div>
             ) : isPro ? (
-              <div className="mx-0.5 my-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70 space-y-2.5">
+              <div className={`mx-0.5 my-1 p-2 rounded-xl border space-y-2.5 ${
+                isDay
+                  ? 'bg-slate-50 border-slate-200'
+                  : 'bg-slate-900/60 border-slate-800/70'
+              }`}>
                 {/* 1. Free Usage Limit */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch']">
+                    <span className={`text-[11px] font-medium font-['Chakra_Petch'] ${
+                      isDay ? 'text-slate-700' : 'text-slate-300'
+                    }`}>
                       Free Usage Limit
                     </span>
-                    <span className="text-[11px] font-mono text-slate-400 font-medium">
+                    <span className={`text-[11px] font-mono font-medium ${
+                      isDay ? 'text-slate-500' : 'text-slate-400'
+                    }`}>
                       {freePercentage}%
                     </span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${
+                    isDay ? 'bg-slate-200' : 'bg-slate-800'
+                  }`}>
                     <div
                       className={`h-full rounded-full transition-all duration-300 ease-out ${
-                        freeRemaining === 0 ? 'bg-slate-600' : 'bg-slate-300'
+                        freeRemaining === 0 ? (isDay ? 'bg-slate-400' : 'bg-slate-600') : (isDay ? 'bg-slate-700' : 'bg-slate-300')
                       }`}
                       style={{ width: `${Math.min(100, Math.max(0, freePercentage))}%` }}
                     />
                   </div>
                 </div>
 
-                <div className="border-t border-slate-800/50" />
+                <div className={`border-t ${isDay ? 'border-slate-200' : 'border-slate-800/50'}`} />
 
                 {/* 2. Pro Usage Limit (10x Usage, resets daily as normal) */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch'] flex items-center gap-1.5">
+                    <span className={`text-[11px] font-medium font-['Chakra_Petch'] flex items-center gap-1.5 ${
+                      isDay ? 'text-slate-700' : 'text-slate-300'
+                    }`}>
                       <span>Pro Usage Limit</span>
-                      <span className="text-[9px] font-mono text-purple-400 font-bold px-1 rounded bg-purple-500/10 border border-purple-500/20">10x</span>
+                      <span className={`text-[9px] font-mono font-bold px-1 rounded border ${
+                        isDay
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                          : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                      }`}>10x</span>
                     </span>
-                    <span className="text-[11px] font-mono text-slate-400 font-medium">
+                    <span className={`text-[11px] font-mono font-medium ${
+                      isDay ? 'text-slate-500' : 'text-slate-400'
+                    }`}>
                       {proPercentage}%
                     </span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${
+                    isDay ? 'bg-slate-200' : 'bg-slate-800'
+                  }`}>
                     <div
-                      className="h-full rounded-full bg-slate-300 transition-all duration-300 ease-out"
+                      className={`h-full rounded-full transition-all duration-300 ease-out ${
+                        isDay ? 'bg-purple-600' : 'bg-slate-300'
+                      }`}
                       style={{ width: `${Math.min(100, Math.max(0, proPercentage))}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[9px] text-slate-500 font-mono mt-0.5">
+                  <div className={`flex items-center justify-between text-[9px] font-mono mt-0.5 ${
+                    isDay ? 'text-slate-500' : 'text-slate-500'
+                  }`}>
                     <span
                       title="Global reset at 2:00 PM Singapore Time (Asia/Singapore, UTC+8)"
-                      className="flex items-center gap-1 text-[9px] text-slate-500 tracking-tight"
+                      className="flex items-center gap-1 text-[9px] tracking-tight"
                     >
-                      <RotateCcw size={9} className="text-slate-500 shrink-0" />
+                      <RotateCcw size={9} className="shrink-0" />
                       Resets in {resetCountdown}
                     </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="mx-0.5 my-1 p-2 rounded-xl bg-slate-900/60 border border-slate-800/70">
+              <div className={`mx-0.5 my-1 p-2 rounded-xl border ${
+                isDay
+                  ? 'bg-slate-50 border-slate-200'
+                  : 'bg-slate-900/60 border-slate-800/70'
+              }`}>
                 <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-[11px] font-medium text-slate-300 font-['Chakra_Petch']">
+                  <span className={`text-[11px] font-medium font-['Chakra_Petch'] ${
+                    isDay ? 'text-slate-700' : 'text-slate-300'
+                  }`}>
                     Usage Limit
                   </span>
-                  <span className="text-[11px] font-mono text-slate-400 font-medium">
+                  <span className={`text-[11px] font-mono font-medium ${
+                    isDay ? 'text-slate-500' : 'text-slate-400'
+                  }`}>
                     {freePercentage}%
                   </span>
                 </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div className={`w-full h-1.5 rounded-full overflow-hidden ${
+                  isDay ? 'bg-slate-200' : 'bg-slate-800'
+                }`}>
                   <div
-                    className="h-full rounded-full bg-slate-300 transition-all duration-300 ease-out"
+                    className={`h-full rounded-full transition-all duration-300 ease-out ${
+                      isDay ? 'bg-slate-700' : 'bg-slate-300'
+                    }`}
                     style={{ width: `${Math.min(100, Math.max(0, freePercentage))}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-1.5">
+                <div className={`flex items-center justify-between text-[10px] font-mono mt-1.5 ${
+                  isDay ? 'text-slate-500' : 'text-slate-500'
+                }`}>
                   <span
                     title="Global reset at 2:00 PM Singapore Time (Asia/Singapore, UTC+8)"
-                    className="flex items-center gap-1 text-[9px] text-slate-500 tracking-tight"
+                    className="flex items-center gap-1 text-[9px] tracking-tight"
                   >
-                    <RotateCcw size={9} className="text-slate-500 shrink-0" />
+                    <RotateCcw size={9} className="shrink-0" />
                     Resets in {resetCountdown}
                   </span>
                 </div>
@@ -2117,7 +2203,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             )}
 
             {/* Subtle Divider */}
-            <div className="my-1 border-t border-slate-800/70" />
+            <div className={`my-1 border-t ${isDay ? 'border-slate-200' : 'border-slate-800/70'}`} />
 
             {/* Menu Item 2: Log Out */}
             <button
@@ -2127,9 +2213,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 logout();
                 onNavigate('home');
               }}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-left cursor-pointer group"
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors text-left cursor-pointer group ${
+                isDay
+                  ? 'text-rose-700 hover:text-rose-800 hover:bg-rose-50'
+                  : 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10'
+              }`}
             >
-              <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center flex-shrink-0 text-rose-400 group-hover:bg-rose-500/20 transition-colors">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                isDay
+                  ? 'bg-rose-100 text-rose-700 group-hover:bg-rose-200'
+                  : 'bg-rose-500/10 text-rose-400 group-hover:bg-rose-500/20'
+              }`}>
                 <LogOut size={15} className="transition-transform group-hover:-translate-x-0.5" />
               </div>
               <span className="text-xs font-bold font-['Chakra_Petch'] leading-tight">
@@ -2149,14 +2243,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             isCollapsed ? 'justify-center px-0 py-2.5 relative' : 'justify-between px-3 py-2.5'
           } rounded-xl text-xs font-medium transition-all cursor-pointer ${
             isSettingsMenuOpen || isSettingsActive
-              ? 'bg-slate-800 text-white font-semibold shadow-inner'
+              ? isDay
+                ? 'bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-sm'
+                : 'bg-slate-800 text-white font-semibold shadow-inner'
+              : isDay
+              ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                isSettingsMenuOpen || isSettingsActive ? 'text-white' : 'text-slate-400'
+                isSettingsMenuOpen || isSettingsActive
+                  ? isDay ? 'text-slate-900' : 'text-white'
+                  : isDay ? 'text-slate-500' : 'text-slate-400'
               }`}
             >
               <Settings
@@ -2172,8 +2272,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {!isCollapsed && (
             <ChevronUp
               size={14}
-              className={`text-slate-400 transition-transform duration-200 shrink-0 ${
-                isSettingsMenuOpen ? 'rotate-180 text-white' : ''
+              className={`transition-transform duration-200 shrink-0 ${
+                isDay
+                  ? isSettingsMenuOpen ? 'rotate-180 text-slate-900' : 'text-slate-400'
+                  : isSettingsMenuOpen ? 'rotate-180 text-white' : 'text-slate-400'
               }`}
             />
           )}
@@ -2823,23 +2925,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 <div className="lg:col-span-2 space-y-6">
                   {/* Feedback Banners */}
                   {profileSavedMsg && (
-                    <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                      <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
-                      <span>Account updated successfully!</span>
+                    <div className={`p-3.5 rounded-xl border text-xs flex items-center gap-2.5 transition-colors ${
+                      isDay
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-sm'
+                        : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+                    }`}>
+                      <CheckCircle2 size={16} className={isDay ? "text-emerald-600 flex-shrink-0" : "text-emerald-400 flex-shrink-0"} />
+                      <span className="font-medium">Account updated successfully!</span>
                     </div>
                   )}
 
                   {profileErrorMsg && (
-                    <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
-                      <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
-                      <span>{profileErrorMsg}</span>
+                    <div className={`p-3.5 rounded-xl border text-xs flex items-center gap-2.5 transition-colors ${
+                      isDay
+                        ? 'bg-rose-50 border-rose-200 text-rose-800 shadow-sm'
+                        : 'bg-red-950/40 border-red-500/30 text-red-300'
+                    }`}>
+                      <AlertCircle size={16} className={isDay ? "text-rose-600 flex-shrink-0" : "text-red-400 flex-shrink-0"} />
+                      <span className="font-medium">{profileErrorMsg}</span>
                     </div>
                   )}
 
                   {/* 1. Profile Banner & Creator Hero Card */}
-                  <div className="rounded-2xl bg-[#090D18] border border-slate-800 overflow-hidden shadow-sm">
+                  <div className={`rounded-2xl border overflow-hidden shadow-sm transition-colors ${
+                    isDay ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#090D18] border-slate-800'
+                  }`}>
                     {/* Banner Background Container */}
-                    <div className="relative w-full h-36 sm:h-48 bg-slate-950 overflow-hidden group/banner border-b border-slate-800/80">
+                    <div className={`relative w-full h-36 sm:h-48 overflow-hidden group/banner border-b transition-colors ${
+                      isDay ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800/80'
+                    }`}>
                       {profileBanner ? (
                         <>
                           <img
@@ -2847,15 +2961,27 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             alt="Donation Page Banner"
                             className="w-full h-full object-cover transition-transform duration-300 group-hover/banner:scale-[1.01]"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-[#090D18] via-[#090D18]/30 to-transparent pointer-events-none" />
+                          <div className={`absolute inset-0 bg-gradient-to-t pointer-events-none transition-colors ${
+                            isDay
+                              ? 'from-white via-white/40 to-transparent'
+                              : 'from-[#090D18] via-[#090D18]/30 to-transparent'
+                          }`} />
                         </>
                       ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-[#0B0F1E] to-slate-950 text-slate-500 p-4">
-                          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                            <ImageIcon size={16} className="text-slate-500" />
-                            <span>No Banner Image Set</span>
+                        <div className={`w-full h-full flex flex-col items-center justify-center p-4 transition-colors ${
+                          isDay
+                            ? 'bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100 text-slate-500'
+                            : 'bg-gradient-to-br from-slate-950 via-[#0B0F1E] to-slate-950 text-slate-500'
+                        }`}>
+                          <div className={`flex items-center gap-2 text-xs font-mono ${
+                            isDay ? 'text-slate-600' : 'text-slate-400'
+                          }`}>
+                            <ImageIcon size={16} className={isDay ? "text-slate-400" : "text-slate-500"} />
+                            <span className="font-semibold">No Banner Image Set</span>
                           </div>
-                          <p className="text-[11px] text-slate-500 text-center mt-1 max-w-sm">
+                          <p className={`text-[11px] text-center mt-1 max-w-sm ${
+                            isDay ? 'text-slate-500' : 'text-slate-500'
+                          }`}>
                             Add a custom banner image to serve as wallpaper and header on your public donation page.
                           </p>
                         </div>
@@ -2863,8 +2989,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                       {/* Top Badges & Banner Actions */}
                       <div className="absolute top-3 inset-x-3 sm:inset-x-4 flex items-center justify-between pointer-events-none">
-                        <span className="pointer-events-auto px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-[10px] font-mono text-slate-300 flex items-center gap-1.5 shadow-sm">
-                          <ImageIcon size={12} className="text-cyan-400" />
+                        <span className={`pointer-events-auto px-2.5 py-1 rounded-lg backdrop-blur-md text-[10px] font-mono flex items-center gap-1.5 shadow-sm transition-colors ${
+                          isDay
+                            ? 'bg-white/90 border border-slate-200 text-slate-700 font-semibold shadow-sm'
+                            : 'bg-black/70 border border-white/10 text-slate-300'
+                        }`}>
+                          <ImageIcon size={12} className={isDay ? "text-cyan-600" : "text-cyan-400"} />
                           <span>Donation Page Banner</span>
                         </span>
 
@@ -2872,17 +3002,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           <button
                             type="button"
                             onClick={() => setIsBannerMediaPickerOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/75 hover:bg-black/90 backdrop-blur-md border border-white/15 text-white hover:text-cyan-300 text-xs font-mono font-bold transition-all shadow-md cursor-pointer hover:border-cyan-500/50"
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg backdrop-blur-md text-xs font-mono font-bold transition-all shadow-md cursor-pointer ${
+                              isDay
+                                ? 'bg-white/95 hover:bg-white border border-slate-200 text-slate-800 hover:text-cyan-700 hover:border-cyan-500/50'
+                                : 'bg-black/75 hover:bg-black/90 border border-white/15 text-white hover:text-cyan-300 hover:border-cyan-500/50'
+                            }`}
                             title="Choose or upload a custom banner image"
                           >
-                            <Upload size={13} className="text-cyan-400" />
+                            <Upload size={13} className={isDay ? "text-cyan-600" : "text-cyan-400"} />
                             <span>{profileBanner ? 'Change Banner' : 'Upload Banner'}</span>
                           </button>
                           {profileBanner && (
                             <button
                               type="button"
                               onClick={handleRemoveBanner}
-                              className="p-1.5 rounded-lg bg-black/75 hover:bg-red-950/80 backdrop-blur-md border border-white/15 hover:border-red-500/40 text-slate-300 hover:text-red-400 transition-all shadow-md cursor-pointer"
+                              className={`p-1.5 rounded-lg backdrop-blur-md transition-all shadow-md cursor-pointer ${
+                                isDay
+                                  ? 'bg-white/95 hover:bg-rose-50 border border-slate-200 hover:border-rose-300 text-slate-600 hover:text-rose-600'
+                                  : 'bg-black/75 hover:bg-red-950/80 border border-white/15 hover:border-red-500/40 text-slate-300 hover:text-red-400'
+                              }`}
                               title="Remove banner image"
                             >
                               <Trash2 size={13} />
@@ -2898,7 +3036,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         {/* Profile Avatar / Logo overlapping banner */}
                         <div
                           onClick={() => setIsMediaPickerOpen(true)}
-                          className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-900 border-4 border-[#090D18] hover:border-cyan-400 overflow-hidden cursor-pointer group flex-shrink-0 transition-all shadow-[0_4px_25px_rgba(0,0,0,0.6)]"
+                          className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden cursor-pointer group flex-shrink-0 transition-all ${
+                            isDay
+                              ? 'bg-white border-4 border-white hover:border-cyan-500 shadow-[0_4px_20px_rgba(0,0,0,0.12)] ring-1 ring-slate-200/80'
+                              : 'bg-slate-900 border-4 border-[#090D18] hover:border-cyan-400 shadow-[0_4px_25px_rgba(0,0,0,0.6)]'
+                          }`}
                           title="Click to choose a new Profile Logo from Media Library"
                         >
                           <img
@@ -2938,13 +3080,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                     }
                                   }}
                                   placeholder="Enter display name..."
-                                  className="px-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-400 text-white font-bold text-sm font-['Chakra_Petch'] focus:outline-none w-full sm:w-64"
+                                  className={`px-3 py-1.5 rounded-xl font-bold text-sm font-['Chakra_Petch'] focus:outline-none w-full sm:w-64 transition-colors ${
+                                    isDay
+                                      ? 'bg-white border-2 border-cyan-600 text-slate-900 shadow-sm'
+                                      : 'bg-slate-950 border border-cyan-400 text-white'
+                                  }`}
                                 />
                                 <button
                                   type="button"
                                   disabled={savingDisplayName}
                                   onClick={handleSaveInlineDisplayName}
-                                  className="p-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50"
+                                  className={`p-1.5 rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 ${
+                                    isDay
+                                      ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm'
+                                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                                  }`}
                                   title="Save Display Name"
                                 >
                                   <Check size={14} />
@@ -2955,7 +3105,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                     setProfileName(user.displayName || user.username || '');
                                     setIsEditingDisplayName(false);
                                   }}
-                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                    isDay
+                                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                                  }`}
                                   title="Cancel"
                                 >
                                   <X size={14} />
@@ -2969,26 +3123,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                     setIsEditingDisplayName(true);
                                   }}
                                   title="Click to edit display name"
-                                  className="text-lg font-extrabold text-white hover:text-cyan-300 font-['Chakra_Petch'] cursor-pointer px-2 py-0.5 -mx-2 rounded-lg hover:bg-slate-900/80 border border-transparent hover:border-slate-800 transition-all"
+                                  className={`text-lg font-extrabold font-['Chakra_Petch'] cursor-pointer px-2 py-0.5 -mx-2 rounded-lg border border-transparent transition-all ${
+                                    isDay
+                                      ? 'text-slate-900 hover:text-cyan-700 hover:bg-slate-100/80 hover:border-slate-200'
+                                      : 'text-white hover:text-cyan-300 hover:bg-slate-900/80 hover:border-slate-800'
+                                  }`}
                                 >
                                   {profileName || user.displayName || user.username}
                                 </h3>
                                 {user.isVerified && (
-                                  <span title="Verified Creator" className="inline-flex items-center text-cyan-400">
-                                    <BadgeCheck size={18} className="text-cyan-400 fill-cyan-400/20" />
+                                  <span title="Verified Creator" className={`inline-flex items-center ${isDay ? 'text-cyan-600' : 'text-cyan-400'}`}>
+                                    <BadgeCheck size={18} className={isDay ? "text-cyan-600 fill-cyan-500/20" : "text-cyan-400 fill-cyan-400/20"} />
                                   </span>
                                 )}
                               </div>
                             )}
                           </div>
-                          <p className="text-xs text-cyan-400 font-mono mt-0.5">
+                          <p className={`text-xs font-mono mt-0.5 ${isDay ? 'text-cyan-700 font-semibold' : 'text-cyan-400'}`}>
                             @{user.username || profileUsername}
                           </p>
                         </div>
                       </div>
 
                       {/* Clickable Description / Bio */}
-                      <div className="w-full pt-2 border-t border-slate-800/60">
+                      <div className={`w-full pt-2 border-t transition-colors ${isDay ? 'border-slate-200' : 'border-slate-800/60'}`}>
                         {isEditingBio ? (
                           <div className="space-y-2">
                             <textarea
@@ -3003,7 +3161,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                 }
                               }}
                               placeholder="Tell your viewers what you stream, when you go live, and how tips support your channel..."
-                              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-400 text-xs text-white focus:outline-none leading-relaxed resize-none"
+                              className={`w-full px-3 py-2 rounded-xl text-xs focus:outline-none leading-relaxed resize-none transition-colors ${
+                                isDay
+                                  ? 'bg-white border-2 border-cyan-600 text-slate-900 shadow-sm'
+                                  : 'bg-slate-950 border border-cyan-400 text-white'
+                              }`}
                             />
                             <div className="flex items-center justify-end gap-2">
                               <button
@@ -3012,7 +3174,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                   setProfileBio(user.bio || '');
                                   setIsEditingBio(false);
                                 }}
-                                className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono transition-colors cursor-pointer"
+                                className={`px-3 py-1 rounded-lg text-xs font-mono transition-colors cursor-pointer ${
+                                  isDay
+                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                                }`}
                               >
                                 Cancel
                               </button>
@@ -3020,7 +3186,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                 type="button"
                                 disabled={savingBio}
                                 onClick={handleSaveInlineBio}
-                                className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs font-mono transition-colors cursor-pointer disabled:opacity-50"
+                                className={`px-3 py-1 rounded-lg font-bold text-xs font-mono transition-colors cursor-pointer disabled:opacity-50 ${
+                                  isDay
+                                    ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm'
+                                    : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+                                }`}
                               >
                                 {savingBio ? 'Saving...' : 'Save Description'}
                               </button>
@@ -3033,14 +3203,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                               setIsEditingBio(true);
                             }}
                             title="Click to edit description"
-                            className="group/bio cursor-pointer p-2.5 -mx-2.5 rounded-xl hover:bg-slate-900/70 border border-transparent hover:border-slate-800/80 transition-all"
+                            className={`group/bio cursor-pointer p-2.5 -mx-2.5 rounded-xl border border-transparent transition-all ${
+                              isDay
+                                ? 'hover:bg-slate-50 hover:border-slate-200'
+                                : 'hover:bg-slate-900/70 hover:border-slate-800/80'
+                            }`}
                           >
                             {profileBio || user.bio ? (
-                              <p className="text-xs text-slate-300 group-hover/bio:text-white leading-relaxed whitespace-pre-wrap break-words">
+                              <p className={`text-xs leading-relaxed whitespace-pre-wrap break-words transition-colors ${
+                                isDay
+                                  ? 'text-slate-600 group-hover/bio:text-slate-900'
+                                  : 'text-slate-300 group-hover/bio:text-white'
+                              }`}>
                                 {profileBio || user.bio}
                               </p>
                             ) : (
-                              <p className="text-xs text-slate-500 group-hover/bio:text-slate-300 italic">
+                              <p className={`text-xs italic transition-colors ${
+                                isDay
+                                  ? 'text-slate-400 group-hover/bio:text-slate-600'
+                                  : 'text-slate-500 group-hover/bio:text-slate-300'
+                              }`}>
                                 Click here to add a channel description / bio...
                               </p>
                             )}
@@ -3053,18 +3235,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   {/* 2. Information Profile */}
                   <form
                     onSubmit={handleSaveProfile}
-                    className="p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-5"
+                    className={`p-6 rounded-2xl border space-y-5 transition-colors ${
+                      isDay ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#090D18] border-slate-800'
+                    }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 transition-colors ${
+                      isDay ? 'border-slate-200' : 'border-slate-800/80'
+                    }`}>
                       <div>
-                        <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                        <h3 className={`text-sm font-bold font-['Chakra_Petch'] uppercase tracking-wider ${
+                          isDay ? 'text-slate-900' : 'text-white'
+                        }`}>
                           Information Profile
                         </h3>
-                        <p className="text-xs text-slate-400 mt-0.5">
+                        <p className={`text-xs mt-0.5 ${isDay ? 'text-slate-500' : 'text-slate-400'}`}>
                           Manage your account email, unique @username handle, thank you message, and social links.
                         </p>
                       </div>
-                      <span className="text-[11px] font-mono text-cyan-400 font-semibold self-start sm:self-auto bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-800/40">
+                      <span className={`text-[11px] font-mono font-semibold self-start sm:self-auto px-2.5 py-1 rounded-lg border transition-colors ${
+                        isDay
+                          ? 'text-cyan-700 bg-cyan-50 border-cyan-200'
+                          : 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40'
+                      }`}>
                         {origin}/@{profileUsername || user.username}
                       </span>
                     </div>
@@ -3075,16 +3267,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         {/* 1. Email Address */}
                         <div>
                           <div className="flex items-center justify-between mb-1.5 font-mono">
-                            <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                              <Mail size={13} className="text-cyan-400" />
+                            <label className={`font-semibold flex items-center gap-1.5 ${
+                              isDay ? 'text-slate-700' : 'text-slate-300'
+                            }`}>
+                              <Mail size={13} className={isDay ? "text-cyan-600" : "text-cyan-400"} />
                               <span>Email Address</span>
                             </label>
-                            <span className="text-[10px] text-emerald-400 font-mono">Verified</span>
+                            <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full ${
+                              isDay ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'text-emerald-400'
+                            }`}>
+                              Verified
+                            </span>
                           </div>
-                          <div className="flex items-center px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 font-mono text-xs select-all">
+                          <div className={`flex items-center px-3.5 py-2.5 rounded-xl border font-mono text-xs select-all transition-colors ${
+                            isDay
+                              ? 'bg-slate-50 border-slate-200 text-slate-800'
+                              : 'bg-slate-950/80 border-slate-800 text-slate-300'
+                          }`}>
                             {user.email}
                           </div>
-                          <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                          <span className={`text-[10px] mt-1 block font-mono ${
+                            isDay ? 'text-slate-500' : 'text-slate-500'
+                          }`}>
                             Linked Google account email address.
                           </span>
                         </div>
@@ -3092,18 +3296,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         {/* 2. Streamer Username */}
                         <div>
                           <div className="flex items-center justify-between mb-1.5 font-mono">
-                            <label className="text-slate-300 font-semibold flex items-center gap-1">
+                            <label className={`font-semibold flex items-center gap-1 ${
+                              isDay ? 'text-slate-700' : 'text-slate-300'
+                            }`}>
                               <span>Username</span>
-                              <span className="text-cyan-400">*</span>
+                              <span className={isDay ? "text-cyan-600" : "text-cyan-400"}>*</span>
                             </label>
                             {usernameStatusMsg && (
                               <span
                                 className={`text-[10px] font-mono flex items-center gap-1 font-semibold ${
                                   usernameStatus === 'taken'
-                                    ? 'text-red-400'
+                                    ? isDay ? 'text-red-600' : 'text-red-400'
                                     : usernameStatus === 'available'
-                                    ? 'text-emerald-400'
-                                    : 'text-slate-400'
+                                    ? isDay ? 'text-emerald-700' : 'text-emerald-400'
+                                    : isDay ? 'text-slate-500' : 'text-slate-400'
                                 }`}
                               >
                                 {usernameStatus === 'taken' && <AlertCircle size={10} />}
@@ -3113,15 +3319,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             )}
                           </div>
                           <div
-                            className={`flex items-center rounded-xl bg-slate-950 border transition-colors overflow-hidden ${
+                            className={`flex items-center rounded-xl border transition-colors overflow-hidden ${
                               usernameStatus === 'taken'
-                                ? 'border-red-500/60 focus-within:border-red-400'
+                                ? isDay ? 'border-red-400 focus-within:border-red-600 bg-white' : 'border-red-500/60 focus-within:border-red-400 bg-slate-950'
                                 : usernameStatus === 'available'
-                                ? 'border-emerald-500/60 focus-within:border-emerald-400'
-                                : 'border-slate-800 focus-within:border-cyan-400'
+                                ? isDay ? 'border-emerald-400 focus-within:border-emerald-600 bg-white' : 'border-emerald-500/60 focus-within:border-emerald-400 bg-slate-950'
+                                : isDay ? 'border-slate-200 focus-within:border-cyan-600 bg-white shadow-sm' : 'border-slate-800 focus-within:border-cyan-400 bg-slate-950'
                             }`}
                           >
-                            <span className="px-3.5 py-2.5 bg-slate-900/80 text-slate-400 font-mono text-xs border-r border-slate-800 select-none font-bold">
+                            <span className={`px-3.5 py-2.5 font-mono text-xs border-r select-none font-bold transition-colors ${
+                              isDay ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-slate-900/80 text-slate-400 border-slate-800'
+                            }`}>
                               @
                             </span>
                             <input
@@ -3132,10 +3340,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                 setProfileUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
                               }
                               placeholder="your_username"
-                              className="w-full px-3.5 py-2.5 bg-transparent text-cyan-400 font-bold text-xs font-mono focus:outline-none placeholder-slate-600"
+                              className={`w-full px-3.5 py-2.5 bg-transparent font-bold text-xs font-mono focus:outline-none transition-colors ${
+                                isDay
+                                  ? 'text-cyan-700 placeholder-slate-400'
+                                  : 'text-cyan-400 placeholder-slate-600'
+                              }`}
                             />
                           </div>
-                          <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                          <span className={`text-[10px] mt-1 block font-mono ${
+                            isDay ? 'text-slate-500' : 'text-slate-500'
+                          }`}>
                             3–24 characters (letters, numbers, underscores). Public URL handle.
                           </span>
                         </div>
@@ -3144,35 +3358,51 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       {/* Custom Thank You Message for Donors */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5 font-mono">
-                          <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                            <Sparkles size={13} className="text-pink-400" />
+                          <label className={`font-semibold flex items-center gap-1.5 ${
+                            isDay ? 'text-slate-700' : 'text-slate-300'
+                          }`}>
+                            <Sparkles size={13} className={isDay ? "text-pink-600" : "text-pink-400"} />
                             <span>Custom Thank You Message</span>
                           </label>
-                          <span className="text-[10px] text-slate-500">Post-Payment Modal Message</span>
+                          <span className={`text-[10px] ${isDay ? 'text-slate-500' : 'text-slate-500'}`}>Post-Payment Modal Message</span>
                         </div>
                         <textarea
                           rows={3}
                           value={profileThanksMessage}
                           onChange={(e) => setProfileThanksMessage(e.target.value)}
                           placeholder="e.g. Thank you, {donor}! Your tip of {amount} has been broadcast live on stream. Your support means the world to me! 💖"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-cyan-400 transition-colors leading-relaxed"
+                          className={`w-full px-3.5 py-2.5 rounded-xl border leading-relaxed transition-colors focus:outline-none ${
+                            isDay
+                              ? 'bg-slate-50/50 hover:bg-white focus:bg-white border-slate-200 text-slate-900 focus:border-cyan-600 shadow-sm'
+                              : 'bg-slate-950 border border-slate-800 text-white focus:border-cyan-400'
+                          }`}
                         />
-                        <span className="text-[10px] text-slate-500 mt-1 block font-mono">
-                          Displayed to viewers immediately after their donation is completed. Placeholders: <code className="text-cyan-400 font-bold">&#123;donor&#125;</code>, <code className="text-cyan-400 font-bold">&#123;amount&#125;</code>, <code className="text-cyan-400 font-bold">&#123;streamer&#125;</code>
+                        <span className={`text-[10px] mt-1 block font-mono ${
+                          isDay ? 'text-slate-500' : 'text-slate-500'
+                        }`}>
+                          Displayed to viewers immediately after their donation is completed. Placeholders: <code className={`font-bold ${isDay ? 'text-cyan-700 bg-cyan-50 px-1 py-0.5 rounded border border-cyan-200' : 'text-cyan-400'}`}>&#123;donor&#125;</code>, <code className={`font-bold ${isDay ? 'text-cyan-700 bg-cyan-50 px-1 py-0.5 rounded border border-cyan-200' : 'text-cyan-400'}`}>&#123;amount&#125;</code>, <code className={`font-bold ${isDay ? 'text-cyan-700 bg-cyan-50 px-1 py-0.5 rounded border border-cyan-200' : 'text-cyan-400'}`}>&#123;streamer&#125;</code>
                         </span>
                       </div>
 
                       {/* 4. Creator Social & Channel Links (Displayed on Donation Page) */}
-                      <div className="pt-4 border-t border-slate-800/80 space-y-3">
+                      <div className={`pt-4 border-t space-y-3 transition-colors ${
+                        isDay ? 'border-slate-200' : 'border-slate-800/80'
+                      }`}>
                         <div className="flex items-center justify-between">
-                          <label className="text-slate-300 font-semibold font-mono flex items-center gap-1.5">
-                            <LinkIcon size={14} className="text-cyan-400" />
+                          <label className={`font-semibold font-mono flex items-center gap-1.5 ${
+                            isDay ? 'text-slate-700' : 'text-slate-300'
+                          }`}>
+                            <LinkIcon size={14} className={isDay ? "text-cyan-600" : "text-cyan-400"} />
                             <span>Social &amp; Channel Links</span>
                           </label>
                           <span
-                            className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border ${
+                            className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border transition-colors ${
                               profileLinks.length >= maxAllowedLinks
-                                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                ? isDay
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                : isDay
+                                ? 'bg-slate-100 text-slate-600 border-slate-200'
                                 : 'bg-slate-900 text-slate-400 border-slate-800'
                             }`}
                           >
@@ -3180,10 +3410,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             {currentPlan === 'pro' ? 'Pro Links' : 'Free Link'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                        <p className={`text-[11px] leading-relaxed ${isDay ? 'text-slate-600' : 'text-slate-400'}`}>
                           Add links to your YouTube, Facebook, Instagram, TikTok, Telegram, Discord, Twitch, X, or personal website. They will be displayed right next to your profile logo on your public donation page with official logos!
                           {currentPlan !== 'pro' && (
-                            <span className="text-amber-400 block mt-0.5">
+                            <span className={`block mt-0.5 font-medium ${isDay ? 'text-amber-700' : 'text-amber-400'}`}>
                               Free plan allows 1 link. Upgrade to Pro for up to 5 links.
                             </span>
                           )}
@@ -3197,23 +3427,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                               return (
                                 <div
                                   key={link.id || idx}
-                                  className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors"
+                                  className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition-colors ${
+                                    isDay
+                                      ? 'bg-slate-50/70 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                      : 'bg-slate-950 border border-slate-800 hover:border-slate-700'
+                                  }`}
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <img
                                       src={link.icon || detected.iconUrl}
                                       alt={link.title || detected.defaultTitle}
-                                      className="w-5 h-5 rounded-md object-contain bg-slate-900 flex-shrink-0"
+                                      className={`w-5 h-5 rounded-md object-contain flex-shrink-0 ${
+                                        isDay ? 'bg-white border border-slate-200 p-0.5' : 'bg-slate-900'
+                                      }`}
                                       onError={(e) => {
                                         (e.target as HTMLElement).style.display = 'none';
                                       }}
                                     />
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-1.5 leading-none">
-                                        <span className="text-xs font-bold text-white font-mono truncate">
+                                        <span className={`text-xs font-bold font-mono truncate ${
+                                          isDay ? 'text-slate-900' : 'text-white'
+                                        }`}>
                                           {link.title || detected.defaultTitle}
                                         </span>
-                                        <span className="text-[10px] text-cyan-400 uppercase font-mono px-1.5 py-0.2 rounded bg-cyan-950/60 border border-cyan-800/40">
+                                        <span className={`text-[10px] uppercase font-mono px-1.5 py-0.2 rounded border font-semibold ${
+                                          isDay
+                                            ? 'text-cyan-700 bg-cyan-50 border-cyan-200'
+                                            : 'text-cyan-400 bg-cyan-950/60 border-cyan-800/40'
+                                        }`}>
                                           {link.platform || detected.platform}
                                         </span>
                                       </div>
@@ -3221,7 +3463,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                         href={link.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-[11px] text-slate-400 hover:text-cyan-300 font-mono truncate block mt-0.5"
+                                        className={`text-[11px] font-mono truncate block mt-0.5 transition-colors ${
+                                          isDay
+                                            ? 'text-slate-500 hover:text-cyan-700'
+                                            : 'text-slate-400 hover:text-cyan-300'
+                                        }`}
                                       >
                                         {link.url}
                                       </a>
@@ -3233,7 +3479,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                       href={link.url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-lg transition-colors"
+                                      className={`p-1.5 rounded-lg transition-colors ${
+                                        isDay
+                                          ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/70'
+                                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                                      }`}
                                       title="Open link"
                                     >
                                       <ExternalLink size={13} />
@@ -3241,7 +3491,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveLink(link.id)}
-                                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                        isDay
+                                          ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                                          : 'text-slate-400 hover:text-red-400 hover:bg-red-950/40'
+                                      }`}
                                       title="Remove link"
                                     >
                                       <Trash2 size={13} />
@@ -3255,8 +3509,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
 
                         {/* Add Link Input Controls */}
                         {profileLinks.length < maxAllowedLinks ? (
-                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-2.5">
-                            <span className="text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider block">
+                          <div className={`p-3 rounded-xl border space-y-2.5 transition-colors ${
+                            isDay ? 'bg-slate-50/60 border-slate-200' : 'bg-slate-950 border-slate-800/80'
+                          }`}>
+                            <span className={`text-[11px] font-mono font-bold uppercase tracking-wider block ${
+                              isDay ? 'text-slate-700' : 'text-slate-300'
+                            }`}>
                               Add New Social Link
                             </span>
                             <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
@@ -3269,7 +3527,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                     if (linkErrorMsg) setLinkErrorMsg(null);
                                   }}
                                   placeholder="https://youtube.com/@yourchannel or fb.com/..."
-                                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                                  className={`w-full px-3 py-2 rounded-lg font-mono text-xs focus:outline-none transition-colors ${
+                                    isDay
+                                      ? 'bg-white border border-slate-200 text-slate-900 focus:border-cyan-600 shadow-sm placeholder:text-slate-400'
+                                      : 'bg-slate-900 border border-slate-800 text-white focus:border-cyan-400'
+                                  }`}
                                 />
                               </div>
                               <div className="sm:col-span-2">
@@ -3278,16 +3540,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                                   value={newLinkTitle}
                                   onChange={(e) => setNewLinkTitle(e.target.value)}
                                   placeholder="Title (optional)"
-                                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
+                                  className={`w-full px-3 py-2 rounded-lg font-mono text-xs focus:outline-none transition-colors ${
+                                    isDay
+                                      ? 'bg-white border border-slate-200 text-slate-900 focus:border-cyan-600 shadow-sm placeholder:text-slate-400'
+                                      : 'bg-slate-900 border border-slate-800 text-white focus:border-cyan-400'
+                                  }`}
                                 />
                               </div>
                             </div>
 
                             {/* Detected preview if user entered URL */}
                             {newLinkUrl.trim() && (
-                              <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 pt-0.5">
-                                <span className="text-slate-500">Auto-detected:</span>
-                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-cyan-300">
+                              <div className="flex items-center gap-2 text-[11px] font-mono pt-0.5">
+                                <span className={isDay ? "text-slate-500" : "text-slate-500"}>Auto-detected:</span>
+                                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border transition-colors ${
+                                  isDay
+                                    ? 'bg-white border-slate-200 text-cyan-700 font-semibold shadow-sm'
+                                    : 'bg-slate-900 border-slate-800 text-cyan-300'
+                                }`}>
                                   <img
                                     src={detectPlatform(newLinkUrl).iconUrl}
                                     alt="logo"
@@ -3302,7 +3572,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             )}
 
                             {linkErrorMsg && (
-                              <p className="text-xs text-red-400 font-mono flex items-center gap-1">
+                              <p className={`text-xs font-mono flex items-center gap-1 ${
+                                isDay ? 'text-rose-600 font-medium' : 'text-red-400'
+                              }`}>
                                 <AlertCircle size={12} />
                                 <span>{linkErrorMsg}</span>
                               </p>
@@ -3312,7 +3584,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                               <button
                                 type="button"
                                 onClick={handleAddLink}
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 font-bold text-xs font-mono transition-colors cursor-pointer"
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold text-xs font-mono transition-colors cursor-pointer ${
+                                  isDay
+                                    ? 'bg-cyan-50 hover:bg-cyan-100 border border-cyan-300 text-cyan-700 shadow-sm'
+                                    : 'bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300'
+                                }`}
                               >
                                 <Plus size={13} />
                                 <span>Add Link</span>
@@ -3320,7 +3596,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             </div>
                           </div>
                         ) : (
-                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
+                          <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-mono transition-colors ${
+                            isDay ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-slate-950 border-slate-800/80 text-slate-400'
+                          }`}>
                             <span>
                               {currentPlan === 'pro'
                                 ? '✓ Maximum of 5 Pro social links reached.'
@@ -3330,7 +3608,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                               <button
                                 type="button"
                                 onClick={() => onNavigate('pricing')}
-                                className="text-cyan-400 hover:underline font-bold"
+                                className={`font-bold hover:underline ${isDay ? 'text-cyan-700' : 'text-cyan-400'}`}
                               >
                                 Upgrade to Pro →
                               </button>
@@ -3340,8 +3618,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-slate-500">
+                    <div className={`pt-3 border-t flex items-center justify-between transition-colors ${
+                      isDay ? 'border-slate-200' : 'border-slate-800/60'
+                    }`}>
+                      <span className={`text-[10px] font-mono ${isDay ? 'text-slate-500' : 'text-slate-500'}`}>
                         All changes sync to MongoDB Atlas
                       </span>
                       <Button
@@ -3349,7 +3629,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         variant="primary"
                         size="md"
                         loading={savingProfile}
-                        className="font-bold"
+                        className="font-bold shadow-md"
                       >
                         Save Profile Details
                       </Button>
@@ -3357,22 +3637,38 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   </form>
 
                   {/* 3. Danger Zone — Account Deletion (7-Day Grace Period) */}
-                  <div className="p-6 rounded-2xl bg-gradient-to-br from-red-950/20 via-[#090D18] to-[#090D18] border border-red-500/30 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-red-500/20 pb-3">
+                  <div className={`p-6 rounded-2xl border space-y-4 transition-colors ${
+                    isDay
+                      ? 'bg-rose-50/50 border-rose-200 shadow-sm'
+                      : 'bg-gradient-to-br from-red-950/20 via-[#090D18] to-[#090D18] border-red-500/30'
+                  }`}>
+                    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 transition-colors ${
+                      isDay ? 'border-rose-200' : 'border-red-500/20'
+                    }`}>
                       <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400">
+                        <div className={`p-2 rounded-xl border ${
+                          isDay
+                            ? 'bg-rose-100 border-rose-200 text-rose-600'
+                            : 'bg-red-500/15 border-red-500/30 text-red-400'
+                        }`}>
                           <AlertCircle size={18} />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold text-red-300 font-['Chakra_Petch'] uppercase tracking-wider">
+                            <h3 className={`text-sm font-bold font-['Chakra_Petch'] uppercase tracking-wider ${
+                              isDay ? 'text-rose-950 font-extrabold' : 'text-red-300'
+                            }`}>
                               Danger Zone • Delete Account
                             </h3>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/15 text-red-400 border border-red-500/30 uppercase">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border uppercase ${
+                              isDay
+                                ? 'bg-rose-100 text-rose-700 border-rose-200'
+                                : 'bg-red-500/15 text-red-400 border-red-500/30'
+                            }`}>
                               7-Day Await
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">
+                          <p className={`text-xs mt-0.5 ${isDay ? 'text-slate-600' : 'text-slate-400'}`}>
                             Request permanent deletion of your creator account and all associated platform data.
                           </p>
                         </div>
@@ -3380,15 +3676,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
 
                     {accountDeletionNotice && (
-                      <div className="p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/30 text-cyan-300 text-xs flex items-center justify-between gap-2">
+                      <div className={`p-3.5 rounded-xl border text-xs flex items-center justify-between gap-2 transition-colors ${
+                        isDay
+                          ? 'bg-cyan-50 border-cyan-200 text-cyan-800 shadow-sm'
+                          : 'bg-slate-900/90 border-cyan-500/30 text-cyan-300'
+                      }`}>
                         <div className="flex items-center gap-2">
-                          <CheckCircle2 size={15} className="text-cyan-400 shrink-0" />
+                          <CheckCircle2 size={15} className={`shrink-0 ${isDay ? 'text-cyan-600' : 'text-cyan-400'}`} />
                           <span>{accountDeletionNotice}</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => setAccountDeletionNotice(null)}
-                          className="text-slate-400 hover:text-white p-1"
+                          className={`p-1 transition-colors ${isDay ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-white'}`}
                         >
                           <X size={13} />
                         </button>
@@ -3396,26 +3696,32 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     )}
 
                     {user.deletionStatus === 'pending' && user.deletionScheduledAt ? (
-                      <div className="p-4 rounded-xl bg-red-950/35 border border-red-500/40 space-y-3.5">
+                      <div className={`p-4 rounded-xl border space-y-3.5 transition-colors ${
+                        isDay
+                          ? 'bg-rose-100/70 border-rose-300 text-rose-950'
+                          : 'bg-red-950/35 border-red-500/40'
+                      }`}>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
-                              <span className="text-xs font-mono font-bold text-red-300 uppercase">
+                              <span className={`text-xs font-mono font-bold uppercase ${
+                                isDay ? 'text-rose-950' : 'text-red-300'
+                              }`}>
                                 Account Scheduled for Permanent Deletion
                               </span>
                             </div>
-                            <p className="text-xs text-slate-300 leading-relaxed">
+                            <p className={`text-xs leading-relaxed ${isDay ? 'text-slate-700' : 'text-slate-300'}`}>
                               Your account is currently in the <strong>7-day deletion waiting period</strong>. Unless cancelled, all of your creator data, profile settings, donation history, overlays, and widgets will be permanently deleted on{' '}
-                              <strong className="text-red-300 font-mono">
+                              <strong className={`font-mono ${isDay ? 'text-rose-950' : 'text-red-300'}`}>
                                 {new Date(user.deletionScheduledAt).toLocaleString()}
                               </strong>{' '}
-                              (retaining only your email address record <code className="text-cyan-300">{user.email}</code>).
+                              (retaining only your email address record <code className={isDay ? 'text-cyan-700 font-bold' : 'text-cyan-300'}>{user.email}</code>).
                             </p>
                             {user.deletionRequestedAt && (
-                              <p className="text-[11px] font-mono text-slate-400">
+                              <p className={`text-[11px] font-mono ${isDay ? 'text-slate-600' : 'text-slate-400'}`}>
                                 Requested on: {new Date(user.deletionRequestedAt).toLocaleString()} • Days remaining:{' '}
-                                <strong className="text-amber-300">
+                                <strong className={isDay ? 'text-amber-800 font-bold' : 'text-amber-300'}>
                                   {Math.max(
                                     1,
                                     Math.ceil(
@@ -3443,11 +3749,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </div>
                     ) : (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-                        <div className="text-xs text-slate-400 leading-relaxed space-y-1 max-w-xl">
+                        <div className={`text-xs leading-relaxed space-y-1 max-w-xl ${isDay ? 'text-slate-600' : 'text-slate-400'}`}>
                           <p>
-                            When you request account deletion, your account enters a <strong className="text-slate-200">7-day waiting period</strong> and a security confirmation email is sent to <span className="text-cyan-400 font-mono">{user.email}</span>.
+                            When you request account deletion, your account enters a <strong className={isDay ? 'text-slate-900' : 'text-slate-200'}>7-day waiting period</strong> and a security confirmation email is sent to <span className={`font-mono ${isDay ? 'text-cyan-700 font-semibold' : 'text-cyan-400'}`}>{user.email}</span>.
                           </p>
-                          <p className="text-[11px] text-slate-500">
+                          <p className={`text-[11px] ${isDay ? 'text-slate-500' : 'text-slate-500'}`}>
                             After 7 days pass, everything is permanently deleted from our database except your email address record. You can cancel anytime during the 7 days, or recreate a fresh account if you sign in again after deletion.
                           </p>
                         </div>
@@ -3458,9 +3764,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                             setDeleteTermsAcknowledged(false);
                             setShowDeleteAccountModal(true);
                           }}
-                          className="px-4 py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-300 hover:text-red-200 font-bold text-xs font-mono transition-all flex items-center gap-2 shrink-0 self-start sm:self-center cursor-pointer"
+                          className={`px-4 py-2.5 rounded-xl font-bold text-xs font-mono transition-all flex items-center gap-2 shrink-0 self-start sm:self-center cursor-pointer ${
+                            isDay
+                              ? 'bg-rose-100 hover:bg-rose-200/80 border border-rose-300 text-rose-800 hover:text-rose-900 shadow-sm'
+                              : 'bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 text-red-300 hover:text-red-200'
+                          }`}
                         >
-                          <Trash2 size={14} className="text-red-400" />
+                          <Trash2 size={14} className={isDay ? "text-rose-600" : "text-red-400"} />
                           <span>Delete Account</span>
                         </button>
                       </div>
@@ -3470,18 +3780,32 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                   {/* Account Deletion Terms & Acknowledgement Modal */}
                   {showDeleteAccountModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-                      <div className="w-full max-w-xl rounded-2xl border border-red-500/30 bg-[#090D18] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                      <div className={`w-full max-w-xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-colors ${
+                        isDay ? 'bg-white border-slate-200' : 'bg-[#090D18] border-red-500/30'
+                      }`}>
                         {/* Modal Header */}
-                        <div className="p-5 border-b border-slate-800 bg-gradient-to-r from-red-950/40 via-slate-900 to-[#090D18] flex items-center justify-between gap-3">
+                        <div className={`p-5 border-b flex items-center justify-between gap-3 transition-colors ${
+                          isDay
+                            ? 'bg-slate-50 border-slate-200'
+                            : 'border-slate-800 bg-gradient-to-r from-red-950/40 via-slate-900 to-[#090D18]'
+                        }`}>
                           <div className="flex items-center gap-3">
-                            <div className="p-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400">
+                            <div className={`p-2.5 rounded-xl border ${
+                              isDay
+                                ? 'bg-rose-100 border-rose-200 text-rose-600'
+                                : 'bg-red-500/15 border-red-500/30 text-red-400'
+                            }`}>
                               <Trash2 size={18} />
                             </div>
                             <div>
-                              <h3 className="text-base font-bold text-white font-['Chakra_Petch']">
+                              <h3 className={`text-base font-bold font-['Chakra_Petch'] ${
+                                isDay ? 'text-slate-900' : 'text-white'
+                              }`}>
                                 Account Deletion Terms &amp; Agreement
                               </h3>
-                              <p className="text-xs text-red-300 font-mono">
+                              <p className={`text-xs font-mono ${
+                                isDay ? 'text-rose-700 font-semibold' : 'text-red-300'
+                              }`}>
                                 Please read carefully before requesting deletion for @{user.username}
                               </p>
                             </div>
@@ -3489,79 +3813,113 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           <button
                             type="button"
                             onClick={() => setShowDeleteAccountModal(false)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              isDay
+                                ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                            }`}
                           >
                             <X size={16} />
                           </button>
                         </div>
 
                         {/* Readable Terms Scrollable Body */}
-                        <div className="p-5 overflow-y-auto space-y-4 text-xs text-slate-300 leading-relaxed">
-                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                            <h4 className="font-bold text-white font-mono uppercase text-[11px] text-cyan-400">
+                        <div className={`p-5 overflow-y-auto space-y-4 text-xs leading-relaxed ${
+                          isDay ? 'text-slate-700' : 'text-slate-300'
+                        }`}>
+                          <div className={`p-3.5 rounded-xl border space-y-2 transition-colors ${
+                            isDay ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                          }`}>
+                            <h4 className={`font-bold font-mono uppercase text-[11px] ${
+                              isDay ? 'text-cyan-700 font-bold' : 'text-cyan-400'
+                            }`}>
                               1. 7-Day Deletion Waiting Period &amp; Cancellation Rights
                             </h4>
-                            <p className="text-slate-400">
-                              Upon submitting this request, your creator account (<strong className="text-white">@{user.username}</strong>) will be placed into a <strong className="text-white">7-day deletion waiting state</strong>. During these 7 days, your account remains accessible and you may cancel the deletion request at any time by clicking the <strong className="text-emerald-400">"Cancel Request Deletion"</strong> button inside My Account.
+                            <p className={isDay ? 'text-slate-600' : 'text-slate-400'}>
+                              Upon submitting this request, your creator account (<strong className={isDay ? 'text-slate-900' : 'text-white'}>@{user.username}</strong>) will be placed into a <strong className={isDay ? 'text-slate-900' : 'text-white'}>7-day deletion waiting state</strong>. During these 7 days, your account remains accessible and you may cancel the deletion request at any time by clicking the <strong className={isDay ? 'text-emerald-700' : 'text-emerald-400'}>"Cancel Request Deletion"</strong> button inside My Account.
                             </p>
                           </div>
 
-                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                            <h4 className="font-bold text-white font-mono uppercase text-[11px] text-red-400">
+                          <div className={`p-3.5 rounded-xl border space-y-2 transition-colors ${
+                            isDay ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                          }`}>
+                            <h4 className={`font-bold font-mono uppercase text-[11px] ${
+                              isDay ? 'text-rose-700 font-bold' : 'text-red-400'
+                            }`}>
                               2. Scope of Permanent Database Deletion (Email Retained Only)
                             </h4>
-                            <p className="text-slate-400">
-                              Once the 7-day grace period expires without cancellation, our system will permanently erase <strong className="text-white">all account data</strong> across our database, including:
+                            <p className={isDay ? 'text-slate-600' : 'text-slate-400'}>
+                              Once the 7-day grace period expires without cancellation, our system will permanently erase <strong className={isDay ? 'text-slate-900' : 'text-white'}>all account data</strong> across our database, including:
                             </p>
-                            <ul className="list-disc pl-5 space-y-1 text-slate-400">
-                              <li>Your creator profile, display name, bio, social links, and unique <code className="text-cyan-300">@{user.username}</code> handle.</li>
+                            <ul className={`list-disc pl-5 space-y-1 ${isDay ? 'text-slate-600' : 'text-slate-400'}`}>
+                              <li>Your creator profile, display name, bio, social links, and unique <code className={isDay ? 'text-cyan-700 font-bold' : 'text-cyan-300'}>@{user.username}</code> handle.</li>
                               <li>All donation ledger records, payment gateway configurations, and Telegram listener sessions.</li>
                               <li>All OBS overlay tokens, Alert Box tiers, Soundboard items, Video Alert settings, Subathon Timers, Goals, Leaderboards,Subscriber tiers, and Spinning Wheel slices.</li>
                               <li>All uploaded Media Library images, GIFs, audio files, support tickets, and mailbox messages.</li>
                             </ul>
-                            <p className="text-amber-300/90 font-mono text-[11px] pt-1">
+                            <p className={`font-mono text-[11px] pt-1 ${isDay ? 'text-amber-800 font-semibold' : 'text-amber-300/90'}`}>
                               Note: Only your email address record ({user.email}) will remain stored in our database.
                             </p>
                           </div>
 
-                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                            <h4 className="font-bold text-white font-mono uppercase text-[11px] text-purple-400">
+                          <div className={`p-3.5 rounded-xl border space-y-2 transition-colors ${
+                            isDay ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                          }`}>
+                            <h4 className={`font-bold font-mono uppercase text-[11px] ${
+                              isDay ? 'text-purple-700 font-bold' : 'text-purple-400'
+                            }`}>
                               3. Recreating Your Account in the Future
                             </h4>
-                            <p className="text-slate-400">
-                              After the 7-day permanent deletion is completed, if you sign in again with your Google account (<span className="text-slate-200 font-mono">{user.email}</span>), a brand-new creator account will be freshly created for you. None of your previous data, settings, or history can be recovered once deleted.
+                            <p className={isDay ? 'text-slate-600' : 'text-slate-400'}>
+                              After the 7-day permanent deletion is completed, if you sign in again with your Google account (<span className={`font-mono ${isDay ? 'text-slate-900 font-bold' : 'text-slate-200'}`}>{user.email}</span>), a brand-new creator account will be freshly created for you. None of your previous data, settings, or history can be recovered once deleted.
                             </p>
                           </div>
 
-                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                            <h4 className="font-bold text-white font-mono uppercase text-[11px] text-emerald-400">
+                          <div className={`p-3.5 rounded-xl border space-y-2 transition-colors ${
+                            isDay ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+                          }`}>
+                            <h4 className={`font-bold font-mono uppercase text-[11px] ${
+                              isDay ? 'text-emerald-700 font-bold' : 'text-emerald-400'
+                            }`}>
                               4. Security Email Alert Verification
                             </h4>
-                            <p className="text-slate-400">
-                              For your protection, confirming this request will immediately dispatch a security alert email to <strong className="text-white font-mono">{user.email}</strong> notifying you of the scheduled deletion and providing instructions if the request was unauthorized.
+                            <p className={isDay ? 'text-slate-600' : 'text-slate-400'}>
+                              For your protection, confirming this request will immediately dispatch a security alert email to <strong className={`font-mono ${isDay ? 'text-slate-900' : 'text-white'}`}>{user.email}</strong> notifying you of the scheduled deletion and providing instructions if the request was unauthorized.
                             </p>
                           </div>
 
                           {/* Final Section: Mandatory Tick / Acknowledgement Checkbox */}
-                          <label className="flex items-start gap-3 p-4 rounded-xl bg-red-950/30 border border-red-500/40 cursor-pointer select-none hover:bg-red-950/40 transition-colors">
+                          <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer select-none transition-colors ${
+                            isDay
+                              ? 'bg-rose-50 border-rose-200 hover:bg-rose-100/70 text-slate-800'
+                              : 'bg-red-950/30 border-red-500/40 hover:bg-red-950/40 text-slate-200'
+                          }`}>
                             <input
                               type="checkbox"
                               checked={deleteTermsAcknowledged}
                               onChange={(e) => setDeleteTermsAcknowledged(e.target.checked)}
-                              className="mt-0.5 w-4 h-4 rounded border-red-500/50 bg-slate-950 text-red-500 focus:ring-red-500 cursor-pointer shrink-0"
+                              className="mt-0.5 w-4 h-4 rounded border-rose-400 bg-white text-red-600 focus:ring-red-500 cursor-pointer shrink-0"
                             />
-                            <span className="text-xs text-slate-200 leading-relaxed">
-                              <strong className="text-red-300">I have read, understood, and accept these terms.</strong> I acknowledge that my account will be set into a 7-day deletion wait period, and that after 7 days pass, all of my database records (except my email address <code className="text-cyan-300">{user.email}</code>) will be permanently deleted.
+                            <span className="text-xs leading-relaxed">
+                              <strong className={isDay ? 'text-rose-900 font-bold' : 'text-red-300'}>I have read, understood, and accept these terms.</strong> I acknowledge that my account will be set into a 7-day deletion wait period, and that after 7 days pass, all of my database records (except my email address <code className={isDay ? 'text-cyan-700 font-bold' : 'text-cyan-300'}>{user.email}</code>) will be permanently deleted.
                             </span>
                           </label>
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-end gap-2.5">
+                        <div className={`p-4 border-t flex items-center justify-end gap-2.5 transition-colors ${
+                          isDay
+                            ? 'bg-slate-50 border-slate-200'
+                            : 'border-slate-800 bg-slate-950/90'
+                        }`}>
                           <button
                             type="button"
                             onClick={() => setShowDeleteAccountModal(false)}
-                            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                              isDay
+                                ? 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-sm'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                            }`}
                           >
                             Cancel
                           </button>
@@ -3588,23 +3946,31 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 <div className="space-y-6">
 
                   {/* Public Tip QR Code & OBS Browser Source Card */}
-                  <div className="p-5 rounded-2xl bg-[#090D18] border border-slate-800 flex flex-col space-y-4">
+                  <div className={`p-5 rounded-2xl border flex flex-col space-y-4 transition-colors ${
+                    isDay ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#090D18] border-slate-800'
+                  }`}>
                     <div className="text-center space-y-1">
                       <div className="flex items-center justify-center gap-2">
-                        <span className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400 border border-pink-500/20">
+                        <span className={`p-1.5 rounded-lg border ${
+                          isDay ? 'bg-pink-50 text-pink-600 border-pink-200' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'
+                        }`}>
                           <QrCode size={16} />
                         </span>
-                        <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
+                        <h3 className={`text-sm font-bold font-['Chakra_Petch'] uppercase tracking-wider ${
+                          isDay ? 'text-slate-900' : 'text-white'
+                        }`}>
                           Public Tip QR Code &amp; OBS Overlay
                         </h3>
                       </div>
-                      <p className="text-[11px] text-slate-400">
+                      <p className={`text-[11px] ${isDay ? 'text-slate-500' : 'text-slate-400'}`}>
                         Scan with ABA Mobile or any Bakong KHQR banking app, or add to OBS Studio
                       </p>
                     </div>
 
                     {/* QR Code SVG preview */}
-                    <div className="p-4 rounded-2xl bg-white shadow-2xl flex items-center justify-center mx-auto border-4 border-slate-900 shadow-cyan-500/10 relative group">
+                    <div className={`p-4 rounded-2xl bg-white shadow-xl flex items-center justify-center mx-auto relative group transition-all ${
+                      isDay ? 'border-4 border-slate-100 shadow-slate-200/80' : 'border-4 border-slate-900 shadow-cyan-500/10'
+                    }`}>
                       <QRCodeSVG
                         value={publicDonateUrl}
                         size={155}
@@ -3624,25 +3990,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                     </div>
 
                     {/* OBS Browser Source URL Box */}
-                    <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                    <div className={`space-y-2 pt-2 border-t transition-colors ${
+                      isDay ? 'border-slate-200' : 'border-slate-800/80'
+                    }`}>
                       <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="font-bold text-pink-400 flex items-center gap-1">
+                        <span className={`font-bold flex items-center gap-1 ${
+                          isDay ? 'text-pink-600' : 'text-pink-400'
+                        }`}>
                           <Sparkles size={12} />
                           <span>OBS BROWSER SOURCE URL</span>
                         </span>
-                        <span className="text-[10px] text-slate-500 font-normal">
+                        <span className={`text-[10px] font-normal ${isDay ? 'text-slate-400' : 'text-slate-500'}`}>
                           320 × 420 px
                         </span>
                       </div>
 
                       {/* Theme Selector Pills */}
-                      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono">
+                      <div className={`grid grid-cols-3 gap-1.5 p-1 rounded-xl border text-[10px] font-mono transition-colors ${
+                        isDay ? 'bg-slate-100 border-slate-200' : 'bg-slate-950 border-slate-800'
+                      }`}>
                         <button
                           type="button"
                           onClick={() => setQrOverlayTheme('cyber-neon')}
                           className={`py-1 rounded-lg transition-all font-bold cursor-pointer ${
                             qrOverlayTheme === 'cyber-neon'
-                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              ? isDay
+                                ? 'bg-white text-cyan-700 border border-slate-200 shadow-sm'
+                                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              : isDay
+                              ? 'text-slate-600 hover:text-slate-900'
                               : 'text-slate-400 hover:text-slate-200'
                           }`}
                         >
@@ -3653,7 +4029,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           onClick={() => setQrOverlayTheme('compact')}
                           className={`py-1 rounded-lg transition-all font-bold cursor-pointer ${
                             qrOverlayTheme === 'compact'
-                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              ? isDay
+                                ? 'bg-white text-cyan-700 border border-slate-200 shadow-sm'
+                                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              : isDay
+                              ? 'text-slate-600 hover:text-slate-900'
                               : 'text-slate-400 hover:text-slate-200'
                           }`}
                         >
@@ -3664,7 +4044,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           onClick={() => setQrOverlayTheme('transparent')}
                           className={`py-1 rounded-lg transition-all font-bold cursor-pointer ${
                             qrOverlayTheme === 'transparent'
-                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              ? isDay
+                                ? 'bg-white text-cyan-700 border border-slate-200 shadow-sm'
+                                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                              : isDay
+                              ? 'text-slate-600 hover:text-slate-900'
                               : 'text-slate-400 hover:text-slate-200'
                           }`}
                         >
@@ -3673,12 +4057,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                       </div>
 
                       {/* URL Display */}
-                      <div className="flex items-center rounded-xl bg-slate-950 border border-slate-800 overflow-hidden">
+                      <div className={`flex items-center rounded-xl border overflow-hidden transition-colors ${
+                        isDay ? 'bg-slate-50 border-slate-200 shadow-inner' : 'bg-slate-950 border-slate-800'
+                      }`}>
                         <input
                           type="text"
                           readOnly
                           value={qrObsUrl}
-                          className="w-full px-3 py-2 bg-transparent text-[11px] font-mono text-cyan-300 focus:outline-none select-all"
+                          className={`w-full px-3 py-2 bg-transparent text-[11px] font-mono focus:outline-none select-all ${
+                            isDay ? 'text-cyan-800 font-medium' : 'text-cyan-300'
+                          }`}
                         />
                       </div>
 
@@ -3689,18 +4077,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           onClick={handleCopyQrObsUrl}
                           className={`py-2 px-3 rounded-xl font-mono text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
                             copiedQrObsUrl
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              ? isDay
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
+                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : isDay
+                              ? 'bg-gradient-to-r from-pink-50 to-cyan-50 hover:from-pink-100 hover:to-cyan-100 text-slate-800 border border-pink-200/80 shadow-sm'
                               : 'bg-gradient-to-r from-pink-500/20 to-cyan-500/20 hover:from-pink-500/30 hover:to-cyan-500/30 text-white border border-pink-500/30'
                           }`}
                         >
                           {copiedQrObsUrl ? (
                             <>
-                              <Check size={13} className="text-emerald-400" />
+                              <Check size={13} className={isDay ? "text-emerald-600" : "text-emerald-400"} />
                               <span>Copied OBS!</span>
                             </>
                           ) : (
                             <>
-                              <Copy size={13} className="text-pink-400" />
+                              <Copy size={13} className={isDay ? "text-pink-600" : "text-pink-400"} />
                               <span>Copy OBS URL</span>
                             </>
                           )}
@@ -3710,21 +4102,31 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           href={qrObsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold font-mono text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold font-mono flex items-center justify-center gap-1.5 transition-colors ${
+                            isDay
+                              ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900 shadow-sm'
+                              : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white'
+                          }`}
                         >
                           <span>Preview OBS</span>
                           <ExternalLink size={12} />
                         </a>
                       </div>
 
-                      <p className="text-[10px] font-mono text-slate-500 text-center pt-0.5">
+                      <p className={`text-[10px] font-mono text-center pt-0.5 ${
+                        isDay ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
                         Add as Browser Source in OBS Studio with transparent background
                       </p>
                     </div>
 
                     {/* Public Web Tip URL Section */}
-                    <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                      <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block text-left">
+                    <div className={`space-y-2 pt-2 border-t transition-colors ${
+                      isDay ? 'border-slate-200' : 'border-slate-800/80'
+                    }`}>
+                      <span className={`text-[10px] font-mono uppercase font-bold block text-left ${
+                        isDay ? 'text-slate-600' : 'text-slate-400'
+                      }`}>
                         DIRECT TIP PAGE URL
                       </span>
                       <div className="grid grid-cols-2 gap-2">
@@ -3732,7 +4134,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                           href={publicDonateUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-cyan-400 flex items-center justify-center gap-1.5 transition-colors"
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                            isDay
+                              ? 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200 text-cyan-700 shadow-sm'
+                              : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-cyan-400'
+                          }`}
                         >
                           <span>Open Tip Page</span>
                           <ExternalLink size={12} />
@@ -3741,7 +4147,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                         <button
                           type="button"
                           onClick={handleCopyDonateLink}
-                          className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
+                          className={`py-2 px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                            isDay
+                              ? 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 shadow-sm'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                          }`}
                         >
                           {copiedDonateLink ? 'Copied Tip URL' : 'Copy Tip URL'}
                         </button>
