@@ -146,7 +146,14 @@ export interface PaymentSettingsDoc {
   exchangeRate?: number;
   isLiveMode?: boolean;
   masterKhqrImage?: string;
+  masterKhqrFilename?: string;
+  masterKhqrFileSize?: number;
+  masterKhqrMimeType?: string;
+  customKhqrImageUrl?: string;
+  customKhqrFilename?: string;
+  customKhqrFileSize?: number;
   khqrBase64?: string;
+  khqrItems?: any[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -652,7 +659,7 @@ export function resolveMatchingAlertBox(activeBoxes: any[], effectiveAmountUsd: 
 
   candidates.sort((a, b) => b.threshold - a.threshold);
   const matched = candidates.find((c) => effectiveAmountUsd >= c.threshold - 0.0001);
-  return matched ? matched.merged : candidates[candidates.length - 1].merged;
+  return matched ? matched.merged : null;
 }
 
 export interface VoiceCloneDoc {
@@ -689,8 +696,15 @@ export interface GatewayConfigDoc {
   khqrFileSize: number;
   khqrMimeType: string;
   khqrBase64?: string; // Persistent base64 backup to withstand server restarts, container redeploys & ephemeral storage
+  customKhqrImageUrl?: string;
+  customKhqrFilename?: string;
+  customKhqrFileSize?: number;
+  customKhqrMimeType?: string;
+  customKhqrBase64?: string; // Persistent base64 backup for custom KHQR image
+  customKhqrUpdatedAt?: Date;
   bankAccountName?: string;
   bakongAccountId?: string;
+  khqrItems?: any[];
   uploadedBy?: string;
   updatedAt: Date;
 }
@@ -1730,7 +1744,218 @@ export async function restoreMasterKhqrImage(
 }
 
 /**
- * Startup restoration: verifies and restores Master KHQR images for all streamers
+ * Verifies and restores a streamer's Custom KHQR image (for "Custom" donation amount).
+ * If the physical file is missing from disk, it reconstitutes it from MongoDB base64.
+ * If the physical file is present, it ensures MongoDB has the base64 backup.
+ */
+export async function restoreCustomKhqrImage(
+  streamerId?: string,
+  username?: string
+): Promise<{
+  restored: boolean;
+  customKhqrImageUrl?: string;
+  filename?: string;
+  fileSize?: number;
+  mimeType?: string;
+}> {
+  try {
+    const gatewayCol = await getGatewayConfigCollection();
+
+    const queryConditions: any[] = [];
+    if (streamerId) {
+      queryConditions.push({ _id: `khqr_${streamerId}` });
+      queryConditions.push({ streamerId: streamerId });
+    }
+    if (username) {
+      queryConditions.push({ _id: `khqr_${username}` });
+      queryConditions.push({ streamerId: username });
+    }
+    if (queryConditions.length === 0) {
+      queryConditions.push({ _id: 'master_khqr_config' });
+    }
+
+    let mongoConfig = await gatewayCol.findOne({
+      $and: [
+        { $or: queryConditions },
+        {
+          $or: [
+            { customKhqrImageUrl: { $exists: true, $ne: '' } },
+            { customKhqrBase64: { $exists: true, $ne: '' } }
+          ]
+        }
+      ]
+    });
+
+    if (!mongoConfig) {
+      mongoConfig = await gatewayCol.findOne({ $or: queryConditions });
+    }
+
+    let paymentSettingsRow: any = null;
+    if (streamerId) {
+      try {
+        const payCol = await getPaymentSettingsCollection();
+        paymentSettingsRow = await payCol.findOne({
+          $or: [{ streamerId }, { streamer_id: streamerId }]
+        } as any);
+      } catch (e) {}
+    }
+
+    const checkFile = (relUrl?: string | null): string | null => {
+      if (!relUrl || typeof relUrl !== 'string' || !relUrl.trim()) return null;
+      const clean = relUrl.trim().replace(/^\//, '');
+      const abs = path.join(process.cwd(), 'public', clean);
+      try {
+        if (fs.existsSync(abs)) {
+          const st = fs.statSync(abs);
+          if (st.isFile() && st.size > 0) return abs;
+        }
+      } catch (e) {}
+      return null;
+    };
+
+    let verifiedAbsPath: string | null = null;
+    let verifiedUrl: string | null = null;
+
+    if (mongoConfig?.customKhqrImageUrl) {
+      const abs = checkFile(mongoConfig.customKhqrImageUrl);
+      if (abs) {
+        verifiedAbsPath = abs;
+        verifiedUrl = mongoConfig.customKhqrImageUrl;
+      }
+    }
+
+    if (!verifiedAbsPath && paymentSettingsRow?.customKhqrImageUrl) {
+      const abs = checkFile(paymentSettingsRow.customKhqrImageUrl);
+      if (abs) {
+        verifiedAbsPath = abs;
+        verifiedUrl = paymentSettingsRow.customKhqrImageUrl;
+      }
+    }
+
+    // CASE A: The image file exists on disk
+    if (verifiedAbsPath && verifiedUrl) {
+      const buffer = fs.readFileSync(verifiedAbsPath);
+      const ext = path.extname(verifiedAbsPath).toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+      const base64 = buffer.toString('base64');
+      const filename = path.basename(verifiedAbsPath);
+      const targetId = streamerId || mongoConfig?.streamerId || 'demo-streamer-id-1001';
+
+      if (!mongoConfig?.customKhqrBase64 || mongoConfig.customKhqrImageUrl !== verifiedUrl || mongoConfig.customKhqrFileSize !== buffer.length) {
+        await gatewayCol.updateOne(
+          { _id: `khqr_${targetId}` },
+          {
+            $set: {
+              streamerId: targetId,
+              ...(username ? { streamerUsername: username } : {}),
+              customKhqrImageUrl: verifiedUrl,
+              customKhqrFilename: mongoConfig?.customKhqrFilename || filename,
+              customKhqrFileSize: buffer.length,
+              customKhqrMimeType: mongoConfig?.customKhqrMimeType || mime,
+              customKhqrBase64: base64,
+              customKhqrUpdatedAt: new Date(),
+              updatedAt: new Date()
+            }
+          },
+          { upsert: true }
+        );
+      }
+
+      if (targetId) {
+        try {
+          const payCol = await getPaymentSettingsCollection();
+          await payCol.updateOne(
+            { streamerId: targetId },
+            {
+              $set: {
+                streamerId: targetId,
+                customKhqrImageUrl: verifiedUrl,
+                customKhqrFilename: mongoConfig?.customKhqrFilename || filename,
+                customKhqrFileSize: buffer.length,
+                updatedAt: new Date()
+              }
+            },
+            { upsert: true }
+          );
+        } catch (e) {}
+      }
+
+      return {
+        restored: true,
+        customKhqrImageUrl: verifiedUrl,
+        filename: mongoConfig?.customKhqrFilename || filename,
+        fileSize: buffer.length,
+        mimeType: mongoConfig?.customKhqrMimeType || mime
+      };
+    }
+
+    // CASE B: Image file is NOT on disk, but MongoDB has customKhqrBase64 backup!
+    if (mongoConfig?.customKhqrBase64 && mongoConfig.customKhqrBase64.trim() !== '') {
+      const targetId = streamerId || mongoConfig.streamerId || 'demo-streamer-id-1001';
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'payment', targetId);
+      fs.mkdirSync(uploadDir, { recursive: true });
+
+      const ext = mongoConfig.customKhqrMimeType?.includes('png') ? '.png' : '.jpg';
+      const origFilename = mongoConfig.customKhqrFilename || `custom-khqr${ext}`;
+      const safeExt = path.extname(origFilename).toLowerCase() || ext;
+      const storedFilename = `custom-khqr-restored-${Date.now()}-${uuidv4().slice(0, 8)}${safeExt}`;
+      const restoredAbs = path.join(uploadDir, storedFilename);
+
+      const buffer = Buffer.from(mongoConfig.customKhqrBase64, 'base64');
+      fs.writeFileSync(restoredAbs, buffer);
+
+      const restoredUrl = `/uploads/payment/${targetId}/${storedFilename}`;
+
+      await gatewayCol.updateOne(
+        { _id: mongoConfig._id },
+        {
+          $set: {
+            streamerId: targetId,
+            ...(username ? { streamerUsername: username } : {}),
+            customKhqrImageUrl: restoredUrl,
+            customKhqrFileSize: buffer.length,
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      if (targetId) {
+        try {
+          const payCol = await getPaymentSettingsCollection();
+          await payCol.updateOne(
+            { streamerId: targetId },
+            {
+              $set: {
+                streamerId: targetId,
+                customKhqrImageUrl: restoredUrl,
+                customKhqrFilename: origFilename,
+                customKhqrFileSize: buffer.length,
+                updatedAt: new Date()
+              }
+            },
+            { upsert: true }
+          );
+        } catch (e) {}
+      }
+
+      return {
+        restored: true,
+        customKhqrImageUrl: restoredUrl,
+        filename: origFilename,
+        fileSize: buffer.length,
+        mimeType: mongoConfig.customKhqrMimeType || (ext === '.png' ? 'image/png' : 'image/jpeg')
+      };
+    }
+
+    return { restored: false };
+  } catch (err: any) {
+    console.error('⚠️ [Custom KHQR] restoreCustomKhqrImage error:', err);
+    return { restored: false };
+  }
+}
+
+/**
+ * Startup restoration: verifies and restores Master and Custom KHQR images for all streamers
  */
 export async function restoreAllMasterKhqrImages(): Promise<void> {
   try {
@@ -1738,7 +1963,9 @@ export async function restoreAllMasterKhqrImages(): Promise<void> {
     const allConfigs = await gatewayCol.find({
       $or: [
         { khqrImageUrl: { $exists: true, $ne: '' } },
-        { khqrBase64: { $exists: true, $ne: '' } }
+        { khqrBase64: { $exists: true, $ne: '' } },
+        { customKhqrImageUrl: { $exists: true, $ne: '' } },
+        { customKhqrBase64: { $exists: true, $ne: '' } }
       ]
     }).toArray();
 
@@ -1746,6 +1973,7 @@ export async function restoreAllMasterKhqrImages(): Promise<void> {
       const sId = conf.streamerId || (conf._id.startsWith('khqr_') ? conf._id.replace('khqr_', '') : null);
       if (sId) {
         await restoreMasterKhqrImage(sId, conf.streamerUsername);
+        await restoreCustomKhqrImage(sId, conf.streamerUsername);
       }
     }
 
@@ -1755,7 +1983,8 @@ export async function restoreAllMasterKhqrImages(): Promise<void> {
       const payRows = await payCol.find({
         $or: [
           { masterKhqrImage: { $exists: true, $ne: '' } },
-          { master_khqr_image: { $exists: true, $ne: '' } } as any
+          { master_khqr_image: { $exists: true, $ne: '' } } as any,
+          { customKhqrImageUrl: { $exists: true, $ne: '' } }
         ]
       }).toArray();
 
@@ -1763,13 +1992,14 @@ export async function restoreAllMasterKhqrImages(): Promise<void> {
         const sId = row.streamerId || (row as any).streamer_id;
         if (sId) {
           await restoreMasterKhqrImage(sId);
+          await restoreCustomKhqrImage(sId);
         }
       }
     } catch (e) {}
 
-    console.log('⚡ [Master KHQR] Restored and synchronized all streamer Master KHQRs from MongoDB');
+    console.log('⚡ [Payment Gateway] Restored and synchronized all Master & Custom KHQRs from MongoDB');
   } catch (err) {
-    console.warn('⚠️ [Master KHQR] Warning during startup restoration:', err);
+    console.warn('⚠️ [Payment Gateway] Warning during startup restoration:', err);
   }
 }
 

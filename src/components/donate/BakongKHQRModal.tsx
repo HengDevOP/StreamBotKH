@@ -162,8 +162,12 @@ export const BakongKHQRModal: React.FC<BakongKHQRModalProps> = ({
           if (Array.isArray(data.config.khqrItems) && data.config.khqrItems.length > 0) {
             setConfigKhqrItems(data.config.khqrItems);
           }
-          if (data.config.khqrImageUrl) {
-            setMasterKhqrImage(data.config.khqrImageUrl);
+          if (!donationData?.qrImage) {
+            if (data.config.customKhqrImageUrl) {
+              setMasterKhqrImage(data.config.customKhqrImageUrl);
+            } else if (data.config.khqrImageUrl) {
+              setMasterKhqrImage(data.config.khqrImageUrl);
+            }
           }
         }
       })

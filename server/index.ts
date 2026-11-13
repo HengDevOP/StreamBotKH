@@ -250,6 +250,14 @@ const apiDirectoryCandidates = [
 const apiDirectory = apiDirectoryCandidates.find((d) => fs.existsSync(d)) || path.resolve(process.cwd(), 'src/app/api');
 scanAndMountRoutes(apiDirectory, '/api');
 
+// Ensure unmatched /api/* routes return JSON 404 instead of HTML
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `API endpoint not found: ${req.method} ${req.originalUrl}`
+  });
+});
+
 // 4. Background Workers: Expired Pending Donations, Account Deletions, Pro Plan Midnight Expiration & 3-Day Reminders, 6-Month Retention Cleanup
 cleanupExpiredPendingDonationsMongo();
 cleanupOlderDonationsMongo(6);

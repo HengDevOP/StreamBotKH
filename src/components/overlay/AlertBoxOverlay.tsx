@@ -469,6 +469,9 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       console.log('⚡ [Overlay] Live donation alert accepted:', alertId, payload);
       const tipAmount = Number(payload.amount) || 0;
       const tipAmountInUsd = payload.currency === 'KHR' ? tipAmount / 4000 : tipAmount;
+      const isTestAlert = Boolean(payload.isTest);
+      const isSubscriptionAlert = Boolean(payload.isSubscription);
+      const isOverrideAlert = isTestAlert || isSubscriptionAlert;
 
       // Find highest matching condition tier across all created alert boxes (all boxes active by default)
       const activeBoxes = alertBoxes;
@@ -483,7 +486,8 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         const matched = sortedDesc.find(
           (t: any) => tipAmountInUsd >= ((Number(t.minAmountCondition) || 0) - 0.0001)
         );
-        const chosen = matched || sortedDesc[sortedDesc.length - 1];
+        const chosen = matched || (isOverrideAlert ? sortedDesc[sortedDesc.length - 1] : null);
+        if (!chosen) return null;
         return chosen === box ? box : { ...box, ...chosen, _id: box._id, name: box.name, isEnabled: true };
       };
 
@@ -505,7 +509,7 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       const conditionMatchedBox =
         (payload.boxId ? resolveTierForBox(activeBoxes.find((b) => String(b._id) === String(payload.boxId))) : null) ||
         matchedCandidate?.merged ||
-        (allTierCandidates.length > 0 ? allTierCandidates[allTierCandidates.length - 1].merged : null);
+        (isOverrideAlert && allTierCandidates.length > 0 ? allTierCandidates[allTierCandidates.length - 1].merged : null);
 
       const resolvedBoxId = payload.boxId || (conditionMatchedBox?._id ? String(conditionMatchedBox._id) : null);
 
@@ -544,10 +548,6 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
         rawMsg.trim().toLowerCase() !== 'undefined'
       );
       const resolvedDonorMessage = isMeaningful ? rawMsg.trim() : '';
-
-      const isTestAlert = Boolean(payload.isTest);
-      const isSubscriptionAlert = Boolean(payload.isSubscription);
-      const isOverrideAlert = isTestAlert || isSubscriptionAlert;
 
       const rawVoice = (isOverrideAlert && (payload.ttsType || payload.ttsVoice))
         ? (payload.ttsType || payload.ttsVoice)
@@ -714,6 +714,14 @@ export const AlertBoxOverlay: React.FC<AlertBoxOverlayProps> = ({ overlayToken, 
       if (activeMode === 'alert-only') {
         if (payload.isSubscription) {
           console.log(`⚡ [Donation Alert Overlay] Ignoring subscriber alert for dedicated subscriber source`);
+          return;
+        }
+        if (!isOverrideAlert && allTierCandidates.length > 0 && !conditionMatchedBox) {
+          console.log(`⚡ [Donation Alert Overlay] Paid amount ($${tipAmountInUsd.toFixed(2)} USD) is below minimum required condition. Not triggering alert.`);
+          return;
+        }
+        if (!isOverrideAlert && activeBoxId && !dedicatedBox) {
+          console.log(`⚡ [Donation Alert Overlay] Paid amount ($${tipAmountInUsd.toFixed(2)} USD) is below dedicated box minimum condition. Not triggering alert.`);
           return;
         }
 

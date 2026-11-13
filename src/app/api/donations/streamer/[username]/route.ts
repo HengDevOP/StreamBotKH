@@ -7,7 +7,8 @@ import {
   getGatewayConfigCollection,
   getTelegramSessionsCollection,
   getTelegramMonitoredGroupsCollection,
-  restoreMasterKhqrImage
+  restoreMasterKhqrImage,
+  restoreCustomKhqrImage
 } from '@/server/database/mongo';
 import { extractYoutubeId, getYoutubeLiveStats } from '@/utils/youtube';
 
@@ -110,8 +111,10 @@ export async function GET(
     const isVideoAlertsUnlocked = currentPlan !== 'free' || isStreamerAdmin;
     const videoAlertEnabled = isVideoAlertsUnlocked && Boolean(videoSettings?.isEnabled ?? videoSettings?.is_enabled ?? true);
 
-    // Check if streamer has an active uploaded Master KHQR code or created KHQR items
+    // Check if streamer has an active uploaded Master KHQR code, Custom KHQR image, or created KHQR items
     let khqrImageUrl = '';
+    let customKhqrImageUrl = '';
+    let customKhqrFilename = '';
     let khqrItems: any[] = [];
     try {
       const gatewayCol = await getGatewayConfigCollection();
@@ -134,6 +137,18 @@ export async function GET(
         khqrImageUrl = restoreResult.khqrImageUrl;
       } else if (gatewayDoc?.khqrImageUrl) {
         khqrImageUrl = gatewayDoc.khqrImageUrl;
+      }
+
+      const customRestore = await restoreCustomKhqrImage(streamerId, cleanUsername);
+      if (customRestore.restored && customRestore.customKhqrImageUrl) {
+        customKhqrImageUrl = customRestore.customKhqrImageUrl;
+        customKhqrFilename = customRestore.filename || '';
+      } else if (gatewayDoc?.customKhqrImageUrl) {
+        customKhqrImageUrl = gatewayDoc.customKhqrImageUrl;
+        customKhqrFilename = gatewayDoc.customKhqrFilename || '';
+      } else if (paymentSettings?.customKhqrImageUrl) {
+        customKhqrImageUrl = paymentSettings.customKhqrImageUrl;
+        customKhqrFilename = paymentSettings.customKhqrFilename || '';
       }
     } catch (e) {}
 
@@ -171,8 +186,8 @@ export async function GET(
       hasTelegramGroup = groupCount > 0;
     } catch (e) {}
 
-    // 3. Check if streamer has uploaded their Master KHQR image or created KHQR items
-    const hasMasterKhqr = Boolean(khqrImageUrl || khqrItems.length > 0);
+    // 3. Check if streamer has uploaded their Master KHQR image, created KHQR items, or uploaded Custom KHQR
+    const hasMasterKhqr = Boolean(khqrImageUrl || khqrItems.length > 0 || customKhqrImageUrl);
 
     // Tip is fully configured only if GramJS is connected, KHQR image is uploaded, and a monitored group is linked
     const isTipConfigured = Boolean(isTelegramConnected && hasMasterKhqr && hasTelegramGroup);
@@ -224,6 +239,8 @@ export async function GET(
       ),
       hasMasterKhqr,
       khqrImageUrl: khqrImageUrl || undefined,
+      customKhqrImageUrl: customKhqrImageUrl || undefined,
+      customKhqrFilename: customKhqrFilename || undefined,
       khqrItems,
       isTelegramConnected,
       hasTelegramGroup,

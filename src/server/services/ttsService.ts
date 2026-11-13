@@ -604,69 +604,42 @@ export async function synthesizeTTSWithBuffer(params: {
       console.warn('[TTS Service] Cloned voice DB lookup error:', e);
     }
 
-    // -------------------------------------------------------------
-    // Pro Plan Enforcement for Neural Voice Cloning
-    // Free plan users fallback to default neural voice (Jenny / Piseth)
-    // -------------------------------------------------------------
-    if (params.token || cloneDoc?.userId) {
-      try {
-        const { getUsersCollection } = await import('@/server/database/mongo');
-        const usersCol = await getUsersCollection();
-        const lookupQueries: any[] = [];
-        if (params.token) {
-          lookupQueries.push(
-            { overlayToken: params.token },
-            { id: params.token },
-            { userId: params.token }
-          );
-        }
-        if (cloneDoc?.userId) {
-          lookupQueries.push(
-            { userId: cloneDoc.userId },
-            { id: cloneDoc.userId },
-            { overlayToken: cloneDoc.userId }
-          );
-        }
-        const streamer = (await usersCol.findOne({
-          $or: lookupQueries
-        })) as any;
-        const streamerPlan = String(streamer?.plan || 'free').toLowerCase();
-        const isAdmin = Boolean(streamer?.isAdmin || streamer?.is_admin || streamer?.role === 'admin');
-        if (streamer && streamerPlan !== 'pro' && !isAdmin) {
-          console.log('[TTS Service] User is on Free plan. Falling back cloned voice to default standard voice.');
-          isCloned = false;
-        }
-      } catch (e) {}
-    }
-
+    // All users (Free & Pro) have full access to OpenVoiceV2 Neural Voice Cloning
     if (isCloned) {
-      const relSample =
-        clonedVoiceUrl && clonedVoiceUrl.startsWith('/uploads/voices/')
-          ? clonedVoiceUrl
-          : cloneDoc?.sampleUrl;
+      const isSupportedSamplePath = (p?: string) =>
+        Boolean(p && typeof p === 'string' && (p.startsWith('/uploads/voices/') || p.startsWith('/assets/voice-clone/')));
 
-      if (relSample && typeof relSample === 'string' && relSample.startsWith('/uploads/voices/')) {
-        const candidatePath = path.join(process.cwd(), 'public', relSample);
+      const relSample = isSupportedSamplePath(clonedVoiceUrl)
+        ? clonedVoiceUrl
+        : cloneDoc?.sampleUrl;
+
+      if (isSupportedSamplePath(relSample)) {
+        const candidatePath = path.join(process.cwd(), 'public', relSample!);
         if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).size > 500) {
           resolvedSampleDiskPath = candidatePath;
         }
       }
 
-      // Fallback: if no valid sample path was resolved yet, pick the newest .wav in /public/uploads/voices/
+      // Fallback: check studio asset or newest .wav in /public/uploads/voices/
       if (!resolvedSampleDiskPath) {
         try {
-          const voicesDir = path.join(process.cwd(), 'public', 'uploads', 'voices');
-          if (fs.existsSync(voicesDir)) {
-            const wavFiles = fs
-              .readdirSync(voicesDir)
-              .filter((f) => f.endsWith('.wav'))
-              .map((f) => ({
-                full: path.join(voicesDir, f),
-                mtime: fs.statSync(path.join(voicesDir, f)).mtimeMs
-              }))
-              .sort((a, b) => b.mtime - a.mtime);
-            if (wavFiles.length > 0) {
-              resolvedSampleDiskPath = wavFiles[0].full;
+          const studioDefault = path.join(process.cwd(), 'public', 'assets', 'voice-clone', 'studio-streamer-pro.wav');
+          if (fs.existsSync(studioDefault) && fs.statSync(studioDefault).size > 500) {
+            resolvedSampleDiskPath = studioDefault;
+          } else {
+            const voicesDir = path.join(process.cwd(), 'public', 'uploads', 'voices');
+            if (fs.existsSync(voicesDir)) {
+              const wavFiles = fs
+                .readdirSync(voicesDir)
+                .filter((f) => f.endsWith('.wav'))
+                .map((f) => ({
+                  full: path.join(voicesDir, f),
+                  mtime: fs.statSync(path.join(voicesDir, f)).mtimeMs
+                }))
+                .sort((a, b) => b.mtime - a.mtime);
+              if (wavFiles.length > 0) {
+                resolvedSampleDiskPath = wavFiles[0].full;
+              }
             }
           }
         } catch {}
@@ -681,6 +654,7 @@ export async function synthesizeTTSWithBuffer(params: {
         cloneDoc?.baseModel === 'neural-female' ||
         cloneDoc?.baseModel === 'female' ||
         cloneDoc?.baseModel === 'kiritts-female' ||
+        (clonedVoiceUrl && clonedVoiceUrl.includes('velvet')) ||
         Number(cloneDoc?.averagePitchHz) > 175;
 
       // Carrier voice matching language, acoustic gender, and sound style
@@ -699,14 +673,14 @@ export async function synthesizeTTSWithBuffer(params: {
         }
       }
 
-      const effectivePitchHz = Number(cloneDoc?.averagePitchHz) || 130;
+      const effectivePitchHz = Number(cloneDoc?.averagePitchHz) || (isFemale ? 215 : 140);
       clonedProfile = {
         averagePitchHz: effectivePitchHz,
         detectedGender: isFemale ? 'female' : 'male',
         soundStyle: cloneDoc?.soundStyle || 'Warm & Conversational',
         pacingLabel: cloneDoc?.pacingLabel || 'Natural (1.0x)',
-        timbre: cloneDoc?.timbre || 'balanced natural voice',
-        tau: cloneDoc?.tau ?? 0.19,
+        timbre: cloneDoc?.timbre || 'balanced natural studio voice',
+        tau: cloneDoc?.tau ?? 0.13,
         f0Std: cloneDoc?.f0Std ?? 18,
         spectralBrightnessHz: Number(cloneDoc?.spectralBrightnessHz) || 400,
         speakingTempoRatio: Number(cloneDoc?.speakingTempoRatio) || 1.0,
@@ -717,14 +691,7 @@ export async function synthesizeTTSWithBuffer(params: {
         ratePercent: parsedManualRate
       };
 
-      // Apply the trained neural speaking rate & pitch offset from the voice sample
-      const trainedPitch =
-        cloneDoc?.pitch && cloneDoc.pitch !== '+0Hz'
-          ? cloneDoc.pitch
-          : (parsedManualPitch !== 0
-              ? `${parsedManualPitch > 0 ? '+' : ''}${parsedManualPitch}Hz`
-              : '+0Hz');
-
+      // Keep carrier pitch at +0Hz so neural_voice_clone.py performs single-stage phase-vocoder pitch alignment
       const trainedRate =
         cloneDoc?.rate && cloneDoc.rate !== '+0%'
           ? cloneDoc.rate
@@ -733,7 +700,7 @@ export async function synthesizeTTSWithBuffer(params: {
               : '+0%');
 
       prosodyOptions = {
-        pitch: params.pitch && params.pitch !== '+0Hz' ? params.pitch : trainedPitch,
+        pitch: '+0Hz',
         rate: params.rate && params.rate !== '+0%' ? params.rate : trainedRate,
         volume: params.volume || cloneDoc?.volume || '+0%'
       };

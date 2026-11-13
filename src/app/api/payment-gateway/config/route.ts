@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGatewayConfigCollection, getPaymentSettingsCollection, getUsersCollection, restoreMasterKhqrImage } from '@/server/database/mongo';
+import { getGatewayConfigCollection, getPaymentSettingsCollection, getUsersCollection, restoreMasterKhqrImage, restoreCustomKhqrImage } from '@/server/database/mongo';
 import { getAuthenticatedUser } from '@/server/auth';
 
 export async function GET(req: NextRequest) {
@@ -56,8 +56,9 @@ export async function GET(req: NextRequest) {
 
     const effectiveStreamerId = streamerId || 'demo-streamer-id-1001';
 
-    // 0. Automatically restore and verify Master KHQR from persistent backup if file was deleted or server restarted
+    // 0. Automatically restore and verify Master & Custom KHQR from persistent backup if file was deleted or server restarted
     const restoreResult = await restoreMasterKhqrImage(effectiveStreamerId, streamerUsername || undefined);
+    const customRestoreResult = await restoreCustomKhqrImage(effectiveStreamerId, streamerUsername || undefined);
 
     // 1. Check MongoDB payment_settings for this streamer
     let mongoPaymentSettings: any = null;
@@ -98,6 +99,20 @@ export async function GET(req: NextRequest) {
     const khqrFileSize = restoreResult.fileSize || mongoConfig?.khqrFileSize || mongoPaymentSettings?.masterKhqrFileSize || 0;
     const khqrMimeType = restoreResult.mimeType || mongoConfig?.khqrMimeType || mongoPaymentSettings?.masterKhqrMimeType || '';
 
+    // Resolve Custom KHQR Image
+    let customKhqrImageUrl = '';
+    if (customRestoreResult.restored && customRestoreResult.customKhqrImageUrl) {
+      customKhqrImageUrl = customRestoreResult.customKhqrImageUrl;
+    } else if (mongoConfig && typeof mongoConfig.customKhqrImageUrl === 'string' && mongoConfig.customKhqrImageUrl.trim() !== '') {
+      customKhqrImageUrl = mongoConfig.customKhqrImageUrl.trim();
+    } else if (mongoPaymentSettings && typeof mongoPaymentSettings.customKhqrImageUrl === 'string' && mongoPaymentSettings.customKhqrImageUrl.trim() !== '') {
+      customKhqrImageUrl = mongoPaymentSettings.customKhqrImageUrl.trim();
+    }
+
+    const customKhqrFilename = customRestoreResult.filename || mongoConfig?.customKhqrFilename || mongoPaymentSettings?.customKhqrFilename || '';
+    const customKhqrFileSize = customRestoreResult.fileSize || mongoConfig?.customKhqrFileSize || mongoPaymentSettings?.customKhqrFileSize || 0;
+    const customKhqrMimeType = customRestoreResult.mimeType || mongoConfig?.customKhqrMimeType || '';
+
     const bankAccountName =
       mongoPaymentSettings?.bakongAccountName ||
       mongoPaymentSettings?.bakong_account_name ||
@@ -127,6 +142,10 @@ export async function GET(req: NextRequest) {
       khqrFilename,
       khqrFileSize,
       khqrMimeType,
+      customKhqrImageUrl,
+      customKhqrFilename,
+      customKhqrFileSize,
+      customKhqrMimeType,
       khqrItems,
       bankAccountName,
       bakongAccountId,
@@ -162,6 +181,101 @@ export async function POST(req: NextRequest) {
 
     const gatewayCol = await getGatewayConfigCollection();
     const paymentCol = await getPaymentSettingsCollection();
+
+    // 1. Handle Set Custom KHQR action (e.g. from Media Library)
+    if (body.action === 'set_custom_khqr') {
+      const customUrl = String(body.imageUrl || '').trim();
+      const customFilename = body.filename ? String(body.filename) : 'custom-khqr.png';
+      const customFileSize = Number(body.fileSize || 0);
+
+      if (!customUrl) {
+        return NextResponse.json(
+          { error: 'Valid KHQR image URL is required for custom KHQR.' },
+          { status: 400 }
+        );
+      }
+
+      await gatewayCol.updateOne(
+        { _id: `khqr_${streamerId}` },
+        {
+          $set: {
+            streamerId,
+            streamerUsername,
+            customKhqrImageUrl: customUrl,
+            customKhqrFilename: customFilename,
+            customKhqrFileSize: customFileSize,
+            customKhqrUpdatedAt: new Date(),
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+
+      try {
+        await paymentCol.updateOne(
+          { streamerId },
+          {
+            $set: {
+              customKhqrImageUrl: customUrl,
+              customKhqrFilename: customFilename,
+              customKhqrFileSize: customFileSize,
+              updatedAt: new Date()
+            }
+          },
+          { upsert: true }
+        );
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'Custom KHQR image configured successfully for your account.',
+        customKhqrImageUrl: customUrl,
+        customKhqrFilename: customFilename,
+        customKhqrFileSize: customFileSize
+      });
+    }
+
+    // 2. Handle Remove Custom KHQR action
+    if (body.action === 'remove_custom_khqr') {
+      await gatewayCol.updateMany(
+        {
+          $or: [
+            { _id: `khqr_${streamerId}` },
+            { streamerId }
+          ]
+        },
+        {
+          $set: {
+            customKhqrImageUrl: '',
+            customKhqrFilename: '',
+            customKhqrFileSize: 0,
+            customKhqrMimeType: '',
+            customKhqrBase64: '',
+            updatedAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+
+      try {
+        await paymentCol.updateOne(
+          { streamerId },
+          {
+            $set: {
+              customKhqrImageUrl: '',
+              customKhqrFilename: '',
+              customKhqrFileSize: 0,
+              updatedAt: new Date()
+            }
+          }
+        );
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'Custom KHQR image removed from your account.'
+      });
+    }
 
     const existingConfig = await gatewayCol.findOne({
       $or: [

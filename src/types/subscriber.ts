@@ -42,12 +42,13 @@ export interface SubscriberTier {
 
 export interface SubscriberItem {
   id: string;
+  streamerToken?: string;
   subscriberName: string;
   youtubeHandle?: string;
   tierId: string;
   tierName: string;
-  price: number;
-  currency: 'USD' | 'KHR';
+  price?: number;
+  currency?: 'USD' | 'KHR';
   badgeText?: string;
   badgeColor?: string;
   badgeBg?: string;
@@ -56,11 +57,17 @@ export interface SubscriberItem {
   badgeGifUrl?: string;
   badgeImage?: string;
   status: 'active' | 'cancelled' | 'expired';
-  subscribedAt: string;
-  expiresAt: string;
+  subscribedAt?: string;
+  expiresAt?: string;
+  startDate?: string;
+  expiryDate?: string;
+  totalMonths?: number;
+  totalAmountPaid?: number;
   paymentMethod?: string;
   donorMessage?: string;
 }
+
+export type SubscriberMember = SubscriberItem;
 
 export interface TelegramOutletGroup {
   chatId: string;

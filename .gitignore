@@ -53,3 +53,7 @@ public/uploads/media/*
 public/uploads/payment/*
 !public/uploads/payment/.gitkeep
 
+# Large neural model checkpoints (>100MB GitHub limit)
+models/openvoice_v2/converter/checkpoint.pth
+
+

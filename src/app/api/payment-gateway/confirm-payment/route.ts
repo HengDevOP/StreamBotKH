@@ -397,7 +397,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Get streamer alert settings from MongoDB alert_boxes
+    const effectiveAmountUsd = effectiveCurrency === 'KHR' ? effectiveAmount / 4000 : effectiveAmount;
     let matchingBox: any = null;
+    let hasConfiguredBoxes = false;
     try {
       const alertBoxesCol = await getAlertBoxesCollection();
       const activeBoxes = await alertBoxesCol
@@ -412,7 +414,7 @@ export async function POST(req: NextRequest) {
         })
         .sort({ minAmountCondition: -1 })
         .toArray();
-      const effectiveAmountUsd = effectiveCurrency === 'KHR' ? effectiveAmount / 4000 : effectiveAmount;
+      hasConfiguredBoxes = activeBoxes.length > 0;
       matchingBox = resolveMatchingAlertBox(activeBoxes, effectiveAmountUsd);
     } catch (e) {
       console.warn('[PaymentGateway] Could not fetch mongo alert boxes:', e);
@@ -439,6 +441,14 @@ export async function POST(req: NextRequest) {
         ]
       });
     } catch (e) {}
+
+    const videoMinTipAmount = videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 2.0) : 2.0;
+    const isVideoAlertEnabled = videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true;
+    const meetsVideoThreshold = isVideoAlertEnabled && effectiveAmountUsd + 0.0001 >= videoMinTipAmount;
+    const finalVideoUrl = meetsVideoThreshold ? effectiveVideoUrl : undefined;
+    const finalVideoTitle = meetsVideoThreshold ? effectiveVideoTitle : undefined;
+    const finalVideoStartTime = meetsVideoThreshold ? effectiveVideoStartTime : 0;
+    const finalVideoEndTime = meetsVideoThreshold ? effectiveVideoEndTime : 0;
 
     // If subscription, fetch subscriber tier alertSettings from MongoDB
     let tierAlertSettings: any = null;
@@ -477,77 +487,93 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Trigger Real-Time OBS Studio Overlay Alert with current saved settings
-    broadcastAlertToOverlay(resolvedOverlayToken, {
-      streamerId: resolvedStreamerId,
-      streamerUsername: streamer.username,
-      boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
-      donationId: activeDonationId,
-      donorName: effectiveDonorName,
-      donorMessage: effectiveDonorMessage,
-      donor_message: effectiveDonorMessage,
-      message: effectiveDonorMessage,
-      amount: effectiveAmount,
-      currency: effectiveCurrency,
-      bankingName: effectiveBankingName,
-      isSubscription: isSubscription || undefined,
-      tierId: tierId || undefined,
-      tierName: tierName || undefined,
-      badgeText: badgeText || undefined,
-      badgeColor: badgeColor || undefined,
-      videoUrl: effectiveVideoUrl,
-      videoTitle: effectiveVideoTitle,
-      videoStartTime: effectiveVideoStartTime,
-      videoEndTime: effectiveVideoEndTime,
-      videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
-      videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
-      videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
-      templateStyle: (isSubscription && tierAlertSettings?.templateStyle) || matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
-      textTemplate: isSubscription
-        ? (tierAlertSettings?.textTemplate || '{name} joined as a {tier} subscriber!')
-        : (matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!'),
-      textColor: (isSubscription && tierAlertSettings?.textColor) || matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
-      donorColor: (isSubscription && (tierAlertSettings?.subscriberColor || tierAlertSettings?.donorColor)) || matchingBox?.donorColor || undefined,
-      amountColor: (isSubscription && (tierAlertSettings?.tierColor || tierAlertSettings?.amountColor)) || matchingBox?.amountColor || undefined,
-      customGifUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-      mediaUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
-      showImage: (isSubscription && tierAlertSettings?.showImage !== undefined) ? tierAlertSettings.showImage : (matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0)),
-      fontFamily: (isSubscription && tierAlertSettings?.fontFamily) || matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
-      fontSize: (isSubscription && tierAlertSettings?.fontSize) || matchingBox?.fontSize || alertSettings?.font_size || 28,
-      layoutMode: (isSubscription && tierAlertSettings?.layoutMode) || matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
-      animationStyle: (isSubscription && tierAlertSettings?.animationStyle) || matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
-      glowColor: (isSubscription && (tierAlertSettings?.glowColor || badgeColor)) || (matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF'),
-      soundUrl: (isSubscription && tierAlertSettings?.soundUrl)
-        ? tierAlertSettings.soundUrl
-        : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
-            ? matchingBox.soundUrl
-            : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
-                ? alertSettings.sound_url
-                : '/sounds/cash-register-kaching.mp3')),
-      soundVolume: (isSubscription && tierAlertSettings?.soundVolume !== undefined)
-        ? tierAlertSettings.soundVolume
-        : (matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85),
-      durationSeconds: (isSubscription && tierAlertSettings?.durationSeconds)
-        ? tierAlertSettings.durationSeconds
-        : (effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
-            ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
-            : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8)),
-      ttsEnabled: (isSubscription && tierAlertSettings?.ttsEnabled !== undefined)
-        ? tierAlertSettings.ttsEnabled
-        : (matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1)),
-      ttsType: (isSubscription && tierAlertSettings?.ttsType)
-        ? tierAlertSettings.ttsType
-        : (matchingBox?.ttsType || (
-            (alertSettings?.tts_voice || '').toLowerCase() === 'google-male' || (alertSettings?.tts_voice || '').toLowerCase().includes('christopher') ? 'google-male'
-            : (alertSettings?.tts_voice || '').toLowerCase().includes('female') || (alertSettings?.tts_voice || '').toLowerCase().includes('sreymom') ? 'kiritts-female'
-            : (alertSettings?.tts_voice || '').toLowerCase().includes('male') || (alertSettings?.tts_voice || '').toLowerCase().includes('piseth') ? 'kiritts-male'
-            : alertSettings?.tts_voice === 'cloned' ? 'cloned'
-            : (alertSettings?.tts_type || 'google')
-          )),
-      clonedVoiceSampleUrl: (isSubscription && tierAlertSettings?.clonedVoiceSampleUrl)
-        ? tierAlertSettings.clonedVoiceSampleUrl
-        : (matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url)
-    });
+    const legacyMinAlertUsd = Number(alertSettings?.min_amount_alert ?? alertSettings?.minAmountAlert ?? 0.01);
+    const meetsAlertThreshold = isSubscription
+      ? true
+      : hasConfiguredBoxes
+      ? Boolean(matchingBox)
+      : effectiveAmountUsd + 0.0001 >= legacyMinAlertUsd;
+
+    const ttsMinAmountUsd = Number(
+      (isSubscription && tierAlertSettings?.ttsMinAmount !== undefined)
+        ? tierAlertSettings.ttsMinAmount
+        : (matchingBox?.ttsMinAmount ?? alertSettings?.tts_min_amount ?? alertSettings?.ttsMinAmount ?? 0)
+    );
+    const meetsTtsThreshold = effectiveAmountUsd + 0.0001 >= ttsMinAmountUsd;
+
+    // 4. Trigger Real-Time OBS Studio Overlay Alert with current saved settings (only if paid amount meets threshold)
+    if (meetsAlertThreshold || Boolean(finalVideoUrl)) {
+      broadcastAlertToOverlay(resolvedOverlayToken, {
+        streamerId: resolvedStreamerId,
+        streamerUsername: streamer.username,
+        boxId: matchingBox?._id ? String(matchingBox._id) : undefined,
+        donationId: activeDonationId,
+        donorName: effectiveDonorName,
+        donorMessage: effectiveDonorMessage,
+        donor_message: effectiveDonorMessage,
+        message: effectiveDonorMessage,
+        amount: effectiveAmount,
+        currency: effectiveCurrency,
+        bankingName: effectiveBankingName,
+        isSubscription: isSubscription || undefined,
+        tierId: tierId || undefined,
+        tierName: tierName || undefined,
+        badgeText: badgeText || undefined,
+        badgeColor: badgeColor || undefined,
+        videoUrl: finalVideoUrl,
+        videoTitle: finalVideoTitle,
+        videoStartTime: finalVideoStartTime,
+        videoEndTime: finalVideoEndTime,
+        videoAlertEnabled: isVideoAlertEnabled,
+        videoMinTipAmount: videoMinTipAmount,
+        videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
+        templateStyle: (isSubscription && tierAlertSettings?.templateStyle) || matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
+        textTemplate: isSubscription
+          ? (tierAlertSettings?.textTemplate || '{name} joined as a {tier} subscriber!')
+          : (matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!'),
+        textColor: (isSubscription && tierAlertSettings?.textColor) || matchingBox?.textColor || alertSettings?.text_color || '#FFFFFF',
+        donorColor: (isSubscription && (tierAlertSettings?.subscriberColor || tierAlertSettings?.donorColor)) || matchingBox?.donorColor || undefined,
+        amountColor: (isSubscription && (tierAlertSettings?.tierColor || tierAlertSettings?.amountColor)) || matchingBox?.amountColor || undefined,
+        customGifUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+        mediaUrl: (isSubscription && tierAlertSettings?.mediaUrl) || badgeGifUrl || badgeImage || matchingBox?.mediaUrl || alertSettings?.custom_gif_url,
+        showImage: (isSubscription && tierAlertSettings?.showImage !== undefined) ? tierAlertSettings.showImage : (matchingBox?.showImage !== undefined ? matchingBox.showImage : (alertSettings?.show_image !== 0)),
+        fontFamily: (isSubscription && tierAlertSettings?.fontFamily) || matchingBox?.fontFamily || alertSettings?.font_family || 'Chakra Petch',
+        fontSize: (isSubscription && tierAlertSettings?.fontSize) || matchingBox?.fontSize || alertSettings?.font_size || 28,
+        layoutMode: (isSubscription && tierAlertSettings?.layoutMode) || matchingBox?.layoutMode || alertSettings?.layout_mode || 'top',
+        animationStyle: (isSubscription && tierAlertSettings?.animationStyle) || matchingBox?.animationStyle || alertSettings?.animation_style || 'fade',
+        glowColor: (isSubscription && (tierAlertSettings?.glowColor || badgeColor)) || (matchingBox?.glowColor || alertSettings?.glow_color || '#00F0FF'),
+        soundUrl: (isSubscription && tierAlertSettings?.soundUrl)
+          ? tierAlertSettings.soundUrl
+          : ((matchingBox?.soundUrl && !matchingBox.soundUrl.includes('neon-chime'))
+              ? matchingBox.soundUrl
+              : (alertSettings?.sound_url && !alertSettings.sound_url.includes('neon-chime')
+                  ? alertSettings.sound_url
+                  : '/sounds/cash-register-kaching.mp3')),
+        soundVolume: (isSubscription && tierAlertSettings?.soundVolume !== undefined)
+          ? tierAlertSettings.soundVolume
+          : (matchingBox?.soundVolume ?? alertSettings?.sound_volume ?? 0.85),
+        durationSeconds: (isSubscription && tierAlertSettings?.durationSeconds)
+          ? tierAlertSettings.durationSeconds
+          : (finalVideoEndTime && finalVideoStartTime && (finalVideoEndTime - finalVideoStartTime > 0)
+              ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, finalVideoEndTime - finalVideoStartTime + 2)
+              : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8)),
+        ttsEnabled: meetsTtsThreshold && Boolean((isSubscription && tierAlertSettings?.ttsEnabled !== undefined)
+          ? tierAlertSettings.ttsEnabled
+          : (matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1))),
+        ttsType: (isSubscription && tierAlertSettings?.ttsType)
+          ? tierAlertSettings.ttsType
+          : (matchingBox?.ttsType || (
+              (alertSettings?.tts_voice || '').toLowerCase() === 'google-male' || (alertSettings?.tts_voice || '').toLowerCase().includes('christopher') ? 'google-male'
+              : (alertSettings?.tts_voice || '').toLowerCase().includes('female') || (alertSettings?.tts_voice || '').toLowerCase().includes('sreymom') ? 'kiritts-female'
+              : (alertSettings?.tts_voice || '').toLowerCase().includes('male') || (alertSettings?.tts_voice || '').toLowerCase().includes('piseth') ? 'kiritts-male'
+              : alertSettings?.tts_voice === 'cloned' ? 'cloned'
+              : (alertSettings?.tts_type || 'google')
+            )),
+        clonedVoiceSampleUrl: (isSubscription && tierAlertSettings?.clonedVoiceSampleUrl)
+          ? tierAlertSettings.clonedVoiceSampleUrl
+          : (matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url)
+      });
+    }
 
     // 5. Broadcast to Streamer Live Dashboard (Updates revenue & recent list immediately)
     broadcastDonationToDashboard(resolvedStreamerId, {

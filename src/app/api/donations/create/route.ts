@@ -106,8 +106,14 @@ export async function POST(req: NextRequest) {
         ]
       });
 
+      const isCustomDonation = Boolean(body.isCustom || body.selectedKhqrId === 'custom');
+
+      if (!khqrImage && isCustomDonation && streamerConfig?.customKhqrImageUrl) {
+        khqrImage = streamerConfig.customKhqrImageUrl;
+      }
+
       const items: any[] = Array.isArray(streamerConfig?.khqrItems) ? streamerConfig.khqrItems : [];
-      if (!khqrImage && items.length > 0) {
+      if (!khqrImage && !isCustomDonation && items.length > 0) {
         const exactMatch = items.find(
           (i) => i.currency === validCurrency && Math.abs(Number(i.amount) - numAmount) < 0.001 && i.imageUrl
         );
@@ -119,6 +125,10 @@ export async function POST(req: NextRequest) {
         } else if (items[0]?.imageUrl) {
           khqrImage = items[0].imageUrl;
         }
+      }
+
+      if (!khqrImage && isCustomDonation && streamerConfig?.customKhqrImageUrl) {
+        khqrImage = streamerConfig.customKhqrImageUrl;
       }
 
       if (!khqrImage) {

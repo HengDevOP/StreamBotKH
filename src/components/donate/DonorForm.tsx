@@ -62,6 +62,8 @@ export interface DonorFormData {
   isWheelSpin?: boolean;
   donationType?: 'tip' | 'subscribe' | 'wheel';
   qrImage?: string;
+  isCustom?: boolean;
+  selectedKhqrId?: string;
 }
 
 import { getBadgeIconComponent } from '../../data/badgeIcons';
@@ -198,6 +200,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
   // Form states: Username, Bank Name, Text/Message, Video URL + Amount & Currency
   const khqrItems = Array.isArray(streamer.khqrItems) ? streamer.khqrItems : [];
+  const hasCustomKhqr = Boolean(streamer.customKhqrImageUrl);
   const usdKhqrList = khqrItems
     .filter((i) => i.currency === 'USD')
     .sort((a, b) => Number(a.amount) - Number(b.amount));
@@ -227,8 +230,15 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   } | null>(null);
 
   const [currency, setCurrency] = useState<'USD' | 'KHR'>(initialCurrency);
-  const [amount, setAmount] = useState<number>(initialItem ? Number(initialItem.amount) : 0);
-  const [selectedKhqrId, setSelectedKhqrId] = useState<string>(initialItem ? initialItem.id : '');
+  const [amount, setAmount] = useState<number>(
+    initialItem ? Number(initialItem.amount) : hasCustomKhqr ? 1 : 0
+  );
+  const [selectedKhqrId, setSelectedKhqrId] = useState<string>(
+    initialItem ? initialItem.id : hasCustomKhqr ? 'custom' : ''
+  );
+  const [customAmountInput, setCustomAmountInput] = useState<string>(
+    !initialItem && hasCustomKhqr ? '1' : ''
+  );
   const [donorName, setDonorName] = useState<string>('');
   const [bankingName, setBankingName] = useState<string>('');
   const [donorMessage, setDonorMessage] = useState<string>('');
@@ -252,19 +262,31 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
   const handleSelectTipCurrency = (nextCurr: 'USD' | 'KHR') => {
     setCurrency(nextCurr);
+    if (selectedKhqrId === 'custom' && hasCustomKhqr) {
+      const defAmt = nextCurr === 'KHR' ? 2000 : 1;
+      setCustomAmountInput(String(defAmt));
+      setAmount(defAmt);
+      return;
+    }
     const list = nextCurr === 'USD' ? usdKhqrList : khrKhqrList;
     if (list.length > 0) {
       setAmount(Number(list[0].amount));
       setSelectedKhqrId(list[0].id);
+    } else if (hasCustomKhqr) {
+      const defAmt = nextCurr === 'KHR' ? 2000 : 1;
+      setSelectedKhqrId('custom');
+      setCustomAmountInput(String(defAmt));
+      setAmount(defAmt);
     } else {
       setAmount(0);
       setSelectedKhqrId('');
     }
   };
 
-  // Ensure default active is always the first index of the active currency
+  // Ensure default active is always the first index of the active currency (unless 'custom' is active)
   useEffect(() => {
     if (donationType === 'tip') {
+      if (selectedKhqrId === 'custom' && hasCustomKhqr) return;
       const activeList = currency === 'USD' ? usdKhqrList : khrKhqrList;
       if (activeList.length > 0) {
         const exists = activeList.some((i) => i.id === selectedKhqrId);
@@ -272,9 +294,14 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           setAmount(Number(activeList[0].amount));
           setSelectedKhqrId(activeList[0].id);
         }
+      } else if (hasCustomKhqr) {
+        const defAmt = currency === 'KHR' ? 2000 : 1;
+        setSelectedKhqrId('custom');
+        setCustomAmountInput(String(defAmt));
+        setAmount(defAmt);
       }
     }
-  }, [currency, usdKhqrList, khrKhqrList, donationType, selectedKhqrId]);
+  }, [currency, usdKhqrList, khrKhqrList, donationType, selectedKhqrId, hasCustomKhqr]);
 
   // Fetch streamer subscriber, wheel, and video alert settings
   useEffect(() => {
@@ -334,12 +361,22 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       setAmount(wheelSettings.minTipAmount || 2.0);
       setCurrency('USD');
     } else if (mode === 'tip') {
+      if (selectedKhqrId === 'custom' && hasCustomKhqr) {
+        const parsed = parseFloat(customAmountInput);
+        setAmount(!isNaN(parsed) && parsed > 0 ? parsed : currency === 'KHR' ? 2000 : 1);
+        return;
+      }
       const activeList = currency === 'USD' ? usdKhqrList : khrKhqrList;
       const matched = activeList.find((i) => i.id === selectedKhqrId) || activeList[0];
       if (matched) {
         setAmount(Number(matched.amount));
         setCurrency(matched.currency);
         setSelectedKhqrId(matched.id);
+      } else if (hasCustomKhqr) {
+        const defAmt = currency === 'KHR' ? 2000 : 1;
+        setSelectedKhqrId('custom');
+        setCustomAmountInput(String(defAmt));
+        setAmount(defAmt);
       } else {
         setAmount(0);
         setSelectedKhqrId('');
@@ -503,6 +540,11 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     if (activeList.length > 0) {
       setAmount(Number(activeList[0].amount));
       setSelectedKhqrId(activeList[0].id);
+    } else if (hasCustomKhqr) {
+      const defAmt = currency === 'KHR' ? 2000 : 1;
+      setSelectedKhqrId('custom');
+      setCustomAmountInput(String(defAmt));
+      setAmount(defAmt);
     } else {
       setAmount(0);
       setSelectedKhqrId('');
@@ -543,8 +585,10 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     const cleanBanking = bankingName.trim();
     if (!cleanDonor && !cleanBanking) return;
 
+    const isCustomSelected = selectedKhqrId === 'custom' && hasCustomKhqr;
+
     // Prevent proceeding if user has not selected any amount in Tip mode
-    if (donationType === 'tip' && (amount <= 0 || (khqrItems.length > 0 && !selectedKhqrId))) {
+    if (donationType === 'tip' && !isCustomSelected && (amount <= 0 || ((khqrItems.length > 0 || hasCustomKhqr) && !selectedKhqrId))) {
       return;
     }
 
@@ -559,6 +603,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       ? selectedTier.price
       : donationType === 'wheel' && wheelSettings
       ? (wheelSettings.minTipAmount || 2.0)
+      : isCustomSelected
+      ? (currency === 'KHR' ? 100 : 0.01)
       : (amount || 0);
 
     if (!finalAmount || finalAmount <= 0) {
@@ -573,11 +619,14 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
 
     const activeKhqrList = finalCurrency === 'USD' ? usdKhqrList : khrKhqrList;
     const matchedKhqrItem =
-      donationType === 'tip'
+      donationType === 'tip' && !isCustomSelected
         ? activeKhqrList.find((i) => i.id === selectedKhqrId) ||
           activeKhqrList.find((i) => Math.abs(Number(i.amount) - finalAmount) < 0.001)
         : null;
     const resolvedFinalAmount = finalAmount;
+    const resolvedQrImage = isCustomSelected
+      ? streamer.customKhqrImageUrl || undefined
+      : matchedKhqrItem?.imageUrl || streamer.customKhqrImageUrl || undefined;
 
     // Show donor username on alerts and TTS, and pass bankingName for bank payment matching
     await onSubmit({
@@ -586,7 +635,9 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
       donorMessage: donorMessage.trim(),
       amount: resolvedFinalAmount,
       currency: finalCurrency,
-      qrImage: matchedKhqrItem?.imageUrl || undefined,
+      qrImage: resolvedQrImage,
+      isCustom: isCustomSelected,
+      selectedKhqrId: isCustomSelected ? 'custom' : selectedKhqrId,
       videoUrl: donationType === 'tip' && meetsMinTip && videoUrl.trim() ? videoUrl.trim() : undefined,
       videoTitle: donationType === 'tip' && meetsMinTip && videoTitle.trim() ? videoTitle.trim() : undefined,
       videoStartTime: donationType === 'tip' && meetsMinTip && videoUrl.trim() ? Math.max(0, videoStartTime) : undefined,
@@ -606,7 +657,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
     });
   };
 
-  const isEligibleTTS = amount >= (streamer.ttsMinAmount || 2);
+  const isCustomSelected = selectedKhqrId === 'custom' && hasCustomKhqr;
+  const isEligibleTTS = isCustomSelected || amount >= (streamer.ttsMinAmount || 2);
   const totalClipSeconds = Math.max(5, videoEndTime - videoStartTime);
   const activeVideoId = extractYouTubeId(videoUrl);
 
@@ -624,7 +676,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
   const videoMinTipKhr = Math.round(videoMinTip * 4000);
   const videoMaxDuration = Number(liveVideoSettings?.maxDurationSeconds ?? streamer.videoMaxDurationSeconds ?? 300); // up to 5 minutes
   const currentAmountInUsd = currency === 'KHR' ? (amount || 0) / 4000 : (amount || 0);
-  const meetsMinTip = amount > 0 && currentAmountInUsd + 0.0001 >= videoMinTip;
+  const meetsMinTip = isCustomSelected || (amount > 0 && currentAmountInUsd + 0.0001 >= videoMinTip);
   const requiredTipLabel =
     currency === 'KHR'
       ? lang === 'kh'
@@ -1123,8 +1175,8 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
           /* TIP MODE: FAST 2-COLUMN COMPACT LAYOUT (ONE LINE)              */
           /* ============================================================== */
           <>
-            {/* CURRENCY & AMOUNT TAB SWITCH (FROM STREAMER CREATED KHQR) */}
-            {khqrItems.length > 0 && (
+            {/* CURRENCY & AMOUNT TAB SWITCH (FROM STREAMER CREATED KHQR + CUSTOM KHQR) */}
+            {(khqrItems.length > 0 || hasCustomKhqr) && (
               <div className="space-y-2">
                 {/* Currency Tab Switch Row */}
                 <div className="flex items-center justify-between gap-2">
@@ -1133,7 +1185,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                   </span>
 
                   <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-950 border border-slate-700/80 shadow-sm">
-                    {usdKhqrList.length > 0 && (
+                    {(usdKhqrList.length > 0 || hasCustomKhqr) && (
                       <button
                         type="button"
                         onClick={() => handleSelectTipCurrency('USD')}
@@ -1147,7 +1199,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                       </button>
                     )}
 
-                    {khrKhqrList.length > 0 && (
+                    {(khrKhqrList.length > 0 || hasCustomKhqr) && (
                       <button
                         type="button"
                         onClick={() => handleSelectTipCurrency('KHR')}
@@ -1163,7 +1215,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                   </div>
                 </div>
 
-                {/* Amount Tab Switch Grid for Active Currency */}
+                {/* Amount Tab Switch Grid for Active Currency + "Custom" Button */}
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 p-1 bg-slate-950/90 border border-slate-800 rounded-xl">
                   {(currency === 'USD' ? usdKhqrList : khrKhqrList).map((item, idx) => {
                     const isSelected =
@@ -1193,6 +1245,23 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                       </button>
                     );
                   })}
+
+                  {/* "Custom" Amount Button (Visible when Streamer selected Custom KHQR Image) */}
+                  {hasCustomKhqr && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedKhqrId('custom');
+                      }}
+                      className={`py-2 px-2.5 rounded-lg font-mono text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                        selectedKhqrId === 'custom'
+                          ? 'bg-white text-slate-950 shadow-sm'
+                          : 'border border-transparent text-slate-400 hover:text-white hover:bg-slate-900/80'
+                      }`}
+                    >
+                      <span>{lang === 'kh' ? 'កំណត់ខ្លួនឯង (Custom)' : 'Custom'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -1396,7 +1465,7 @@ export const DonorForm: React.FC<DonorFormProps> = ({ streamer, onSubmit, onSetu
                 ? Boolean(selectedTier && selectedTier.price > 0)
                 : donationType === 'wheel'
                 ? Boolean(wheelSettings && (wheelSettings.minTipAmount || 2) > 0)
-                : amount > 0 && (khqrItems.length === 0 || Boolean(selectedKhqrId));
+                : isCustomSelected || (amount > 0 && (khqrItems.length === 0 || Boolean(selectedKhqrId)));
 
             return (
               <Button

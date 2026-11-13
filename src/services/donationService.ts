@@ -35,6 +35,8 @@ export interface PublicStreamerInfo {
   viewers?: number;
   hasMasterKhqr?: boolean;
   khqrImageUrl?: string;
+  customKhqrImageUrl?: string;
+  customKhqrFilename?: string;
   khqrItems?: KhqrPresetItem[];
   isTelegramConnected?: boolean;
   hasTelegramGroup?: boolean;

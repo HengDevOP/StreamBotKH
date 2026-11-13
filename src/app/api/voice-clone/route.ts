@@ -301,7 +301,10 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.warn('[VoiceClone] Could not write sample file to disk:', e);
       }
-    } else if (typeof sampleUrl === 'string' && sampleUrl.startsWith('/uploads/voices/')) {
+    } else if (
+      typeof sampleUrl === 'string' &&
+      (sampleUrl.startsWith('/uploads/voices/') || sampleUrl.startsWith('/assets/voice-clone/'))
+    ) {
       const diskPath = path.join(process.cwd(), 'public', sampleUrl);
       if (fs.existsSync(diskPath)) {
         analyzedProfile = await analyzeVoiceSampleFile(diskPath);
@@ -315,7 +318,7 @@ export async function POST(req: NextRequest) {
     const resolvedPitchHz =
       analyzedProfile?.averagePitchHz ||
       Number(averagePitchHz) ||
-      (resolvedGender === 'female' ? 210 : 130);
+      (resolvedGender === 'female' ? 210 : 132);
 
     const finalBaseModel =
       baseModel && baseModel !== 'auto'
@@ -324,9 +327,7 @@ export async function POST(req: NextRequest) {
         ? 'neural-female'
         : 'neural-male';
 
-    const derivedPitch = analyzedProfile?.pitchOffsetHz !== undefined && analyzedProfile.pitchOffsetHz !== 0
-      ? `${analyzedProfile.pitchOffsetHz > 0 ? '+' : ''}${analyzedProfile.pitchOffsetHz}Hz`
-      : String(pitch || '+0Hz').trim();
+    const derivedPitch = '+0Hz';
 
     const derivedRate = analyzedProfile?.ratePercent !== undefined && analyzedProfile.ratePercent !== 0
       ? `${analyzedProfile.ratePercent > 0 ? '+' : ''}${analyzedProfile.ratePercent}%`
@@ -336,7 +337,7 @@ export async function POST(req: NextRequest) {
       userId,
       voiceName: voiceName.trim() || 'My Streamer AI Voice',
       sampleUrl: storedSampleUrl,
-      sampleDurationSeconds: Number(sampleDurationSeconds),
+      sampleDurationSeconds: Number(sampleDurationSeconds) || 15,
       baseModel: finalBaseModel,
       pitch: derivedPitch,
       rate: derivedRate,
@@ -345,12 +346,12 @@ export async function POST(req: NextRequest) {
       averagePitchHz: resolvedPitchHz,
       soundStyle: analyzedProfile?.soundStyle || 'Warm & Conversational',
       pacingLabel: analyzedProfile?.pacingLabel || 'Natural (1.0x)',
-      timbre: analyzedProfile?.timbre || String(timbre || 'natural voice'),
-      tau: analyzedProfile?.tau ?? 0.19,
-      f0Std: analyzedProfile?.f0Std ?? 18,
+      timbre: analyzedProfile?.timbre || String(timbre || 'balanced natural studio voice'),
+      tau: analyzedProfile?.tau ?? 0.13,
+      f0Std: analyzedProfile?.f0Std ?? 16,
       spectralBrightnessHz: analyzedProfile?.spectralBrightnessHz ?? 380,
       speakingTempoRatio: analyzedProfile?.speakingTempoRatio ?? 1.0,
-      chestGainDb: analyzedProfile?.chestGainDb ?? 2.0,
+      chestGainDb: analyzedProfile?.chestGainDb ?? 2.2,
       presenceGainDb: analyzedProfile?.presenceGainDb ?? 1.8,
       airGainDb: analyzedProfile?.airGainDb ?? 1.2,
       clonedAt: new Date()

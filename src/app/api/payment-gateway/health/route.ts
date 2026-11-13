@@ -59,12 +59,14 @@ export async function GET(req: NextRequest) {
         ? mongoPaymentSettings.khqrItems
         : [];
 
-      // Step 2 is considered complete ONLY if the client has actually added at least 1 KHQR item
-      if (items.length > 0) {
+      // Step 2 is considered complete if the client has added at least 1 KHQR item or configured Custom KHQR
+      if (items.length > 0 || Boolean(mongoConfig?.customKhqrImageUrl || mongoPaymentSettings?.customKhqrImageUrl)) {
         hasKhqrConfigured = true;
       } else if (streamerId === 'demo-streamer-id-1001') {
         const globalConfig = (await gatewayCol.findOne({ _id: 'master_khqr_config' })) as any;
         if (Array.isArray(globalConfig?.khqrItems) && globalConfig.khqrItems.length > 0) {
+          hasKhqrConfigured = true;
+        } else if (globalConfig?.customKhqrImageUrl) {
           hasKhqrConfigured = true;
         }
       }

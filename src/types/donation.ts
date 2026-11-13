@@ -49,6 +49,8 @@ export interface CreateDonationRequest {
   isWheelSpin?: boolean;
   donationType?: 'tip' | 'subscribe' | 'wheel';
   qrImage?: string;
+  isCustom?: boolean;
+  selectedKhqrId?: string;
 }
 
 export interface CreateDonationResponse {

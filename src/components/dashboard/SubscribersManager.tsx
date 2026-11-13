@@ -33,6 +33,7 @@ import {
   BADGE_ICON_LIST,
   getBadgeIconComponent
 } from '../../data/badgeIcons';
+import { useSocket } from '../../context/SocketContext';
 
 interface SubscribersManagerProps {
   streamerToken?: string;
@@ -52,8 +53,34 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   onSelectTierId,
   onRegenerateToken
 }) => {
-  const token = streamerToken || 'demo_token';
-  const username = streamerUsername || 'Streamer';
+  const token = streamerToken || 'demo-token';
+  const username = streamerUsername || 'streamer';
+  const { socket, joinOverlayRoom } = useSocket();
+
+  useEffect(() => {
+    if (token) {
+      joinOverlayRoom(token);
+    }
+  }, [token, joinOverlayRoom]);
+
+  const authFetch = (url: string, init: RequestInit = {}) => {
+    const authToken = typeof window !== 'undefined'
+      ? (localStorage.getItem('streamneon_auth_token') || localStorage.getItem('auth_token') || localStorage.getItem('streamneon_token'))
+      : null;
+    const headers = new Headers(init.headers || {});
+    if (authToken && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${authToken}`);
+    }
+    return fetch(url, { credentials: 'include', ...init, headers });
+  };
+
+  const safeJson = async (res: Response) => {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return { success: false, error: `Unexpected response (${res.status})` };
+    }
+    return res.json();
+  };
 
   // State
   const [tiers, setTiers] = useState<SubscriberTier[]>([]);
@@ -121,18 +148,40 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     setTimeout(() => setCopiedObs(false), 2000);
   };
 
-  // 1. Fetch Tiers & Settings
+  const persistTiers = async (nextTiers: SubscriberTier[], nextOutletGroup = telegramOutletGroup) => {
+    const res = await authFetch('/api/widgets/subscribers/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        username,
+        enabled: true,
+        tiers: nextTiers,
+        telegramOutletGroup: nextOutletGroup
+      })
+    });
+    return safeJson(res);
+  };
+
+  // 1. Fetch Tiers, Settings & Subscribers
   const fetchTiers = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/subscribers?token=${token}`);
-      const data = await res.json();
-      if (data.success) {
-        setTiers(data.tiers || []);
-        setSubscribers(data.subscribers || []);
-        if (data.telegramOutletGroup) {
-          setTelegramOutletGroup(data.telegramOutletGroup);
-        }
+      const query = `token=${encodeURIComponent(token)}&username=${encodeURIComponent(username)}`;
+      const [settingsRes, subsRes] = await Promise.all([
+        authFetch(`/api/widgets/subscribers/settings?${query}`),
+        authFetch(`/api/widgets/subscribers?${query}`)
+      ]);
+
+      const settingsData = await safeJson(settingsRes);
+      if (settingsData?.success && settingsData.settings) {
+        setTiers(Array.isArray(settingsData.settings.tiers) ? settingsData.settings.tiers : []);
+        setTelegramOutletGroup(settingsData.settings.telegramOutletGroup || null);
+      }
+
+      const subsData = await safeJson(subsRes);
+      if (subsData?.success) {
+        setSubscribers(Array.isArray(subsData.subscribers) ? subsData.subscribers : []);
       }
     } catch (err) {
       console.error('[SubscribersManager] Failed to fetch:', err);
@@ -143,7 +192,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
 
   useEffect(() => {
     fetchTiers();
-  }, [token]);
+  }, [token, username]);
 
   // Check initial tier selection from props
   useEffect(() => {
@@ -197,6 +246,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
       const payload: Partial<SubscriberTier> = {
         name: tierName.trim(),
         price: Number(tierPrice) || 4.99,
+        currency: 'USD',
         description: tierDescription.trim(),
         badgeIcon: tierBadgeIcon,
         badgeText: tierBadgeText.trim(),
@@ -213,9 +263,9 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
       } else {
         const newTier: SubscriberTier = {
           id: `tier_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          streamerToken: token,
           name: payload.name!,
           price: payload.price!,
+          currency: 'USD',
           description: payload.description,
           badgeIcon: payload.badgeIcon!,
           badgeText: payload.badgeText!,
@@ -224,7 +274,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
           badgeGifUrl: payload.badgeGifUrl,
           perks: payload.perks!,
           enabled: payload.enabled !== false,
-          sortOrder: tiers.length,
+          order: tiers.length,
           alertSettings: {
             templateStyle: 'minimal',
             glowColor: '#FFFFFF',
@@ -233,21 +283,16 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
             textColor: '#FFFFFF',
             subscriberColor: '#FFFFFF',
             tierColor: '#A3A3A3',
-            layoutMode: 'standard',
+            layoutMode: 'top',
             animationStyle: 'fade',
             ttsEnabled: true,
-            ttsType: 'standard'
+            ttsType: 'kiritts-female'
           }
         };
         nextTiers.push(newTier);
       }
 
-      const res = await fetch('/api/subscribers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, tiers: nextTiers })
-      });
-      const data = await res.json();
+      const data = await persistTiers(nextTiers);
       if (data.success) {
         setTiers(nextTiers);
         setIsTierModalOpen(false);
@@ -268,11 +313,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     const nextTiers = tiers.filter((t) => t.id !== tierId);
     setTiers(nextTiers);
     try {
-      await fetch('/api/subscribers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, tiers: nextTiers })
-      });
+      await persistTiers(nextTiers);
       showToast('Tier removed');
     } catch (err) {
       console.error('Failed to delete tier:', err);
@@ -284,11 +325,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     const nextTiers = tiers.map((t) => (t.id === tierId ? { ...t, enabled: t.enabled === false } : t));
     setTiers(nextTiers);
     try {
-      await fetch('/api/subscribers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, tiers: nextTiers })
-      });
+      await persistTiers(nextTiers);
     } catch (err) {
       console.error('Failed to toggle tier:', err);
     }
@@ -296,20 +333,38 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
 
   // Test Badge Comment on Live Chat
   const handleTestBadgeComment = async (tier: SubscriberTier) => {
+    const author = `Member_${tier.badgeText || 'VIP'}`;
+    const testPayload = {
+      token,
+      streamerToken: token,
+      action: 'test_message',
+      author,
+      message: `Hyped to be a proud ${tier.name} subscriber! Let’s go! 🔥✨`,
+      badge: tier.badgeText || 'VIP',
+      badgeColor: tier.badgeColor || '#FFFFFF',
+      badgeBg: tier.badgeBg,
+      badgeBorder: tier.badgeBorder,
+      badgeIcon: tier.badgeIcon || 'Crown',
+      badgeGifUrl: tier.badgeGifUrl || tier.badgeImage || '',
+      badgeImage: tier.badgeImage || tier.badgeGifUrl || '',
+      isTest: true
+    };
+
+    if (socket && socket.connected) {
+      socket.emit('chat:test_message', testPayload);
+      showToast('Tested badge comment on OBS chat overlay!');
+      return;
+    }
+
     try {
-      const res = await fetch('/api/subscribers', {
+      const res = await authFetch('/api/widgets/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'test_comment',
-          token,
-          tierId: tier.id,
-          username: `Member_${tier.badgeText || 'VIP'}`
-        })
+        body: JSON.stringify(testPayload)
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data.success) {
-        showToast(`Tested badge comment on OBS chat overlay!`);
+        showToast('Tested badge comment on OBS chat overlay!');
       }
     } catch (err) {
       console.error('Failed to broadcast test comment:', err);
@@ -324,35 +379,49 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     }
     const targetTierId = manualTierId || (tiers[0] ? tiers[0].id : '');
     const targetTier = tiers.find((t) => t.id === targetTierId);
-
-    const newSub: SubscriberMember = {
-      id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      streamerToken: token,
-      subscriberName: manualSubName.trim(),
-      tierId: targetTierId,
-      tierName: targetTier?.name || 'VIP Member',
-      badgeText: targetTier?.badgeText || 'VIP',
-      badgeColor: targetTier?.badgeColor || '#FFFFFF',
-      badgeIcon: targetTier?.badgeIcon || 'Crown',
-      status: 'active',
-      startDate: new Date().toISOString(),
-      expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      totalMonths: 1,
-      totalAmountPaid: targetTier?.price || 4.99
-    };
-
-    const nextSubs = [newSub, ...subscribers];
-    setSubscribers(nextSubs);
-    setIsManualSubModalOpen(false);
-    setManualSubName('');
-    showToast(`Granted 30-day membership badge to ${newSub.subscriberName}!`);
+    const cleanSubName = manualSubName.trim();
 
     try {
-      await fetch('/api/subscribers', {
+      const res = await authFetch('/api/widgets/subscribers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add_subscriber', token, subscriber: newSub })
+        body: JSON.stringify({
+          action: 'manual_add',
+          streamerToken: token,
+          streamerUsername: username,
+          subscriberName: cleanSubName,
+          tierId: targetTierId,
+          paymentMethod: 'manual_gift'
+        })
       });
+      const data = await safeJson(res);
+      if (data.success && data.subscriber) {
+        setSubscribers((prev) => [data.subscriber, ...prev.filter((s) => s.id !== data.subscriber.id)]);
+      } else {
+        const nowIso = new Date().toISOString();
+        const expIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        const fallbackSub: SubscriberMember = {
+          id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          streamerToken: token,
+          subscriberName: cleanSubName,
+          tierId: targetTierId,
+          tierName: targetTier?.name || 'VIP Member',
+          badgeText: targetTier?.badgeText || 'VIP',
+          badgeColor: targetTier?.badgeColor || '#FFFFFF',
+          badgeIcon: targetTier?.badgeIcon || 'Crown',
+          status: 'active',
+          subscribedAt: nowIso,
+          expiresAt: expIso,
+          startDate: nowIso,
+          expiryDate: expIso,
+          totalMonths: 1,
+          totalAmountPaid: targetTier?.price || 4.99
+        };
+        setSubscribers((prev) => [fallbackSub, ...prev]);
+      }
+      setIsManualSubModalOpen(false);
+      setManualSubName('');
+      showToast(`Granted 30-day membership badge to ${cleanSubName}!`);
     } catch (err) {
       console.error('Failed to save manual subscriber:', err);
     }
@@ -364,10 +433,10 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     const nextSubs = subscribers.filter((s) => s.id !== subId);
     setSubscribers(nextSubs);
     try {
-      await fetch('/api/subscribers', {
+      await authFetch('/api/widgets/subscribers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_subscriber', token, subscriberId: subId })
+        body: JSON.stringify({ action: 'delete_subscription', id: subId, streamerToken: token })
       });
       showToast('Member removed');
     } catch (err) {
@@ -380,10 +449,32 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     setIsOutletModalOpen(true);
     try {
       setFetchingDialogs(true);
-      const res = await fetch(`/api/telegram/dialogs?token=${token}`);
-      const data = await res.json();
-      if (data.success && Array.isArray(data.dialogs)) {
-        setOutletDialogs(data.dialogs);
+      const res = await authFetch('/api/telegram/groups');
+      const data = await safeJson(res);
+      if (data.success) {
+        const dialogs = Array.isArray(data.availableDialogs) ? data.availableDialogs : [];
+        const groups = Array.isArray(data.groups) ? data.groups : [];
+        const combinedMap = new Map<string, { id: string; title: string; username?: string }>();
+        dialogs.forEach((d: any) => {
+          if (d?.id) {
+            combinedMap.set(String(d.id), {
+              id: String(d.id),
+              title: d.title || 'Untitled Group',
+              username: d.username
+            });
+          }
+        });
+        groups.forEach((g: any) => {
+          const cid = String(g?.chat_id || g?.chatId || g?.id || '');
+          if (cid && !combinedMap.has(cid)) {
+            combinedMap.set(cid, {
+              id: cid,
+              title: g.title || 'Telegram Group',
+              username: g.username
+            });
+          }
+        });
+        setOutletDialogs(Array.from(combinedMap.values()));
       }
     } catch (err) {
       console.error('Failed to fetch Telegram dialogs:', err);
@@ -395,12 +486,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
   const handleConnectOutletGroup = async (group: { chatId: string; title: string; username?: string }) => {
     try {
       setLoadingOutlet(true);
-      const res = await fetch('/api/subscribers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'set_outlet_group', token, outletGroup: group })
-      });
-      const data = await res.json();
+      const data = await persistTiers(tiers, group);
       if (data.success) {
         setTelegramOutletGroup(group);
         setIsOutletModalOpen(false);
@@ -419,11 +505,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     if (!confirm('Disconnect this Telegram outlet group?')) return;
     try {
       setLoadingOutlet(true);
-      await fetch('/api/subscribers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'set_outlet_group', token, outletGroup: null })
-      });
+      await persistTiers(tiers, null);
       setTelegramOutletGroup(null);
       showToast('Telegram outlet group disconnected');
     } catch (err) {
@@ -534,14 +616,11 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
           </h3>
           {tiers.length > 0 && (
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (confirm('Delete all membership tiers?')) {
                   setTiers([]);
-                  fetch('/api/subscribers', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token, tiers: [] })
-                  });
+                  await persistTiers([]);
+                  showToast('All tiers cleared');
                 }
               }}
               className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
@@ -813,7 +892,9 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                       </span>
                     </td>
                     <td className="py-2.5 text-neutral-400">
-                      {sub.startDate ? new Date(sub.startDate).toLocaleDateString() : 'Recent'}
+                      {(sub.subscribedAt || sub.startDate)
+                        ? new Date(sub.subscribedAt || sub.startDate!).toLocaleDateString()
+                        : 'Recent'}
                     </td>
                     <td className="py-2.5">
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -920,7 +1001,7 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
                 <label className="font-medium text-neutral-300">Badge Icon</label>
                 <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 bg-[#181818] border border-[#262626] rounded-lg p-2.5">
                   {BADGE_ICON_LIST.slice(0, 16).map((iconObj) => {
-                    const Icon = iconObj.component;
+                    const Icon = iconObj.icon || getBadgeIconComponent(iconObj.id);
                     const isSelected = tierBadgeIcon === iconObj.id;
                     return (
                       <button

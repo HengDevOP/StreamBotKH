@@ -415,11 +415,17 @@ export class TelegramGroupListener {
       const effectiveDonorMessage = isMeaningful ? rawMsg.trim() : '';
       const effectiveAmount = parsed.amount > 0 ? parsed.amount : (matchedTemp?.amount || dbDonation?.amount || 1.0);
       const effectiveCurrency = parsed.currency || matchedTemp?.currency || dbDonation?.currency || 'USD';
+      const effectiveAmountUsd = effectiveCurrency === 'KHR' ? effectiveAmount / 4000 : effectiveAmount;
       const effectiveBankingName = matchedTemp?.banking_name || dbDonation?.banking_name || dbDonation?.bankingName || parsed.bankingName || 'Bakong KHQR';
-      const effectiveVideoUrl = matchedTemp?.video_url || dbDonation?.video_url || dbDonation?.videoUrl || undefined;
-      const effectiveVideoTitle = matchedTemp?.video_title || dbDonation?.video_title || dbDonation?.videoTitle || undefined;
-      const effectiveVideoStartTime = Number(matchedTemp?.video_start_time ?? dbDonation?.video_start_time ?? dbDonation?.videoStartTime ?? 0);
-      const effectiveVideoEndTime = Number(matchedTemp?.video_end_time ?? dbDonation?.video_end_time ?? dbDonation?.videoEndTime ?? 0);
+
+      const videoMinTipAmount = videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 2.0) : 2.0;
+      const isVideoAlertEnabled = videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true;
+      const rawVideoUrl = matchedTemp?.video_url || dbDonation?.video_url || dbDonation?.videoUrl || undefined;
+      const meetsVideoThreshold = isVideoAlertEnabled && effectiveAmountUsd + 0.0001 >= videoMinTipAmount;
+      const effectiveVideoUrl = meetsVideoThreshold ? rawVideoUrl : undefined;
+      const effectiveVideoTitle = meetsVideoThreshold ? (matchedTemp?.video_title || dbDonation?.video_title || dbDonation?.videoTitle || undefined) : undefined;
+      const effectiveVideoStartTime = meetsVideoThreshold ? Number(matchedTemp?.video_start_time ?? dbDonation?.video_start_time ?? dbDonation?.videoStartTime ?? 0) : 0;
+      const effectiveVideoEndTime = meetsVideoThreshold ? Number(matchedTemp?.video_end_time ?? dbDonation?.video_end_time ?? dbDonation?.videoEndTime ?? 0) : 0;
 
       // Update or insert into MongoDB donations ledger
       try {
@@ -456,6 +462,7 @@ export class TelegramGroupListener {
 
       // Fetch current saved condition alert box from MongoDB for this streamer
       let matchingBox: any = null;
+      let hasConfiguredBoxes = false;
       try {
         const alertBoxesCol = await getAlertBoxesCollection();
         const activeBoxes = await alertBoxesCol
@@ -471,11 +478,19 @@ export class TelegramGroupListener {
           .sort({ minAmountCondition: -1 })
           .toArray();
 
-        const effectiveAmountUsd = effectiveCurrency === 'KHR' ? effectiveAmount / 4000 : effectiveAmount;
+        hasConfiguredBoxes = activeBoxes.length > 0;
         matchingBox = resolveMatchingAlertBox(activeBoxes, effectiveAmountUsd);
       } catch (e) {
         console.warn('[TelegramListener] Could not fetch mongo alert boxes:', e);
       }
+
+      const legacyMinAlertUsd = Number(alertSettings?.min_amount_alert ?? alertSettings?.minAmountAlert ?? 0.01);
+      const meetsAlertThreshold = hasConfiguredBoxes
+        ? Boolean(matchingBox)
+        : effectiveAmountUsd + 0.0001 >= legacyMinAlertUsd;
+
+      const ttsMinAmountUsd = Number(matchingBox?.ttsMinAmount ?? alertSettings?.tts_min_amount ?? alertSettings?.ttsMinAmount ?? 0);
+      const meetsTtsThreshold = effectiveAmountUsd + 0.0001 >= ttsMinAmountUsd;
 
       // 3. Construct live alert payload for OBS Studio overlay with current saved alert settings
       const alertPayload = {
@@ -495,8 +510,8 @@ export class TelegramGroupListener {
         videoTitle: effectiveVideoTitle,
         videoStartTime: effectiveVideoStartTime,
         videoEndTime: effectiveVideoEndTime,
-        videoAlertEnabled: videoSettings ? (videoSettings.isEnabled === true || videoSettings.is_enabled === 1 || videoSettings.is_enabled === true) : true,
-        videoMinTipAmount: videoSettings ? Number(videoSettings.minTipAmount ?? videoSettings.min_tip_amount ?? 0.25) : 0.25,
+        videoAlertEnabled: isVideoAlertEnabled,
+        videoMinTipAmount: videoMinTipAmount,
         videoMaxDurationSeconds: videoSettings ? Number(videoSettings.maxDurationSeconds ?? videoSettings.max_duration_seconds ?? 300) : 300,
         templateStyle: matchingBox?.templateStyle || alertSettings?.template_style || 'neon-box',
         textTemplate: matchingBox?.textTemplate || alertSettings?.text_template || '{donator} donated {amount} through superchat!',
@@ -520,7 +535,7 @@ export class TelegramGroupListener {
         durationSeconds: effectiveVideoEndTime && effectiveVideoStartTime && (effectiveVideoEndTime - effectiveVideoStartTime > 0)
           ? Math.max(matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8, effectiveVideoEndTime - effectiveVideoStartTime + 2)
           : (matchingBox?.durationSeconds || alertSettings?.duration_seconds || 8),
-        ttsEnabled: matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1),
+        ttsEnabled: meetsTtsThreshold && Boolean(matchingBox?.ttsEnabled !== undefined ? matchingBox.ttsEnabled : ((alertSettings?.tts_enabled ?? 1) === 1)),
         ttsType: matchingBox?.ttsType || alertSettings?.tts_type || 'google',
         clonedVoiceSampleUrl: matchingBox?.clonedVoiceSampleUrl || alertSettings?.cloned_voice_sample_url
       };
@@ -529,37 +544,45 @@ export class TelegramGroupListener {
       const isTtsActive = Boolean(alertPayload.ttsEnabled);
       let finalTtsActive = isTtsActive;
       let tokenCost = finalTtsActive ? 20 : 15;
+      let tokenDeduction: { success: boolean; stats: any } = {
+        success: false,
+        stats: { used: 0, limit: 2000, remaining: 2000 }
+      };
 
-      // Attempt token deduction (2,000 daily tokens limit)
-      let tokenDeduction = await deductUserTokens(streamerId, tokenCost);
+      if (meetsAlertThreshold || Boolean(effectiveVideoUrl)) {
+        // Attempt token deduction (2,000 daily tokens limit)
+        tokenDeduction = await deductUserTokens(streamerId, tokenCost);
 
-      // Low tokens fallback: downgrade TTS to false if >= 15 tokens available
-      if (!tokenDeduction.success && finalTtsActive && tokenCost === 20) {
-        const fallbackCheck = await deductUserTokens(streamerId, 15);
-        if (fallbackCheck.success) {
-          tokenDeduction = fallbackCheck;
-          finalTtsActive = false;
-          tokenCost = 15;
-          alertPayload.ttsEnabled = false;
-          console.log(`⚡ [TelegramListener] Low tokens for @${streamer.username}: downgraded TTS to false (15 tokens charged).`);
+        // Low tokens fallback: downgrade TTS to false if >= 15 tokens available
+        if (!tokenDeduction.success && finalTtsActive && tokenCost === 20) {
+          const fallbackCheck = await deductUserTokens(streamerId, 15);
+          if (fallbackCheck.success) {
+            tokenDeduction = fallbackCheck;
+            finalTtsActive = false;
+            tokenCost = 15;
+            alertPayload.ttsEnabled = false;
+            console.log(`⚡ [TelegramListener] Low tokens for @${streamer.username}: downgraded TTS to false (15 tokens charged).`);
+          }
         }
-      }
 
-      // 4. Broadcast to OBS Browser Source Overlay & Streamer Dashboard
-      if (tokenDeduction.success) {
-        if (streamerOverlayToken) {
-          broadcastAlertToOverlay(streamerOverlayToken, alertPayload);
-        }
-        broadcastTokenUsageUpdated(streamerId, tokenDeduction.stats);
-        if (streamerOverlayToken && streamerOverlayToken !== streamerId) {
-          broadcastTokenUsageUpdated(streamerOverlayToken, tokenDeduction.stats);
+        // 4. Broadcast to OBS Browser Source Overlay & Streamer Dashboard
+        if (tokenDeduction.success) {
+          if (streamerOverlayToken) {
+            broadcastAlertToOverlay(streamerOverlayToken, alertPayload);
+          }
+          broadcastTokenUsageUpdated(streamerId, tokenDeduction.stats);
+          if (streamerOverlayToken && streamerOverlayToken !== streamerId) {
+            broadcastTokenUsageUpdated(streamerOverlayToken, tokenDeduction.stats);
+          }
+        } else {
+          console.warn(`⚠️ [TelegramListener] Daily token limit reached for @${streamer.username} (${tokenDeduction.stats.used}/${tokenDeduction.stats.limit} tokens used). Alert overlay suppressed.`);
+          broadcastTokenUsageUpdated(streamerId, tokenDeduction.stats);
+          if (streamerOverlayToken && streamerOverlayToken !== streamerId) {
+            broadcastTokenUsageUpdated(streamerOverlayToken, tokenDeduction.stats);
+          }
         }
       } else {
-        console.warn(`⚠️ [TelegramListener] Daily token limit reached for @${streamer.username} (${tokenDeduction.stats.used}/${tokenDeduction.stats.limit} tokens used). Alert overlay suppressed.`);
-        broadcastTokenUsageUpdated(streamerId, tokenDeduction.stats);
-        if (streamerOverlayToken && streamerOverlayToken !== streamerId) {
-          broadcastTokenUsageUpdated(streamerOverlayToken, tokenDeduction.stats);
-        }
+        console.log(`⚠️ [TelegramListener] Paid amount ($${effectiveAmountUsd.toFixed(2)} USD) is below minimum required alert condition for @${streamer.username}. Suppressing alert.`);
       }
 
       broadcastDonationToDashboard(streamerId, {

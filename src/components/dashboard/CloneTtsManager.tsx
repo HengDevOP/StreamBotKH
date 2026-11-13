@@ -71,6 +71,75 @@ const SUGGESTED_SCRIPTS = [
   }
 ];
 
+export interface StudioVoiceAsset {
+  id: string;
+  voiceName: string;
+  sampleUrl: string;
+  durationSeconds: number;
+  detectedGender: 'male' | 'female';
+  averagePitchHz: number;
+  soundStyle: string;
+  pacingLabel: string;
+  timbre: string;
+  badge: string;
+  description: string;
+}
+
+const STUDIO_VOICE_ASSETS: StudioVoiceAsset[] = [
+  {
+    id: 'studio-streamer-pro',
+    voiceName: 'Streamer Pro (Signature Male)',
+    sampleUrl: '/assets/voice-clone/studio-streamer-pro.wav',
+    durationSeconds: 16,
+    detectedGender: 'male',
+    averagePitchHz: 144,
+    soundStyle: 'Energetic Streamer',
+    pacingLabel: 'Natural (1.0x)',
+    timbre: 'warm studio chest resonance & crisp broadcast clarity',
+    badge: 'BEST OVERALL',
+    description: 'Mastered 24kHz male streamer voice with OpenVoiceV2 256-D speaker embedding and 513-tap Blackman FIR formant profile.'
+  },
+  {
+    id: 'studio-velvet-ai',
+    voiceName: 'Velvet Nova (Expressive Female)',
+    sampleUrl: '/assets/voice-clone/studio-velvet-ai.wav',
+    durationSeconds: 15,
+    detectedGender: 'female',
+    averagePitchHz: 222,
+    soundStyle: 'Crisp & Animated',
+    pacingLabel: 'Natural (1.0x)',
+    timbre: 'bright high-clarity female creator presence',
+    badge: 'TOP FEMALE',
+    description: 'Expressive, crystal-clear female creator voice tuned for lively donation alerts and bilingual readouts.'
+  },
+  {
+    id: 'studio-cyber-narrator',
+    voiceName: 'Cyber Titan (Deep Radio Male)',
+    sampleUrl: '/assets/voice-clone/studio-cyber-narrator.wav',
+    durationSeconds: 16,
+    detectedGender: 'male',
+    averagePitchHz: 136,
+    soundStyle: 'Deep & Resonant',
+    pacingLabel: 'Relaxed (-4%)',
+    timbre: 'rich studio baritone with 220Hz chest warmth',
+    badge: 'DEEP BASS',
+    description: 'Deep, authoritative radio broadcast baritone with enhanced low-mid warmth and smooth cadence.'
+  },
+  {
+    id: 'studio-khmer-bilingual',
+    voiceName: 'Angkor Pro (Khmer & English)',
+    sampleUrl: '/assets/voice-clone/studio-khmer-bilingual.wav',
+    durationSeconds: 15,
+    detectedGender: 'male',
+    averagePitchHz: 139,
+    soundStyle: 'Warm & Conversational',
+    pacingLabel: 'Fast & Upbeat (+5%)',
+    timbre: 'punchy bilingual Khmer & English vocal tract profile',
+    badge: 'BILINGUAL PRO',
+    description: 'Optimized for seamless Khmer (ភាសាខ្មែរ) and English donation messages with crisp consonant preservation.'
+  }
+];
+
 export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
   user,
   currentPlan = 'free',
@@ -85,8 +154,10 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
   const [loadingClones, setLoadingClones] = useState<boolean>(true);
 
   // Training inputs
-  const [inputMode, setInputMode] = useState<'record' | 'upload'>('record');
-  const [voiceName, setVoiceName] = useState<string>('My Streamer Voice');
+  const [inputMode, setInputMode] = useState<'record' | 'upload' | 'assets'>('assets');
+  const [selectedAssetId, setSelectedAssetId] = useState<string>(STUDIO_VOICE_ASSETS[0].id);
+  const [previewingAssetId, setPreviewingAssetId] = useState<string | null>(null);
+  const [voiceName, setVoiceName] = useState<string>(STUDIO_VOICE_ASSETS[0].voiceName);
   const [selectedScriptIndex, setSelectedScriptIndex] = useState<number>(0);
 
   // Audio recording state
@@ -188,6 +259,7 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
     setSpeakingVoiceId(null);
     setPlayingSampleId(null);
     setIsPlayingRecordedSample(false);
+    setPreviewingAssetId(null);
   };
 
   // Clean up audio on unmount
@@ -405,6 +477,38 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
     });
   };
 
+  // Preview Studio Voice Asset
+  const handleTogglePreviewAsset = (asset: StudioVoiceAsset) => {
+    if (previewingAssetId === asset.id) {
+      stopAllAudio();
+      return;
+    }
+
+    stopAllAudio();
+    const audio = new Audio(`${asset.sampleUrl}?t=${Date.now()}`);
+    activeAudioPlayerRef.current = audio;
+    setPreviewingAssetId(asset.id);
+
+    audio.onended = () => {
+      setPreviewingAssetId(null);
+      activeAudioPlayerRef.current = null;
+    };
+    audio.onerror = () => {
+      setPreviewingAssetId(null);
+      activeAudioPlayerRef.current = null;
+    };
+    audio.play().catch(() => {
+      setPreviewingAssetId(null);
+      activeAudioPlayerRef.current = null;
+    });
+  };
+
+  const handleSelectStudioAsset = (asset: StudioVoiceAsset) => {
+    setSelectedAssetId(asset.id);
+    setVoiceName(asset.voiceName);
+    setErrorMessage(null);
+  };
+
   // Reset recording
   const handleRetake = () => {
     stopAllAudio();
@@ -427,43 +531,65 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
       return;
     }
 
-    if (!recordedBlob) {
-      setErrorMessage('Please record or upload at least 5 seconds of voice audio.');
-      return;
-    }
+    const selectedStudioAsset =
+      inputMode === 'assets'
+        ? STUDIO_VOICE_ASSETS.find((a) => a.id === selectedAssetId) || STUDIO_VOICE_ASSETS[0]
+        : null;
 
-    if (recordedDuration < 4.8) {
-      setErrorMessage(`Voice audio is only ${recordedDuration.toFixed(1)}s. At least 5 seconds is required (5s – 15s or longer).`);
-      return;
+    if (inputMode !== 'assets') {
+      if (!recordedBlob) {
+        setErrorMessage('Please record or upload at least 5 seconds of voice audio.');
+        return;
+      }
+
+      if (recordedDuration < 4.8) {
+        setErrorMessage(`Voice audio is only ${recordedDuration.toFixed(1)}s. At least 5 seconds is required (5s – 15s or longer).`);
+        return;
+      }
     }
 
     stopAllAudio();
     setIsTraining(true);
-    setTrainingStep('Preparing audio sample for acoustic training...');
+    setTrainingStep(
+      selectedStudioAsset
+        ? 'Loading pre-computed OpenVoiceV2 24kHz studio speaker profile...'
+        : 'Preparing audio sample for acoustic training...'
+    );
     setErrorMessage(null);
 
     try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(recordedBlob);
-      });
+      let targetSampleUrl = '';
+      let targetDuration = 15;
 
-      const base64Data = await base64Promise;
+      if (selectedStudioAsset) {
+        targetSampleUrl = selectedStudioAsset.sampleUrl;
+        targetDuration = selectedStudioAsset.durationSeconds;
+      } else if (recordedBlob) {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(recordedBlob);
+        });
+        targetSampleUrl = await base64Promise;
+        targetDuration = Math.round(recordedDuration);
+      }
 
       setTrainingStep('Analyzing acoustic pitch, cadence, and vocal dynamics...');
-      await new Promise((r) => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 450));
 
       setTrainingStep('Extracting neural sound style, pacing, and speaking rhythm...');
-      await new Promise((r) => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 450));
 
-      setTrainingStep('Synthesizing custom neural voice model & formant profile...');
+      setTrainingStep('Synthesizing OpenVoiceV2 neural voice model & 513-tap FIR formant profile...');
 
       const payload = {
-        voiceName: voiceName.trim() || 'My Streamer Voice',
-        sampleUrl: base64Data,
-        sampleDurationSeconds: Math.round(recordedDuration),
+        voiceName:
+          voiceName.trim() ||
+          selectedStudioAsset?.voiceName ||
+          'My Streamer Voice',
+        sampleUrl: targetSampleUrl,
+        sampleDurationSeconds: targetDuration,
         baseModel: 'auto',
         pitch: '+0Hz',
         rate: '+0%',
@@ -691,7 +817,24 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
           </div>
 
           {/* Mode Switcher */}
-          <div className="w-full sm:w-auto grid grid-cols-2 sm:flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+          <div className="w-full sm:w-auto grid grid-cols-3 sm:flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setInputMode('assets');
+                stopAllAudio();
+                const currentAsset = STUDIO_VOICE_ASSETS.find((a) => a.id === selectedAssetId) || STUDIO_VOICE_ASSETS[0];
+                setVoiceName(currentAsset.voiceName);
+              }}
+              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                inputMode === 'assets'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Sparkles size={13} className="text-emerald-400" />
+              <span>Studio Assets</span>
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -755,8 +898,94 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
           />
         </div>
 
-        {/* RECORDING / UPLOAD INTERFACE */}
-        {inputMode === 'record' ? (
+        {/* STUDIO ASSETS / RECORDING / UPLOAD INTERFACE */}
+        {inputMode === 'assets' ? (
+          <div className="space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                <Sparkles size={13} className="text-emerald-400" />
+                <span>Pre-Mastered 24kHz OpenVoiceV2 Neural Studio Voice Assets</span>
+              </span>
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2.5 py-0.5 rounded-full">
+                Instant 256-D Profile + 513-Tap FIR Formant Ready
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {STUDIO_VOICE_ASSETS.map((asset) => {
+                const isSelected = selectedAssetId === asset.id;
+                const isPreviewing = previewingAssetId === asset.id;
+                return (
+                  <div
+                    key={asset.id}
+                    onClick={() => handleSelectStudioAsset(asset)}
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                      isSelected
+                        ? 'bg-slate-900 border-emerald-500/60 ring-1 ring-emerald-500/20'
+                        : 'bg-slate-950/80 border-slate-800/80 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                              isSelected
+                                ? 'border-emerald-400 bg-emerald-500 text-slate-950'
+                                : 'border-slate-700 bg-slate-900'
+                            }`}
+                          >
+                            {isSelected && <Check size={10} strokeWidth={3} />}
+                          </div>
+                          <h3 className="text-xs font-bold text-white truncate">
+                            {asset.voiceName}
+                          </h3>
+                        </div>
+                        <span className="shrink-0 text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-emerald-400 border border-slate-700">
+                          {asset.badge}
+                        </span>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        {asset.description}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/70">
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                          {asset.soundStyle}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                          {asset.averagePitchHz}Hz
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                          {asset.durationSeconds}s 24kHz
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTogglePreviewAsset(asset);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border flex items-center gap-1 transition-colors cursor-pointer shrink-0 ${
+                          isPreviewing
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                            : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'
+                        }`}
+                      >
+                        {isPreviewing ? <Pause size={11} /> : <Play size={11} />}
+                        <span>{isPreviewing ? 'Stop' : 'Preview'}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : inputMode === 'record' ? (
           <div className="space-y-3.5 sm:space-y-4">
             {/* Reading Script Selector */}
             <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2.5">
@@ -926,13 +1155,19 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
           <p className="text-xs text-slate-500">
             {isLimitReached
               ? 'Limit of 3 voices reached. Delete an existing model to train another.'
-              : 'Requires minimum 5s of clean speech (5s – 15s or longer).'}
+              : inputMode === 'assets'
+                ? 'Ready to clone using bundled 24kHz OpenVoiceV2 Hybrid Studio voice profile.'
+                : 'Requires minimum 5s of clean speech (5s – 15s or longer).'}
           </p>
 
           <button
             type="button"
             onClick={handleTrainVoice}
-            disabled={!recordedBlob || isTraining || recordedDuration < 4.8 || isLimitReached}
+            disabled={
+              isTraining ||
+              isLimitReached ||
+              (inputMode !== 'assets' && (!recordedBlob || recordedDuration < 4.8))
+            }
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white hover:bg-slate-200 text-slate-950 font-semibold text-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isTraining ? (
@@ -941,7 +1176,7 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
                 <span>Training Voice...</span>
               </>
             ) : (
-              <span>Train Voice Model</span>
+              <span>{inputMode === 'assets' ? 'Clone Selected Studio Voice' : 'Train Voice Model'}</span>
             )}
           </button>
         </div>
