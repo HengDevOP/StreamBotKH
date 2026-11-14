@@ -2247,3 +2247,29 @@ html.light-mode body:has(.obs-overlay) {
   background-color: transparent !important;
   background-image: none !important;
 }
+
+/* ============================================================== */
+/* SUPPORT TICKET WORKSPACE DAY / LIGHT MODE REFINEMENTS          */
+/* ============================================================== */
+html.light-mode .ticket-bubble-admin {
+  background: linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%) !important;
+  border-color: #C7D2FE !important;
+  color: #1E1B4B !important;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.08) !important;
+}
+
+html.light-mode .ticket-bubble-user {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light-mode .ticket-active-support-card {
+  background-color: #F0FDF4 !important;
+  border-color: #BBF7D0 !important;
+}
+
+html.light-mode .ticket-chat-canvas {
+  background-color: #F8FAFC !important;
+}

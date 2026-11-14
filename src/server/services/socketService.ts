@@ -1,9 +1,11 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
-import { getUsersCollection, getOverlayTokenHistoryCollection, getMongoDb, getSubscribersCollection, buildSubscriberUsernameQuery } from '../database/mongo';
+import { getUsersCollection, getOverlayTokenHistoryCollection, getMongoDb, getSubscribersCollection, getSupportTicketsCollection, buildSubscriberUsernameQuery } from '../database/mongo';
 import { extractYoutubeId, getYoutubeLiveStats } from '../../utils/youtube';
 import { verifyProStreamerByToken } from './planService';
+import { getClientIp, isIpBlockedAsync, extractRequestUser, registerOnIpBlockedCallback } from '../utils/rateLimiter';
+import { isUserAdminRecord } from './ticketAuth';
 
 let io: SocketIOServer | null = null;
 
@@ -267,6 +269,36 @@ export interface AlertPayload {
   badgeColor?: string;
 }
 
+function getSocketClientIp(socket: Socket): string {
+  return getClientIp({
+    headers: socket.handshake.headers,
+    socket: { remoteAddress: socket.handshake.address },
+    ip: socket.handshake.address
+  });
+}
+
+/**
+ * Immediately notify and disconnect all active Socket.IO clients belonging to a blocked IP
+ */
+export function disconnectBlockedIpSockets(ip: string, reason: string = 'Blocked by Administrator'): number {
+  const activeIo: SocketIOServer | null = io || g.__socketIoServer || null;
+  if (!activeIo) return 0;
+
+  const targetIp = getClientIp({ headers: {}, ip });
+  let count = 0;
+
+  for (const [, socket] of activeIo.sockets.sockets) {
+    const socketIp = (socket.data as any)?.clientIp || getSocketClientIp(socket);
+    const isAdmin = Boolean((socket.data as any)?.isAdmin);
+    if (socketIp === targetIp && !isAdmin) {
+      socket.emit('security:ip_blocked', { ip: targetIp, reason });
+      socket.disconnect(true);
+      count++;
+    }
+  }
+  return count;
+}
+
 export function initSocketServer(server: HttpServer): SocketIOServer {
   io = new SocketIOServer(server, {
     cors: {
@@ -274,8 +306,85 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       methods: ['GET', 'POST']
     }
   });
+  g.__socketIoServer = io;
+
+  registerOnIpBlockedCallback((blockedIp, reason) => {
+    disconnectBlockedIpSockets(blockedIp, reason);
+  });
+
+  // Reject incoming WebSocket handshakes from blocked IPs and capture authenticated user/admin presence
+  io.use(async (socket, next) => {
+    try {
+      const clientIp = getSocketClientIp(socket);
+      const user = extractRequestUser({
+        headers: socket.handshake.headers,
+        auth: socket.handshake.auth
+      });
+
+      let resolvedIsAdmin = Boolean(user?.isAdmin);
+      if (user?.id && !resolvedIsAdmin) {
+        try {
+          const usersCol = await getUsersCollection();
+          const row = await usersCol.findOne({ userId: user.id }, { projection: { isAdmin: 1, role: 1, email: 1 } });
+          if (row) resolvedIsAdmin = isUserAdminRecord(row, user.email);
+        } catch {
+          // Ignore before mongo connect
+        }
+      }
+
+      (socket.data as any).clientIp = clientIp;
+      (socket.data as any).userId = user?.id || null;
+      (socket.data as any).userEmail = user?.email ? user.email.toLowerCase() : null;
+      (socket.data as any).isAdmin = resolvedIsAdmin;
+
+      if (!resolvedIsAdmin) {
+        const blockStatus = await isIpBlockedAsync(clientIp);
+        if (blockStatus.blocked) {
+          return next(new Error(`IP_BLOCKED: ${blockStatus.reason || 'Blocked by Administrator'}`));
+        }
+      }
+      next();
+    } catch {
+      next();
+    }
+  });
 
   io.on('connection', (socket: Socket) => {
+    if ((socket.data as any)?.isAdmin) {
+      socket.join('tickets:admin');
+      io?.emit('support:admin_presence', { changed: true });
+    }
+
+    socket.on('presence:identify', async (data?: { token?: string }) => {
+      const wasAdmin = Boolean((socket.data as any)?.isAdmin);
+      const user = extractRequestUser({
+        headers: socket.handshake.headers,
+        auth: { token: data?.token || socket.handshake.auth?.token }
+      });
+      if (user) {
+        let resolvedIsAdmin = Boolean(user.isAdmin);
+        if (user.id && !resolvedIsAdmin) {
+          try {
+            const usersCol = await getUsersCollection();
+            const row = await usersCol.findOne({ userId: user.id }, { projection: { isAdmin: 1, role: 1, email: 1 } });
+            if (row) resolvedIsAdmin = isUserAdminRecord(row, user.email);
+          } catch {
+            // Non-fatal
+          }
+        }
+        (socket.data as any).userId = user.id || null;
+        (socket.data as any).userEmail = user.email ? user.email.toLowerCase() : null;
+        (socket.data as any).isAdmin = resolvedIsAdmin;
+        if (resolvedIsAdmin) {
+          socket.join('tickets:admin');
+        } else {
+          socket.leave('tickets:admin');
+        }
+        if (resolvedIsAdmin !== wasAdmin || resolvedIsAdmin) {
+          io?.emit('support:admin_presence', { changed: true });
+        }
+      }
+    });
     // OBS overlay joins room using overlay_token
     socket.on('join:overlay', (data: { overlayToken: string }) => {
       if (!data?.overlayToken) return;
@@ -497,12 +606,30 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
       }
     });
 
-    // Support Ticket live chat rooms
-    socket.on('join:ticket', (data: { ticketId: string }) => {
-      if (data?.ticketId) {
-        socket.join(`ticket:${data.ticketId}`);
-        console.log(`[Socket] Client joined live ticket room: ticket:${data.ticketId}`);
+    // Support Ticket live chat rooms (strictly scoped to ticket owner or verified admin)
+    socket.on('join:ticket', async (data: { ticketId: string }) => {
+      if (!data?.ticketId) return;
+      const socketUserId = (socket.data as any)?.userId;
+      const socketIsAdmin = Boolean((socket.data as any)?.isAdmin);
+      if (!socketUserId && !socketIsAdmin) return;
+
+      if (!socketIsAdmin) {
+        try {
+          const ticketsCol = await getSupportTicketsCollection();
+          const ticketDoc = (await ticketsCol.findOne(
+            { id: data.ticketId },
+            { projection: { streamerId: 1, streamer_id: 1 } as any }
+          )) as any;
+          const ownerId = ticketDoc?.streamerId || ticketDoc?.streamer_id;
+          if (!ticketDoc || ownerId !== socketUserId) {
+            return;
+          }
+        } catch {
+          return;
+        }
       }
+
+      socket.join(`ticket:${data.ticketId}`);
     });
 
     socket.on('leave:ticket', (data: { ticketId: string }) => {
@@ -549,8 +676,12 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
     });
 
     socket.on('disconnect', () => {
+      const wasAdmin = Boolean((socket.data as any)?.isAdmin);
       socketWatchedVideoIds.delete(socket.id);
       stopYoutubeStatsPollerIfIdle();
+      if (wasAdmin) {
+        io?.emit('support:admin_presence', { changed: true });
+      }
     });
   });
 
@@ -560,7 +691,25 @@ export function initSocketServer(server: HttpServer): SocketIOServer {
 }
 
 export function getIO(): SocketIOServer | null {
-  return io || (global as any).socketIO || null;
+  return io || (global as any).socketIO || g.__socketIoServer || null;
+}
+
+/**
+ * Returns userIds and lowercase emails of currently connected online Admin sockets
+ */
+export function getOnlineAdminPresence(): { userIds: Set<string>; emails: Set<string> } {
+  const userIds = new Set<string>();
+  const emails = new Set<string>();
+  const activeIo = getIO();
+  if (!activeIo) return { userIds, emails };
+
+  for (const [, socket] of activeIo.sockets.sockets) {
+    if ((socket.data as any)?.isAdmin) {
+      if ((socket.data as any).userId) userIds.add(String((socket.data as any).userId));
+      if ((socket.data as any).userEmail) emails.add(String((socket.data as any).userEmail).toLowerCase());
+    }
+  }
+  return { userIds, emails };
 }
 
 export function broadcastAlertToOverlay(overlayToken: string, payload: AlertPayload) {
@@ -637,25 +786,44 @@ export function broadcastMediaDelete(userId: string, mediaId: string) {
   activeIo.emit('media:deleted', { mediaId, userId });
 }
 
-export function broadcastTicketMessage(ticketId: string, message: any) {
+export function broadcastTicketMessage(ticketId: string, message: any, streamerId?: string) {
   const activeIo = getIO();
   if (!activeIo) return;
   activeIo.to(`ticket:${ticketId}`).emit('ticket:message', { ticketId, message });
-  activeIo.emit('ticket:updated', { ticketId, lastMessage: message });
+  activeIo.to('tickets:admin').emit('ticket:updated', { ticketId, lastMessage: message });
+  if (streamerId) {
+    activeIo.to(`dashboard:${streamerId}`).emit('ticket:updated', { ticketId, lastMessage: message });
+  }
 }
 
-export function broadcastTicketClaimed(ticketId: string, claimedData: any) {
+export function broadcastTicketClaimed(ticketId: string, claimedData: any, streamerId?: string) {
   const activeIo = getIO();
   if (!activeIo) return;
   activeIo.to(`ticket:${ticketId}`).emit('ticket:claimed', claimedData);
-  activeIo.emit('ticket:updated', { ticketId, ...claimedData });
+  activeIo.to('tickets:admin').emit('ticket:updated', { ticketId, ...claimedData });
+  if (streamerId) {
+    activeIo.to(`dashboard:${streamerId}`).emit('ticket:updated', { ticketId, ...claimedData });
+  }
 }
 
-export function broadcastTicketStatusChanged(ticketId: string, statusData: any) {
+export function broadcastTicketStatusChanged(ticketId: string, statusData: any, streamerId?: string) {
   const activeIo = getIO();
   if (!activeIo) return;
   activeIo.to(`ticket:${ticketId}`).emit('ticket:status_changed', statusData);
-  activeIo.emit('ticket:updated', { ticketId, ...statusData });
+  activeIo.to('tickets:admin').emit('ticket:updated', { ticketId, ...statusData });
+  if (streamerId) {
+    activeIo.to(`dashboard:${streamerId}`).emit('ticket:updated', { ticketId, ...statusData });
+  }
+}
+
+export function broadcastTicketDeleted(ticketId: string, streamerId?: string) {
+  const activeIo = getIO();
+  if (!activeIo) return;
+  activeIo.to(`ticket:${ticketId}`).emit('ticket:deleted', { ticketId });
+  activeIo.to('tickets:admin').emit('ticket:deleted', { ticketId });
+  if (streamerId) {
+    activeIo.to(`dashboard:${streamerId}`).emit('ticket:deleted', { ticketId });
+  }
 }
 
 // ---------------------------------------------------------------------------

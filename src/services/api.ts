@@ -40,6 +40,16 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      if (response.status === 403 && data?.blocked && typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('streamneon:ip-blocked', {
+            detail: {
+              ip: data.ip || 'Unknown',
+              reason: data.reason || data.error || 'Blocked by Administrator'
+            }
+          })
+        );
+      }
       const err: any = new Error(data.error || `HTTP error ${response.status}`);
       err.status = response.status;
       err.data = data;

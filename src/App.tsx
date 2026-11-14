@@ -70,6 +70,10 @@ function DashboardRouteWrapper() {
     tab = 'support';
   } else if (rawTab === 'mailbox' || rawTab === 'mail' || rawTab === 'inbox') {
     tab = 'mailbox';
+  } else if (rawTab === 'session-logs' || rawTab === 'admin-session-logs' || rawTab === 'logs') {
+    tab = 'admin-session-logs';
+  } else if (rawTab === 'ip-address' || rawTab === 'admin-ip-address' || rawTab === 'ips') {
+    tab = 'admin-ip-address';
   }
 
   const handleNav = (page: string, params?: any) => {
@@ -327,6 +331,76 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const pathname = location.pathname;
+  const [blockedIpInfo, setBlockedIpInfo] = React.useState<{ ip: string; reason: string } | null>(null);
+
+  React.useEffect(() => {
+    const handleIpBlocked = (e: Event) => {
+      const custom = e as CustomEvent<{ ip: string; reason: string }>;
+      if (custom.detail) {
+        setBlockedIpInfo(custom.detail);
+      }
+    };
+    window.addEventListener('streamneon:ip-blocked', handleIpBlocked);
+
+    // Intercept ALL fetch() calls globally so any 403 { blocked: true } response immediately locks the UI
+    const win = window as any;
+    if (!win.__streamneonFetchPatched) {
+      const nativeFetch = window.fetch.bind(window);
+      win.__streamneonFetchPatched = true;
+      window.fetch = async (...args: Parameters<typeof fetch>) => {
+        const res = await nativeFetch(...args);
+        if (res.status === 403) {
+          try {
+            const cloned = res.clone();
+            const data = await cloned.json();
+            if (data && data.blocked) {
+              window.dispatchEvent(
+                new CustomEvent('streamneon:ip-blocked', {
+                  detail: {
+                    ip: data.ip || 'Current IP',
+                    reason: data.reason || data.error || 'Blocked by Administrator'
+                  }
+                })
+              );
+            }
+          } catch {
+            // Non-JSON 403 response
+          }
+        }
+        return res;
+      };
+    }
+
+    return () => window.removeEventListener('streamneon:ip-blocked', handleIpBlocked);
+  }, []);
+
+  // Verify IP access status on mount, route navigation, and periodic heartbeat across all pages
+  React.useEffect(() => {
+    let cancelled = false;
+    const checkIpStatus = async () => {
+      try {
+        const res = await fetch('/api/security/ip-status', { credentials: 'include' });
+        if (!cancelled && res.status === 403) {
+          const data = await res.json().catch(() => ({}));
+          if (data?.blocked) {
+            setBlockedIpInfo({
+              ip: data.ip || 'Current IP',
+              reason: data.reason || 'Blocked by Administrator'
+            });
+          }
+        }
+      } catch {
+        // Ignore transient network errors
+      }
+    };
+
+    checkIpStatus();
+    const timer = window.setInterval(checkIpStatus, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [pathname]);
 
   React.useEffect(() => {
     if (pathname.startsWith('/creator') || pathname.startsWith('/dashboard')) {
@@ -351,6 +425,30 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       } catch (e) {}
     }
   }, [pathname]);
+
+  if (blockedIpInfo) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-[#090D16] text-slate-100 flex items-center justify-center p-6 select-none">
+        <div className="max-w-md w-full bg-[#0B0F19] border border-rose-500/40 rounded-2xl p-8 text-center space-y-4 shadow-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs font-mono font-bold uppercase">
+            403 • Access Restricted
+          </div>
+          <h1 className="text-xl font-bold text-white">Your IP Address Has Been Blocked</h1>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Your connection to this website and all services has been suspended by the platform security administrator. You cannot perform any actions while this block is active.
+          </p>
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-left font-mono text-xs space-y-1.5">
+            <div className="text-slate-400">
+              Client IP: <span className="text-white font-bold">{blockedIpInfo.ip}</span>
+            </div>
+            <div className="text-slate-400">
+              Reason: <span className="text-rose-300 font-semibold">{blockedIpInfo.reason}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const isOverlay = pathname.startsWith('/overlay') || pathname.startsWith('/widget');
   const isDashboard = pathname.startsWith('/dashboard') || pathname.startsWith('/creator');

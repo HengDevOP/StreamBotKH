@@ -7,6 +7,7 @@ import { getJwtSecret } from '@/server/auth';
 import { generateSecureOverlayToken } from '@/server/utils/crypto';
 import { getRandomTemplateGif } from '@/data/presetsData';
 import { sendWelcomeEmail } from '@/server/services/emailService';
+import { getClientIp, getClientUserAgent, recordSessionLog } from '@/server/utils/rateLimiter';
 
 function reloadEnv() {
   const savedPort = process.env.PORT;
@@ -410,7 +411,8 @@ export async function upsertGoogleStreamer(profile: {
     plan,
     overlay_token: overlayToken,
     telegram_pairing_code: pairingCode,
-    social_links: JSON.stringify(socialLinks)
+    social_links: JSON.stringify(socialLinks),
+    isFirstTimeUser
   };
 }
 
@@ -537,6 +539,25 @@ export async function POST(req: NextRequest) {
 
     const streamer = await upsertGoogleStreamer({ email, name, picture: avatarUrl });
     const token = generateToken(streamer);
+
+    const clientIp = getClientIp(req);
+    recordSessionLog({
+      eventType: streamer.isFirstTimeUser ? 'REGISTER' : 'LOGIN',
+      action: streamer.isFirstTimeUser
+        ? `New Client Registered (@${streamer.username})`
+        : `Client Login (@${streamer.username})`,
+      method: 'POST',
+      path: '/api/auth/google',
+      statusCode: 200,
+      ip: clientIp,
+      userAgent: getClientUserAgent(req),
+      userId: streamer.id,
+      username: streamer.username,
+      userEmail: streamer.email,
+      details: streamer.isFirstTimeUser
+        ? `New creator account created via Google OAuth (${streamer.email})`
+        : `Authenticated via Google OAuth (${streamer.email})`
+    });
 
     return NextResponse.json({
       token,

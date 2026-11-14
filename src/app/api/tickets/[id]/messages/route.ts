@@ -1,34 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { getAuthenticatedUser } from '@/server/auth';
-import { isAdminEmail } from '@/server/database/db';
-import { getUsersCollection, getSupportTicketsCollection, getTicketMessagesCollection } from '@/server/database/mongo';
+import {
+  getSupportTicketsCollection,
+  getTicketMessagesCollection,
+  TicketAttachmentDoc
+} from '@/server/database/mongo';
 import { broadcastTicketMessage } from '@/server/services/socketService';
+import { getTicketCaller } from '@/server/services/ticketAuth';
 
-async function getCallerWithRole(req: NextRequest) {
-  const authUser = getAuthenticatedUser(req);
-  if (!authUser) return null;
+const ALLOWED_KINDS = new Set(['file', 'image', 'video', 'voice', 'link']);
 
-  let row: any = null;
-  try {
-    const usersCol = await getUsersCollection();
-    row = await usersCol.findOne({ userId: authUser.id });
-  } catch (e) {}
+function sanitizeAttachments(rawList: unknown): TicketAttachmentDoc[] {
+  if (!Array.isArray(rawList)) return [];
 
-  const email = row?.email || authUser.email || '';
-  return {
-    id: authUser.id,
-    email,
-    username: row?.username || authUser.username || 'streamer',
-    displayName: row?.displayName || authUser.username || 'Streamer',
-    avatarUrl: row?.avatarUrl || '',
-    isAdmin: isAdminEmail(email)
-  };
+  const result: TicketAttachmentDoc[] = [];
+  for (const item of rawList.slice(0, 6)) {
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as Record<string, any>;
+    const kind = String(raw.kind || '').trim().toLowerCase();
+    if (!ALLOWED_KINDS.has(kind)) continue;
+
+    const rawUrl = String(raw.url || '').trim();
+    if (!rawUrl || rawUrl.length > 2048) continue;
+
+    // Validate safe URL: uploaded local path under /uploads/tickets/ or strict http(s) URL
+    let safeUrl = '';
+    if (kind !== 'link' && rawUrl.startsWith('/uploads/tickets/')) {
+      safeUrl = rawUrl;
+    } else {
+      try {
+        const parsed = new URL(rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          safeUrl = parsed.toString();
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    if (!safeUrl) continue;
+
+    const rawName = String(raw.name || safeUrl).trim().slice(0, 160) || 'Attachment';
+    const size = typeof raw.size === 'number' && Number.isFinite(raw.size) && raw.size > 0 ? Math.round(raw.size) : undefined;
+    const durationSec =
+      typeof raw.durationSec === 'number' && Number.isFinite(raw.durationSec) && raw.durationSec > 0
+        ? Math.round(raw.durationSec)
+        : undefined;
+    const mimeType = raw.mimeType ? String(raw.mimeType).trim().slice(0, 80) : undefined;
+    const waveform = Array.isArray(raw.waveform)
+      ? raw.waveform
+          .slice(0, 48)
+          .map((n: any) => Number(n))
+          .filter((n: number) => Number.isFinite(n))
+          .map((n: number) => Math.round(Math.min(1, Math.max(0.1, n)) * 100) / 100)
+      : undefined;
+
+    result.push({
+      id: String(raw.id || 'att_' + uuidv4().replace(/-/g, '').slice(0, 12)),
+      kind: kind as TicketAttachmentDoc['kind'],
+      name: rawName,
+      url: safeUrl,
+      ...(mimeType ? { mimeType } : {}),
+      ...(size !== undefined ? { size } : {}),
+      ...(durationSec !== undefined ? { durationSec } : {}),
+      ...(waveform && waveform.length > 0 ? { waveform } : {})
+    });
+  }
+
+  return result;
+}
+
+function buildLastMessagePreview(text: string, attachments: TicketAttachmentDoc[]): string {
+  if (text) return text.slice(0, 160);
+  if (attachments.length === 0) return '';
+  const first = attachments[0];
+  if (first.kind === 'voice') return '🎤 Voice message';
+  if (first.kind === 'image') return `🖼️ ${first.name}`.slice(0, 160);
+  if (first.kind === 'video') return `🎬 ${first.name}`.slice(0, 160);
+  if (first.kind === 'link') return `🔗 ${first.name}`.slice(0, 160);
+  return `📎 ${first.name}`.slice(0, 160);
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const caller = await getCallerWithRole(req);
+    const caller = await getTicketCaller(req);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -47,8 +102,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const body = await req.json().catch(() => ({}));
     const text = String(body.message || '').trim();
-    if (!text) {
-      return NextResponse.json({ error: 'Message cannot be empty' }, { status: 400 });
+    const attachments = sanitizeAttachments(body.attachments);
+
+    if (!text && attachments.length === 0) {
+      return NextResponse.json({ error: 'Message or attachment is required' }, { status: 400 });
     }
 
     const msgId = 'msg_' + uuidv4().replace(/-/g, '').slice(0, 16);
@@ -64,6 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       senderRole,
       senderAvatar: caller.avatarUrl,
       message: text,
+      ...(attachments.length > 0 ? { attachments } : {}),
       createdAt: now
     });
 
@@ -72,11 +130,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       newStatus = caller.isAdmin ? 'claimed' : 'open';
     }
 
+    const preview = buildLastMessagePreview(text, attachments);
+
     await ticketsCol.updateOne(
       { id: ticketId },
       {
         $set: {
-          lastMessage: text.slice(0, 160),
+          lastMessage: preview,
           lastMessageAt: now,
           status: newStatus,
           updatedAt: now
@@ -92,10 +152,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       senderRole,
       senderAvatar: caller.avatarUrl,
       message: text,
+      ...(attachments.length > 0 ? { attachments } : {}),
       createdAt: now
     };
 
-    broadcastTicketMessage(ticketId, messagePayload);
+    broadcastTicketMessage(ticketId, messagePayload, ticketStreamerId);
 
     return NextResponse.json({
       success: true,

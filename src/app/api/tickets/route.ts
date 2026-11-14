@@ -1,33 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { getAuthenticatedUser } from '@/server/auth';
-import { isAdminEmail } from '@/server/database/db';
-import { getUsersCollection, getSupportTicketsCollection, getTicketMessagesCollection } from '@/server/database/mongo';
-
-async function getCallerWithRole(req: NextRequest) {
-  const authUser = getAuthenticatedUser(req);
-  if (!authUser) return null;
-
-  let row: any = null;
-  try {
-    const usersCol = await getUsersCollection();
-    row = await usersCol.findOne({ userId: authUser.id });
-  } catch (e) {}
-
-  const email = row?.email || authUser.email || '';
-  return {
-    id: authUser.id,
-    email,
-    username: row?.username || authUser.username || 'streamer',
-    displayName: row?.displayName || authUser.username || 'Streamer',
-    avatarUrl: row?.avatarUrl || '',
-    isAdmin: isAdminEmail(email)
-  };
-}
+import { getSupportTicketsCollection, getTicketMessagesCollection } from '@/server/database/mongo';
+import { getOnlineAdminPresence } from '@/server/services/socketService';
+import { getRecentHttpActiveAdminKeys, recordAdminHeartbeat } from '@/server/utils/rateLimiter';
+import { getTicketCaller, getSupportAdminDirectory } from '@/server/services/ticketAuth';
 
 export async function GET(req: NextRequest) {
   try {
-    const caller = await getCallerWithRole(req);
+    const caller = await getTicketCaller(req);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -88,12 +68,77 @@ export async function GET(req: NextRequest) {
       if (summary[st] !== undefined) {
         summary[st]++;
       }
-      if (st === 'open' && (!t.claimedById && !t.claimed_by_id)) {
+      if (st === 'open' && !t.claimedById && !(t as any).claimed_by_id) {
         summary.unclaimed++;
       }
     }
 
-    return NextResponse.json({ tickets, summary, isAdmin: caller.isAdmin });
+    if (caller.isAdmin) {
+      recordAdminHeartbeat(caller.id, caller.email);
+    }
+
+    // Detect currently online Admin Support profiles (active Socket.IO admin session or recent HTTP activity within 60s)
+    let activeSupports: Array<{
+      id: string;
+      username: string;
+      displayName: string;
+      email: string;
+      avatarUrl: string;
+      bio: string;
+      isVerified: boolean;
+      role: string;
+      isOnline: boolean;
+      lastActiveAt: string;
+    }> = [];
+
+    let availableAdmins: any[] = [];
+    try {
+      const socketPresence = getOnlineAdminPresence();
+      const httpPresence = getRecentHttpActiveAdminKeys(60000);
+      const adminDir = await getSupportAdminDirectory();
+
+      for (const u of adminDir) {
+        const emailLower = u.email.trim().toLowerCase();
+        const isSocketOnline =
+          (u.id && socketPresence.userIds.has(u.id)) ||
+          (emailLower && socketPresence.emails.has(emailLower));
+        const isHttpOnline =
+          (u.id && httpPresence.userIds.has(u.id)) ||
+          (emailLower && httpPresence.emails.has(emailLower));
+
+        if (caller.isAdmin) {
+          availableAdmins.push({
+            ...u,
+            isOnline: Boolean(isSocketOnline || isHttpOnline)
+          });
+        }
+
+        if (isSocketOnline || isHttpOnline) {
+          activeSupports.push({
+            id: u.id,
+            username: u.username,
+            displayName: u.displayName,
+            email: u.email,
+            avatarUrl: u.avatarUrl,
+            bio: u.bio,
+            isVerified: true,
+            role: u.role,
+            isOnline: true,
+            lastActiveAt: u.lastActiveAt || new Date().toISOString()
+          });
+        }
+      }
+    } catch {
+      // Non-fatal if admin presence lookup fails
+    }
+
+    return NextResponse.json({
+      tickets,
+      summary,
+      activeSupports,
+      ...(caller.isAdmin ? { availableAdmins } : {}),
+      isAdmin: caller.isAdmin
+    });
   } catch (err: any) {
     console.error('[Tickets GET] Error:', err);
     return NextResponse.json({ error: err.message || 'Failed to fetch tickets' }, { status: 500 });
@@ -102,7 +147,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const caller = await getCallerWithRole(req);
+    const caller = await getTicketCaller(req);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

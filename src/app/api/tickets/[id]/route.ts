@@ -1,33 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/server/auth';
-import { isAdminEmail } from '@/server/database/db';
-import { getUsersCollection, getSupportTicketsCollection, getTicketMessagesCollection } from '@/server/database/mongo';
-import { broadcastTicketStatusChanged } from '@/server/services/socketService';
+import path from 'path';
+import fs from 'fs/promises';
+import { getSupportTicketsCollection, getTicketMessagesCollection } from '@/server/database/mongo';
+import { broadcastTicketStatusChanged, broadcastTicketDeleted } from '@/server/services/socketService';
+import { getTicketCaller } from '@/server/services/ticketAuth';
 
-async function getCallerWithRole(req: NextRequest) {
-  const authUser = getAuthenticatedUser(req);
-  if (!authUser) return null;
-
-  let row: any = null;
-  try {
-    const usersCol = await getUsersCollection();
-    row = await usersCol.findOne({ userId: authUser.id });
-  } catch (e) {}
-
-  const email = row?.email || authUser.email || '';
-  return {
-    id: authUser.id,
-    email,
-    username: row?.username || authUser.username || 'streamer',
-    displayName: row?.displayName || authUser.username || 'Streamer',
-    avatarUrl: row?.avatarUrl || '',
-    isAdmin: isAdminEmail(email)
-  };
-}
+const VALID_STATUSES = ['open', 'claimed', 'resolved', 'closed'] as const;
+const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const caller = await getCallerWithRole(req);
+    const caller = await getTicketCaller(req);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -54,7 +37,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       senderName: m.senderName || m.sender_name,
       senderRole: m.senderRole || m.sender_role,
       senderAvatar: m.senderAvatar || m.sender_avatar,
-      message: m.message,
+      message: m.message || '',
+      ...(Array.isArray(m.attachments) && m.attachments.length > 0 ? { attachments: m.attachments } : {}),
       createdAt: m.createdAt || m.created_at
     }));
 
@@ -89,7 +73,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const caller = await getCallerWithRole(req);
+    const caller = await getTicketCaller(req);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -107,8 +91,29 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
 
     const body = await req.json().catch(() => ({}));
-    const newStatus = body.status ? String(body.status).toLowerCase() : ticketRow.status;
-    const newPriority = body.priority ? String(body.priority).toLowerCase() : ticketRow.priority;
+    const currentStatus = String(ticketRow.status || 'open').toLowerCase();
+    const currentPriority = String(ticketRow.priority || 'medium').toLowerCase();
+
+    const requestedStatus = body.status !== undefined ? String(body.status).trim().toLowerCase() : currentStatus;
+    const requestedPriority = body.priority !== undefined ? String(body.priority).trim().toLowerCase() : currentPriority;
+
+    if (!(VALID_STATUSES as readonly string[]).includes(requestedStatus)) {
+      return NextResponse.json({ error: 'Invalid ticket status' }, { status: 400 });
+    }
+    if (!(VALID_PRIORITIES as readonly string[]).includes(requestedPriority)) {
+      return NextResponse.json({ error: 'Invalid ticket priority' }, { status: 400 });
+    }
+
+    // Strict RBAC: Only administrators can modify ticket status or priority (including closing/resolving)
+    if (!caller.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only administrators can modify ticket status or priority' },
+        { status: 403 }
+      );
+    }
+
+    const newStatus = requestedStatus as (typeof VALID_STATUSES)[number];
+    const newPriority = requestedPriority as (typeof VALID_PRIORITIES)[number];
     const now = new Date().toISOString();
 
     await ticketsCol.updateOne(
@@ -116,8 +121,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       { $set: { status: newStatus, priority: newPriority, updatedAt: now } }
     );
 
-    // If status changed to resolved or closed, add system notice
-    if (newStatus !== ticketRow.status) {
+    // If status changed, add system notice
+    let systemMessage: any = null;
+    if (newStatus !== currentStatus) {
       const msgId = 'msg_sys_' + Date.now();
       const statusNotice = newStatus === 'resolved'
         ? `Ticket marked as Resolved by ${caller.displayName}.`
@@ -125,8 +131,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         ? `Ticket closed by ${caller.displayName}.`
         : `Ticket status updated to ${newStatus.toUpperCase()} by ${caller.displayName}.`;
 
-      const messagesCol = await getTicketMessagesCollection();
-      await messagesCol.insertOne({
+      systemMessage = {
         id: msgId,
         ticketId,
         senderId: 'system',
@@ -135,10 +140,17 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         senderAvatar: '',
         message: statusNotice,
         createdAt: now
-      });
+      };
+
+      const messagesCol = await getTicketMessagesCollection();
+      await messagesCol.insertOne(systemMessage);
     }
 
-    broadcastTicketStatusChanged(ticketId, { status: newStatus, priority: newPriority, updatedAt: now });
+    broadcastTicketStatusChanged(
+      ticketId,
+      { status: newStatus, priority: newPriority, updatedAt: now, systemMessage },
+      ticketStreamerId
+    );
 
     const updated = await ticketsCol.findOne({ id: ticketId });
     return NextResponse.json({ success: true, ticket: updated });
@@ -150,9 +162,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const caller = await getCallerWithRole(req);
+    const caller = await getTicketCaller(req);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!caller.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only administrators can delete support tickets' },
+        { status: 403 }
+      );
     }
 
     const ticketId = params.id;
@@ -163,15 +182,47 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
 
     const ticketStreamerId = ticketRow.streamerId || ticketRow.streamer_id;
-    if (!caller.isAdmin && ticketStreamerId !== caller.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const messagesCol = await getTicketMessagesCollection();
+
+    // Collect every uploaded attachment file path referenced by messages in this ticket before erasing rows
+    const ticketMessages = await messagesCol
+      .find({ $or: [{ ticketId }, { ticket_id: ticketId }] })
+      .toArray();
+
+    const uploadsTicketsRoot = path.resolve(process.cwd(), 'public', 'uploads', 'tickets');
+    const attachmentPathsToErase = new Set<string>();
+    for (const msg of ticketMessages as any[]) {
+      if (!Array.isArray(msg.attachments)) continue;
+      for (const att of msg.attachments) {
+        const rawUrl = String(att?.url || '').trim();
+        if (!rawUrl.startsWith('/uploads/tickets/')) continue;
+        const resolved = path.resolve(process.cwd(), 'public', rawUrl.replace(/^\/+/, ''));
+        if (resolved.startsWith(uploadsTicketsRoot + path.sep)) {
+          attachmentPathsToErase.add(resolved);
+        }
+      }
     }
 
-    const messagesCol = await getTicketMessagesCollection();
-    await messagesCol.deleteMany({ ticketId });
-    await ticketsCol.deleteOne({ id: ticketId });
+    // Erase all messages and the ticket document itself
+    await messagesCol.deleteMany({ $or: [{ ticketId }, { ticket_id: ticketId }] });
+    await ticketsCol.deleteMany({ id: ticketId });
 
-    return NextResponse.json({ success: true });
+    // Erase individual attachment files and the ticket upload folder on disk
+    for (const filePath of attachmentPathsToErase) {
+      await fs.rm(filePath, { force: true }).catch(() => {});
+    }
+
+    const safeTicketDir = ticketId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (safeTicketDir) {
+      const ticketDirResolved = path.resolve(uploadsTicketsRoot, safeTicketDir);
+      if (ticketDirResolved.startsWith(uploadsTicketsRoot + path.sep)) {
+        await fs.rm(ticketDirResolved, { recursive: true, force: true }).catch(() => {});
+      }
+    }
+
+    broadcastTicketDeleted(ticketId, ticketStreamerId);
+
+    return NextResponse.json({ success: true, deletedTicketId: ticketId });
   } catch (err: any) {
     console.error('[Ticket DELETE] Error:', err);
     return NextResponse.json({ error: err.message || 'Failed to delete ticket' }, { status: 500 });

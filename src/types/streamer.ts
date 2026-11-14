@@ -74,6 +74,17 @@ export interface Streamer {
   createdAt?: string;
 }
 
+export interface TicketAttachment {
+  id: string;
+  kind: 'file' | 'image' | 'video' | 'voice' | 'link';
+  name: string;
+  url: string;
+  mimeType?: string;
+  size?: number;
+  durationSec?: number;
+  waveform?: number[];
+}
+
 export interface TicketMessage {
   id: string;
   ticketId: string;
@@ -82,6 +93,7 @@ export interface TicketMessage {
   senderRole: 'user' | 'admin' | 'system';
   senderAvatar?: string;
   message: string;
+  attachments?: TicketAttachment[];
   createdAt: string;
 }
 

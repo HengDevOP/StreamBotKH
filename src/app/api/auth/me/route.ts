@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser, generateToken } from '@/server/auth';
 import { getUsersCollection, processExpiredAccountDeletions, computeUserTokenStats, getTodayDateString } from '@/server/database/mongo';
-import { isAdminEmail } from '@/server/database/db';
+import { isUserAdminRecord } from '@/server/services/ticketAuth';
 
 export async function GET(req: NextRequest) {
   const user = getAuthenticatedUser(req);
@@ -170,6 +170,6 @@ export async function GET(req: NextRequest) {
       ? new Date(streamer.deletionScheduledAt).toISOString()
       : null,
     createdAt: streamer.createdAt,
-    isAdmin: isAdminEmail(streamer.email)
+    isAdmin: isUserAdminRecord(streamer, streamer.email)
   });
 }

@@ -75,7 +75,8 @@ import {
   Pickaxe,
   Mic,
   Upload,
-  RotateCcw
+  RotateCcw,
+  Terminal
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -120,6 +121,7 @@ import { AdminPullRequestsManager } from '../components/dashboard/AdminPullReque
 import { TicketSupportManager } from '../components/dashboard/TicketSupportManager';
 import { AdminPromotionManager, PromotionConfig } from '../components/dashboard/AdminPromotionManager';
 import { AdminTrialManager } from '../components/dashboard/AdminTrialManager';
+import { AdminSessionLogsManager } from '../components/dashboard/AdminSessionLogsManager';
 import { MediaPickerModal } from '../components/dashboard/MediaPickerModal';
 import { MailboxDrawer } from '../components/dashboard/MailboxDrawer';
 import { MailboxManager } from '../components/dashboard/MailboxManager';
@@ -166,7 +168,9 @@ export type DashboardTab =
   | 'admin-users'
   | 'admin-trial'
   | 'admin-requests'
-  | 'admin-promotion';
+  | 'admin-promotion'
+  | 'admin-session-logs'
+  | 'admin-ip-address';
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initialTab, initialSelectedId }) => {
   const { user, loading: authLoading, refreshUser, logout } = useAuth();
@@ -339,6 +343,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   activeTabRef.current = activeTab;
 
   const isCurrentTabDirtyRef = useRef(false);
+  const isAdminUser = Boolean(
+    user && (user.isAdmin || (user.email && user.email.trim().toLowerCase() === 'hchenheng@gmail.com'))
+  );
+  const isAdminRef = useRef(isAdminUser);
+  isAdminRef.current = isAdminUser;
+
+  useEffect(() => {
+    if (!authLoading && user && !isAdminUser && activeTab.startsWith('admin-')) {
+      setActiveTab('overview');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/creator?tab=overview');
+      }
+    }
+  }, [authLoading, user, isAdminUser, activeTab]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -366,6 +384,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         let rawTab = search.split('tab=')[1]?.split('&')[0]?.split('?')[0];
         if (rawTab === 'alerts' || rawTab === 'donations') rawTab = 'donation';
         if (rawTab) {
+          if (rawTab.startsWith('admin-') && !isAdminRef.current) {
+            setActiveTab('overview');
+            window.history.replaceState(null, '', '/creator?tab=overview');
+            return;
+          }
           if (isCurrentTabDirtyRef.current) {
             window.history.pushState(null, '', `/creator?tab=${activeTabRef.current}`);
             window.dispatchEvent(
@@ -592,6 +615,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   // Safe tab navigation interceptor: blocks switching away if current tab has unsaved changes
   const handleTabNavigation = (targetTab: DashboardTab) => {
     setIsSettingsMenuOpen(false);
+    if (targetTab.startsWith('admin-') && !isAdminRef.current) {
+      setActiveTab('overview');
+      setMobileDrawerOpen(false);
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/creator?tab=overview');
+      }
+      return;
+    }
     if (targetTab === activeTab) return;
     if (isCurrentTabDirty) {
       triggerBlockedNavigationEarthquake();
@@ -1638,6 +1669,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
                 label: 'Promotion Pricing',
                 icon: Tag,
                 badge: null
+              },
+              {
+                id: 'admin-session-logs' as DashboardTab,
+                label: 'Session Logs',
+                icon: Terminal,
+                badge: null
+              },
+              {
+                id: 'admin-ip-address' as DashboardTab,
+                label: 'IP Address',
+                icon: Globe,
+                badge: null
               }
             ]
           }
@@ -1811,7 +1854,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
         },
         {
           id: 'support' as DashboardTab,
-          label: 'Ticket Support',
+          label: 'Support Ticket',
           icon: Headphones,
           badge: null
         }
@@ -4513,6 +4556,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           )}
 
           {/* ============================================================== */}
+          {/* ADMIN PANEL: SESSION LOGS                                      */}
+          {/* ============================================================== */}
+          {activeTab === 'admin-session-logs' && isAdmin && (
+            <AdminSessionLogsManager mode="logs" />
+          )}
+
+          {/* ============================================================== */}
+          {/* ADMIN PANEL: IP ADDRESS SECURITY                               */}
+          {/* ============================================================== */}
+          {activeTab === 'admin-ip-address' && isAdmin && (
+            <AdminSessionLogsManager mode="ips" />
+          )}
+
+          {/* ============================================================== */}
           {/* ADMIN PANEL: 7-DAY FREE TRIAL CONFIGURATION                    */}
           {/* ============================================================== */}
           {activeTab === 'admin-trial' && isAdmin && (
@@ -4532,7 +4589,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           )}
 
           {/* ============================================================== */}
-          {/* TICKET SUPPORT & LIVE DESK (USER & ADMIN)                      */}
+          {/* SUPPORT TICKET & LIVE DESK (USER & ADMIN)                      */}
           {/* ============================================================== */}
           {(activeTab === 'admin-requests' || activeTab === 'support' || (activeTab as any) === 'report-issue') && (
             <TicketSupportManager

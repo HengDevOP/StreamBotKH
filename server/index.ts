@@ -11,11 +11,12 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { NextRequest } from 'next/server';
-import { initMongo, cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo, processExpiredAccountDeletions, processPlanExpirationsAndReminders } from '../src/server/database/mongo';
+import { initMongo, cleanupExpiredPendingDonationsMongo, cleanupOlderDonationsMongo, processExpiredAccountDeletions, processPlanExpirationsAndReminders, pruneOldSessionLogsMongo } from '../src/server/database/mongo';
 import { initSocketServer } from '../src/server/services/socketService';
-import { globalRateLimiterMiddleware } from '../src/server/utils/rateLimiter';
+import { globalRateLimiterMiddleware, isIpBlockedAsync, getClientIp, renderBlockedHtmlPage } from '../src/server/utils/rateLimiter';
 
 const app = express();
+app.set('trust proxy', true);
 const server = http.createServer({ maxHeaderSize: 65536 }, app);
 
 // Keep-alive timeouts to prevent idle connection stalls
@@ -258,16 +259,18 @@ app.use('/api', (req, res) => {
   });
 });
 
-// 4. Background Workers: Expired Pending Donations, Account Deletions, Pro Plan Midnight Expiration & 3-Day Reminders, 6-Month Retention Cleanup
+// 4. Background Workers: Expired Pending Donations, Account Deletions, Pro Plan Midnight Expiration & 3-Day Reminders, 6-Month Retention Cleanup, Daily Session Log Pruner
 cleanupExpiredPendingDonationsMongo();
 cleanupOlderDonationsMongo(6);
 processExpiredAccountDeletions();
 processPlanExpirationsAndReminders();
+pruneOldSessionLogsMongo();
 setInterval(() => {
   cleanupExpiredPendingDonationsMongo();
   cleanupOlderDonationsMongo(6);
   processExpiredAccountDeletions();
   processPlanExpirationsAndReminders();
+  pruneOldSessionLogsMongo();
 }, 30 * 1000);
 
 // Health check endpoint
@@ -305,7 +308,7 @@ if (distDir) {
   app.use(express.static(distDir, { maxAge: '1h', index: 'index.html' }));
 
   // SPA fallback for all non-API routes
-  app.use((req, res, next) => {
+  app.use(async (req, res, next) => {
     if (
       (req.method !== 'GET' && req.method !== 'HEAD') ||
       req.path.startsWith('/api') ||
@@ -314,6 +317,11 @@ if (distDir) {
       req.path.startsWith('/socket.io')
     ) {
       return next();
+    }
+    const clientIp = getClientIp(req);
+    const blockStatus = await isIpBlockedAsync(clientIp);
+    if (blockStatus.blocked) {
+      return res.status(403).send(renderBlockedHtmlPage(clientIp, blockStatus.reason));
     }
     res.sendFile(path.join(distDir, 'index.html'));
   });

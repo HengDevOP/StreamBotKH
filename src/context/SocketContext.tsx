@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { mediaService } from '../services/mediaService';
+import { getStoredAuthToken } from '../services/api';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -26,6 +27,9 @@ function getGlobalSocket(): Socket {
     globalSocket = io(window.location.origin, {
       path: '/socket.io',
       transports: ['polling', 'websocket'], // Start with HTTP polling handshake -> smooth WebSocket upgrade
+      auth: (cb) => {
+        cb({ token: getStoredAuthToken() || undefined });
+      },
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -53,6 +57,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       joinedOverlayTokens.clear();
       joinedDashboardIds.clear();
 
+      const token = getStoredAuthToken();
+      if (token) {
+        s.emit('presence:identify', { token });
+      }
+
       // Auto-rejoin rooms on reconnect or server restart so overlay never goes silent
       if (lastJoinedOverlayToken) {
         joinedOverlayTokens.add(lastJoinedOverlayToken);
@@ -73,8 +82,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     s.on('connect', onConnect);
     s.on('disconnect', onDisconnect);
 
-    // If socket is already connected when this component mounts, ensure rooms are joined once!
+    // If socket is already connected when this component mounts, ensure rooms & presence are joined once!
     if (s.connected) {
+      const existingToken = getStoredAuthToken();
+      if (existingToken) {
+        s.emit('presence:identify', { token: existingToken });
+      }
       if (lastJoinedOverlayToken && !joinedOverlayTokens.has(lastJoinedOverlayToken)) {
         joinedOverlayTokens.add(lastJoinedOverlayToken);
         s.emit('join:overlay', { overlayToken: lastJoinedOverlayToken });

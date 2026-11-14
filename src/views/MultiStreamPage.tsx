@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import {
-  Monitor,
   Volume2,
   VolumeX,
   Maximize2,
@@ -13,9 +12,6 @@ import {
   Check,
   CheckCircle2,
   DollarSign,
-  Zap,
-  Lock,
-  Unlock,
   RefreshCw,
   Sliders,
   X,
@@ -26,25 +22,18 @@ import {
   Copy,
   Grid,
   Tv,
-  Heart,
   Sparkles,
   Send,
-  Smile,
   Users,
   Radio,
   ChevronRight,
   ChevronLeft,
-  Flame,
-  Award,
-  Crown,
-  Layers,
   Menu,
   Youtube,
   Play,
   Pause,
   AlertCircle,
-  AlertTriangle,
-  Loader2
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -54,61 +43,20 @@ import { CreateDonationResponse } from '../types/donation';
 import { BakongKHQRModal } from '../components/donate/BakongKHQRModal';
 import { DonorForm, DonorFormData } from '../components/donate/DonorForm';
 import { extractYoutubeId } from '../utils/youtube';
+import {
+  StreamerClient,
+  ChatMessage,
+  TelevisionPlayerSkeleton,
+  TelevisionControlBarSkeleton,
+  TelevisionRecommendedSkeleton,
+  TelevisionStreamerListSkeleton,
+  TelevisionTipFormSkeleton,
+  TelevisionStreamerCard,
+  RecommendedStreamerCard,
+  ChatMessageRow
+} from '../components/tv/TelevisionComponents';
 
-export interface StreamerClient {
-  id: string;
-  name: string;
-  username: string;
-  avatar: string;
-  bio?: string;
-  isVerified?: boolean;
-  game: string;
-  viewers: number;
-  isLive: boolean;
-  videoEmbedUrl?: string;
-  youtubeId?: string;
-  tipUsername?: string;
-  isTelegramConnected?: boolean;
-  hasTelegramGroup?: boolean;
-  hasMasterKhqr?: boolean;
-  isTipConfigured?: boolean;
-  videoAlertEnabled?: boolean;
-  hasVideoOverlay?: boolean;
-  videoMinTipAmount?: number;
-  videoMaxDurationSeconds?: number;
-  plan?: string;
-}
-
-// Default initial database streamer
-const DEFAULT_STREAMER: StreamerClient = {
-  id: 'streamer_8949c329d7ca4569',
-  name: 'SelenuxML',
-  username: 'selenuxml',
-  avatar: '/uploads/media/1793296449447-a1134a7c.png',
-  game: 'Teamfight Tactics',
-  viewers: 0,
-  isLive: false,
-  youtubeId: '',
-  tipUsername: 'selenuxml',
-  isTipConfigured: true,
-  videoAlertEnabled: false,
-  hasVideoOverlay: false,
-  plan: 'free'
-};
-
-const INITIAL_STREAMERS: StreamerClient[] = [DEFAULT_STREAMER];
-
-interface ChatMessage {
-  id: string;
-  author: string;
-  avatar?: string;
-  badge?: string;
-  badgeColor?: string;
-  message: string;
-  time: string;
-  isTip?: boolean;
-  tipAmount?: string;
-}
+export type { StreamerClient };
 
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   {
@@ -239,10 +187,13 @@ export const MultiStreamPage: React.FC = () => {
     return null;
   };
 
-  // Streamers List & State
-  const [streamers, setStreamers] = useState<StreamerClient[]>(INITIAL_STREAMERS);
-  const [selectedStreamer, setSelectedStreamer] = useState<StreamerClient>(INITIAL_STREAMERS[0]);
-  const [multiViewIds, setMultiViewIds] = useState<string[]>([INITIAL_STREAMERS[0].id]);
+  // Streamers List & API Loading State
+  const [streamers, setStreamers] = useState<StreamerClient[]>([]);
+  const [selectedStreamer, setSelectedStreamer] = useState<StreamerClient | null>(null);
+  const [multiViewIds, setMultiViewIds] = useState<string[]>([]);
+  const [streamersLoading, setStreamersLoading] = useState<boolean>(true);
+  const [streamersRefreshing, setStreamersRefreshing] = useState<boolean>(false);
+  const [streamersError, setStreamersError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Side Panel View State ('chat' | 'streamers' | 'tip')
@@ -251,18 +202,14 @@ export const MultiStreamPage: React.FC = () => {
 
   // View & Audio Controls
   const [fitScreenMode, setFitScreenMode] = useState<'fit' | 'grid'>('fit');
-  const [volume, setVolume] = useState<number>(50);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isChatOpen, setIsChatOpen] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFullscreenHud, setShowFullscreenHud] = useState(true);
   const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>(() => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 1280,
     height: typeof window !== 'undefined' ? window.innerHeight : 720,
   }));
-  const [isLocked, setIsLocked] = useState(false);
 
   // Stream Quality Options & State
   const QUALITY_OPTIONS = [
@@ -283,10 +230,11 @@ export const MultiStreamPage: React.FC = () => {
   const videoIframeRef = useRef<HTMLIFrameElement | null>(null);
   const qualityMenuRef = useRef<HTMLDivElement | null>(null);
   const fullscreenHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeStreamersAbortRef = useRef<AbortController | null>(null);
 
   const isPortraitViewport = viewportSize.height > viewportSize.width;
 
-  const revealFullscreenHud = () => {
+  const revealFullscreenHud = useCallback(() => {
     setShowFullscreenHud(true);
     if (fullscreenHudTimerRef.current) {
       clearTimeout(fullscreenHudTimerRef.current);
@@ -294,21 +242,29 @@ export const MultiStreamPage: React.FC = () => {
     fullscreenHudTimerRef.current = setTimeout(() => {
       setShowFullscreenHud(false);
     }, 3500);
-  };
+  }, []);
 
-  // Track viewport size & orientation changes for horizontal fullscreen rotation
+  // Track viewport size & orientation changes (rAF-throttled to avoid synchronous layout storms)
   useEffect(() => {
+    let rafId: number | null = null;
+    let orientationTimer: ReturnType<typeof setTimeout> | null = null;
+
     const updateViewportSize = () => {
-      setViewportSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        setViewportSize((prev) => {
+          const w = window.innerWidth;
+          const h = window.innerHeight;
+          return prev.width === w && prev.height === h ? prev : { width: w, height: h };
+        });
       });
     };
 
     const handleOrientationChange = () => {
       updateViewportSize();
-      // Mobile browsers sometimes update innerWidth/innerHeight slightly after orientationchange
-      setTimeout(updateViewportSize, 120);
+      if (orientationTimer) clearTimeout(orientationTimer);
+      orientationTimer = setTimeout(updateViewportSize, 120);
     };
 
     updateViewportSize();
@@ -317,6 +273,8 @@ export const MultiStreamPage: React.FC = () => {
     window.visualViewport?.addEventListener('resize', updateViewportSize);
 
     return () => {
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      if (orientationTimer) clearTimeout(orientationTimer);
       window.removeEventListener('resize', updateViewportSize);
       window.removeEventListener('orientationchange', handleOrientationChange);
       window.visualViewport?.removeEventListener('resize', updateViewportSize);
@@ -623,7 +581,7 @@ export const MultiStreamPage: React.FC = () => {
   const [submittingTip, setSubmittingTip] = useState<boolean>(false);
   const [activeDonation, setActiveDonation] = useState<CreateDonationResponse | null>(null);
   const [isKHQRModalOpen, setIsKHQRModalOpen] = useState<boolean>(false);
-  const [tipTargetStreamer, setTipTargetStreamer] = useState<StreamerClient>(INITIAL_STREAMERS[0]);
+  const [tipTargetStreamer, setTipTargetStreamer] = useState<StreamerClient | null>(null);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isUnconfiguredTipModalOpen, setIsUnconfiguredTipModalOpen] = useState<boolean>(false);
@@ -718,7 +676,7 @@ export const MultiStreamPage: React.FC = () => {
     }
   };
 
-  const handleCopyText = (text: string) => {
+  const handleCopyText = useCallback((text: string) => {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => {
         setCopiedText(text);
@@ -743,7 +701,7 @@ export const MultiStreamPage: React.FC = () => {
         }
       });
     }
-  };
+  }, []);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -752,8 +710,10 @@ export const MultiStreamPage: React.FC = () => {
     }
   }, [chatMessages, sideTab]);
 
-  // Periodic simulated realistic live chat activity
+  // Periodic simulated realistic live chat activity (only active in Room Chat while tab is visible)
   useEffect(() => {
+    if (chatMode !== 'room') return;
+
     const samplePool = [
       { author: 'SokhaEsports', message: 'TFT combo so clean 🔥' },
       { author: 'ChhayGaming', message: 'Lek 1 ban ot may? ⚡' },
@@ -764,6 +724,7 @@ export const MultiStreamPage: React.FC = () => {
     ];
 
     const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       const pick = samplePool[Math.floor(Math.random() * samplePool.length)];
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -780,89 +741,143 @@ export const MultiStreamPage: React.FC = () => {
     }, 8000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [chatMode]);
 
-  // Fetch real registered streamers from real database (/api/streamers)
-  useEffect(() => {
-    fetch('/api/streamers')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.streamers) && data.streamers.length > 0) {
-          const dbStreamers: StreamerClient[] = data.streamers.map((s: any) => ({
-            id: s.id || s.username,
-            name: s.name || s.displayName || s.username,
-            username: s.username,
-            avatar: s.avatar || s.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${s.username}`,
-            bio: s.bio || '',
-            isVerified: Boolean(s.isVerified),
-            game: s.game || 'Live Broadcast',
-            viewers: s.viewers || 0,
-            isLive: Boolean(s.isLive),
-            youtubeId: s.youtubeId || '',
-            videoEmbedUrl: s.videoEmbedUrl,
-            tipUsername: s.username,
-            isTelegramConnected: s.isTelegramConnected,
-            hasTelegramGroup: s.hasTelegramGroup,
-            hasMasterKhqr: s.hasMasterKhqr,
-            isTipConfigured: s.isTipConfigured,
-            videoAlertEnabled: Boolean(s.videoAlertEnabled),
-            hasVideoOverlay: Boolean(s.hasVideoOverlay),
-            plan: s.plan || 'free',
-            videoMinTipAmount: Number(s.videoMinTipAmount ?? 2.0),
-            videoMaxDurationSeconds: Number(s.videoMaxDurationSeconds ?? 300)
-          }));
+  const mapApiStreamer = useCallback((s: any): StreamerClient => ({
+    id: s.id || s.username,
+    name: s.name || s.displayName || s.username,
+    username: s.username,
+    avatar: s.avatar || s.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${s.username}`,
+    bio: s.bio || '',
+    isVerified: Boolean(s.isVerified),
+    game: s.game || 'Live Broadcast',
+    viewers: s.viewers || 0,
+    isLive: Boolean(s.isLive),
+    youtubeId: s.youtubeId || '',
+    videoEmbedUrl: s.videoEmbedUrl,
+    tipUsername: s.username,
+    isTelegramConnected: s.isTelegramConnected,
+    hasTelegramGroup: s.hasTelegramGroup,
+    hasMasterKhqr: s.hasMasterKhqr,
+    isTipConfigured: s.isTipConfigured,
+    videoAlertEnabled: Boolean(s.videoAlertEnabled),
+    hasVideoOverlay: Boolean(s.hasVideoOverlay),
+    plan: s.plan || 'free',
+    videoMinTipAmount: Number(s.videoMinTipAmount ?? 2.0),
+    videoMaxDurationSeconds: Number(s.videoMaxDurationSeconds ?? 300)
+  }), []);
 
-          // Active channels list is 100% retrieved from database user accounts
-          setStreamers(dbStreamers);
+  // Fetch & Refresh registered streamers from /api/streamers
+  const fetchStreamers = useCallback(async (forceRefresh = false) => {
+    if (activeStreamersAbortRef.current) {
+      activeStreamersAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeStreamersAbortRef.current = controller;
 
-          // Focus requested streamer from route /tv?={username} if present
-          const reqUser = getRequestedUsername();
-          if (reqUser) {
-            const match = dbStreamers.find(
+    if (forceRefresh) {
+      setStreamersRefreshing(true);
+    } else {
+      setStreamersLoading(true);
+    }
+    setStreamersError(null);
+
+    try {
+      const endpoint = forceRefresh ? '/api/streamers?refresh=1' : '/api/streamers';
+      const res = await fetch(endpoint, { signal: controller.signal });
+      if (!res.ok) {
+        throw new Error(`Channel directory unavailable (${res.status})`);
+      }
+      const data = await res.json();
+      if (!data?.success || !Array.isArray(data.streamers)) {
+        throw new Error(data?.error || 'Invalid channel response');
+      }
+
+      const dbStreamers: StreamerClient[] = data.streamers.map(mapApiStreamer);
+      setStreamers(dbStreamers);
+
+      if (dbStreamers.length > 0) {
+        const reqUser = getRequestedUsername();
+        const urlMatch = reqUser
+          ? dbStreamers.find(
               (s) => s.username.toLowerCase() === reqUser || s.id.toLowerCase() === reqUser
-            );
-            if (match) {
-              setSelectedStreamer(match);
-              setTipTargetStreamer(match);
-              setMultiViewIds([match.id]);
-              return;
-            }
-          }
+            )
+          : undefined;
 
-          // Otherwise focus first real live database streamer by default
-          const firstStreamer = dbStreamers.find((s) => s.isLive) || dbStreamers[0];
-          setSelectedStreamer(firstStreamer);
-          setTipTargetStreamer(firstStreamer);
-          setMultiViewIds([firstStreamer.id]);
-        }
-      })
-      .catch((err) => {
-        console.warn('Failed to load real database streamers:', err);
-      });
-  }, []);
+        setSelectedStreamer((prev) => {
+          if (urlMatch) return urlMatch;
+          if (prev) {
+            const refreshedPrev = dbStreamers.find(
+              (s) => s.username.toLowerCase() === prev.username.toLowerCase() || s.id === prev.id
+            );
+            if (refreshedPrev) return refreshedPrev;
+          }
+          return dbStreamers.find((s) => s.isLive) || dbStreamers[0];
+        });
+
+        setTipTargetStreamer((prev) => {
+          if (urlMatch) return urlMatch;
+          if (prev) {
+            const refreshedPrev = dbStreamers.find(
+              (s) => s.username.toLowerCase() === prev.username.toLowerCase() || s.id === prev.id
+            );
+            if (refreshedPrev) return refreshedPrev;
+          }
+          return dbStreamers.find((s) => s.isLive) || dbStreamers[0];
+        });
+
+        setMultiViewIds((prev) => {
+          const validIds = prev.filter((id) => dbStreamers.some((s) => s.id === id));
+          if (validIds.length > 0) return validIds;
+          const initialFocus = urlMatch || dbStreamers.find((s) => s.isLive) || dbStreamers[0];
+          return initialFocus ? [initialFocus.id] : [];
+        });
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      console.warn('Failed to load real database streamers:', err);
+      setStreamersError(err?.message || 'Unable to reach broadcast directory.');
+    } finally {
+      if (!controller.signal.aborted) {
+        setStreamersLoading(false);
+        setStreamersRefreshing(false);
+      }
+    }
+  }, [mapApiStreamer]);
+
+  useEffect(() => {
+    void fetchStreamers(false);
+    return () => {
+      activeStreamersAbortRef.current?.abort();
+    };
+  }, [fetchStreamers]);
 
   // Ensure logged-in user's channel account is always included in the active channel list
   useEffect(() => {
-    if (!user || !user.username) return;
+    if (!user || !user.username || streamersLoading) return;
+    const ytId = extractYoutubeId(user.liveStreamUrl) || '';
+    const userChannel: StreamerClient = {
+      id: (user as any).userId || user.id || user.username,
+      name: user.displayName || user.username,
+      username: user.username,
+      avatar: user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`,
+      bio: user.bio || '',
+      game: 'IRL Gaming & Chat',
+      viewers: 0,
+      isLive: false,
+      youtubeId: ytId,
+      tipUsername: user.username
+    };
+
     setStreamers((prev) => {
       const exists = prev.some((s) => s.username.toLowerCase() === user.username.toLowerCase());
       if (exists) return prev;
-      const ytId = extractYoutubeId(user.liveStreamUrl) || '';
-      const userChannel: StreamerClient = {
-        id: (user as any).userId || user.id || user.username,
-        name: user.displayName || user.username,
-        username: user.username,
-        avatar: user.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`,
-        bio: user.bio || '',
-        game: 'IRL Gaming & Chat',
-        viewers: 0,
-        isLive: false,
-        youtubeId: ytId,
-        tipUsername: user.username
-      };
       return [userChannel, ...prev];
     });
-  }, [user]);
+    setSelectedStreamer((prev) => prev || userChannel);
+    setTipTargetStreamer((prev) => prev || userChannel);
+    setMultiViewIds((prev) => (prev.length > 0 ? prev : [userChannel.id]));
+  }, [user, streamersLoading]);
 
   // React to URL route changes: /tv?={username} or /tv?user={username} or /tv/:username
   useEffect(() => {
@@ -874,12 +889,12 @@ export const MultiStreamPage: React.FC = () => {
     );
 
     if (match) {
-      if (selectedStreamer.username.toLowerCase() !== match.username.toLowerCase()) {
+      if (selectedStreamer?.username.toLowerCase() !== match.username.toLowerCase()) {
         setSelectedStreamer(match);
         setTipTargetStreamer(match);
         setMultiViewIds([match.id]);
       }
-    } else {
+    } else if (!streamersLoading) {
       // Query profile from database in case streamer isn't in current list
       donationService.getPublicStreamer(reqUser)
         .then((pub) => {
@@ -914,7 +929,7 @@ export const MultiStreamPage: React.FC = () => {
         })
         .catch(() => {});
     }
-  }, [location.search, paramUsername]);
+  }, [location.search, paramUsername, streamers, streamersLoading, selectedStreamer?.username]);
 
   // Load the selected streamer's full public donation profile (KHQR items, video alert, subscribers...) — same data as Donation Page
   useEffect(() => {
@@ -936,7 +951,7 @@ export const MultiStreamPage: React.FC = () => {
         const nextMaxDur = Number(pub.videoMaxDurationSeconds ?? 300);
 
         setSelectedStreamer((prev) => {
-          if (prev.username.toLowerCase() !== uname.toLowerCase()) return prev;
+          if (!prev || prev.username.toLowerCase() !== uname.toLowerCase()) return prev;
           return {
             ...prev,
             bio: pub.bio !== undefined ? pub.bio : prev.bio,
@@ -1074,7 +1089,7 @@ export const MultiStreamPage: React.FC = () => {
       );
 
       setSelectedStreamer((prev) =>
-        prev.username.toLowerCase() === targetUser
+        prev && prev.username.toLowerCase() === targetUser
           ? {
               ...prev,
               name: payload.displayName || prev.name,
@@ -1130,36 +1145,49 @@ export const MultiStreamPage: React.FC = () => {
   }, [streamers]);
 
   const recommendedStreamers = useMemo(() => {
+    if (!selectedStreamer) return sortedStreamers;
     const others = sortedStreamers.filter(
       (s) => s.id !== selectedStreamer.id && s.username.toLowerCase() !== selectedStreamer.username.toLowerCase()
     );
     return others.length > 0 ? others : sortedStreamers;
-  }, [sortedStreamers, selectedStreamer.id, selectedStreamer.username]);
+  }, [sortedStreamers, selectedStreamer]);
 
-  const handleSelectStreamer = (streamer: StreamerClient) => {
+  const recommendedLiveCount = useMemo(() => {
+    return recommendedStreamers.filter((s) => s.isLive).length;
+  }, [recommendedStreamers]);
+
+  const handleSelectStreamer = useCallback((streamer: StreamerClient) => {
     setSelectedStreamer(streamer);
     setTipTargetStreamer(streamer);
-    if (!multiViewIds.includes(streamer.id)) {
-      setMultiViewIds([streamer.id]);
-    }
+    setMultiViewIds((prev) => (prev.includes(streamer.id) ? prev : [streamer.id]));
     setIsNavMenuOpen(false);
     // Sync the URL route: /tv?={username}
     navigate(`/tv?=${streamer.username}`, { replace: true });
-  };
+  }, [navigate]);
 
-  const handleSelectRecommendedStreamer = (streamer: StreamerClient) => {
+  const handleSelectRecommendedStreamer = useCallback((streamer: StreamerClient) => {
     handleSelectStreamer(streamer);
     mainStageScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [handleSelectStreamer]);
 
-  const updateRecommendedScrollState = () => {
+  const handleQuickTipFromCard = useCallback((e: React.MouseEvent, streamer: StreamerClient) => {
+    e.stopPropagation();
+    handleSelectRecommendedStreamer(streamer);
+    setTipTargetStreamer(streamer);
+    setSideTab('tip');
+    if (streamer.isTipConfigured === false) {
+      setIsUnconfiguredTipModalOpen(true);
+    }
+  }, [handleSelectRecommendedStreamer]);
+
+  const updateRecommendedScrollState = useCallback(() => {
     const el = recommendedRowRef.current;
     if (!el) return;
     setCanScrollRecLeft(el.scrollLeft > 4);
     setCanScrollRecRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-  };
+  }, []);
 
-  const scrollRecommendedRow = (direction: 'left' | 'right') => {
+  const scrollRecommendedRow = useCallback((direction: 'left' | 'right') => {
     const el = recommendedRowRef.current;
     if (!el) return;
     const step = Math.max(280, Math.round(el.clientWidth * 0.72));
@@ -1167,7 +1195,7 @@ export const MultiStreamPage: React.FC = () => {
       left: direction === 'left' ? -step : step,
       behavior: 'smooth'
     });
-  };
+  }, []);
 
   useEffect(() => {
     updateRecommendedScrollState();
@@ -1177,20 +1205,25 @@ export const MultiStreamPage: React.FC = () => {
       clearTimeout(timer);
       window.removeEventListener('resize', updateRecommendedScrollState);
     };
-  }, [recommendedStreamers.length]);
+  }, [recommendedStreamers.length, updateRecommendedScrollState]);
 
-  const handleToggleMultiView = (e: React.MouseEvent, streamerId: string) => {
+  const handleToggleMultiView = useCallback((e: React.MouseEvent, streamerId: string) => {
     e.stopPropagation();
-    if (multiViewIds.includes(streamerId)) {
-      if (multiViewIds.length > 1) {
-        setMultiViewIds(multiViewIds.filter((id) => id !== streamerId));
+    setMultiViewIds((prev) => {
+      if (prev.includes(streamerId)) {
+        if (prev.length > 1) {
+          const next = prev.filter((id) => id !== streamerId);
+          if (next.length <= 1) setFitScreenMode('fit');
+          return next;
+        }
+        return prev;
       }
-    } else {
-      if (multiViewIds.length < 4) {
-        setMultiViewIds([...multiViewIds, streamerId]);
+      if (prev.length < 4) {
+        return [...prev, streamerId];
       }
-    }
-  };
+      return prev;
+    });
+  }, []);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1336,7 +1369,7 @@ export const MultiStreamPage: React.FC = () => {
     const formattedAmount =
       paidCurrency === 'KHR' ? `${paidAmount.toLocaleString()} ៛` : `$${paidAmount.toFixed(2)}`;
     const donor = paidDetails?.donor_name || currentDonorName || 'Anonymous Supporter';
-    const msg = paidDetails?.donor_message || `Bakong KHQR Tip Sent to ${target.name}! ⚡️`;
+    const msg = paidDetails?.donor_message || `Bakong KHQR Tip Sent to ${target?.name || 'Streamer'}! ⚡️`;
 
     setChatMessages((prev) => [
       ...prev,
@@ -1353,149 +1386,170 @@ export const MultiStreamPage: React.FC = () => {
     ]);
   };
 
-  // Reusable Streamer Item Component (Used in Sidebar, NavMenu, and Mobile Tab)
-  const renderStreamerItem = (streamer: StreamerClient, showControls = true) => {
-    const isSelected = selectedStreamer.id === streamer.id;
-    const isInMultiView = multiViewIds.includes(streamer.id);
-
-    return (
-      <div
+  const renderChannelList = (items: StreamerClient[]) => {
+    if (streamersLoading && items.length === 0) {
+      return <TelevisionStreamerListSkeleton count={6} />;
+    }
+    if (streamersError && items.length === 0) {
+      return (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-center space-y-2.5">
+          <AlertCircle size={20} className="text-red-400 mx-auto" />
+          <p className="text-xs font-mono text-red-200">{streamersError}</p>
+          <button
+            type="button"
+            onClick={() => void fetchStreamers(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 text-[11px] font-mono font-bold cursor-pointer transition-colors"
+          >
+            <RefreshCw size={12} className={streamersRefreshing ? 'animate-spin' : ''} />
+            <span>Retry</span>
+          </button>
+        </div>
+      );
+    }
+    if (items.length === 0) {
+      return (
+        <div className="p-6 text-center rounded-xl border border-dashed border-slate-800 text-slate-400 text-xs font-mono">
+          {searchQuery.trim()
+            ? `No channels matching "${searchQuery.trim()}".`
+            : 'No streamer channels available right now.'}
+        </div>
+      );
+    }
+    return items.map((streamer) => (
+      <TelevisionStreamerCard
         key={streamer.id}
-        onClick={() => handleSelectStreamer(streamer)}
-        className={`p-2.5 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all border ${
-          isSelected
-            ? 'bg-slate-800/95 border-emerald-500/60 shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-500/30'
-            : 'bg-[#090D18]/60 border-slate-800/60 hover:bg-slate-800/60 hover:border-slate-700'
-        }`}
-        title={`${streamer.name} • ${streamer.game}`}
-      >
-        {/* Avatar with Live Indicator */}
-        <div className="relative shrink-0">
-          <img
-            src={streamer.avatar}
-            alt={streamer.name}
-            className={`w-9 h-9 rounded-full bg-slate-800 object-cover ring-2 ${
-              streamer.isLive ? 'ring-emerald-500/70' : 'ring-slate-700 opacity-70'
-            }`}
-          />
-          {streamer.isLive ? (
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse ring-2 ring-[#090D18]" />
-          ) : (
-            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-slate-600 ring-2 ring-[#090D18]" />
-          )}
-        </div>
-
-        {/* Streamer Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs sm:text-sm font-bold text-white truncate leading-tight">
-              {streamer.name}
-            </span>
-            {user?.username && streamer.username.toLowerCase() === user.username.toLowerCase() && (
-              <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[8px] font-mono font-bold uppercase shrink-0">
-                You
-              </span>
-            )}
-            {streamer.isLive ? (
-              <span className="px-1.5 py-0.2 rounded bg-red-500/20 text-red-400 text-[8px] font-mono font-black shrink-0">
-                LIVE
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-500 text-[8px] font-mono font-bold shrink-0">
-                OFFLINE
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400 font-mono truncate">
-            <span className="truncate">{streamer.game}</span>
-            {streamer.isLive && (
-              <span className="text-red-500 font-bold inline-flex items-center gap-1 shrink-0">
-                <Users size={11} className="text-red-500 shrink-0" />
-                <span>{streamer.viewers.toLocaleString()}</span>
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        {showControls && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Multi-view Grid Toggle */}
-            <button
-              type="button"
-              onClick={(e) => handleToggleMultiView(e, streamer.id)}
-              className={`p-1.5 rounded-lg text-[10px] font-mono transition-colors ${
-                isInMultiView
-                  ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
-              title={isInMultiView ? 'Remove from multi-view' : 'Add to multi-view'}
-            >
-              <Grid size={13} />
-            </button>
-
-            {/* Selection Checkmark */}
-            <div
-              className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                isSelected
-                  ? 'bg-emerald-400 text-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.5)]'
-                  : 'border border-slate-700 bg-slate-900/80'
-              }`}
-            >
-              {isSelected && <Check size={12} className="stroke-[3]" />}
-            </div>
-          </div>
-        )}
-      </div>
-    );
+        streamer={streamer}
+        isSelected={selectedStreamer?.id === streamer.id}
+        isInMultiView={multiViewIds.includes(streamer.id)}
+        isCurrentUser={Boolean(user?.username && streamer.username.toLowerCase() === user.username.toLowerCase())}
+        showControls
+        onSelect={handleSelectStreamer}
+        onToggleMultiView={handleToggleMultiView}
+      />
+    ));
   };
 
   return (
-    <div className="app-viewport-lock fixed inset-0 w-full h-[100dvh] max-h-[100dvh] overflow-hidden overscroll-none bg-[#060911] text-slate-100 flex flex-col font-sans cursor-default select-text antialiased selection:bg-cyan-500/30 selection:text-white">
+    <div className="app-viewport-lock fixed inset-0 w-full h-[100dvh] max-h-[100dvh] overflow-hidden overscroll-none bg-[#050811] text-slate-100 flex flex-col font-sans cursor-default select-text antialiased selection:bg-cyan-500/30 selection:text-white">
+      {/* Subtle Studio Ambient Top Glow */}
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_60%_100%_at_30%_0%,rgba(16,185,129,0.08),transparent)] z-0" />
+
       {/* ============================================================== */}
       {/* 1. TOP APPLICATION NAVIGATION BAR                              */}
       {/* ============================================================== */}
-      <header className="h-10 sm:h-12 bg-[#090D18] border-b border-slate-800/80 px-2.5 sm:px-4 flex items-center justify-between gap-2 shrink-0 z-30">
-        {/* Left: Branding & Broadcast Identity */}
-        <div className="flex items-center gap-2 min-w-0">
+      <header className="relative h-11 sm:h-12 bg-[#080C17]/95 backdrop-blur-md border-b border-slate-800/80 px-2.5 sm:px-4 flex items-center justify-between gap-2 shrink-0 z-30">
+        {/* Left: Drawer Trigger + Studio Branding + Live Summary */}
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
           <button
+            type="button"
+            onClick={() => setIsNavMenuOpen(true)}
+            className="relative p-1.5 sm:p-2 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-emerald-500/40 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
+            title="Browse all channels"
+            aria-label="Open channels menu"
+          >
+            <Menu size={15} />
+            {liveStreamersCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#080C17] animate-pulse" />
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => navigate('/')}
             className="flex items-center gap-2 group text-left cursor-pointer focus:outline-none shrink-0"
             title="Return to StreamWidgets"
           >
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500/20 to-cyan-500/15 border border-emerald-500/35 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform shadow-sm shadow-emerald-950/50">
               <Tv size={15} />
             </div>
             <span className="text-sm font-extrabold tracking-wider font-['Chakra_Petch'] text-white">
               Television
             </span>
           </button>
+
+          {/* Live Directory Pill */}
+          {streamersLoading ? (
+            <div className="hidden xs:flex h-5 w-16 rounded-full bg-slate-800/70 animate-pulse" />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSideTab('streamers')}
+              className={`hidden xs:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold transition-colors cursor-pointer ${
+                liveStreamersCount > 0
+                  ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/15'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+              }`}
+              title="View active channels"
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  liveStreamersCount > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-600'
+                }`}
+              />
+              <span>{liveStreamersCount > 0 ? `${liveStreamersCount} LIVE` : `${streamers.length} CH`}</span>
+            </button>
+          )}
         </div>
 
-        {/* Right: Copy Link & Back (Icon Only, Back Button in Red) */}
+        {/* Center-Right: Active Channel Badge + Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {selectedStreamer && (
+            <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800/80 max-w-[200px]">
+              <img
+                src={selectedStreamer.avatar}
+                alt={selectedStreamer.name}
+                decoding="async"
+                className="w-4 h-4 rounded-full object-cover shrink-0"
+              />
+              <span className="text-[11px] font-mono font-semibold text-slate-200 truncate">
+                @{selectedStreamer.username}
+              </span>
+            </div>
+          )}
+
+          {/* Refresh Stream Directory */}
+          <button
+            type="button"
+            onClick={() => void fetchStreamers(true)}
+            disabled={streamersRefreshing || streamersLoading}
+            className="p-1.5 sm:p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/40 text-slate-300 hover:text-cyan-300 disabled:opacity-50 transition-colors cursor-pointer"
+            title="Refresh live channels"
+            aria-label="Refresh channels"
+          >
+            <RefreshCw size={14} className={streamersRefreshing ? 'animate-spin text-cyan-400' : ''} />
+          </button>
+
           {/* Copy Streamer Share Link */}
           <button
+            type="button"
             onClick={() => handleCopyStreamLink()}
-            className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+            disabled={!selectedStreamer}
+            className={`p-1.5 sm:p-2 rounded-lg border transition-colors cursor-pointer disabled:opacity-40 ${
               copiedLink
                 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                 : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white'
             }`}
-            title={copiedLink ? 'Stream Link Copied!' : `Copy link to /tv?=${selectedStreamer.username}`}
+            title={
+              copiedLink
+                ? 'Stream Link Copied!'
+                : selectedStreamer
+                  ? `Copy link to /tv?=${selectedStreamer.username}`
+                  : 'Copy stream link'
+            }
             aria-label="Copy Stream Link"
           >
-            {copiedLink ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
+            {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
           </button>
 
           {/* Back to Home Button (Red Theme) */}
           <button
+            type="button"
             onClick={() => navigate('/')}
-            className="p-2 rounded-lg bg-red-500/10 border border-red-500/30 hover:border-red-500/60 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors cursor-pointer shadow-sm"
+            className="p-1.5 sm:p-2 rounded-lg bg-red-500/10 border border-red-500/30 hover:border-red-500/60 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors cursor-pointer shadow-sm"
             title="Back to Home"
             aria-label="Back to Home"
           >
-            <ArrowLeft size={15} />
+            <ArrowLeft size={14} />
           </button>
         </div>
       </header>
@@ -1505,15 +1559,12 @@ export const MultiStreamPage: React.FC = () => {
       {/* ============================================================== */}
       {isNavMenuOpen && (
         <div className="fixed inset-0 z-50 flex">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
             onClick={() => setIsNavMenuOpen(false)}
           />
 
-          {/* Sliding Panel */}
           <div className="relative w-80 max-w-[85vw] h-full bg-[#090D18] border-r border-slate-800 flex flex-col shadow-2xl z-50 animate-in slide-in-from-left duration-200">
-            {/* Navmenu Header */}
             <div className="h-14 px-4 border-b border-slate-800 flex items-center justify-between bg-[#0B0F19] shrink-0">
               <div className="flex items-center gap-2">
                 <Tv size={16} className="text-emerald-400" />
@@ -1524,15 +1575,27 @@ export const MultiStreamPage: React.FC = () => {
                   {liveStreamersCount} LIVE
                 </span>
               </div>
-              <button
-                onClick={() => setIsNavMenuOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => void fetchStreamers(true)}
+                  disabled={streamersRefreshing}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 cursor-pointer"
+                  title="Refresh channels"
+                >
+                  <RefreshCw size={15} className={streamersRefreshing ? 'animate-spin text-cyan-400' : ''} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsNavMenuOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                  aria-label="Close drawer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
-            {/* Navmenu Search Bar */}
             <div className="p-3 border-b border-slate-800 bg-[#090D18] shrink-0">
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -1546,12 +1609,11 @@ export const MultiStreamPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Navmenu Streamers List (Live sorted to top) */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-2">
               <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-bold mb-1">
                 Select Stream to Watch ({filteredStreamers.length})
               </div>
-              {filteredStreamers.map((streamer) => renderStreamerItem(streamer, true))}
+              {renderChannelList(filteredStreamers)}
             </div>
           </div>
         </div>
@@ -1563,19 +1625,19 @@ export const MultiStreamPage: React.FC = () => {
       <div
         className={`flex-1 flex flex-col lg:flex-row min-h-0 ${
           isFullscreen ? 'overflow-visible' : 'overflow-hidden'
-        } relative`}
+        } relative z-10`}
       >
         {/* ============================================================ */}
         {/* VIDEO BROADCAST STAGE (Top-Left 16:9 Video + 1-Row Carousel) */}
         {/* ============================================================ */}
         <main
           ref={mainStageScrollRef}
-          className={`w-full lg:w-[clamp(26rem,calc(((100dvh-21rem)*16/9)+1.5rem),calc(100%-21rem))] flex flex-col min-w-0 min-h-0 bg-[#060911] ${
+          className={`w-full lg:w-[clamp(26rem,calc(((100dvh-21rem)*16/9)+1.5rem),calc(100%-21.5rem))] flex flex-col min-w-0 min-h-0 bg-transparent ${
             isFullscreen ? 'overflow-visible' : 'overflow-hidden'
-          } p-1.5 sm:p-2.5 lg:p-3 gap-1.5 sm:gap-2 shrink-0 lg:flex-none lg:h-full`}
+          } p-2 sm:p-2.5 lg:p-3 gap-2 shrink-0 lg:flex-none lg:h-full`}
         >
           {/* Top-Left Responsive 16:9 Video Wrapper (Non-Scrolling Fit to Screen) */}
-          <div className="w-full lg:flex-1 lg:min-h-0 mx-auto lg:mx-0 flex flex-col gap-1.5 sm:gap-2 shrink-0 lg:shrink">
+          <div className="w-full lg:flex-1 lg:min-h-0 mx-auto lg:mx-0 flex flex-col gap-2 shrink-0 lg:shrink">
             {/* 1. Video Player Canvas (True 16:9 on mobile/desktop — Never Overflows Viewport) */}
             <div
               ref={videoStageRef}
@@ -1588,385 +1650,464 @@ export const MultiStreamPage: React.FC = () => {
               className={
                 isFullscreen
                   ? 'fixed inset-0 z-[100] w-full h-full bg-black overflow-hidden flex items-center justify-center'
-                  : 'relative w-full max-h-[36dvh] sm:max-h-[42dvh] lg:max-h-[calc((100vw-22.5rem)*9/16)] aspect-video lg:aspect-auto lg:flex-1 lg:min-h-0 mx-auto rounded-xl sm:rounded-2xl bg-[#04060A] border border-slate-800/80 overflow-hidden shadow-2xl flex items-center justify-center shrink-0 lg:shrink'
+                  : 'relative w-full max-h-[34dvh] sm:max-h-[42dvh] lg:max-h-[calc((100vw-22.5rem)*9/16)] aspect-video lg:aspect-auto lg:flex-1 lg:min-h-0 mx-auto rounded-xl sm:rounded-2xl bg-[#04070E] border border-slate-800/90 overflow-hidden shadow-[0_24px_64px_-24px_rgba(0,0,0,0.9)] flex items-center justify-center shrink-0 lg:shrink'
               }
             >
-            <div
-              className={`relative flex items-center justify-center overflow-hidden ${
-                isFullscreen && isPortraitViewport ? 'shrink-0 rotate-90 bg-black' : 'w-full h-full'
-              }`}
-              style={
-                isFullscreen && isPortraitViewport
-                  ? { width: `${viewportSize.height}px`, height: `${viewportSize.width}px` }
-                  : undefined
-              }
-            >
-            {fitScreenMode === 'grid' && multiViewIds.length > 1 ? (
-              /* Multi-Stream Grid Mode */
-              <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-2 p-2 overflow-y-auto">
-                {multiViewIds.map((id) => {
-                  const s = streamers.find((c) => c.id === id) || selectedStreamer;
-                  return (
-                    <div
-                      key={id}
-                      onClick={() => setSelectedStreamer(s)}
-                      className={`relative rounded-xl overflow-hidden bg-slate-950 border transition-all cursor-pointer flex flex-col ${
-                        selectedStreamer.id === id ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="relative flex-1 bg-black flex items-center justify-center min-h-[140px] overflow-hidden">
-                        {s.isLive && s.youtubeId ? (
-                          <iframe
-                            src={`https://www.youtube-nocookie.com/embed/${s.youtubeId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1`}
-                            title={s.name}
-                            className="w-[104%] h-[114%] -mt-[2%] -mb-[4%] border-0 pointer-events-none select-none"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-[#080B14] text-center">
-                            <span className="text-[10px] font-mono font-bold text-slate-500">OFFLINE</span>
-                          </div>
-                        )}
-                        <div className="absolute inset-0 z-10 bg-transparent select-none" />
-                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-[10px] font-mono text-white flex items-center gap-1.5 z-20">
-                          {s.isLive ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                          ) : (
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                          )}
-                          <span>{s.name}</span>
-                        </div>
-                      </div>
-                      <div className="h-8 bg-slate-900/90 px-3 flex items-center justify-between text-xs font-mono">
-                        <span className="text-slate-400 truncate">{s.isLive ? s.game : 'Stream Offline'}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedStreamer(s);
-                            setTipTargetStreamer(s);
-                            setSideTab('tip');
-                            if (s.isTipConfigured === false) {
-                              setIsUnconfiguredTipModalOpen(true);
-                            }
-                          }}
-                          className="text-[10px] text-emerald-400 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
-                        >
-                          <DollarSign size={10} />
-                          <span>Tip</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : selectedStreamer.isLive && selectedStreamer.youtubeId ? (
-              /* Single Focus View (Interactive Live Stream with Pause, Resume, Volume, and Live Duration) */
-              <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden select-none">
-                <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
-                  <iframe
-                    ref={videoIframeRef}
-                    key={`${selectedStreamer.youtubeId}_${selectedQuality}`}
-                    onLoad={() => {
-                      if (videoIframeRef.current && videoIframeRef.current.contentWindow) {
-                        try {
-                          videoIframeRef.current.contentWindow.postMessage(
-                            JSON.stringify({ event: 'listening' }),
-                            '*'
-                          );
-                          if (selectedQuality !== 'auto') {
-                            videoIframeRef.current.contentWindow.postMessage(
-                              JSON.stringify({
-                                event: 'command',
-                                func: 'setPlaybackQuality',
-                                args: [selectedQuality]
-                              }),
-                              '*'
-                            );
-                            videoIframeRef.current.contentWindow.postMessage(
-                              JSON.stringify({
-                                event: 'command',
-                                func: 'setPlaybackQualityRange',
-                                args: [selectedQuality, selectedQuality]
-                              }),
-                              '*'
-                            );
-                          }
-                        } catch (e) {}
-                      }
-                    }}
-                    src={`https://www.youtube.com/embed/${selectedStreamer.youtubeId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1&modestbranding=0&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1${
-                      typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : ''
-                    }${selectedQuality !== 'auto' ? `&vq=${selectedQuality}` : ''}`}
-                    title={selectedStreamer.name}
-                    className="w-full h-full border-0 select-auto shrink-0 pointer-events-auto"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-              </div>
-            ) : (
-              /* Streamer Offline Screen */
-              <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center bg-[#070A12] select-none">
-                <div className="relative mb-3">
-                  <img
-                    src={selectedStreamer.avatar}
-                    alt={selectedStreamer.name}
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900 border-2 border-slate-700 object-cover opacity-80"
-                  />
-                  <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[9px] font-mono font-bold text-slate-400">
-                    OFFLINE
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-bold text-white font-['Chakra_Petch']">
-                  {selectedStreamer.name} is Offline
-                </h3>
-                <p className="text-xs text-slate-400 max-w-sm mt-1 mb-4 font-mono leading-relaxed">
-                  {selectedStreamer.youtubeId
-                    ? 'The broadcast has ended or is not live right now. Check back when they stream again!'
-                    : 'This streamer has not attached an active live stream URL yet.'}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isFullscreen) {
-                      void exitFullscreenMode();
-                    }
-                    setTipTargetStreamer(selectedStreamer);
-                    setSideTab('tip');
-                    if (selectedStreamer.isTipConfigured === false) {
-                      setIsUnconfiguredTipModalOpen(true);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs font-mono transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  <DollarSign size={14} className="stroke-[3]" />
-                  <span>Tip {selectedStreamer.name}</span>
-                </button>
-              </div>
-            )}
-
-            {/* Fullscreen Horizontal HUD & Minimize Button */}
-            {isFullscreen && (
-              <>
-                <div
-                  className={`absolute top-3 left-3 sm:top-5 sm:left-5 z-40 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/75 backdrop-blur-md border border-slate-800/80 shadow-xl transition-opacity duration-300 pointer-events-none ${
-                    showFullscreenHud ? 'opacity-100' : 'opacity-0'
-                  }`}
-                >
-                  <img
-                    src={selectedStreamer.avatar}
-                    alt={selectedStreamer.name}
-                    className="w-6 h-6 rounded-full bg-slate-800 object-cover ring-1 ring-emerald-500/60"
-                  />
-                  <span className="text-xs font-bold text-white font-['Chakra_Petch']">
-                    @{selectedStreamer.username || selectedStreamer.name}
-                  </span>
-                  {selectedStreamer.isLive && (
-                    <>
-                      <span className="text-slate-600 text-[10px]">•</span>
-                      <span className="text-red-500 font-bold font-mono text-[11px] flex items-center gap-1">
-                        <Users size={12} className="text-red-500 shrink-0" />
-                        <span>{selectedStreamer.viewers.toLocaleString()}</span>
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void exitFullscreenMode();
-                  }}
-                  className={`absolute top-3 right-3 sm:top-5 sm:right-5 z-40 p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-emerald-400/60 text-white shadow-2xl transition-all duration-300 cursor-pointer flex items-center justify-center ${
-                    showFullscreenHud ? 'opacity-100' : 'opacity-50 hover:opacity-100'
-                  }`}
-                  title="Minimize Video"
-                  aria-label="Exit Fullscreen"
-                >
-                  <Minimize2 size={18} />
-                </button>
-              </>
-            )}
-            </div>
-          </div>
-
-          {/* 2. Menu Next to Video Screen Bottom */}
-          <div className="relative z-30 min-h-[38px] sm:min-h-[46px] py-1 sm:py-1.5 px-2 sm:px-3 rounded-lg sm:rounded-xl bg-[#090D18] border border-slate-800 flex items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-xl select-text cursor-default">
-            {/* Left: Streamer Logo, Username & Total Watching only */}
-            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-              {/* Streamer Logo */}
               <div
-                className="relative shrink-0 cursor-pointer"
-                onClick={() => setSideTab('streamers')}
-                title="Click to view all streamers"
+                className={`relative flex items-center justify-center overflow-hidden ${
+                  isFullscreen && isPortraitViewport ? 'shrink-0 rotate-90 bg-black' : 'w-full h-full'
+                }`}
+                style={
+                  isFullscreen && isPortraitViewport
+                    ? { width: `${viewportSize.height}px`, height: `${viewportSize.width}px` }
+                    : undefined
+                }
               >
-                <img
-                  src={selectedStreamer.avatar}
-                  alt={selectedStreamer.name}
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 object-cover ring-2 ring-emerald-500/60"
-                />
-                {selectedStreamer.isLive && (
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#090D18]" />
-                )}
-              </div>
-
-              {/* Username & Total Watching only */}
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                <span className="text-[11px] sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
-                  @{selectedStreamer.username || selectedStreamer.name}
-                </span>
-                <span className="text-slate-600 text-[10px] sm:text-xs">•</span>
-                {selectedStreamer.isLive ? (
-                  <span
-                    className="text-red-500 font-bold font-mono text-[11px] sm:text-xs flex items-center gap-1 shrink-0"
-                    title={`${selectedStreamer.viewers.toLocaleString()} watching`}
-                  >
-                    <Users size={13} className="text-red-500 shrink-0" />
-                    <span>{selectedStreamer.viewers.toLocaleString()}</span>
-                  </span>
-                ) : (
-                  <span className="text-slate-500 font-bold font-mono text-[10px] sm:text-xs flex items-center gap-1 shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                    OFFLINE
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Right: Quick Action Controls (Play/Pause, Mute/Volume, Live Jump, Open YouTube, Quality, Share & Fullscreen) */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              {/* Play / Pause Toggle Button */}
-              {selectedStreamer.isLive && selectedStreamer.youtubeId && (
-                <button
-                  type="button"
-                  onClick={handleTogglePlayPause}
-                  className="p-1 sm:p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
-                  title={isPlaying ? 'Pause stream' : 'Resume stream'}
-                  aria-label={isPlaying ? 'Pause' : 'Resume'}
-                >
-                  {isPlaying ? <Pause size={13} className="text-cyan-400" /> : <Play size={13} className="text-cyan-400" />}
-                </button>
-              )}
-
-              {/* Volume / Mute Toggle Button */}
-              {selectedStreamer.isLive && selectedStreamer.youtubeId && (
-                <button
-                  type="button"
-                  onClick={handleToggleMute}
-                  className="p-1 sm:p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
-                  title={isMuted ? 'Unmute audio' : 'Mute audio'}
-                  aria-label={isMuted ? 'Unmute' : 'Mute'}
-                >
-                  {isMuted ? <VolumeX size={13} className="text-red-400" /> : <Volume2 size={13} className="text-slate-300" />}
-                </button>
-              )}
-
-              {/* Jump to Current Live Duration Button */}
-              {selectedStreamer.isLive && selectedStreamer.youtubeId && (
-                <button
-                  type="button"
-                  onClick={handleSeekToLive}
-                  className="flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg bg-red-600/15 border border-red-500/40 text-red-400 hover:bg-red-600 hover:text-white transition-all cursor-pointer font-mono text-[10px] sm:text-[11px] font-bold"
-                  title="Click to jump to current live duration"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span>LIVE</span>
-                </button>
-              )}
-
-              {/* Open Current Live on Original YouTube Provider Button */}
-              {selectedStreamer.youtubeId && (
-                <a
-                  href={`https://www.youtube.com/watch?v=${selectedStreamer.youtubeId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 p-1 sm:p-1.5 rounded-lg bg-red-600/15 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
-                  title="Watch current live duration on original YouTube provider"
-                >
-                  <Youtube size={13} />
-                  <span className="hidden md:inline text-[10px] font-mono font-semibold">YouTube</span>
-                </a>
-              )}
-
-              {/* Stream Quality Selector Dropdown */}
-              <div className="relative" ref={qualityMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsQualityMenuOpen(!isQualityMenuOpen)}
-                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg border transition-all cursor-pointer font-mono text-xs ${
-                    isQualityMenuOpen
-                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
-                      : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
-                  }`}
-                  title="Choose Stream Quality"
-                >
-                  <Sliders size={12} className={isQualityMenuOpen ? 'text-cyan-400' : 'text-slate-400'} />
-                  <span className="text-[10px] sm:text-[11px] font-bold">
-                    {QUALITY_OPTIONS.find((q) => q.value === selectedQuality)?.label.replace(' HD', '') || 'Auto'}
-                  </span>
-                </button>
-
-                {isQualityMenuOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 w-52 rounded-xl bg-[#0B0F1D]/95 backdrop-blur-md border border-slate-700 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 select-none">
-                    <div className="px-2.5 py-1.5 border-b border-slate-800 mb-1 flex items-center justify-between">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-                        Stream Quality
-                      </span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                {streamersLoading && !selectedStreamer ? (
+                  <TelevisionPlayerSkeleton />
+                ) : !selectedStreamer ? (
+                  <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center bg-[#070B14] select-none">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-3 text-amber-400">
+                      <AlertCircle size={22} />
                     </div>
-                    <div className="space-y-0.5">
-                      {QUALITY_OPTIONS.map((opt) => {
-                        const isSelected = selectedQuality === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => changeStreamQuality(opt.value)}
-                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold'
-                                : 'text-slate-300 hover:bg-slate-800/70 hover:text-white'
-                            }`}
-                          >
-                            <div className="flex flex-col">
-                              <span className="text-xs font-mono font-medium">{opt.label}</span>
-                              <span className="text-[9px] text-slate-400 font-mono leading-none">{opt.desc}</span>
+                    <h3 className="text-sm sm:text-base font-bold text-white font-['Chakra_Petch']">
+                      {streamersError ? 'Unable to Connect Broadcast Feed' : 'No Broadcast Selected'}
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-sm mt-1 mb-4 font-mono">
+                      {streamersError || 'Check your connection or refresh the channel directory.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void fetchStreamers(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs font-mono transition-all cursor-pointer"
+                    >
+                      <RefreshCw size={13} className={streamersRefreshing ? 'animate-spin' : ''} />
+                      <span>Retry Connection</span>
+                    </button>
+                  </div>
+                ) : fitScreenMode === 'grid' && multiViewIds.length > 1 ? (
+                  /* Multi-Stream Grid Mode */
+                  <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-2 p-2 overflow-y-auto bg-[#050811]">
+                    {multiViewIds.map((id) => {
+                      const s = streamers.find((c) => c.id === id) || selectedStreamer;
+                      return (
+                        <div
+                          key={id}
+                          onClick={() => setSelectedStreamer(s)}
+                          className={`relative rounded-xl overflow-hidden bg-slate-950 border transition-all cursor-pointer flex flex-col ${
+                            selectedStreamer.id === id ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="relative flex-1 bg-black flex items-center justify-center min-h-[140px] overflow-hidden">
+                            {s.isLive && s.youtubeId ? (
+                              <iframe
+                                src={`https://www.youtube-nocookie.com/embed/${s.youtubeId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&playsinline=1`}
+                                title={s.name}
+                                loading="lazy"
+                                className="w-[104%] h-[114%] -mt-[2%] -mb-[4%] border-0 pointer-events-none select-none"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-[#080B14] text-center">
+                                <span className="text-[10px] font-mono font-bold text-slate-500">OFFLINE</span>
+                              </div>
+                            )}
+                            <div className="absolute inset-0 z-10 bg-transparent select-none" />
+                            <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-slate-950/80 backdrop-blur-sm border border-slate-800 text-[10px] font-mono text-white flex items-center gap-1.5 z-20">
+                              {s.isLive ? (
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                              ) : (
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+                              )}
+                              <span>{s.name}</span>
                             </div>
-                            {isSelected && <Check size={13} className="text-cyan-400 shrink-0 ml-2" />}
-                          </button>
-                        );
-                      })}
+                          </div>
+                          <div className="h-8 bg-slate-900/90 px-3 flex items-center justify-between text-xs font-mono">
+                            <span className="text-slate-400 truncate">{s.isLive ? s.game : 'Stream Offline'}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedStreamer(s);
+                                setTipTargetStreamer(s);
+                                setSideTab('tip');
+                                if (s.isTipConfigured === false) {
+                                  setIsUnconfiguredTipModalOpen(true);
+                                }
+                              }}
+                              className="text-[10px] text-emerald-400 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <DollarSign size={10} />
+                              <span>Tip</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : selectedStreamer.isLive && selectedStreamer.youtubeId ? (
+                  /* Single Focus View (Interactive Live Stream with Pause, Resume, Volume, and Live Duration) */
+                  <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden select-none">
+                    <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
+                      <iframe
+                        ref={videoIframeRef}
+                        key={`${selectedStreamer.youtubeId}_${selectedQuality}`}
+                        onLoad={() => {
+                          if (videoIframeRef.current && videoIframeRef.current.contentWindow) {
+                            try {
+                              videoIframeRef.current.contentWindow.postMessage(
+                                JSON.stringify({ event: 'listening' }),
+                                '*'
+                              );
+                              if (selectedQuality !== 'auto') {
+                                videoIframeRef.current.contentWindow.postMessage(
+                                  JSON.stringify({
+                                    event: 'command',
+                                    func: 'setPlaybackQuality',
+                                    args: [selectedQuality]
+                                  }),
+                                  '*'
+                                );
+                                videoIframeRef.current.contentWindow.postMessage(
+                                  JSON.stringify({
+                                    event: 'command',
+                                    func: 'setPlaybackQualityRange',
+                                    args: [selectedQuality, selectedQuality]
+                                  }),
+                                  '*'
+                                );
+                              }
+                            } catch (e) {}
+                          }
+                        }}
+                        src={`https://www.youtube.com/embed/${selectedStreamer.youtubeId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1&modestbranding=0&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1${
+                          typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : ''
+                        }${selectedQuality !== 'auto' ? `&vq=${selectedQuality}` : ''}`}
+                        title={selectedStreamer.name}
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        className="w-full h-full border-0 select-auto shrink-0 pointer-events-auto"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Streamer Offline Screen */
+                  <div className="relative w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 text-center bg-[#070B14] select-none overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(16,185,129,0.08),transparent_65%)] pointer-events-none" />
+                    <div className="relative mb-2.5 sm:mb-3">
+                      <img
+                        src={selectedStreamer.avatar}
+                        alt={selectedStreamer.name}
+                        decoding="async"
+                        className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-slate-900 border-2 border-slate-700/80 object-cover opacity-90 shadow-xl"
+                      />
+                      <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-[9px] font-mono font-bold text-slate-400">
+                        OFFLINE
+                      </span>
+                    </div>
+                    <h3 className="text-sm sm:text-lg font-bold text-white font-['Chakra_Petch']">
+                      {selectedStreamer.name} is Offline
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-400 max-w-sm mt-1 mb-3 sm:mb-4 font-mono leading-relaxed">
+                      {selectedStreamer.youtubeId
+                        ? 'The broadcast has ended or is not live right now. Check back when they stream again!'
+                        : 'This streamer has not attached an active live stream URL yet.'}
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isFullscreen) {
+                            void exitFullscreenMode();
+                          }
+                          setTipTargetStreamer(selectedStreamer);
+                          setSideTab('tip');
+                          if (selectedStreamer.isTipConfigured === false) {
+                            setIsUnconfiguredTipModalOpen(true);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs font-mono transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
+                      >
+                        <DollarSign size={14} className="stroke-[3]" />
+                        <span>Tip {selectedStreamer.name}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void fetchStreamers(true)}
+                        disabled={streamersRefreshing}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-bold text-xs font-mono transition-all cursor-pointer"
+                      >
+                        <RefreshCw size={12} className={streamersRefreshing ? 'animate-spin text-cyan-400' : ''} />
+                        <span>Check Live</span>
+                      </button>
                     </div>
                   </div>
                 )}
+
+                {/* Fullscreen Horizontal HUD & Minimize Button */}
+                {isFullscreen && selectedStreamer && (
+                  <>
+                    <div
+                      className={`absolute top-3 left-3 sm:top-5 sm:left-5 z-40 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/75 backdrop-blur-md border border-slate-800/80 shadow-xl transition-opacity duration-300 pointer-events-none ${
+                        showFullscreenHud ? 'opacity-100' : 'opacity-0'
+                      }`}
+                    >
+                      <img
+                        src={selectedStreamer.avatar}
+                        alt={selectedStreamer.name}
+                        className="w-6 h-6 rounded-full bg-slate-800 object-cover ring-1 ring-emerald-500/60"
+                      />
+                      <span className="text-xs font-bold text-white font-['Chakra_Petch']">
+                        @{selectedStreamer.username || selectedStreamer.name}
+                      </span>
+                      {selectedStreamer.isLive && (
+                        <>
+                          <span className="text-slate-600 text-[10px]">•</span>
+                          <span className="text-red-500 font-bold font-mono text-[11px] flex items-center gap-1">
+                            <Users size={12} className="text-red-500 shrink-0" />
+                            <span>{selectedStreamer.viewers.toLocaleString()}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void exitFullscreenMode();
+                      }}
+                      className={`absolute top-3 right-3 sm:top-5 sm:right-5 z-40 p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-emerald-400/60 text-white shadow-2xl transition-all duration-300 cursor-pointer flex items-center justify-center ${
+                        showFullscreenHud ? 'opacity-100' : 'opacity-50 hover:opacity-100'
+                      }`}
+                      title="Minimize Video"
+                      aria-label="Exit Fullscreen"
+                    >
+                      <Minimize2 size={18} />
+                    </button>
+                  </>
+                )}
               </div>
-
-              {/* Share / Copy Streamer URL */}
-              <button
-                onClick={() => handleCopyStreamLink()}
-                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                  copiedLink
-                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                }`}
-                title={copiedLink ? 'Stream Link Copied!' : `Copy Stream Link (/tv?=${selectedStreamer.username})`}
-              >
-                {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
-              </button>
-
-              {/* Fullscreen / Minimize Button */}
-              <button
-                type="button"
-                onClick={handleToggleFullscreen}
-                className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
-                title={isFullscreen ? 'Minimize Video' : 'Full Screen (Horizontal)'}
-                aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-              >
-                {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-              </button>
             </div>
-          </div>
+
+            {/* 2. Menu Next to Video Screen Bottom */}
+            {streamersLoading && !selectedStreamer ? (
+              <TelevisionControlBarSkeleton />
+            ) : selectedStreamer ? (
+              <div className="relative z-30 min-h-[42px] sm:min-h-[48px] py-1.5 px-2.5 sm:px-3.5 rounded-xl bg-[#090E1B]/95 border border-slate-800/90 flex items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-xl select-text cursor-default">
+                {/* Left: Streamer Logo, Username & Total Watching */}
+                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                  <div
+                    className="relative shrink-0 cursor-pointer"
+                    onClick={() => setSideTab('streamers')}
+                    title="Click to view all streamers"
+                  >
+                    <img
+                      src={selectedStreamer.avatar}
+                      alt={selectedStreamer.name}
+                      decoding="async"
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 object-cover ring-2 ring-emerald-500/60"
+                    />
+                    {selectedStreamer.isLive && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#090E1B]" />
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <span className="text-[11px] sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
+                      @{selectedStreamer.username || selectedStreamer.name}
+                    </span>
+                    {selectedStreamer.isVerified && (
+                      <CheckCircle2 size={13} className="text-emerald-400 shrink-0 hidden sm:inline" />
+                    )}
+                    <span className="text-slate-600 text-[10px] sm:text-xs">•</span>
+                    {selectedStreamer.isLive ? (
+                      <span
+                        className="text-red-400 font-bold font-mono text-[11px] sm:text-xs flex items-center gap-1 shrink-0"
+                        title={`${selectedStreamer.viewers.toLocaleString()} watching`}
+                      >
+                        <Users size={13} className="text-red-400 shrink-0" />
+                        <span>{selectedStreamer.viewers.toLocaleString()}</span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 font-bold font-mono text-[10px] sm:text-xs flex items-center gap-1 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+                        OFFLINE
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Quick Action Controls */}
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                  {selectedStreamer.isLive && selectedStreamer.youtubeId && (
+                    <button
+                      type="button"
+                      onClick={handleTogglePlayPause}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
+                      title={isPlaying ? 'Pause stream' : 'Resume stream'}
+                      aria-label={isPlaying ? 'Pause' : 'Resume'}
+                    >
+                      {isPlaying ? <Pause size={13} className="text-cyan-400" /> : <Play size={13} className="text-cyan-400" />}
+                    </button>
+                  )}
+
+                  {selectedStreamer.isLive && selectedStreamer.youtubeId && (
+                    <button
+                      type="button"
+                      onClick={handleToggleMute}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
+                      title={isMuted ? 'Unmute audio' : 'Mute audio'}
+                      aria-label={isMuted ? 'Unmute' : 'Mute'}
+                    >
+                      {isMuted ? <VolumeX size={13} className="text-red-400" /> : <Volume2 size={13} className="text-slate-300" />}
+                    </button>
+                  )}
+
+                  {selectedStreamer.isLive && selectedStreamer.youtubeId && (
+                    <button
+                      type="button"
+                      onClick={handleSeekToLive}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-red-600/15 border border-red-500/40 text-red-400 hover:bg-red-600 hover:text-white transition-all cursor-pointer font-mono text-[10px] sm:text-[11px] font-bold"
+                      title="Click to jump to current live duration"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                      <span>LIVE</span>
+                    </button>
+                  )}
+
+                  {multiViewIds.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setFitScreenMode((prev) => (prev === 'grid' ? 'fit' : 'grid'))}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors cursor-pointer font-mono text-[10px] font-bold ${
+                        fitScreenMode === 'grid'
+                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                          : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
+                      }`}
+                      title="Toggle multi-view grid"
+                    >
+                      <Grid size={12} />
+                      <span className="hidden sm:inline">{multiViewIds.length}x</span>
+                    </button>
+                  )}
+
+                  {selectedStreamer.youtubeId && (
+                    <a
+                      href={`https://www.youtube.com/watch?v=${selectedStreamer.youtubeId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 p-1.5 rounded-lg bg-red-600/15 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
+                      title="Watch current live duration on original YouTube provider"
+                    >
+                      <Youtube size={13} />
+                      <span className="hidden md:inline text-[10px] font-mono font-semibold">YouTube</span>
+                    </a>
+                  )}
+
+                  {/* Quick Tip Pill */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTipTargetStreamer(selectedStreamer);
+                      setSideTab('tip');
+                      if (selectedStreamer.isTipConfigured === false) {
+                        setIsUnconfiguredTipModalOpen(true);
+                      }
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg border font-mono text-[10px] sm:text-[11px] font-bold transition-colors cursor-pointer ${
+                      sideTab === 'tip'
+                        ? 'bg-emerald-400 border-emerald-300 text-slate-950'
+                        : 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300 hover:bg-emerald-500/25'
+                    }`}
+                    title={`Tip ${selectedStreamer.name}`}
+                  >
+                    <DollarSign size={12} className="stroke-[2.5]" />
+                    <span className="hidden xs:inline">Tip</span>
+                  </button>
+
+                  {/* Stream Quality Selector Dropdown */}
+                  <div className="relative" ref={qualityMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsQualityMenuOpen(!isQualityMenuOpen)}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-all cursor-pointer font-mono text-xs ${
+                        isQualityMenuOpen
+                          ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
+                          : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+                      }`}
+                      title="Choose Stream Quality"
+                    >
+                      <Sliders size={12} className={isQualityMenuOpen ? 'text-cyan-400' : 'text-slate-400'} />
+                      <span className="text-[10px] sm:text-[11px] font-bold hidden sm:inline">
+                        {QUALITY_OPTIONS.find((q) => q.value === selectedQuality)?.label.replace(' HD', '') || 'Auto'}
+                      </span>
+                    </button>
+
+                    {isQualityMenuOpen && (
+                      <div className="absolute bottom-full right-0 mb-2 w-52 rounded-xl bg-[#0B0F1D]/95 backdrop-blur-md border border-slate-700 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 select-none">
+                        <div className="px-2.5 py-1.5 border-b border-slate-800 mb-1 flex items-center justify-between">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                            Stream Quality
+                          </span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        </div>
+                        <div className="space-y-0.5">
+                          {QUALITY_OPTIONS.map((opt) => {
+                            const isSelected = selectedQuality === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => changeStreamQuality(opt.value)}
+                                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold'
+                                    : 'text-slate-300 hover:bg-slate-800/70 hover:text-white'
+                                }`}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-mono font-medium">{opt.label}</span>
+                                  <span className="text-[9px] text-slate-400 font-mono leading-none">{opt.desc}</span>
+                                </div>
+                                {isSelected && <Check size={13} className="text-cyan-400 shrink-0 ml-2" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Share / Copy Streamer URL */}
+                  <button
+                    type="button"
+                    onClick={() => handleCopyStreamLink()}
+                    className={`hidden sm:flex p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                      copiedLink
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                    title={copiedLink ? 'Stream Link Copied!' : `Copy Stream Link (/tv?=${selectedStreamer.username})`}
+                    aria-label="Share stream link"
+                  >
+                    {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
+                  </button>
+
+                  {/* Fullscreen / Minimize Button */}
+                  <button
+                    type="button"
+                    onClick={handleToggleFullscreen}
+                    className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
+                    title={isFullscreen ? 'Minimize Video' : 'Full Screen (Horizontal)'}
+                    aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                  >
+                    {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* 3. Desktop Recommended Streamers Section (1-Row Left/Right Scrollable Carousel) */}
@@ -1977,10 +2118,10 @@ export const MultiStreamPage: React.FC = () => {
                 <h2 className="text-sm font-extrabold uppercase tracking-wider text-white font-['Chakra_Petch']">
                   Recommended Streamers
                 </h2>
-                {recommendedStreamers.some((s) => s.isLive) && (
+                {recommendedLiveCount > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] font-mono font-bold flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                    {recommendedStreamers.filter((s) => s.isLive).length} LIVE
+                    {recommendedLiveCount} LIVE
                   </span>
                 )}
               </div>
@@ -1991,7 +2132,7 @@ export const MultiStreamPage: React.FC = () => {
                     type="button"
                     onClick={() => scrollRecommendedRow('left')}
                     disabled={!canScrollRecLeft}
-                    className="p-1.5 rounded-lg bg-[#090D18] border border-slate-800 text-slate-300 hover:text-white hover:border-emerald-500/50 disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-[#090E1B] border border-slate-800 text-slate-300 hover:text-white hover:border-emerald-500/50 disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer"
                     title="Scroll Left"
                     aria-label="Scroll Recommended Streamers Left"
                   >
@@ -2001,7 +2142,7 @@ export const MultiStreamPage: React.FC = () => {
                     type="button"
                     onClick={() => scrollRecommendedRow('right')}
                     disabled={!canScrollRecRight}
-                    className="p-1.5 rounded-lg bg-[#090D18] border border-slate-800 text-slate-300 hover:text-white hover:border-emerald-500/50 disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-[#090E1B] border border-slate-800 text-slate-300 hover:text-white hover:border-emerald-500/50 disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer"
                     title="Scroll Right"
                     aria-label="Scroll Recommended Streamers Right"
                   >
@@ -2020,184 +2161,51 @@ export const MultiStreamPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="relative group/recrow w-full">
-              {/* Left Floating Scroll Button */}
-              {canScrollRecLeft && (
-                <button
-                  type="button"
-                  onClick={() => scrollRecommendedRow('left')}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-slate-950/90 hover:bg-emerald-400 text-white hover:text-slate-950 border border-slate-700/80 hover:border-emerald-300 shadow-2xl flex items-center justify-center opacity-0 group-hover/recrow:opacity-100 transition-all duration-200 cursor-pointer"
-                  title="Scroll Left"
-                  aria-label="Scroll Left"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-              )}
+            {streamersLoading && streamers.length === 0 ? (
+              <TelevisionRecommendedSkeleton count={5} />
+            ) : (
+              <div className="relative group/recrow w-full">
+                {canScrollRecLeft && (
+                  <button
+                    type="button"
+                    onClick={() => scrollRecommendedRow('left')}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-slate-950/90 hover:bg-emerald-400 text-white hover:text-slate-950 border border-slate-700/80 hover:border-emerald-300 shadow-2xl flex items-center justify-center opacity-0 group-hover/recrow:opacity-100 transition-all duration-200 cursor-pointer"
+                    title="Scroll Left"
+                    aria-label="Scroll Left"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                )}
 
-              {/* Right Floating Scroll Button */}
-              {canScrollRecRight && (
-                <button
-                  type="button"
-                  onClick={() => scrollRecommendedRow('right')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-slate-950/90 hover:bg-emerald-400 text-white hover:text-slate-950 border border-slate-700/80 hover:border-emerald-300 shadow-2xl flex items-center justify-center opacity-0 group-hover/recrow:opacity-100 transition-all duration-200 cursor-pointer"
-                  title="Scroll Right"
-                  aria-label="Scroll Right"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              )}
+                {canScrollRecRight && (
+                  <button
+                    type="button"
+                    onClick={() => scrollRecommendedRow('right')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-slate-950/90 hover:bg-emerald-400 text-white hover:text-slate-950 border border-slate-700/80 hover:border-emerald-300 shadow-2xl flex items-center justify-center opacity-0 group-hover/recrow:opacity-100 transition-all duration-200 cursor-pointer"
+                    title="Scroll Right"
+                    aria-label="Scroll Right"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                )}
 
-              <div
-                ref={recommendedRowRef}
-                onScroll={updateRecommendedScrollState}
-                className="flex flex-nowrap items-stretch gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-              >
-                {recommendedStreamers.map((s) => {
-                  const isCurrent = selectedStreamer.id === s.id;
-                  return (
-                    <div
+                <div
+                  ref={recommendedRowRef}
+                  onScroll={updateRecommendedScrollState}
+                  className="flex flex-nowrap items-stretch gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {recommendedStreamers.map((s) => (
+                    <RecommendedStreamerCard
                       key={s.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleSelectRecommendedStreamer(s)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleSelectRecommendedStreamer(s);
-                        }
-                      }}
-                      className={`group relative w-[180px] xl:w-[198px] shrink-0 snap-start rounded-xl bg-[#090D18] border transition-all duration-200 overflow-hidden cursor-pointer flex flex-col shadow-lg ${
-                        isCurrent
-                          ? 'border-emerald-500/70 ring-1 ring-emerald-500/30'
-                          : 'border-slate-800/80 hover:border-emerald-500/50 hover:bg-[#0C1222] hover:shadow-emerald-950/30'
-                      }`}
-                      title={`Watch ${s.name} (@${s.username})`}
-                    >
-                    {/* 16:9 Video Card Preview */}
-                    <div className="relative w-full aspect-video bg-gradient-to-br from-[#0B1224] via-[#060913] to-[#0D162B] overflow-hidden flex items-center justify-center select-none">
-                      {/* Ambient Avatar Backdrop (Visible when no YouTube thumbnail or while loading) */}
-                      <img
-                        src={s.avatar}
-                        alt=""
-                        aria-hidden="true"
-                        className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-25 scale-125 pointer-events-none"
-                      />
-                      <div className="relative z-0 flex flex-col items-center justify-center gap-1.5 opacity-85">
-                        <img
-                          src={s.avatar}
-                          alt={s.name}
-                          className="w-11 h-11 rounded-full bg-slate-900 border border-slate-700/80 object-cover shadow-md"
-                        />
-                        <span className="text-[10px] font-mono text-slate-400">@{s.username}</span>
-                      </div>
-
-                      {/* Real YouTube Video / Live Broadcast Thumbnail */}
-                      {s.youtubeId && (
-                        <img
-                          src={`https://i.ytimg.com/vi/${s.youtubeId}/hqdefault.jpg`}
-                          alt={`${s.name} stream preview`}
-                          loading="lazy"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                          className="absolute inset-0 z-10 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      )}
-
-                      {/* Subtle Bottom Readability Gradient */}
-                      <div className="absolute inset-x-0 bottom-0 h-12 z-20 bg-gradient-to-t from-black/85 via-black/30 to-transparent pointer-events-none" />
-
-                      {/* Top-Left Live / Offline Status Pill */}
-                      <div className="absolute top-2 left-2 z-20">
-                        {s.isLive ? (
-                          <span className="px-2 py-0.5 rounded-md bg-red-600/95 text-white text-[10px] font-mono font-black tracking-wider uppercase flex items-center gap-1 shadow-md">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                            LIVE
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md bg-slate-950/85 backdrop-blur-sm border border-slate-800 text-slate-400 text-[9px] font-mono font-bold uppercase">
-                            OFFLINE
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Bottom-Left Viewers / Category Pill */}
-                      <div className="absolute bottom-2 left-2 right-2 z-20 flex items-center justify-between gap-2 pointer-events-none">
-                        {s.isLive ? (
-                          <span className="px-2 py-0.5 rounded-md bg-slate-950/85 backdrop-blur-sm border border-red-500/30 text-red-500 text-[10px] font-mono font-bold flex items-center gap-1">
-                            <Users size={11} className="text-red-500 shrink-0" />
-                            <span>{s.viewers.toLocaleString()}</span>
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-mono text-slate-300/90 truncate">
-                            {s.game}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Hover Play Video Indicator */}
-                      <div className="absolute inset-0 z-30 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none">
-                        <div className="w-10 h-10 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 transform scale-90 group-hover:scale-100 transition-transform duration-200">
-                          <Play size={18} className="fill-slate-950 ml-0.5" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Video Card Footer Info */}
-                    <div className="p-2 flex items-center justify-between gap-2 bg-[#090D18] group-hover:bg-[#0C1222] transition-colors">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="relative shrink-0">
-                          <img
-                            src={s.avatar}
-                            alt={s.name}
-                            className={`w-7 h-7 rounded-full bg-slate-800 object-cover ring-2 ${
-                              s.isLive ? 'ring-emerald-500/70' : 'ring-slate-800'
-                            }`}
-                          />
-                          <span
-                            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-[#090D18] ${
-                              s.isLive ? 'bg-emerald-400' : 'bg-slate-600'
-                            }`}
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1 min-w-0">
-                            <span className="text-xs font-bold text-white font-['Chakra_Petch'] truncate group-hover:text-emerald-300 transition-colors">
-                              {s.name}
-                            </span>
-                            {s.isVerified && (
-                              <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-[10px] font-mono text-slate-400 truncate">
-                            {s.bio || `@${s.username} • ${s.game}`}
-                          </p>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectRecommendedStreamer(s);
-                          setTipTargetStreamer(s);
-                          setSideTab('tip');
-                          if (s.isTipConfigured === false) {
-                            setIsUnconfiguredTipModalOpen(true);
-                          }
-                        }}
-                        className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold flex items-center gap-0.5 shrink-0 transition-colors cursor-pointer"
-                        title={`Tip ${s.name}`}
-                      >
-                        <DollarSign size={10} className="stroke-[2.5]" />
-                        <span>Tip</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                      streamer={s}
+                      isCurrent={selectedStreamer?.id === s.id}
+                      onSelect={handleSelectRecommendedStreamer}
+                      onQuickTip={handleQuickTipFromCard}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </section>
         </main>
 
@@ -2206,75 +2214,81 @@ export const MultiStreamPage: React.FC = () => {
         {/* Responsive: Bottom of video on device size (< lg),          */}
         {/*             Rescales width dynamically next to video (>= lg) */}
         {/* ============================================================ */}
-        <aside className="w-full lg:w-auto lg:min-w-[20rem] flex-1 lg:h-full bg-[#090D18] border-t lg:border-t-0 lg:border-l border-slate-800/80 flex flex-col min-h-0 overflow-hidden z-20 shadow-2xl">
-          {/* Top Tab Switcher Header (Icons Only) */}
-          <div className="h-9 sm:h-11 px-2 sm:px-3 border-b border-slate-800 flex items-center justify-around bg-[#0B0F19] shrink-0">
+        <aside className="w-full lg:w-auto lg:min-w-[21.5rem] flex-1 lg:h-full bg-[#080C17] border-t lg:border-t-0 lg:border-l border-slate-800/80 flex flex-col min-h-0 overflow-hidden z-20 shadow-2xl">
+          {/* Top Tab Switcher Header (Responsive Icons + Compact Labels) */}
+          <div className="h-10 sm:h-11 px-2 border-b border-slate-800 flex items-stretch gap-1 bg-[#0B0F1A] shrink-0">
             <button
+              type="button"
               onClick={() => setSideTab('chat')}
-              className={`flex-1 py-1 sm:py-2 flex items-center justify-center transition-all border-b-2 cursor-pointer ${
+              className={`flex-1 px-2 flex items-center justify-center gap-1.5 text-[11px] font-mono font-bold transition-all border-b-2 cursor-pointer ${
                 sideTab === 'chat'
                   ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10'
-                  : 'border-transparent text-slate-400 hover:text-white'
+                  : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-900/40'
               }`}
               title="Live Chat"
               aria-label="Live Chat"
             >
-              <MessageSquare size={16} className="sm:w-[18px] sm:h-[18px]" />
+              <MessageSquare size={15} className="shrink-0" />
+              <span className="hidden xs:inline">Chat</span>
             </button>
 
             <button
+              type="button"
               onClick={() => setSideTab('streamers')}
-              className={`relative flex-1 py-1 sm:py-2 flex items-center justify-center transition-all border-b-2 cursor-pointer ${
+              className={`relative flex-1 px-2 flex items-center justify-center gap-1.5 text-[11px] font-mono font-bold transition-all border-b-2 cursor-pointer ${
                 sideTab === 'streamers'
                   ? 'border-emerald-400 text-emerald-300 bg-emerald-500/10'
-                  : 'border-transparent text-slate-400 hover:text-white'
+                  : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-900/40'
               }`}
               title={`Streamers (${liveStreamersCount} Currently Live)`}
               aria-label={`Streamers (${liveStreamersCount} Currently Live)`}
             >
-              <span className="relative inline-flex items-center justify-center">
-                <Users size={16} className="sm:w-[18px] sm:h-[18px]" />
-                <span
-                  className={`absolute -top-1.5 -right-2.5 min-w-[14px] h-[14px] sm:min-w-[16px] sm:h-[16px] px-1 rounded-full font-mono text-[8px] sm:text-[9px] font-extrabold leading-none flex items-center justify-center ring-2 ring-[#0B0F19] ${
-                    liveStreamersCount > 0
-                      ? 'bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/40'
-                      : 'bg-slate-700 text-slate-300'
-                  }`}
-                >
-                  {liveStreamersCount}
-                </span>
+              <Users size={15} className="shrink-0" />
+              <span className="hidden xs:inline">Channels</span>
+              <span
+                className={`min-w-[16px] h-[16px] px-1 rounded-full font-mono text-[9px] font-extrabold leading-none inline-flex items-center justify-center ${
+                  liveStreamersCount > 0
+                    ? 'bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/40'
+                    : 'bg-slate-800 text-slate-300 border border-slate-700'
+                }`}
+              >
+                {liveStreamersCount}
               </span>
             </button>
 
             <button
+              type="button"
               onClick={() => setSideTab('tip')}
-              className={`flex-1 py-1 sm:py-2 flex items-center justify-center transition-all border-b-2 cursor-pointer ${
+              className={`flex-1 px-2 flex items-center justify-center gap-1.5 text-[11px] font-mono font-bold transition-all border-b-2 cursor-pointer ${
                 sideTab === 'tip'
                   ? 'border-pink-400 text-pink-300 bg-pink-500/10'
-                  : 'border-transparent text-slate-400 hover:text-white'
+                  : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-900/40'
               }`}
               title="Tip Streamer"
               aria-label="Tip Streamer"
             >
-              <DollarSign size={16} className="sm:w-[18px] sm:h-[18px]" />
+              <DollarSign size={15} className="shrink-0" />
+              <span className="hidden xs:inline">Tip</span>
             </button>
           </div>
 
           {/* Tab 1: Live Chat Content (Supports Real-Time YouTube Live Chat Stream & Room Chat) */}
           {sideTab === 'chat' && (
-            <div className="h-full flex flex-col min-h-0 bg-[#090D18]">
+            <div className="h-full flex flex-col min-h-0 bg-[#080C17]">
               {/* Chat Sub-Header with Channel & Mode Switcher */}
-              <div className="h-8 sm:h-10 px-2 sm:px-3 border-b border-slate-800/80 bg-[#090D18] flex items-center justify-between text-[10px] sm:text-[11px] font-mono text-slate-400 shrink-0">
-                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                  {chatMode === 'youtube' && selectedStreamer.isLive ? (
+              <div className="h-9 sm:h-10 px-2.5 sm:px-3 border-b border-slate-800/80 bg-[#090E1B] flex items-center justify-between text-[10px] sm:text-[11px] font-mono text-slate-400 shrink-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {chatMode === 'youtube' && selectedStreamer?.isLive ? (
                     <>
-                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
                       <span className="text-white font-bold truncate">YouTube Live Chat</span>
                     </>
                   ) : (
                     <>
-                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
-                      <span className="text-white font-bold truncate">@{selectedStreamer.name} Room</span>
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+                      <span className="text-white font-bold truncate">
+                        {selectedStreamer ? `@${selectedStreamer.name} Room` : 'Broadcast Chat'}
+                      </span>
                     </>
                   )}
                 </div>
@@ -2310,7 +2324,7 @@ export const MultiStreamPage: React.FC = () => {
                     </button>
                   </div>
 
-                  {chatMode === 'youtube' && selectedStreamer.youtubeId && (
+                  {chatMode === 'youtube' && selectedStreamer?.youtubeId && (
                     <a
                       href={`https://www.youtube.com/live_chat?v=${selectedStreamer.youtubeId}`}
                       target="_blank"
@@ -2326,7 +2340,11 @@ export const MultiStreamPage: React.FC = () => {
 
               {/* Chat Viewport */}
               {chatMode === 'youtube' ? (
-                selectedStreamer.youtubeId && selectedStreamer.isLive ? (
+                streamersLoading && !selectedStreamer ? (
+                  <div className="flex-1 p-3 overflow-hidden">
+                    <TelevisionStreamerListSkeleton count={5} />
+                  </div>
+                ) : selectedStreamer?.youtubeId && selectedStreamer.isLive ? (
                   /* 1. Real-Time YouTube Live Chat Iframe */
                   <div className="flex-1 w-full h-full relative min-h-0 bg-[#0F0F0F] overflow-hidden flex flex-col">
                     <iframe
@@ -2339,7 +2357,7 @@ export const MultiStreamPage: React.FC = () => {
                   </div>
                 ) : (
                   /* Offline or Missing Live URL */
-                  <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center bg-[#090D18]">
+                  <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center bg-[#080C17]">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mb-2 sm:mb-3 text-slate-500">
                       <Radio size={18} className="sm:w-[22px] sm:h-[22px] opacity-60" />
                     </div>
@@ -2347,9 +2365,11 @@ export const MultiStreamPage: React.FC = () => {
                       YouTube Live Chat Offline
                     </h4>
                     <p className="text-[11px] sm:text-xs text-slate-400 font-mono max-w-xs leading-relaxed mb-3 sm:mb-4">
-                      {selectedStreamer.youtubeId
-                        ? `${selectedStreamer.name} is not currently live on YouTube. Real-time chat will start when the stream goes live.`
-                        : `${selectedStreamer.name} has not linked a YouTube live stream URL yet.`}
+                      {!selectedStreamer
+                        ? 'Select a live channel to join its YouTube stream chat or switch to Room Chat.'
+                        : selectedStreamer.youtubeId
+                          ? `${selectedStreamer.name} is not currently live on YouTube. Real-time chat will start when the stream goes live.`
+                          : `${selectedStreamer.name} has not linked a YouTube live stream URL yet.`}
                     </p>
                     <button
                       type="button"
@@ -2368,67 +2388,24 @@ export const MultiStreamPage: React.FC = () => {
                     className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3 space-y-1.5 sm:space-y-2.5 text-xs font-mono scroll-smooth"
                   >
                     <div className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/60 text-[10px] text-slate-400 text-center">
-                      Welcome to @{selectedStreamer.name}&apos;s live stream room! Be respectful to everyone.
+                      Welcome to {selectedStreamer ? `@${selectedStreamer.name}'s` : 'this'} live stream room! Be respectful to everyone.
                     </div>
 
-                    {chatMessages.map((msg) => {
-                      const fullMsgText = `${msg.author}: ${msg.message}`;
-                      const isThisCopied = copiedText === fullMsgText;
-                      return (
-                        <div
-                          key={msg.id}
-                          className={`p-2 rounded-xl border transition-all select-text group/chat ${
-                            msg.isTip
-                              ? 'bg-emerald-950/30 border-emerald-500/40 shadow-sm'
-                              : 'bg-slate-900/40 border-slate-800/60 hover:bg-slate-900/70'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-1.5 mb-1 select-text">
-                            <div className="flex items-center gap-1.5 min-w-0 select-text">
-                              <span className="font-bold text-white truncate text-[11px] select-text">
-                                @{msg.author}
-                              </span>
-                              {msg.badge && (
-                                <span
-                                  className={`px-1.5 py-0.2 rounded text-[8px] font-bold uppercase tracking-wider shrink-0 ${
-                                    msg.badgeColor || 'bg-slate-800 text-slate-300'
-                                  }`}
-                                >
-                                  {msg.badge}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {msg.isTip && msg.tipAmount && (
-                                <span className="px-1.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[9px] font-mono flex items-center gap-0.5 select-text">
-                                  <DollarSign size={9} className="stroke-[3]" />
-                                  {msg.tipAmount}
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => handleCopyText(fullMsgText)}
-                                className="opacity-0 group-hover/chat:opacity-100 transition-opacity p-0.5 rounded text-slate-400 hover:text-cyan-300 hover:bg-slate-800 cursor-pointer"
-                                title="Copy message text"
-                              >
-                                {isThisCopied ? (
-                                  <Check size={11} className="text-emerald-400" />
-                                ) : (
-                                  <Copy size={11} />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-slate-200 text-xs leading-relaxed break-words font-sans select-text cursor-default selection:bg-cyan-500/40 selection:text-white">
-                            {msg.message}
-                          </p>
-                        </div>
-                      );
-                    })}
+                    {chatMessages.map((msg) => (
+                      <ChatMessageRow
+                        key={msg.id}
+                        msg={msg}
+                        isCopied={copiedText === `${msg.author}: ${msg.message}`}
+                        onCopy={handleCopyText}
+                      />
+                    ))}
                   </div>
 
                   {/* Room Chat Input */}
-                  <form onSubmit={handleSendMessage} className="p-1.5 sm:p-2.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] border-t border-slate-800 bg-[#0B0F19] flex gap-1.5 sm:gap-2 shrink-0">
+                  <form
+                    onSubmit={handleSendMessage}
+                    className="p-2 sm:p-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t border-slate-800 bg-[#0B0F1A] flex gap-1.5 sm:gap-2 shrink-0"
+                  >
                     <input
                       type="text"
                       value={inputMessage}
@@ -2441,6 +2418,7 @@ export const MultiStreamPage: React.FC = () => {
                       disabled={!inputMessage.trim()}
                       className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 text-slate-950 font-bold transition-all cursor-pointer shrink-0"
                       title="Send message"
+                      aria-label="Send message"
                     >
                       <Send size={13} className="sm:w-3.5 sm:h-3.5" />
                     </button>
@@ -2452,9 +2430,9 @@ export const MultiStreamPage: React.FC = () => {
 
           {/* Tab 2: Streamer List Content */}
           {sideTab === 'streamers' && (
-            <div className="h-full flex flex-col min-h-0">
-              <div className="p-3 border-b border-slate-800 bg-[#090D18] shrink-0">
-                <div className="relative">
+            <div className="h-full flex flex-col min-h-0 bg-[#080C17]">
+              <div className="p-2.5 sm:p-3 border-b border-slate-800 bg-[#090E1B] shrink-0 flex items-center gap-2">
+                <div className="relative flex-1">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                   <input
                     type="text"
@@ -2464,117 +2442,134 @@ export const MultiStreamPage: React.FC = () => {
                     className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 font-mono"
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void fetchStreamers(true)}
+                  disabled={streamersRefreshing || streamersLoading}
+                  className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/40 text-slate-300 hover:text-emerald-300 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
+                  title="Refresh channels"
+                  aria-label="Refresh channels"
+                >
+                  <RefreshCw size={14} className={streamersRefreshing ? 'animate-spin text-emerald-400' : ''} />
+                </button>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-2">
-                {filteredStreamers.map((s) => renderStreamerItem(s, true))}
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3 space-y-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                {renderChannelList(filteredStreamers)}
               </div>
             </div>
           )}
 
           {/* Tab 3: Tip Streamer Content (Integrated with Donation Page Flow) */}
           {sideTab === 'tip' && (
-            <div className="h-full flex flex-col min-h-0 bg-[#090D18]">
-              {/* 1. Scrollable Form Body */}
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3.5 space-y-2.5 sm:space-y-3">
-                {/* Streamer Profile Header */}
-                <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 flex items-center justify-between gap-2.5 shadow-md select-text cursor-default">
-                  <div className="flex items-center gap-2.5 min-w-0 select-text">
-                    <div className="relative shrink-0">
-                      <img
-                        src={selectedStreamer.avatar}
-                        alt={selectedStreamer.name}
-                        className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-slate-800 object-cover ring-2 ring-emerald-400 shadow-sm"
-                      />
-                      {selectedStreamer.isLive && (
-                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#090D18]" />
-                      )}
-                    </div>
-                    <div className="min-w-0 select-text">
-                      <div className="flex items-center gap-1 select-text">
-                        <h4 className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate select-text cursor-default">
-                          {selectedStreamer.name}
-                        </h4>
-                        <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
-                      </div>
-                      {selectedStreamer.bio && (
-                        <p className="text-[11px] sm:text-xs font-sans text-slate-400 line-clamp-2 mt-0.5 leading-relaxed select-text cursor-default">
-                          {selectedStreamer.bio}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quick Copy Streamer URL */}
-                  <button
-                    type="button"
-                    onClick={() => handleCopyStreamLink(selectedStreamer.username)}
-                    className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl border transition-all cursor-pointer shrink-0 ${
-                      copiedLink
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                        : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                    }`}
-                    title={`Copy link /tv?=${selectedStreamer.username}`}
-                  >
-                    {copiedLink ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                  </button>
-                </div>
-
-                {/* Tipping Not Configured Warning Card (Clicking opens Popup Modal) */}
-                {selectedStreamer.isTipConfigured === false && (
-                  <div
-                    onClick={() => {
-                      setTipTargetStreamer(selectedStreamer);
-                      setIsUnconfiguredTipModalOpen(true);
-                    }}
-                    className="p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 space-y-1.5 select-text shadow-sm cursor-pointer hover:bg-amber-500/15 transition-all group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 font-bold text-xs font-mono">
-                        <AlertTriangle size={15} className="text-amber-400 shrink-0 animate-pulse" />
-                        <span>Tipping Not Configured</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold text-amber-400 group-hover:underline flex items-center gap-0.5">
-                        <span>Check Status</span>
-                        <ArrowRight size={10} />
-                      </span>
-                    </div>
-                    <p className="text-[11px] font-sans text-amber-200/90 leading-snug">
-                      Streamer has not completed tip setup. Click here to review required setup checklist.
+            <div className="h-full flex flex-col min-h-0 bg-[#080C17]">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 sm:p-3.5 space-y-2.5 sm:space-y-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                {streamersLoading && !selectedStreamer ? (
+                  <TelevisionTipFormSkeleton />
+                ) : !selectedStreamer ? (
+                  <div className="p-6 rounded-2xl border border-slate-800 bg-[#0B101D] text-center space-y-2">
+                    <AlertCircle size={22} className="text-amber-400 mx-auto" />
+                    <p className="text-xs font-mono text-slate-300">
+                      Select a channel first to send a tip.
                     </p>
                   </div>
-                )}
-
-                {/* Donation Form — exact working copy of the Donation Page (/donate) */}
-                {tipStreamerInfo && tipStreamerInfo.username?.toLowerCase() === selectedStreamer.username?.toLowerCase() ? (
-                  <DonorForm
-                    key={tipStreamerInfo.username}
-                    streamer={tipStreamerInfo}
-                    onSubmit={handleTipFormSubmit}
-                    onSetupRequired={() => {
-                      setTipTargetStreamer(selectedStreamer);
-                      setIsUnconfiguredTipModalOpen(true);
-                    }}
-                    loading={submittingTip}
-                    isModalOpen={isKHQRModalOpen}
-                    hideHeader
-                    className="p-3 sm:p-4 border border-slate-800 bg-[#0C101C] rounded-2xl shadow-xl space-y-4 w-full flex flex-col"
-                  />
                 ) : (
-                  <div className="p-6 rounded-2xl border border-slate-800 bg-[#0C101C] flex flex-col items-center justify-center gap-2 text-slate-400">
-                    {tipStreamerInfoLoading ? (
-                      <>
-                        <Loader2 size={22} className="animate-spin text-cyan-400" />
-                        <span className="text-[11px] font-mono tracking-wider">LOADING DONATION FORM...</span>
-                      </>
+                  <>
+                    {/* Streamer Profile Header */}
+                    <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 flex items-center justify-between gap-2.5 shadow-md select-text cursor-default">
+                      <div className="flex items-center gap-2.5 min-w-0 select-text">
+                        <div className="relative shrink-0">
+                          <img
+                            src={selectedStreamer.avatar}
+                            alt={selectedStreamer.name}
+                            decoding="async"
+                            className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-slate-800 object-cover ring-2 ring-emerald-400 shadow-sm"
+                          />
+                          {selectedStreamer.isLive && (
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#080C17]" />
+                          )}
+                        </div>
+                        <div className="min-w-0 select-text">
+                          <div className="flex items-center gap-1 select-text">
+                            <h4 className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate select-text cursor-default">
+                              {selectedStreamer.name}
+                            </h4>
+                            {selectedStreamer.isVerified && (
+                              <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                            )}
+                          </div>
+                          {selectedStreamer.bio && (
+                            <p className="text-[11px] sm:text-xs font-sans text-slate-400 line-clamp-2 mt-0.5 leading-relaxed select-text cursor-default">
+                              {selectedStreamer.bio}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyStreamLink(selectedStreamer.username)}
+                        className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl border transition-all cursor-pointer shrink-0 ${
+                          copiedLink
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                            : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                        }`}
+                        title={`Copy link /tv?=${selectedStreamer.username}`}
+                      >
+                        {copiedLink ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                      </button>
+                    </div>
+
+                    {/* Tipping Not Configured Warning Card */}
+                    {selectedStreamer.isTipConfigured === false && (
+                      <div
+                        onClick={() => {
+                          setTipTargetStreamer(selectedStreamer);
+                          setIsUnconfiguredTipModalOpen(true);
+                        }}
+                        className="p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 space-y-1.5 select-text shadow-sm cursor-pointer hover:bg-amber-500/15 transition-all group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-bold text-xs font-mono">
+                            <AlertTriangle size={15} className="text-amber-400 shrink-0 animate-pulse" />
+                            <span>Tipping Not Configured</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-amber-400 group-hover:underline flex items-center gap-0.5">
+                            <span>Check Status</span>
+                            <ArrowRight size={10} />
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-sans text-amber-200/90 leading-snug">
+                          Streamer has not completed tip setup. Click here to review required setup checklist.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Donation Form or Structured Loading Skeleton */}
+                    {tipStreamerInfo && tipStreamerInfo.username?.toLowerCase() === selectedStreamer.username?.toLowerCase() ? (
+                      <DonorForm
+                        key={tipStreamerInfo.username}
+                        streamer={tipStreamerInfo}
+                        onSubmit={handleTipFormSubmit}
+                        onSetupRequired={() => {
+                          setTipTargetStreamer(selectedStreamer);
+                          setIsUnconfiguredTipModalOpen(true);
+                        }}
+                        loading={submittingTip}
+                        isModalOpen={isKHQRModalOpen}
+                        hideHeader
+                        className="p-3 sm:p-4 border border-slate-800 bg-[#0B101D] rounded-2xl shadow-xl space-y-4 w-full flex flex-col"
+                      />
+                    ) : tipStreamerInfoLoading ? (
+                      <TelevisionTipFormSkeleton />
                     ) : (
-                      <>
+                      <div className="p-6 rounded-2xl border border-slate-800 bg-[#0B101D] flex flex-col items-center justify-center gap-2 text-slate-400">
                         <AlertCircle size={22} className="text-amber-400" />
                         <span className="text-[11px] font-mono text-center">
                           Donation page is unavailable for @{selectedStreamer.username}.
                         </span>
-                      </>
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             </div>
@@ -2591,14 +2586,14 @@ export const MultiStreamPage: React.FC = () => {
         donationData={activeDonation}
         donorName={currentDonorName}
         bankingName={currentBankingName}
-        streamerId={tipStreamerInfo?.id || tipTargetStreamer?.id || selectedStreamer.id}
-        streamerUsername={tipStreamerInfo?.username || tipTargetStreamer?.username || selectedStreamer.username}
+        streamerId={tipStreamerInfo?.id || tipTargetStreamer?.id || selectedStreamer?.id || ''}
+        streamerUsername={tipStreamerInfo?.username || tipTargetStreamer?.username || selectedStreamer?.username || ''}
         streamerKhqrItems={tipStreamerInfo?.khqrItems}
         onPaymentSuccess={handlePaymentSuccess}
         lang={tipLang}
       />
 
-      {/* Payment Toast (Slides in from right side on all screens — same as Donation Page) */}
+      {/* Payment Toast */}
       {tipToastMessage && (
         <div
           role="alert"
@@ -2623,21 +2618,17 @@ export const MultiStreamPage: React.FC = () => {
         </div>
       )}
 
-      {/* Streamer Tipping Unconfigured Modal (Top-Tier Animated Popup Dialog) */}
-      {isUnconfiguredTipModalOpen && (
+      {/* Streamer Tipping Unconfigured Modal */}
+      {isUnconfiguredTipModalOpen && (tipTargetStreamer || selectedStreamer) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          {/* Backdrop Click Dismiss */}
           <div
             className="fixed inset-0"
             onClick={() => setIsUnconfiguredTipModalOpen(false)}
           />
 
-          {/* Animated Popup Container */}
           <div className="relative w-full max-w-md rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#10162A] via-[#0C1120] to-[#080B14] border border-amber-500/50 shadow-[0_0_60px_rgba(245,158,11,0.25)] p-5 sm:p-6 select-text overflow-hidden z-10 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
-            {/* Ambient Radial Glow */}
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-20 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
 
-            {/* Popup Header */}
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800/80 mb-4">
               <div className="flex items-center gap-3">
                 <div className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow-lg shadow-amber-500/20">
@@ -2650,7 +2641,7 @@ export const MultiStreamPage: React.FC = () => {
                     Tipping Setup Required
                   </h3>
                   <p className="text-[11px] font-mono text-amber-300/80 mt-0.5">
-                    @{tipTargetStreamer?.username || selectedStreamer.username}
+                    @{(tipTargetStreamer || selectedStreamer)?.username}
                   </p>
                 </div>
               </div>
@@ -2664,12 +2655,10 @@ export const MultiStreamPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Clean Modal Message */}
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200 leading-relaxed font-sans mb-4">
               This streamer hasn&apos;t configured tipping yet. If you are this streamer, please head to your Dashboard to finish connecting your payment and notification setup.
             </div>
 
-            {/* Configuration Checklist */}
             <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800/90 space-y-2.5 text-xs font-mono mb-5 shadow-inner">
               <div className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-1 flex items-center justify-between">
                 <span>Setup Checklist</span>
@@ -2679,41 +2668,40 @@ export const MultiStreamPage: React.FC = () => {
                 <span className="text-slate-300 text-[11px]">Telegram Session (GramJS)</span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    (tipTargetStreamer || selectedStreamer).isTelegramConnected
+                    (tipTargetStreamer || selectedStreamer)?.isTelegramConnected
                       ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                       : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
                   }`}
                 >
-                  {(tipTargetStreamer || selectedStreamer).isTelegramConnected ? '✓ Connected' : '✗ Not Connected'}
+                  {(tipTargetStreamer || selectedStreamer)?.isTelegramConnected ? '✓ Connected' : '✗ Not Connected'}
                 </span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800/50">
                 <span className="text-slate-300 text-[11px]">Master KHQR Payment Image</span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    (tipTargetStreamer || selectedStreamer).hasMasterKhqr
+                    (tipTargetStreamer || selectedStreamer)?.hasMasterKhqr
                       ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                       : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
                   }`}
                 >
-                  {(tipTargetStreamer || selectedStreamer).hasMasterKhqr ? '✓ Uploaded' : '✗ Missing'}
+                  {(tipTargetStreamer || selectedStreamer)?.hasMasterKhqr ? '✓ Uploaded' : '✗ Missing'}
                 </span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800/50">
                 <span className="text-slate-300 text-[11px]">Monitored Alert Group</span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    (tipTargetStreamer || selectedStreamer).hasTelegramGroup
+                    (tipTargetStreamer || selectedStreamer)?.hasTelegramGroup
                       ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                       : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
                   }`}
                 >
-                  {(tipTargetStreamer || selectedStreamer).hasTelegramGroup ? '✓ Linked' : '✗ Not Linked'}
+                  {(tipTargetStreamer || selectedStreamer)?.hasTelegramGroup ? '✓ Linked' : '✗ Not Linked'}
                 </span>
               </div>
             </div>
 
-            {/* Popup Action Buttons */}
             <div className="flex items-center gap-2.5">
               <button
                 type="button"

@@ -67,8 +67,64 @@ export interface UserDoc {
   deletionScheduledAt?: Date | string | null;
   accountDeleted?: boolean;
   deletedAt?: Date | string | null;
+  lastIp?: string;
+  ipHistory?: string[];
+  lastUserAgent?: string;
+  lastActiveAt?: Date | string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface SessionLogDoc {
+  _id?: ObjectId;
+  id: string;
+  dateKey: string;
+  eventType: 'LOGIN' | 'REGISTER' | 'API_REQUEST' | 'SECURITY_BLOCK' | 'RATE_WARNING' | 'AUTH_Action' | string;
+  action: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  ip: string;
+  userAgent?: string;
+  userId?: string | null;
+  username?: string | null;
+  userEmail?: string | null;
+  requestsPerSecond: number;
+  isHighRateWarning: boolean;
+  isBlocked: boolean;
+  durationMs?: number;
+  details?: string;
+  createdAt: Date;
+}
+
+export interface BlockedIpDoc {
+  _id?: ObjectId;
+  ip: string;
+  reason: string;
+  blockedBy?: string;
+  createdAt: number;
+  expiresAt: number; // 0 = permanent block
+  violationsCount: number;
+  associatedUserId?: string | null;
+  associatedUsername?: string | null;
+  associatedEmail?: string | null;
+}
+
+export interface TrackedIpDoc {
+  _id?: ObjectId;
+  ip: string;
+  totalRequests: number;
+  peakRps: number;
+  lastRps: number;
+  warningCount: number;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  lastPath?: string;
+  lastMethod?: string;
+  userAgent?: string;
+  userIds?: string[];
+  usernames?: string[];
+  emails?: string[];
 }
 
 export interface DonationDoc {
@@ -517,6 +573,17 @@ export interface SupportTicketDoc {
   updatedAt: string;
 }
 
+export interface TicketAttachmentDoc {
+  id: string;
+  kind: 'file' | 'image' | 'video' | 'voice' | 'link';
+  name: string;
+  url: string;
+  mimeType?: string;
+  size?: number;
+  durationSec?: number;
+  waveform?: number[];
+}
+
 export interface TicketMessageDoc {
   _id?: ObjectId;
   id: string;
@@ -526,6 +593,7 @@ export interface TicketMessageDoc {
   senderRole: 'user' | 'admin' | 'system';
   senderAvatar?: string;
   message: string;
+  attachments?: TicketAttachmentDoc[];
   createdAt: string;
 }
 
@@ -1083,6 +1151,69 @@ export async function getWheelSettingsCollection(): Promise<Collection<WheelSett
   return db.collection<WheelSettingsDoc>('wheel_settings');
 }
 
+export async function getSessionLogsCollection(): Promise<Collection<SessionLogDoc>> {
+  const db = await getMongoDb();
+  return db.collection<SessionLogDoc>('session_logs');
+}
+
+export async function getBlockedIpsCollection(): Promise<Collection<BlockedIpDoc>> {
+  const db = await getMongoDb();
+  return db.collection<BlockedIpDoc>('blocked_ips');
+}
+
+export async function getTrackedIpsCollection(): Promise<Collection<TrackedIpDoc>> {
+  const db = await getMongoDb();
+  return db.collection<TrackedIpDoc>('tracked_ips');
+}
+
+const gDailyLogs = globalThis as unknown as {
+  __lastPrunedSessionDateKey?: string;
+};
+
+/**
+ * Returns today's daily tracking key (YYYY-MM-DD in Asia/Phnom_Penh UTC+7).
+ */
+export function getDailyLogDateKey(date: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Phnom_Penh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    const utcPlus7 = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+    return utcPlus7.toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Prunes any session_logs stored from previous days (past dateKey or missing dateKey)
+ * so MongoDB only retains the current daily record set.
+ */
+export async function pruneOldSessionLogsMongo(
+  currentDateKey: string = getDailyLogDateKey(),
+  force: boolean = false
+): Promise<number> {
+  if (!force && gDailyLogs.__lastPrunedSessionDateKey === currentDateKey) {
+    return 0;
+  }
+  try {
+    const col = await getSessionLogsCollection();
+    const res = await col.deleteMany({
+      $or: [
+        { dateKey: { $ne: currentDateKey } },
+        { dateKey: { $exists: false } },
+      ],
+    });
+    gDailyLogs.__lastPrunedSessionDateKey = currentDateKey;
+    return res.deletedCount || 0;
+  } catch (err) {
+    console.warn('[MongoDB] pruneOldSessionLogsMongo failed:', err);
+    return 0;
+  }
+}
+
 /**
  * Helper to build a flexible MongoDB query matching YouTube usernames / handles
  * Handles:
@@ -1427,6 +1558,16 @@ export async function initMongo() {
     await db.collection('telegram_monitored_groups').createIndex({ streamerId: 1, chatId: 1 }, { unique: true });
     await db.collection('mailbox_messages').createIndex({ id: 1 }, { unique: true });
     await db.collection('mailbox_messages').createIndex({ streamerId: 1, createdAt: -1 });
+    await db.collection('session_logs').createIndex({ dateKey: 1, createdAt: -1 });
+    await db.collection('session_logs').createIndex({ createdAt: -1 });
+    await db.collection('session_logs').createIndex({ ip: 1, createdAt: -1 });
+    await db.collection('session_logs').createIndex({ eventType: 1, createdAt: -1 });
+    await db.collection('blocked_ips').createIndex({ ip: 1 }, { unique: true });
+    await db.collection('tracked_ips').createIndex({ ip: 1 }, { unique: true });
+    await db.collection('tracked_ips').createIndex({ lastSeenAt: -1 });
+
+    // Prune past-day session logs on startup
+    await pruneOldSessionLogsMongo(getDailyLogDateKey(), true);
 
     // Ensure every user has a valid overlayToken
     const usersMissingTokens = await db.collection('users').find({
@@ -2158,12 +2299,24 @@ export async function executePermanentAccountDeletion(userDoc: any): Promise<boo
           $or: [{ _id: `khqr_${streamerId}` as any }, { streamerId }]
         }).catch(() => {});
 
-        // Delete support tickets and their messages
+        // Delete support tickets, their messages, and uploaded attachment folders
         const tickets = await db.collection('support_tickets').find({ streamerId }).toArray().catch(() => []);
         if (tickets.length > 0) {
           const ticketIds = tickets.map((t: any) => t.id).filter(Boolean);
           if (ticketIds.length > 0) {
-            await db.collection('ticket_messages').deleteMany({ ticketId: { $in: ticketIds } }).catch(() => {});
+            await db.collection('ticket_messages').deleteMany({
+              $or: [{ ticketId: { $in: ticketIds } }, { ticket_id: { $in: ticketIds } }]
+            }).catch(() => {});
+            const uploadsTicketsRoot = path.resolve(process.cwd(), 'public', 'uploads', 'tickets');
+            for (const tid of ticketIds) {
+              const safeDir = String(tid).replace(/[^a-zA-Z0-9_-]/g, '');
+              if (safeDir) {
+                const resolvedDir = path.resolve(uploadsTicketsRoot, safeDir);
+                if (resolvedDir.startsWith(uploadsTicketsRoot + path.sep)) {
+                  await fs.promises.rm(resolvedDir, { recursive: true, force: true }).catch(() => {});
+                }
+              }
+            }
           }
           await db.collection('support_tickets').deleteMany({ streamerId }).catch(() => {});
         }

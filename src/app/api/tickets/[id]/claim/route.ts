@@ -1,34 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { getAuthenticatedUser } from '@/server/auth';
-import { isAdminEmail } from '@/server/database/db';
-import { getUsersCollection, getSupportTicketsCollection, getTicketMessagesCollection } from '@/server/database/mongo';
+import { getSupportTicketsCollection, getTicketMessagesCollection } from '@/server/database/mongo';
+import { getTicketCaller } from '@/server/services/ticketAuth';
 import { broadcastTicketClaimed, broadcastTicketStatusChanged } from '@/server/services/socketService';
-
-async function getCallerWithRole(req: NextRequest) {
-  const authUser = getAuthenticatedUser(req);
-  if (!authUser) return null;
-
-  let row: any = null;
-  try {
-    const usersCol = await getUsersCollection();
-    row = await usersCol.findOne({ userId: authUser.id });
-  } catch (e) {}
-
-  const email = row?.email || authUser.email || '';
-  return {
-    id: authUser.id,
-    email,
-    username: row?.username || authUser.username || 'streamer',
-    displayName: row?.displayName || authUser.username || 'Streamer',
-    avatarUrl: row?.avatarUrl || '',
-    isAdmin: isAdminEmail(email)
-  };
-}
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const caller = await getCallerWithRole(req);
+    const caller = await getTicketCaller(req);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -78,23 +56,27 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         createdAt: now
       });
 
-      broadcastTicketClaimed(ticketId, {
-        status: 'claimed',
-        claimedById: caller.id,
-        claimedByName: caller.displayName,
-        claimedByAvatar: caller.avatarUrl,
-        claimedAt: now,
-        systemMessage: {
-          id: msgId,
-          ticketId,
-          senderId: caller.id,
-          senderName: caller.displayName,
-          senderRole: 'system',
-          senderAvatar: caller.avatarUrl,
-          message: claimText,
-          createdAt: now
-        }
-      });
+      broadcastTicketClaimed(
+        ticketId,
+        {
+          status: 'claimed',
+          claimedById: caller.id,
+          claimedByName: caller.displayName,
+          claimedByAvatar: caller.avatarUrl,
+          claimedAt: now,
+          systemMessage: {
+            id: msgId,
+            ticketId,
+            senderId: caller.id,
+            senderName: caller.displayName,
+            senderRole: 'system',
+            senderAvatar: caller.avatarUrl,
+            message: claimText,
+            createdAt: now
+          }
+        },
+        ticketRow.streamerId || ticketRow.streamer_id
+      );
 
       return NextResponse.json({
         success: true,
@@ -112,11 +94,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         {
           $set: {
             status: 'open',
-            claimedById: null,
-            claimedByName: null,
-            claimedByAvatar: null,
-            claimedAt: null,
             updatedAt: now
+          },
+          $unset: {
+            claimedById: '',
+            claimedByName: '',
+            claimedByAvatar: '',
+            claimedAt: ''
           }
         }
       );
@@ -133,13 +117,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         createdAt: now
       });
 
-      broadcastTicketStatusChanged(ticketId, {
-        status: 'open',
-        claimedById: null,
-        claimedByName: null,
-        claimedByAvatar: null,
-        claimedAt: null
-      });
+      broadcastTicketStatusChanged(
+        ticketId,
+        {
+          status: 'open',
+          claimedById: null,
+          claimedByName: null,
+          claimedByAvatar: null,
+          claimedAt: null
+        },
+        ticketRow.streamerId || ticketRow.streamer_id
+      );
 
       return NextResponse.json({ success: true, action: 'unclaimed' });
     }

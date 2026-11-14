@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/server/auth';
 import { isAdminEmail } from '@/server/database/db';
-import { getAllBlockedIps, blockIp, unblockIp } from '@/server/utils/rateLimiter';
+import { getAllBlockedIpsAsync, blockIpAsync, unblockIpAsync } from '@/server/utils/rateLimiter';
+import { disconnectBlockedIpSockets } from '@/server/services/socketService';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
     }
 
-    const blockedIps = getAllBlockedIps();
+    const blockedIps = await getAllBlockedIpsAsync();
     return NextResponse.json({
       success: true,
       count: blockedIps.length,
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'unblock') {
-      const removed = unblockIp(ip);
+      const removed = await unblockIpAsync(ip);
       return NextResponse.json({
         success: true,
         message: removed ? `IP ${ip} successfully unblocked.` : `IP ${ip} was not in blocked list.`
@@ -44,11 +45,21 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'block') {
-      const durationMs = durationMinutes ? Number(durationMinutes) * 60 * 1000 : 15 * 60 * 1000;
-      blockIp(ip, reason || 'Manual Admin block', durationMs);
+      const durationMs =
+        durationMinutes !== undefined && Number(durationMinutes) > 0
+          ? Number(durationMinutes) * 60 * 1000
+          : 0;
+      await blockIpAsync(ip, reason || 'Manual Admin block', durationMs, {
+        blockedBy: user.email,
+        allowLocalhost: true
+      });
+      disconnectBlockedIpSockets(ip, reason || 'Manual Admin block');
       return NextResponse.json({
         success: true,
-        message: `IP ${ip} blocked for ${durationMinutes || 15} minutes.`
+        message:
+          durationMs > 0
+            ? `IP ${ip} blocked for ${durationMinutes} minutes.`
+            : `IP ${ip} permanently blocked.`
       });
     }
 

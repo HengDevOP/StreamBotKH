@@ -7,6 +7,7 @@ import {
   resolveRedirectUri,
   upsertGoogleStreamer
 } from '../route';
+import { getClientIp, getClientUserAgent, recordSessionLog } from '@/server/utils/rateLimiter';
 
 export async function GET(req: NextRequest) {
   let frontendOrigin = resolveFrontendOrigin(req);
@@ -91,6 +92,25 @@ export async function GET(req: NextRequest) {
       email: userData.email,
       name: userData.name || userData.given_name || 'Streamer',
       picture: userData.picture || ''
+    });
+
+    const clientIp = getClientIp(req);
+    recordSessionLog({
+      eventType: (streamer as any).isFirstTimeUser ? 'REGISTER' : 'LOGIN',
+      action: (streamer as any).isFirstTimeUser
+        ? `New Client Registered (@${streamer.username})`
+        : `Client Login (@${streamer.username})`,
+      method: 'GET',
+      path: '/api/auth/google/callback',
+      statusCode: 302,
+      ip: clientIp,
+      userAgent: getClientUserAgent(req),
+      userId: streamer.id,
+      username: streamer.username,
+      userEmail: streamer.email,
+      details: (streamer as any).isFirstTimeUser
+        ? `New creator account registered via Google OAuth (${streamer.email})`
+        : `Signed in via Google OAuth (${streamer.email})`
     });
 
     // 4. Sign JWT and redirect directly to creator panel with token
