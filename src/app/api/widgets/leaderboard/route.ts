@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         period: 'all',
         maxRows: 3,
         accentColor: '#F59E0B',
-        templateStyle: 'cyber-neon',
+        templateStyle: 'champion-spotlight',
         showBackground: true,
         showAnimation: true,
         showRankBadges: true,
@@ -169,11 +169,14 @@ export async function GET(req: NextRequest) {
         period: row.period || 'all',
         maxRows: row.maxRows || row.max_rows || 3,
         accentColor: row.accentColor || row.accent_color || '#F59E0B',
-        templateStyle: row.templateStyle || row.template_style || 'cyber-neon',
+        templateStyle: row.templateStyle || row.template_style || 'champion-spotlight',
         showBackground: row.showBackground !== false && row.show_background !== 0,
         showAnimation: row.showAnimation !== false && row.show_animation !== 0,
         showRankBadges: row.showRankBadges !== false && row.show_rank_badges !== 0,
-        fontFamily: row.fontFamily || row.font_family || 'Chakra Petch'
+        fontFamily: row.fontFamily || row.font_family || 'Chakra Petch',
+        rankFonts: row.rankFonts || {},
+        nameAmountGap: typeof row.nameAmountGap === 'number' ? row.nameAmountGap : 10,
+        removeRankCardBg: Boolean(row.removeRankCardBg)
       },
       topDonors
     });
@@ -195,11 +198,14 @@ export async function POST(req: NextRequest) {
       period = 'all',
       maxRows = 3,
       accentColor = '#F59E0B',
-      templateStyle = 'cyber-neon',
+      templateStyle = 'champion-spotlight',
       showBackground = true,
       showAnimation = true,
       showRankBadges = true,
       fontFamily = 'Chakra Petch',
+      rankFonts = {},
+      nameAmountGap = 10,
+      removeRankCardBg = false,
       testTip = false,
       testOvertake = false
     } = body;
@@ -261,6 +267,9 @@ export async function POST(req: NextRequest) {
       showAnimation: Boolean(showAnimation),
       showRankBadges: Boolean(showRankBadges),
       fontFamily,
+      rankFonts: rankFonts && typeof rankFonts === 'object' ? rankFonts : {},
+      nameAmountGap: typeof nameAmountGap === 'number' ? nameAmountGap : 10,
+      removeRankCardBg: Boolean(removeRankCardBg),
       updatedAt: new Date()
     };
 
@@ -283,7 +292,10 @@ export async function POST(req: NextRequest) {
         showBackground: updated.showBackground,
         showAnimation: updated.showAnimation,
         showRankBadges: updated.showRankBadges,
-        fontFamily: updated.fontFamily
+        fontFamily: updated.fontFamily,
+        rankFonts: updated.rankFonts || {},
+        nameAmountGap: typeof updated.nameAmountGap === 'number' ? updated.nameAmountGap : 10,
+        removeRankCardBg: Boolean(updated.removeRankCardBg)
       };
 
       io.to(`overlay:${token}`).emit('leaderboard:update', broadcastPayload);
@@ -306,7 +318,10 @@ export async function POST(req: NextRequest) {
         showBackground: updated.showBackground,
         showAnimation: updated.showAnimation,
         showRankBadges: updated.showRankBadges,
-        fontFamily: updated.fontFamily
+        fontFamily: updated.fontFamily,
+        rankFonts: updated.rankFonts || {},
+        nameAmountGap: typeof updated.nameAmountGap === 'number' ? updated.nameAmountGap : 10,
+        removeRankCardBg: Boolean(updated.removeRankCardBg)
       }
     });
   } catch (err: any) {

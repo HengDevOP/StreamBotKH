@@ -561,8 +561,8 @@ export async function GET(req: NextRequest) {
       settings = defaultDoc;
     }
 
-    // 2. Get or seed Soundboard Items (up to 9 pads maximum)
-    let items = await sbiCol.find({ streamerToken: token }).sort({ sortOrder: 1, createdAt: 1 }).limit(9).toArray();
+    // 2. Get or seed Soundboard Items (up to 18 pads maximum)
+    let items = await sbiCol.find({ streamerToken: token }).sort({ sortOrder: 1, createdAt: 1 }).limit(18).toArray();
 
     if (!items || items.length === 0) {
       const docsToInsert = DEFAULT_SOUNDBOARD_ITEMS.slice(0, 9).map((def, index) => ({
@@ -584,7 +584,7 @@ export async function GET(req: NextRequest) {
       }));
 
       await sbiCol.insertMany(docsToInsert as any);
-      items = await sbiCol.find({ streamerToken: token }).sort({ sortOrder: 1, createdAt: 1 }).limit(9).toArray();
+      items = await sbiCol.find({ streamerToken: token }).sort({ sortOrder: 1, createdAt: 1 }).limit(18).toArray();
     }
 
     const formattedSettings = {
@@ -672,12 +672,12 @@ export async function POST(req: NextRequest) {
 
     // ACTION: Reorder sound pads by index (drag & drop)
     if (action === 'reorder_items') {
-      const itemIds = (body.itemIds || []) as string[];
+      const itemIds = ((body.itemIds || body.orderedIds) || []) as string[];
       if (!Array.isArray(itemIds) || itemIds.length === 0) {
         return NextResponse.json({ success: false, error: 'itemIds array is required' }, { status: 400 });
       }
 
-      for (let idx = 0; idx < Math.min(itemIds.length, 9); idx++) {
+      for (let idx = 0; idx < Math.min(itemIds.length, 18); idx++) {
         const id = itemIds[idx];
         await sbiCol.updateOne(
           { streamerToken: token, $or: [{ id }, { _id: id as any }] },
@@ -693,17 +693,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Soundboard pads reordered successfully' });
     }
 
-    // ACTION: Add new sound pad (max 9 sound pads allowed)
+    // ACTION: Add new sound pad (max 18 sound pads allowed)
     if (action === 'add_item') {
-      const item = body.item;
+      const item = body.item || body;
       if (!item || !item.title) {
         return NextResponse.json({ success: false, error: 'Sound title is required' }, { status: 400 });
       }
 
       const count = await sbiCol.countDocuments({ streamerToken: token });
-      if (count >= 9) {
+      if (count >= 18) {
         return NextResponse.json(
-          { success: false, error: 'Maximum limit of 9 soundboard pads reached. Delete or edit an existing pad.' },
+          { success: false, error: 'Maximum limit of 18 soundboard pads reached. Delete or edit an existing pad.' },
           { status: 400 }
         );
       }

@@ -229,15 +229,26 @@ export interface StreamGoalDoc {
 
 export interface StreamLeaderboardDoc {
   _id?: ObjectId;
-  streamerId: string;
+  streamerId?: string;
+  streamerToken?: string;
   title: string;
-  timeframe: string;
-  maxEntries: number;
-  theme: string;
+  period?: string;
+  timeframe?: string;
+  maxRows?: number;
+  maxEntries?: number;
+  accentColor?: string;
+  templateStyle?: string;
+  theme?: string;
   fontFamily: string;
-  showAmounts: boolean;
-  isActive: boolean;
-  createdAt: Date;
+  rankFonts?: Record<string, string>;
+  nameAmountGap?: number;
+  removeRankCardBg?: boolean;
+  showBackground?: boolean;
+  showAnimation?: boolean;
+  showRankBadges?: boolean;
+  showAmounts?: boolean;
+  isActive?: boolean;
+  createdAt?: Date;
   updatedAt: Date;
 }
 

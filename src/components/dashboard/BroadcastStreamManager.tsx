@@ -2,13 +2,17 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  CheckCircle2,
   AlertCircle,
   X,
   ExternalLink,
   Copy,
+  Check,
   Eye,
-  EyeOff
+  EyeOff,
+  Radio,
+  Users,
+  RefreshCw,
+  PanelRight
 } from 'lucide-react';
 import { streamerService } from '../../services/streamerService';
 import { AnimatedCounter } from '../overlay/StreamViewCountOverlay';
@@ -17,6 +21,9 @@ export interface BroadcastStreamManagerProps {
   user: any;
   onRefreshUser?: () => Promise<void>;
   onNavigateToTab?: (tab: string) => void;
+  isRightbarOpen?: boolean;
+  onToggleRightbar?: () => void;
+  onCloseRightbar?: () => void;
 }
 
 type PlatformId = 'youtube' | 'twitch' | 'tiktok' | 'facebook' | 'kick' | 'instagram';
@@ -114,7 +121,10 @@ const PLATFORMS: PlatformItem[] = [
 
 export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
   user,
-  onRefreshUser
+  onRefreshUser,
+  isRightbarOpen = true,
+  onToggleRightbar,
+  onCloseRightbar
 }) => {
   // URLs state
   const [urls, setUrls] = useState<{
@@ -143,19 +153,22 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
   const [platformViewers, setPlatformViewers] = useState<Record<string, number>>({});
   const [isChannelLive, setIsChannelLive] = useState<boolean>(false);
   const [hasConfiguredChannels, setHasConfiguredChannels] = useState<boolean>(false);
+  const [isRefreshingViewers, setIsRefreshingViewers] = useState<boolean>(false);
+  const [previewScale, setPreviewScale] = useState<number>(1.25);
 
   const [showOverlayToken, setShowOverlayToken] = useState(false);
   const [copiedOverlay, setCopiedOverlay] = useState(false);
 
-  // Toast
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  // Error Toast only
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Overlay Token & URL
   const overlayToken = user?.overlayToken || 'demo-token';
-  const overlayUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/overlay/view-count/${overlayToken}`
-    : `/overlay/view-count/${overlayToken}`;
+  const overlayUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/overlay/view-count/${overlayToken}`
+      : `/overlay/view-count/${overlayToken}`;
 
   // Sync state when user prop updates
   useEffect(() => {
@@ -172,7 +185,10 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
       lastSavedUrlsRef.current = initial;
 
       if (user.broadcastViewCount) {
-        if (Array.isArray(user.broadcastViewCount.enabledPlatforms) && user.broadcastViewCount.enabledPlatforms.length > 0) {
+        if (
+          Array.isArray(user.broadcastViewCount.enabledPlatforms) &&
+          user.broadcastViewCount.enabledPlatforms.length > 0
+        ) {
           setEnabledPlatforms(user.broadcastViewCount.enabledPlatforms);
         }
       }
@@ -187,14 +203,13 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
     };
   }, []);
 
-  // Sync real-time live viewers detected from configured broadcast channels
-  useEffect(() => {
-    let isMounted = true;
-    const fetchLiveViewers = async () => {
+  const fetchLiveViewers = React.useCallback(
+    async (manual = false) => {
+      if (manual) setIsRefreshingViewers(true);
       try {
         const res = await fetch(`/api/widgets/view-count?token=${overlayToken}`);
         const data = await res.json();
-        if (isMounted && data?.success && typeof data.totalViewers === 'number') {
+        if (data?.success && typeof data.totalViewers === 'number') {
           setRealViewers(data.totalViewers);
           setIsChannelLive(Boolean(data.isLive));
           setHasConfiguredChannels(Boolean(data.hasChannels));
@@ -202,33 +217,34 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
             setPlatformViewers(data.platformViewers);
           }
         }
-      } catch {}
-    };
+      } catch {
+      } finally {
+        if (manual) setIsRefreshingViewers(false);
+      }
+    },
+    [overlayToken]
+  );
 
+  // Sync real-time live viewers detected from configured broadcast channels
+  useEffect(() => {
     fetchLiveViewers();
-    const interval = setInterval(fetchLiveViewers, 10000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [overlayToken]);
+    const interval = setInterval(() => fetchLiveViewers(false), 10000);
+    return () => clearInterval(interval);
+  }, [fetchLiveViewers]);
 
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  const showError = (message: string) => {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
-    setToast({ message, type });
+    setErrorToast(message);
     toastTimerRef.current = setTimeout(() => {
-      setToast(null);
+      setErrorToast(null);
     }, 2500);
   };
 
   // Auto-save stream URL
-  const handleAutoSaveUrl = async (
-    platformId: PlatformId,
-    overrideVal?: string
-  ) => {
-    const currentVal = (overrideVal !== undefined ? overrideVal : (urls[platformId] || '')).trim();
+  const handleAutoSaveUrl = async (platformId: PlatformId, overrideVal?: string) => {
+    const currentVal = (overrideVal !== undefined ? overrideVal : urls[platformId] || '').trim();
     const prevSaved = (lastSavedUrlsRef.current[platformId] || '').trim();
 
     if (currentVal === prevSaved) {
@@ -283,10 +299,8 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
           }
         })
         .catch(() => {});
-
-      showToast('Saved', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to save', 'error');
+      showError(err.message || 'Failed to save channel URL');
     }
   };
 
@@ -296,9 +310,11 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
   };
 
   // Save view count settings
-  const saveViewCountSettings = async (overrides: Partial<{
-    enabledPlatforms: PlatformId[];
-  }> = {}) => {
+  const saveViewCountSettings = async (
+    overrides: Partial<{
+      enabledPlatforms: PlatformId[];
+    }> = {}
+  ) => {
     const nextSettings = {
       enabledPlatforms: overrides.enabledPlatforms || enabledPlatforms
     };
@@ -330,10 +346,8 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
       if (onRefreshUser) {
         await onRefreshUser();
       }
-
-      showToast('Saved', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to save', 'error');
+      showError(err.message || 'Failed to save platform selection');
     }
   };
 
@@ -344,7 +358,7 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
       : [...enabledPlatforms, platformId];
 
     if (next.length === 0) {
-      showToast('Select at least one platform', 'error');
+      showError('Select at least one platform');
       return;
     }
 
@@ -356,269 +370,402 @@ export const BroadcastStreamManager: React.FC<BroadcastStreamManagerProps> = ({
   const handleCopyOverlay = () => {
     navigator.clipboard.writeText(overlayUrl);
     setCopiedOverlay(true);
-    showToast('Copied URL', 'success');
     setTimeout(() => setCopiedOverlay(false), 2000);
   };
 
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-in fade-in duration-300">
-      
-      {/* ─────────────────────────────────────────────────────────────
-          VIEW COUNT OVERLAY SECTION (CLEAN & MINIMAL)
-      ───────────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl bg-[#090D18] border border-slate-800 p-5 space-y-4 shadow-sm">
-        <div>
-          <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] tracking-wide">
-            Concurrent View Count
-          </h3>
-          <p className="text-[11px] text-slate-400">
-            Tick platforms to display their logos with your concurrent viewer count in OBS.
-          </p>
-        </div>
+  const connectedCount = PLATFORMS.filter((p) => Boolean((urls[p.id] || '').trim())).length;
 
-        {/* Overlay URL Input */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 flex items-center rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 overflow-hidden">
-            <span className="text-xs font-mono text-slate-400 select-all truncate">
-              {showOverlayToken
-                ? overlayUrl
-                : `${overlayUrl.split('/overlay/view-count/')[0]}/overlay/view-count/••••••••••••••••`}
+  return (
+    <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 w-full h-full overflow-hidden">
+      {/* ============================================================ */}
+      {/* LEFT MAIN WORKSPACE: CONCURRENT VIEW COUNT WEB APPLICATION   */}
+      {/* ============================================================ */}
+      <div className="flex-1 min-w-0 bg-[#0B0F19] border border-slate-800/80 rounded-xl flex flex-col overflow-hidden min-h-[480px]">
+        {/* Top Header Bar */}
+        <div className="px-4 py-3 border-b border-slate-800/80 bg-[#090D16] flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Radio
+              size={15}
+              className={isChannelLive ? 'text-emerald-400 animate-pulse shrink-0' : 'text-slate-400 shrink-0'}
+            />
+            <span className="text-xs font-semibold text-white truncate">Concurrent View Count</span>
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                isChannelLive
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  : hasConfiguredChannels
+                  ? 'bg-slate-900 text-slate-400 border-slate-800'
+                  : 'bg-slate-900 text-slate-500 border-slate-800'
+              }`}
+            >
+              {isChannelLive
+                ? `LIVE • ${realViewers.toLocaleString()} WATCHING`
+                : hasConfiguredChannels
+                ? 'OFFLINE • 0 WATCHING'
+                : 'NO CHANNELS LINKED'}
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowOverlayToken(!showOverlayToken)}
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
-            title={showOverlayToken ? 'Hide token' : 'Show token'}
-          >
-            {showOverlayToken ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCopyOverlay}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-mono text-slate-200 hover:text-white transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
-          >
-            <Copy size={13} />
-            <span>{copiedOverlay ? 'Copied' : 'Copy URL'}</span>
-          </button>
-
-          <a
-            href={overlayUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
-            title="Open overlay in new tab"
-          >
-            <ExternalLink size={15} />
-          </a>
-        </div>
-
-        {/* Platform Selection */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-slate-400">
-            Platforms
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {PLATFORMS.map((platform) => {
-              const isTicked = enabledPlatforms.includes(platform.id);
-              return (
+          <div className="flex items-center gap-2">
+            {/* Scale Controls */}
+            <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-lg p-0.5">
+              {[0.75, 1, 1.25, 1.5].map((scaleVal) => (
                 <button
-                  key={platform.id}
+                  key={scaleVal}
                   type="button"
-                  onClick={() => handleTogglePlatform(platform.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-medium transition-colors cursor-pointer select-none ${
-                    isTicked
-                      ? 'bg-slate-800 border-slate-600 text-white'
-                      : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                  onClick={() => setPreviewScale(scaleVal)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                    previewScale === scaleVal
+                      ? 'bg-slate-700 text-white font-semibold'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <div className="shrink-0">{platform.logo}</div>
-                  <span>{platform.name}</span>
+                  {Math.round(scaleVal * 100)}%
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => fetchLiveViewers(true)}
+              disabled={isRefreshingViewers}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              title="Refresh live viewer count"
+            >
+              <RefreshCw size={12} className={isRefreshingViewers ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+
+            {onToggleRightbar && !isRightbarOpen && (
+              <button
+                type="button"
+                onClick={onToggleRightbar}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Open Broadcast Channels"
+              >
+                <PanelRight size={13} />
+                <span className="hidden sm:inline">Channels</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Clean Live Preview */}
-        <div className="space-y-2 pt-2 border-t border-slate-800/80">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-slate-400">
-              Preview
-            </label>
-            <div className="text-[11px] font-mono">
-              {isChannelLive ? (
-                <span className="text-emerald-400 font-medium">
-                  ● Live ({realViewers.toLocaleString()} watching
-                  {enabledPlatforms.filter((p) => (platformViewers[p] || 0) > 0).length > 1 && (
-                    <span className="text-slate-400 ml-1">
-                      —{' '}
-                      {enabledPlatforms
-                        .filter((p) => (platformViewers[p] || 0) > 0)
-                        .map((p) => `${PLATFORMS.find((pl) => pl.id === p)?.name || p}: ${(platformViewers[p] || 0).toLocaleString()}`)
-                        .join(' + ')}
-                    </span>
-                  )}
-                  )
-                </span>
-              ) : hasConfiguredChannels ? (
-                <span className="text-slate-500">
-                  Channels offline (0 watching)
-                </span>
-              ) : (
-                <span className="text-slate-500">
-                  No channel set
-                </span>
-              )}
+        {/* Main Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-5">
+          {/* Live Preview Stage */}
+          <div className="obs-preview-stage flex-1 min-h-[220px] rounded-xl bg-[#070A12] border border-slate-800/80 flex flex-col justify-between p-5 relative overflow-hidden">
+            <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-slate-500">
+              <span>OBS OVERLAY PREVIEW</span>
+              <span>
+                {enabledPlatforms.length} {enabledPlatforms.length === 1 ? 'PLATFORM' : 'PLATFORMS'} ACTIVE
+              </span>
+            </div>
+
+            {/* Center Scaled Preview Badge */}
+            <div className="my-auto py-8 flex items-center justify-center overflow-x-auto">
+              <div
+                style={{
+                  transform: `scale(${previewScale})`,
+                  transformOrigin: 'center center'
+                }}
+                className="transition-transform duration-200"
+              >
+                <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-black/85 border border-white/10 text-white shadow-lg">
+                  <div className="flex items-center gap-2">
+                    {enabledPlatforms.map((pid) => (
+                      <div key={pid} className="shrink-0 flex items-center justify-center">
+                        {PLATFORMS.find((p) => p.id === pid)?.logo}
+                      </div>
+                    ))}
+                  </div>
+                  <AnimatedCounter
+                    value={realViewers}
+                    className="text-xl font-bold font-mono tracking-tight text-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 border-t border-slate-800/60 pt-3">
+              <span>
+                Tick or untick platforms below to customize which icons appear next to your total concurrent viewers.
+              </span>
+              <span className="font-mono text-slate-500">Auto-updates every 10s</span>
             </div>
           </div>
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-center">
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-black/80 border border-white/10 text-white">
-              <div className="flex items-center gap-2">
-                {enabledPlatforms.map((pid) => (
-                  <div key={pid} className="shrink-0">
-                    {PLATFORMS.find((p) => p.id === pid)?.logo}
-                  </div>
-                ))}
+
+          {/* Platform Filter & Live Breakdown Grid */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-semibold text-white uppercase tracking-wider">
+                  Displayed Overlay Platforms & Live Breakdown
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Select platforms to include in your OBS Concurrent View Count overlay.
+                </p>
               </div>
-              <AnimatedCounter
-                value={realViewers}
-                className="text-lg font-bold font-mono tracking-tight text-white"
-              />
+              <div className="text-xs font-mono text-slate-400">
+                Total: <span className="text-white font-semibold">{realViewers.toLocaleString()}</span>
+              </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+              {PLATFORMS.map((platform) => {
+                const isTicked = enabledPlatforms.includes(platform.id);
+                const hasUrl = Boolean((urls[platform.id] || '').trim());
+                const count = platformViewers[platform.id] || 0;
+
+                return (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => handleTogglePlatform(platform.id)}
+                    className={`p-3.5 rounded-xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 ${
+                      isTicked
+                        ? 'bg-slate-900/90 border-slate-600 text-white'
+                        : 'bg-[#090D16] border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 ${
+                          isTicked ? 'bg-slate-800 border-slate-700' : 'bg-slate-950 border-slate-800'
+                        }`}
+                      >
+                        {platform.logo}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-white truncate">{platform.name}</span>
+                          {isTicked && (
+                            <span className="px-1.5 py-0.2 rounded bg-white/10 text-[9px] font-mono text-slate-200">
+                              ON
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 truncate">
+                          {count > 0
+                            ? `${count.toLocaleString()} watching live`
+                            : hasUrl
+                            ? 'Channel linked • 0 watching'
+                            : 'Not linked in rightbar'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`text-xs font-mono font-semibold ${
+                          count > 0 ? 'text-emerald-400' : 'text-slate-500'
+                        }`}
+                      >
+                        {count.toLocaleString()}
+                      </span>
+                      <div
+                        className={`w-4 h-4 rounded border flex items-center justify-center ${
+                          isTicked ? 'bg-white border-white text-slate-950' : 'border-slate-700 bg-slate-950'
+                        }`}
+                      >
+                        {isTicked && <Check size={11} strokeWidth={3} />}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom OBS Source URL Dock Bar */}
+        <div className="p-3.5 border-t border-slate-800/80 bg-[#090D16] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[11px] font-mono text-slate-400 shrink-0 hidden md:inline">OBS SOURCE URL:</span>
+            <div className="flex-1 flex items-center rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 overflow-hidden min-w-0">
+              <span className="text-xs font-mono text-slate-300 select-all truncate">
+                {showOverlayToken
+                  ? overlayUrl
+                  : `${overlayUrl.split('/overlay/view-count/')[0]}/overlay/view-count/••••••••••••••••`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowOverlayToken(!showOverlayToken)}
+              className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title={showOverlayToken ? 'Hide token' : 'Show token'}
+            >
+              {showOverlayToken ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyOverlay}
+              className="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-200 text-slate-950 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              {copiedOverlay ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+              <span>{copiedOverlay ? 'Copied' : 'Copy OBS URL'}</span>
+            </button>
+
+            <a
+              href={overlayUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title="Open overlay in new tab"
+            >
+              <ExternalLink size={14} />
+            </a>
           </div>
         </div>
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          STREAM CHANNELS & URLS SECTION
-      ───────────────────────────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] tracking-wide">
-            Broadcast Channels
-          </h3>
-          <p className="text-[11px] text-slate-400">
-            Add your stream or channel links for viewer tracking and multistreaming.
-          </p>
-        </div>
+      {/* ============================================================ */}
+      {/* RIGHTBAR: BROADCAST CHANNELS CONFIGURATION                   */}
+      {/* ============================================================ */}
+      <div
+        className={`fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity duration-300 ease-in-out ${
+          isRightbarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onCloseRightbar}
+      />
 
-        <div className="space-y-3">
-          {PLATFORMS.map((platform) => {
-            const val = urls[platform.id] || '';
-            const hasUrl = Boolean(val.trim());
+      <div
+        className={`fixed lg:static top-0 right-0 bottom-0 z-50 lg:z-auto w-full max-w-[380px] lg:max-w-none shrink-0 h-full overflow-hidden transition-all duration-300 ease-in-out ${
+          isRightbarOpen
+            ? 'translate-x-0 lg:w-[360px] xl:w-[390px] lg:opacity-100 pointer-events-auto'
+            : 'translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:-ml-4 pointer-events-none'
+        }`}
+      >
+        <aside className="w-full max-w-[380px] lg:max-w-none lg:w-[360px] xl:w-[390px] bg-[#0B0F19] border-l lg:border border-slate-800/80 lg:rounded-xl flex flex-col h-full overflow-hidden">
+          {/* Rightbar Header */}
+          <div className="px-4 py-3 border-b border-slate-800/80 bg-[#090D16] flex items-center justify-between gap-2 shrink-0">
+            <div>
+              <div className="flex items-center gap-2">
+                <Users size={14} className="text-slate-300" />
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
+                  Broadcast Channels
+                </h3>
+                <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-400">
+                  {connectedCount}/{PLATFORMS.length}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Add your live stream links for automatic viewer tracking.
+              </p>
+            </div>
 
-            return (
-              <div
-                key={platform.id}
-                className="rounded-2xl bg-[#090D18] border border-slate-800 p-4 sm:p-5 space-y-3 hover:border-slate-700/80 transition-colors shadow-sm"
+            {onCloseRightbar && (
+              <button
+                type="button"
+                onClick={onCloseRightbar}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close Broadcast Channels"
               >
-                {/* Row Header */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0">
-                      {platform.logo}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] tracking-wide">
-                        {platform.name}
-                      </h4>
-                      <p className="text-[11px] text-slate-400">
-                        {platform.subtitle}
-                      </p>
-                    </div>
-                  </div>
+                <X size={15} />
+              </button>
+            )}
+          </div>
 
-                  <div className="flex items-center gap-2">
+          {/* Rightbar Scrollable Channel List */}
+          <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5">
+            {PLATFORMS.map((platform) => {
+              const val = urls[platform.id] || '';
+              const hasUrl = Boolean(val.trim());
+              const liveCount = platformViewers[platform.id] || 0;
+
+              return (
+                <div
+                  key={platform.id}
+                  className="rounded-xl bg-[#090D16] border border-slate-800 p-3 space-y-2.5 hover:border-slate-700/80 transition-colors"
+                >
+                  {/* Channel Header */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0">
+                        {platform.logo}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-semibold text-white truncate">{platform.name}</h4>
+                        <p className="text-[10px] text-slate-400 truncate">{platform.subtitle}</p>
+                      </div>
+                    </div>
+
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                        (platformViewers[platform.id] || 0) > 0
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium border shrink-0 ${
+                        liveCount > 0
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                           : hasUrl
-                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                          : 'bg-slate-900 text-slate-500 border-slate-800'
+                          ? 'bg-slate-800 text-slate-200 border-slate-700'
+                          : 'bg-slate-950 text-slate-500 border-slate-800'
                       }`}
                     >
-                      {(platformViewers[platform.id] || 0) > 0
-                        ? `● Live (${platformViewers[platform.id].toLocaleString()})`
+                      {liveCount > 0
+                        ? `● Live (${liveCount.toLocaleString()})`
                         : hasUrl
                         ? 'Connected'
                         : 'Disconnected'}
                     </span>
                   </div>
-                </div>
 
-                {/* Input & External Link */}
-                <div className="flex items-center gap-2.5">
-                  <div className="flex-1 flex items-center rounded-xl bg-slate-950 border border-slate-800 focus-within:border-slate-600 transition-colors overflow-hidden">
-                    <input
-                      type="url"
-                      value={val}
-                      onChange={(e) => setUrls({ ...urls, [platform.id]: e.target.value })}
-                      onBlur={() => handleAutoSaveUrl(platform.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.currentTarget.blur();
-                        }
-                      }}
-                      placeholder={platform.placeholder}
-                      className="w-full px-3.5 py-2.5 bg-transparent text-white font-mono text-xs focus:outline-none placeholder-slate-600"
-                    />
-                    {val && (
-                      <button
-                        type="button"
-                        onClick={() => handleClearUrl(platform.id)}
-                        className="p-2 text-slate-500 hover:text-white transition-colors cursor-pointer mr-1 shrink-0"
-                        title="Clear URL"
+                  {/* URL Input & Actions */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 flex items-center rounded-lg bg-slate-950 border border-slate-800 focus-within:border-slate-600 transition-colors overflow-hidden">
+                      <input
+                        type="url"
+                        value={val}
+                        onChange={(e) => setUrls({ ...urls, [platform.id]: e.target.value })}
+                        onBlur={() => handleAutoSaveUrl(platform.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        placeholder={platform.placeholder}
+                        className="w-full px-2.5 py-1.5 bg-transparent text-white font-mono text-[11px] focus:outline-none placeholder-slate-600"
+                      />
+                      {val && (
+                        <button
+                          type="button"
+                          onClick={() => handleClearUrl(platform.id)}
+                          className="p-1.5 text-slate-500 hover:text-white transition-colors cursor-pointer shrink-0"
+                          title="Clear URL"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    {hasUrl && (
+                      <a
+                        href={val.startsWith('http://') || val.startsWith('https://') ? val : `https://${val}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors shrink-0"
+                        title="Open channel in new tab"
                       >
-                        <X size={14} />
-                      </button>
+                        <ExternalLink size={13} />
+                      </a>
                     )}
                   </div>
-
-                  {hasUrl && (
-                    <a
-                      href={val.startsWith('http://') || val.startsWith('https://') ? val : `https://${val}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 text-xs font-mono transition-colors shrink-0"
-                      title="Open in new tab"
-                    >
-                      <ExternalLink size={14} />
-                    </a>
-                  )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </aside>
       </div>
 
-      {/* Floating Toast Message */}
-      <div
-        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-200 ease-out pointer-events-none ${
-          toast
-            ? 'translate-y-0 opacity-100'
-            : 'translate-y-2 opacity-0 pointer-events-none'
-        }`}
-      >
-        <div
-          className={`px-3.5 py-2 rounded-xl border font-mono text-xs flex items-center gap-2 ${
-            toast?.type === 'error'
-              ? 'bg-slate-900 border-red-500/40 text-red-300'
-              : 'bg-slate-900 border-slate-800 text-slate-200'
-          }`}
-        >
-          {toast?.type === 'error' ? (
+      {/* Error Toast Message */}
+      {errorToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="px-3.5 py-2 rounded-lg bg-slate-900 border border-red-500/40 text-red-300 font-mono text-xs flex items-center gap-2 shadow-xl">
             <AlertCircle size={14} className="text-red-400 shrink-0" />
-          ) : (
-            <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
-          )}
-          <span>{toast?.message}</span>
+            <span>{errorToast}</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

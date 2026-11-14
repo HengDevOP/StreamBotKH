@@ -167,7 +167,11 @@ function GoalOverlayRouteWrapper() {
 
 // Wrapper for Leaderboard Widget Overlay
 function LeaderboardOverlayRouteWrapper() {
-  const { token } = useParams<{ token?: string }>();
+  const { token, rank: routeRank } = useParams<{ token?: string; rank?: string }>();
+  const [searchParams] = useSearchParams();
+  const rawRank = routeRank || searchParams.get('rank');
+  const parsedRank = rawRank && Number(rawRank) >= 1 ? Math.min(10, Math.floor(Number(rawRank))) : null;
+
   return (
     <div className="w-screen h-screen overflow-hidden bg-transparent obs-overlay m-0 p-0">
       <style>{`
@@ -177,7 +181,7 @@ function LeaderboardOverlayRouteWrapper() {
           background-image: none !important;
         }
       `}</style>
-      <StreamLeaderboardOverlay token={token || ''} />
+      <StreamLeaderboardOverlay token={token || ''} singleRank={parsedRank} />
     </div>
   );
 }
@@ -474,6 +478,8 @@ function AppRoutes() {
         <Route path="/overlay/soundboard/:token" element={<SoundboardOverlayRouteWrapper />} />
         <Route path="/overlay/goal/:token" element={<GoalOverlayRouteWrapper />} />
         <Route path="/overlay/leaderboard/:token" element={<LeaderboardOverlayRouteWrapper />} />
+        <Route path="/overlay/leaderboard/:token/rank/:rank" element={<LeaderboardOverlayRouteWrapper />} />
+        <Route path="/overlay/leaderboard/:token/:rank" element={<LeaderboardOverlayRouteWrapper />} />
         <Route path="/overlay/timer" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/timer/:token" element={<TimerOverlayRouteWrapper />} />
         <Route path="/overlay/pokemon/:token" element={<PokemonOverlayRouteWrapper />} />

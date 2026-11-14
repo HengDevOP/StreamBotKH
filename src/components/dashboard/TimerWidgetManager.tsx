@@ -27,6 +27,7 @@ import {
   TimerTemplateMeta,
   formatTimerParts
 } from '../overlay/timerTemplates';
+import { TimerSkeleton } from './DashboardSkeleton';
 
 interface TimerWidgetManagerProps {
   streamerToken?: string;
@@ -73,11 +74,13 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
   // Test simulation state
   const [customTestAmount, setCustomTestAmount] = useState<number>(2.0);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const effectiveToken = streamerToken || 'demo-token';
 
   // 1. Fetch initial configuration from database
   useEffect(() => {
+    setIsLoading(true);
     fetch(`/api/widgets/timer?token=${effectiveToken}`)
       .then((res) => res.json())
       .then((data) => {
@@ -108,7 +111,8 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
           }
         }
       })
-      .catch((e) => console.error('Error fetching timer config:', e));
+      .catch((e) => console.error('Error fetching timer config:', e))
+      .finally(() => setIsLoading(false));
   }, [effectiveToken]);
 
   // 2. Countdown interval in dashboard
@@ -304,6 +308,10 @@ export const TimerWidgetManager: React.FC<TimerWidgetManagerProps> = ({ streamer
       tpl.category.toLowerCase().includes(q);
     return matchesCategory && matchesSearch;
   });
+
+  if (isLoading) {
+    return <TimerSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

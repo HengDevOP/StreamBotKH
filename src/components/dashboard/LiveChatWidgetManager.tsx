@@ -45,6 +45,7 @@ import { ANIMATION_STYLES, CHAT_ANIMATIONS_CSS, CHAT_FONTS } from '../../utils/c
 import { useSocket } from '../../context/SocketContext';
 import { MediaPickerModal } from './MediaPickerModal';
 import { CHAT_THEMES, ChatOverlayTheme, ChatThemePreset } from '../../data/chatOverlayPresets';
+import { LiveChatSkeleton } from './DashboardSkeleton';
 
 export interface LiveChatWidgetManagerProps {
   streamerToken?: string;
@@ -311,6 +312,17 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
   const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
   const [sendingTest, setSendingTest] = useState<boolean>(false);
   const [testSent, setTestSent] = useState<boolean>(false);
+  const [previewScale, setPreviewScale] = useState<number>(1);
+  const [widthInput, setWidthInput] = useState<string>(String(DEFAULT_SETTINGS.overlayWidth));
+  const [heightInput, setHeightInput] = useState<string>(String(DEFAULT_SETTINGS.overlayHeight));
+
+  useEffect(() => {
+    setWidthInput(String(settings.overlayWidth ?? 0));
+  }, [settings.overlayWidth]);
+
+  useEffect(() => {
+    setHeightInput(String(settings.overlayHeight ?? 0));
+  }, [settings.overlayHeight]);
 
   // Rightbar Settings Drawer State (Controlled from Navbar or Uncontrolled fallback)
   const [internalRightbarOpen, setInternalRightbarOpen] = useState<boolean>(false);
@@ -1289,40 +1301,75 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
     );
   };
 
+  if (loading) {
+    return <LiveChatSkeleton />;
+  }
+
   return (
     <div className="relative w-full h-full flex-1 min-h-0 flex flex-col">
       <style>{CHAT_ANIMATIONS_CSS}</style>
 
       {/* ============================================================== */}
       {/* 2-COLUMN LIVE WEB APPLICATION WORKSPACE                        */}
-      {/* (DESKTOP: LIVE RIGHTBAR CONTENT, MOBILE: BOTTOM PAGE)          */}
       {/* ============================================================== */}
       <div className="w-full flex-1 min-h-0 flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch overflow-hidden">
-        {/* LEFT COLUMN: MAIN SIMPLE LIVE CHAT STAGE */}
-        <div className="relative flex-1 min-w-0 w-full rounded-2xl bg-slate-950 border border-slate-800/90 shadow-2xl overflow-hidden flex flex-col min-h-[480px] lg:min-h-0 h-full">
+        {/* LEFT COLUMN: MAIN LIVE CHAT PREVIEW STAGE */}
+        <div className="relative flex-1 min-w-0 w-full rounded-xl bg-[#0B0F19] border border-slate-800/80 overflow-hidden flex flex-col min-h-[480px] lg:min-h-0 h-full">
           {/* Chat Stage Top Header */}
-          <div className="px-4 py-2.5 bg-[#0a0f1d] border-b border-slate-800 flex items-center justify-end gap-1.5 sm:gap-2 flex-shrink-0 z-10">
-            {/* Copy OBS URL Button */}
+          <div className="px-4 py-2.5 bg-[#090D16] border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 flex-shrink-0 z-10">
+            {/* Left: Dimensions & Scale Size Controls (Top-Left Origin) */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-white">Live Chat Preview</span>
+              <span className="text-[11px] font-mono text-slate-400 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                {settings.overlayWidth ? `${settings.overlayWidth}px` : 'Auto'} × {settings.overlayHeight ? `${settings.overlayHeight}px` : 'Auto'}
+              </span>
+
+              {/* Scale Size Selector */}
+              <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+                <span className="text-[10px] font-mono text-slate-400 px-1.5">Scale</span>
+                {[
+                  { label: '50%', value: 0.5 },
+                  { label: '75%', value: 0.75 },
+                  { label: '100%', value: 1 },
+                  { label: '125%', value: 1.25 }
+                ].map((s) => (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => setPreviewScale(s.value)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                      previewScale === s.value
+                        ? 'bg-slate-800 text-white font-semibold'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Stage Actions */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={copyObsUrl}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors border cursor-pointer ${
                   copiedUrl
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
-                    : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/60'
+                    : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800'
                 }`}
                 title="Copy OBS Overlay URL"
               >
-                {copiedUrl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-cyan-400" />}
+                {copiedUrl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
                 <span className="hidden xs:inline">{copiedUrl ? 'Copied' : 'Copy OBS URL'}</span>
               </button>
 
-              {/* Open Overlay in Tab */}
               <a
                 href={obsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750 transition-colors flex items-center justify-center"
+                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors flex items-center justify-center"
                 title="Open OBS Overlay in new tab"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -1331,7 +1378,7 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               <button
                 type="button"
                 onClick={handleClearMessages}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-900 transition-colors"
+                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors"
                 title="Clear Messages"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -1341,20 +1388,18 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                 type="button"
                 onClick={() => handleSendTestMessage()}
                 disabled={sendingTest}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-semibold transition-all"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-[11px] font-medium transition-colors"
               >
-                <Sparkles className="w-3 h-3 text-amber-400" />
                 <span>Simulate</span>
               </button>
 
-              {/* Toggle Rightbar Settings Button */}
               <button
                 type="button"
                 onClick={toggleRightbar}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors border cursor-pointer ${
                   isRightbarOpen
-                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.4)]'
-                    : 'bg-slate-900 hover:bg-slate-800 text-cyan-300 border-cyan-500/30'
+                    ? 'bg-slate-200 text-slate-950 border-slate-200 font-semibold'
+                    : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800'
                 }`}
                 title={isRightbarOpen ? 'Close Settings' : 'Open Settings'}
                 aria-label="Toggle Chat Settings"
@@ -1362,184 +1407,176 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                 <PanelRight className="w-3.5 h-3.5" />
                 <span>Settings</span>
               </button>
-          </div>
-
-        {/* Scrollable Chat Feed Area - Anchored to bottom like OBS Stream Overlay */}
-        <div
-          ref={chatScrollRef}
-          className="flex-1 p-3 sm:p-5 overflow-auto no-scrollbar relative flex flex-col justify-end items-center"
-          style={{
-            backgroundImage: 'radial-gradient(ellipse at top, #0f172a 0%, #030712 100%)',
-            fontFamily: settings.fontFamily || 'Chakra Petch, sans-serif'
-          }}
-        >
-          {/* Subtle Grid Lines */}
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
-
-          {/* OBS Canvas Bounds Indicator & Message Container */}
-          <div
-            className={`relative z-10 transition-all duration-300 flex flex-col justify-end ${
-              settings.overlayWidth > 0 || settings.overlayHeight > 0
-                ? 'border border-cyan-500/20 rounded-xl bg-slate-950/20'
-                : 'w-full'
-            }`}
-            style={{
-              width: settings.overlayWidth && settings.overlayWidth > 0 ? `${settings.overlayWidth}px` : '100%',
-              maxWidth: settings.overlayWidth && settings.overlayWidth > 0 ? `${settings.overlayWidth}px` : '100%',
-              height: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '100%',
-              maxHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '100%',
-              minHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${Math.min(settings.overlayHeight, 320)}px` : undefined,
-              boxSizing: 'border-box'
-            }}
-          >
-            <div className="w-full flex flex-col justify-end overflow-y-auto no-scrollbar">
-              {messages.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500 space-y-2">
-                  <MessageSquare className="w-8 h-8 opacity-40 text-cyan-400" />
-                  <p className="text-xs">No chat messages yet.</p>
-                  <p className="text-[11px] text-slate-600">
-                    Click <strong className="text-slate-400">Simulate</strong> or type a message below to broadcast to OBS.
-                  </p>
-                </div>
-              ) : (
-                messages.map((item) => renderMessageContent(item))
-              )}
             </div>
           </div>
-        </div>
 
-        {/* Quick Tag Pills */}
-        <div className="px-4 py-2 bg-slate-900/90 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
-          <span className="text-[10px] text-slate-500 font-mono uppercase flex-shrink-0">Quick Chat:</span>
-          {QUICK_TAGS.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => handleSendTestMessage(tag)}
-              className="px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 text-[11px] text-slate-300 hover:text-white border border-slate-800 whitespace-nowrap transition-colors flex-shrink-0"
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-
-        {/* Bottom Interactive Message Composer */}
-        <div className="p-3 sm:p-4 bg-[#0a0f1d] border-t border-slate-800 flex-shrink-0">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (customInput.trim()) {
-                handleSendTestMessage(customInput.trim());
-              }
+          {/* Scrollable Chat Feed Area - Scaled from Top-Left (origin-top-left) */}
+          <div
+            className="obs-preview-stage flex-1 p-4 sm:p-6 overflow-auto relative flex items-start justify-start"
+            style={{
+              backgroundColor: '#060911',
+              backgroundImage:
+                'linear-gradient(45deg, #0b101d 25%, transparent 25%), linear-gradient(-45deg, #0b101d 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #0b101d 75%), linear-gradient(-45deg, transparent 75%, #0b101d 75%)',
+              backgroundSize: '24px 24px',
+              backgroundPosition: '0 0, 0 12px, 12px -12px, -12px 0px',
+              fontFamily: settings.fontFamily || 'Chakra Petch, sans-serif'
             }}
-            className="flex items-center gap-2"
           >
-            <input
-              type="text"
-              placeholder="Type your message..."
-              value={customInput}
-              onChange={(e) => setCustomInput(e.target.value)}
-              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-            />
-            <Button
-              type="submit"
-              disabled={sendingTest || !customInput.trim()}
-              className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition-all"
+            {/* Outer footprint wrapper sized to scaled dimensions so scrollbars fit top-left scaling */}
+            <div
+              className="relative"
+              style={{
+                width:
+                  settings.overlayWidth && settings.overlayWidth > 0
+                    ? `${Math.round(settings.overlayWidth * previewScale)}px`
+                    : `${Math.round(100 * previewScale)}%`,
+                height:
+                  settings.overlayHeight && settings.overlayHeight > 0
+                    ? `${Math.round(settings.overlayHeight * previewScale)}px`
+                    : '100%',
+                minHeight:
+                  settings.overlayHeight && settings.overlayHeight > 0
+                    ? `${Math.round(Math.min(settings.overlayHeight, 320) * previewScale)}px`
+                    : '320px'
+              }}
             >
-              <Send className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Send</span>
-            </Button>
-          </form>
-        </div>
-      </div>
+              {/* OBS Canvas Bounds Indicator & Message Container - Anchored & Scaled from Top-Left */}
+              <div
+                className={`relative z-10 origin-top-left transition-transform duration-150 flex flex-col justify-end p-3 ${
+                  settings.overlayWidth > 0 || settings.overlayHeight > 0
+                    ? 'border border-slate-800 rounded-lg bg-[#090D16]/60'
+                    : 'w-full'
+                }`}
+                style={{
+                  transform: `scale(${previewScale})`,
+                  transformOrigin: 'top left',
+                  width: settings.overlayWidth && settings.overlayWidth > 0 ? `${settings.overlayWidth}px` : '100%',
+                  maxWidth: settings.overlayWidth && settings.overlayWidth > 0 ? `${settings.overlayWidth}px` : '100%',
+                  height: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '100%',
+                  maxHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${settings.overlayHeight}px` : '100%',
+                  minHeight: settings.overlayHeight && settings.overlayHeight > 0 ? `${Math.min(settings.overlayHeight, 320)}px` : '320px',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <div
+                  ref={chatScrollRef}
+                  className="w-full h-full flex flex-col justify-end overflow-y-auto no-scrollbar"
+                >
+                  {messages.length === 0 ? (
+                    <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500 space-y-1.5">
+                      <MessageSquare className="w-6 h-6 opacity-40 text-slate-400" />
+                      <p className="text-xs text-slate-400">No chat messages yet.</p>
+                      <p className="text-[11px] text-slate-500">
+                        Click <strong className="text-slate-300">Simulate</strong> or type a message below to test.
+                      </p>
+                    </div>
+                  ) : (
+                    messages.map((item) => renderMessageContent(item))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
 
-      {/* ============================================================== */}
-      {/* MOBILE BACKDROP OVERLAY                                        */}
-      {/* ============================================================== */}
-      {isRightbarOpen && (
+          {/* Quick Tag Pills */}
+          <div className="px-4 py-2 bg-[#090D16] border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
+            <span className="text-[10px] text-slate-500 font-mono uppercase flex-shrink-0">Quick Chat:</span>
+            {QUICK_TAGS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => handleSendTestMessage(tag)}
+                className="px-2.5 py-1 rounded-md bg-slate-950 hover:bg-slate-800 text-[11px] text-slate-300 hover:text-white border border-slate-800 whitespace-nowrap transition-colors flex-shrink-0"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
+          {/* Bottom Interactive Message Composer */}
+          <div className="p-3 bg-[#090D16] border-t border-slate-800/80 flex-shrink-0">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (customInput.trim()) {
+                  handleSendTestMessage(customInput.trim());
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                placeholder="Type a test chat message..."
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-600"
+              />
+              <button
+                type="submit"
+                disabled={sendingTest || !customInput.trim()}
+                className="bg-slate-100 hover:bg-white disabled:opacity-40 text-slate-950 font-semibold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition-colors"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Send</span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* MOBILE BACKDROP OVERLAY                                        */}
+        {/* ============================================================== */}
         <div
-          className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-md lg:hidden transition-opacity duration-200"
+          className={`fixed inset-0 z-[90] bg-black/60 lg:hidden transition-opacity duration-300 ease-in-out ${
+            isRightbarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
           onClick={closeRightbar}
         />
-      )}
 
-      {/* ============================================================== */}
-      {/* RIGHT COLUMN: LIVE RIGHTBAR SETTINGS (FITS ON WEBPAGE)         */}
-      {/* (DESKTOP: RIGHT COLUMN | MOBILE: RESPONSIVE MODAL WEB APP)     */}
-      {/* ============================================================== */}
-      <aside
-        ref={settingsSectionRef}
-        id="chat-settings-section"
-        className={`
-          ${isRightbarOpen
-            ? 'fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto z-[100] w-full sm:w-[420px] bg-[#090D18] sm:border-l border-slate-800 shadow-2xl flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden animate-in slide-in-from-right duration-200 lg:relative lg:inset-auto lg:z-auto lg:w-[340px] xl:w-[370px] lg:flex lg:flex-col lg:rounded-2xl lg:border lg:border-slate-800/90'
-            : 'hidden'
-          }
-          lg:shadow-2xl lg:h-full lg:overflow-hidden lg:min-h-0 flex-shrink-0
-        `}
-      >
-          {/* Rightbar Header Deck */}
-          <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#060911]/90 flex items-center justify-between gap-3 flex-shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner flex-shrink-0">
-                <PanelRight className="w-4 h-4" />
+        {/* ============================================================== */}
+        {/* RIGHT COLUMN: SIMPLE CONFIG RIGHTBAR (NO SAVE/RESET BUTTONS)   */}
+        {/* ============================================================== */}
+        <div
+          className={`fixed inset-y-0 right-0 z-[100] w-full sm:w-[380px] lg:relative lg:inset-auto lg:z-auto shrink-0 h-[100dvh] max-h-[100dvh] lg:h-full lg:max-h-none lg:min-h-0 overflow-hidden transition-all duration-300 ease-in-out ${
+            isRightbarOpen
+              ? 'translate-x-0 lg:w-[350px] xl:w-[380px] lg:opacity-100 pointer-events-auto'
+              : 'translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:-ml-4 pointer-events-none'
+          }`}
+        >
+          <aside
+            ref={settingsSectionRef}
+            id="chat-settings-section"
+            className="w-full sm:w-[380px] lg:w-[350px] xl:w-[380px] bg-[#0B0F19] sm:border-l border-slate-800 flex flex-col h-full overflow-hidden lg:rounded-xl lg:border lg:border-slate-800/80"
+          >
+            {/* Rightbar Header (Clean, without duplicate Save button) */}
+            <div className="px-4 py-3 border-b border-slate-800/80 bg-[#090D16] flex items-center justify-between gap-3 flex-shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Chat Configuration
+                </h3>
+                <p className="text-[11px] text-slate-400">Customize layout, dimensions &amp; typography</p>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-white font-['Chakra_Petch'] uppercase tracking-wider">
-                    Chat Settings
-                  </h3>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                    LIVE
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {hasUnsavedChanges && (
+                  <span className="text-[10px] font-mono text-amber-300 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
+                    Modified
                   </span>
-                </div>
-                <p className="text-[10px] text-slate-400">Live customization &amp; overlay sync</p>
+                )}
+                <button
+                  type="button"
+                  onClick={closeRightbar}
+                  className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  title="Close Settings"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
-
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {hasUnsavedChanges && (
-                <span className="hidden sm:inline text-[10px] font-mono text-amber-400 font-semibold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 animate-pulse">
-                  Unsaved
-                </span>
-              )}
-              {saveSuccess && (
-                <span className="text-[10px] font-mono text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1 animate-in fade-in">
-                  <Check size={11} className="text-emerald-400" />
-                  <span>Saved</span>
-                </span>
-              )}
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={handleSaveSettings}
-                loading={saving}
-                disabled={!hasUnsavedChanges && !saveSuccess}
-                className={`font-bold font-mono text-xs px-3 shadow-md transition-all ${
-                  hasUnsavedChanges
-                    ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_12px_rgba(0,240,255,0.35)]'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700/80 cursor-default opacity-80'
-                }`}
-              >
-                <Save size={12} className={hasUnsavedChanges ? 'text-slate-950' : 'text-slate-400'} />
-                <span>Save</span>
-              </Button>
-              {/* Mobile Close Button */}
-              <button
-                type="button"
-                onClick={closeRightbar}
-                className="lg:hidden w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                title="Close Settings"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
 
           {/* Error Alert Banner if Save failed */}
           {saveError && (
-            <div className="px-4 py-2.5 bg-red-950/80 border-b border-red-500/40 text-red-200 text-xs flex items-center gap-2 animate-in fade-in">
+            <div className="px-4 py-2.5 bg-red-950/80 border-b border-red-500/40 text-red-200 text-xs flex items-center gap-2">
               <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
               <span className="flex-1 text-[11px] font-medium leading-tight">{saveError}</span>
               <button
@@ -1552,610 +1589,400 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
             </div>
           )}
 
-        {/* Scrollable Settings Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 no-scrollbar">
-          {/* SECTION 0: CHAT OVERLAY TEMPLATE / THEME */}
-          <div className="space-y-3 pb-4 border-b border-slate-800/80">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white font-bold text-xs">
-                <Palette className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Chat Overlay Template</span>
-              </div>
-              <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase tracking-wider">
-                {CHAT_THEMES.find((t) => t.id === (settings.theme || 'default'))?.badge || 'CLASSIC'}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {CHAT_THEMES.map((themePreset) => {
-                const isSelected = (settings.theme || 'default') === themePreset.id;
-                return (
-                  <button
-                    key={themePreset.id}
-                    type="button"
-                    onClick={() => handleSelectTheme(themePreset.id)}
-                    className={`p-2.5 rounded-xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
-                      isSelected
-                        ? 'border-cyan-400 bg-cyan-950/30 shadow-[0_0_14px_rgba(0,240,255,0.25)] ring-1 ring-cyan-400/50'
-                        : 'border-slate-800 bg-slate-950/70 hover:border-slate-700 hover:bg-slate-900/60'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                      <span className="text-lg leading-none select-none">{themePreset.icon}</span>
-                      <span
-                        className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black uppercase tracking-wider"
-                        style={{
-                          color: themePreset.badgeColor,
-                          backgroundColor: themePreset.badgeBg,
-                          border: `1px solid ${themePreset.badgeBorder}`
-                        }}
-                      >
-                        {themePreset.badge}
-                      </span>
-                    </div>
-
-                    <div className="text-xs font-bold text-white truncate group-hover:text-cyan-300 transition-colors">
-                      {themePreset.name}
-                    </div>
-                    <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                      {themePreset.subtitle}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              {CHAT_THEMES.find((t) => t.id === (settings.theme || 'default'))?.description ||
-                'Select an overlay template to instantly style your live chat.'}
-            </p>
-          </div>
-
-          {/* SECTION 1: TYPOGRAPHY (2 DIFFERENT FONTS: USERNAME & MESSAGE) */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-white font-bold text-xs">
-              <Type className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Typography (2 Fonts)</span>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] text-slate-300 font-medium">Username Font</label>
-                  <span className="text-[9px] text-cyan-400 font-mono">
-                    {settings.authorFontFamily || 'Chakra Petch'}
-                  </span>
-                </div>
-                <select
-                  value={settings.authorFontFamily || settings.fontFamily || 'Chakra Petch'}
-                  onChange={(e) => setSettings({ ...settings, authorFontFamily: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-                >
-                  {CHAT_FONTS.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
+          {/* Scrollable Settings Content Body */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-5">
+            {/* SECTION 0: CHAT OVERLAY TEMPLATE / THEME */}
+            <div className="space-y-2.5 pb-4 border-b border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-200">Overlay Theme</span>
+                <span className="text-[10px] font-mono text-slate-400 uppercase">
+                  {CHAT_THEMES.find((t) => t.id === (settings.theme || 'default'))?.name || 'Classic'}
+                </span>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] text-slate-300 font-medium">Message Font</label>
-                  <span className="text-[9px] text-cyan-400 font-mono">
-                    {settings.messageFontFamily || 'Inter'}
-                  </span>
-                </div>
-                <select
-                  value={settings.messageFontFamily || 'Inter'}
-                  onChange={(e) => setSettings({ ...settings, messageFontFamily: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-                >
-                  {CHAT_FONTS.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1 font-medium">Font Size</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {(['sm', 'base', 'lg', 'xl'] as const).map((sz) => (
+              <div className="grid grid-cols-2 gap-1.5">
+                {CHAT_THEMES.map((themePreset) => {
+                  const isSelected = (settings.theme || 'default') === themePreset.id;
+                  return (
                     <button
-                      key={sz}
-                      onClick={() => setSettings({ ...settings, fontSize: sz })}
-                      className={`py-1.5 text-xs font-semibold rounded-lg border uppercase transition-all ${
-                        settings.fontSize === sz
-                          ? 'border-cyan-400 bg-cyan-500/20 text-cyan-300'
+                      key={themePreset.id}
+                      type="button"
+                      onClick={() => handleSelectTheme(themePreset.id)}
+                      className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'border-slate-400 bg-slate-800 text-white'
+                          : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                        <span className="text-xs font-semibold text-white truncate">
+                          {themePreset.name}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono text-slate-400 bg-slate-900 border border-slate-800">
+                          {themePreset.badge}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 truncate">
+                        {themePreset.subtitle}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* SECTION 1: OVERLAY DIMENSIONS (TEXT VALUE INPUTS FOR W & H) */}
+            <div className="space-y-3 pb-4 border-b border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-200">Overlay Dimensions (W × H)</span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {settings.overlayWidth ? `${settings.overlayWidth}px` : 'Auto'} × {settings.overlayHeight ? `${settings.overlayHeight}px` : 'Auto'}
+                </span>
+              </div>
+
+              {/* Direct Value Text Inputs for Width (W) and Height (H) */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] text-slate-400 font-medium mb-1">
+                    Width (W)
+                  </label>
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={widthInput}
+                      placeholder="420 (0 = Auto)"
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        setWidthInput(raw);
+                        if (raw !== '') {
+                          const parsed = Math.min(3840, Math.max(0, parseInt(raw, 10) || 0));
+                          setSettings((prev) => ({ ...prev, overlayWidth: parsed }));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (widthInput.trim() === '') {
+                          setWidthInput('0');
+                          setSettings((prev) => ({ ...prev, overlayWidth: 0 }));
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-8 py-2 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+                    />
+                    <span className="absolute right-2.5 text-[10px] font-mono text-slate-500 pointer-events-none">
+                      px
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-slate-400 font-medium mb-1">
+                    Height (H)
+                  </label>
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={heightInput}
+                      placeholder="600 (0 = Auto)"
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        setHeightInput(raw);
+                        if (raw !== '') {
+                          const parsed = Math.min(3840, Math.max(0, parseInt(raw, 10) || 0));
+                          setSettings((prev) => ({ ...prev, overlayHeight: parsed }));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (heightInput.trim() === '') {
+                          setHeightInput('0');
+                          setSettings((prev) => ({ ...prev, overlayHeight: 0 }));
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-8 py-2 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+                    />
+                    <span className="absolute right-2.5 text-[10px] font-mono text-slate-500 pointer-events-none">
+                      px
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dimension Presets */}
+              <div className="grid grid-cols-5 gap-1">
+                {[
+                  { label: 'Auto (0)', w: 0, h: 0 },
+                  { label: '360×480', w: 360, h: 480 },
+                  { label: '420×600', w: 420, h: 600 },
+                  { label: '600×600', w: 600, h: 600 },
+                  { label: '640×800', w: 640, h: 800 }
+                ].map((p) => {
+                  const active = settings.overlayWidth === p.w && settings.overlayHeight === p.h;
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, overlayWidth: p.w, overlayHeight: p.h })}
+                      className={`py-1.5 px-1 rounded-md border text-[10px] font-mono transition-colors truncate text-center ${
+                        active
+                          ? 'border-slate-500 bg-slate-800 text-white font-semibold'
                           : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
                       }`}
                     >
-                      {sz}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* CHAT LINE STYLE (INLINE, INDENTED, STACKED) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] text-slate-400 font-medium">Chat Line Style</label>
-                  <span className="text-[9px] text-cyan-400 font-mono capitalize">
-                    {settings.lineStyle || 'inline'}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: 'inline', label: 'Inline Flow', desc: 'Continuous line, fills full width (wraps across line)' },
-                    { id: 'indented', label: 'Indented', desc: 'Author on left, wrapped under message' },
-                    { id: 'stacked', label: 'Stacked (2-Row)', desc: 'Author on top, message full width below' }
-                  ].map((styleOption) => (
-                    <button
-                      key={styleOption.id}
-                      type="button"
-                      onClick={() => setSettings({ ...settings, lineStyle: styleOption.id as any })}
-                      className={`py-2 px-1 text-center rounded-lg border transition-all cursor-pointer ${
-                        (settings.lineStyle || 'inline') === styleOption.id
-                          ? 'border-cyan-400 bg-cyan-500/20 text-cyan-300 shadow-[0_0_8px_rgba(0,240,255,0.3)] font-bold'
-                          : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white hover:border-slate-700'
-                      }`}
-                      title={styleOption.desc}
-                    >
-                      <div className="text-[11px] leading-tight">{styleOption.label}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION: TEXT BORDER & SHADOW (STROKE & GLOW) */}
-          <div className="space-y-3.5 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white font-bold text-xs">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Text Border & Shadow</span>
-              </div>
-              <span className="text-[10px] text-cyan-400 font-mono">
-                {settings.textBorderWidth ? `${settings.textBorderWidth}px stroke` : 'No border'} • {settings.textShadowStyle || 'strong'}
-              </span>
-            </div>
-
-            {/* 1. Text Border (Outline / Stroke) */}
-            <div className="space-y-2 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-slate-300">Text Outline Border</label>
-                <span className="text-[10px] text-cyan-400 font-mono font-bold">
-                  {settings.textBorderWidth === 0 ? 'Off (0px)' : `${settings.textBorderWidth}px`}
-                </span>
-              </div>
-
-              {/* Stroke Width Buttons: 0px, 1px, 2px, 3px, 4px */}
-              <div className="grid grid-cols-5 gap-1.5">
-                {[0, 1, 2, 3, 4].map((w) => {
-                  const isSelected = (settings.textBorderWidth ?? 0) === w;
-                  return (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => setSettings({ ...settings, textBorderWidth: w })}
-                      className={`py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer text-center ${
-                        isSelected
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(0,240,255,0.3)]'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      {w === 0 ? 'None' : `${w}px`}
+                      {p.label}
                     </button>
                   );
                 })}
               </div>
+            </div>
 
-              {/* Stroke Color Picker & Presets */}
-              {(settings.textBorderWidth ?? 0) > 0 && (
-                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1">
-                    <input
-                      type="color"
-                      value={settings.textBorderColor?.startsWith('#') && settings.textBorderColor.length === 7 ? settings.textBorderColor : '#000000'}
-                      onChange={(e) => setSettings({ ...settings, textBorderColor: e.target.value })}
-                      className="w-6 h-6 rounded border-0 cursor-pointer p-0 bg-transparent"
-                      title="Choose outline color"
-                    />
-                    <input
-                      type="text"
-                      value={settings.textBorderColor || '#000000'}
-                      onChange={(e) => setSettings({ ...settings, textBorderColor: e.target.value })}
-                      className="w-20 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[11px] font-mono text-white uppercase focus:outline-none focus:border-cyan-400"
-                      maxLength={7}
-                    />
+            {/* SECTION 2: TYPOGRAPHY (USERNAME & MESSAGE FONTS) */}
+            <div className="space-y-3 pb-4 border-b border-slate-800/80">
+              <span className="text-xs font-semibold text-slate-200 block">Typography</span>
+
+              <div className="space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] text-slate-400">Username Font</label>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {settings.authorFontFamily || 'Chakra Petch'}
+                    </span>
                   </div>
+                  <select
+                    value={settings.authorFontFamily || settings.fontFamily || 'Chakra Petch'}
+                    onChange={(e) => setSettings({ ...settings, authorFontFamily: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-600"
+                  >
+                    {CHAT_FONTS.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  {/* Quick Color Swatches */}
-                  <div className="flex items-center gap-1">
-                    {[
-                      { color: '#000000', name: 'Black' },
-                      { color: '#0B101E', name: 'Dark Navy' },
-                      { color: '#FFFFFF', name: 'White' },
-                      { color: '#00F0FF', name: 'Cyan' },
-                      { color: '#F59E0B', name: 'Amber' }
-                    ].map((swatch) => (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] text-slate-400">Message Font</label>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {settings.messageFontFamily || 'Inter'}
+                    </span>
+                  </div>
+                  <select
+                    value={settings.messageFontFamily || 'Inter'}
+                    onChange={(e) => setSettings({ ...settings, messageFontFamily: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-600"
+                  >
+                    {CHAT_FONTS.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Font Size</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(['sm', 'base', 'lg', 'xl'] as const).map((sz) => (
                       <button
-                        key={swatch.color}
+                        key={sz}
                         type="button"
-                        onClick={() => setSettings({ ...settings, textBorderColor: swatch.color })}
-                        className={`w-5 h-5 rounded-md border transition-all cursor-pointer ${
-                          settings.textBorderColor?.toLowerCase() === swatch.color.toLowerCase()
-                            ? 'ring-2 ring-cyan-400 scale-110'
-                            : 'border-slate-800 hover:scale-105'
+                        onClick={() => setSettings({ ...settings, fontSize: sz })}
+                        className={`py-1.5 text-xs font-medium rounded-lg border uppercase transition-colors ${
+                          settings.fontSize === sz
+                            ? 'border-slate-500 bg-slate-800 text-white font-semibold'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
                         }`}
-                        style={{ backgroundColor: swatch.color }}
-                        title={swatch.name}
-                      />
+                      >
+                        {sz}
+                      </button>
                     ))}
                   </div>
                 </div>
-              )}
+
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Line Layout</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'inline', label: 'Inline' },
+                      { id: 'indented', label: 'Indented' },
+                      { id: 'stacked', label: 'Stacked' }
+                    ].map((styleOption) => (
+                      <button
+                        key={styleOption.id}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, lineStyle: styleOption.id as any })}
+                        className={`py-1.5 px-2 text-center rounded-lg border text-xs transition-colors cursor-pointer ${
+                          (settings.lineStyle || 'inline') === styleOption.id
+                            ? 'border-slate-500 bg-slate-800 text-white font-semibold'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {styleOption.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* 2. Text Shadow */}
-            <div className="space-y-2 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+            {/* SECTION 3: COLORS */}
+            <div className="space-y-3 pb-4 border-b border-slate-800/80">
+              <span className="text-xs font-semibold text-slate-200 block">Colors</span>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">Author Color</label>
+                  <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg p-1.5">
+                    <input
+                      type="color"
+                      value={settings.authorColor?.startsWith('#') && settings.authorColor.length === 7 ? settings.authorColor : '#00F0FF'}
+                      onChange={(e) => setSettings({ ...settings, authorColor: e.target.value })}
+                      className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={settings.authorColor || '#00F0FF'}
+                      onChange={(e) => setSettings({ ...settings, authorColor: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[11px] font-mono text-white uppercase focus:outline-none focus:border-slate-600"
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">Message Color</label>
+                  <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg p-1.5">
+                    <input
+                      type="color"
+                      value={settings.messageColor?.startsWith('#') && settings.messageColor.length === 7 && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF'}
+                      onChange={(e) => setSettings({ ...settings, messageColor: e.target.value })}
+                      className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={settings.messageColor || '#FFFFFF'}
+                      onChange={(e) => setSettings({ ...settings, messageColor: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[11px] font-mono text-white uppercase focus:outline-none focus:border-slate-600"
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 4: TEXT BORDER & SHADOW */}
+            <div className="space-y-3 pb-4 border-b border-slate-800/80">
+              <span className="text-xs font-semibold text-slate-200 block">Text Stroke &amp; Shadow</span>
+
+              <div className="space-y-2 p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] text-slate-400">Outline Width</label>
+                  <span className="text-[10px] text-slate-300 font-mono">
+                    {settings.textBorderWidth === 0 ? 'None' : `${settings.textBorderWidth}px`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-1">
+                  {[0, 1, 2, 3, 4].map((w) => {
+                    const isSelected = (settings.textBorderWidth ?? 0) === w;
+                    return (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, textBorderWidth: w })}
+                        className={`py-1 rounded border text-xs font-mono transition-colors ${
+                          isSelected
+                            ? 'bg-slate-800 border-slate-500 text-white font-semibold'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {w === 0 ? '0' : `${w}px`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2 p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] text-slate-400">Text Shadow</label>
+                  <span className="text-[10px] text-slate-300 font-mono capitalize">
+                    {settings.textShadowStyle || 'none'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { id: 'none', label: 'None' },
+                    { id: 'soft', label: 'Soft' },
+                    { id: 'strong', label: 'Strong' },
+                    { id: 'glow', label: 'Glow' }
+                  ].map((s) => {
+                    const isSelected = (settings.textShadowStyle || 'none') === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, textShadowStyle: s.id as any })}
+                        className={`py-1 rounded border text-xs transition-colors ${
+                          isSelected
+                            ? 'bg-slate-800 border-slate-500 text-white font-semibold'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 5: ANIMATION STYLE */}
+            <div className="space-y-2.5 pb-4 border-b border-slate-800/80">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-slate-300">Text Shadow & Glow</label>
-                <span className="text-[10px] text-cyan-400 font-mono font-bold capitalize">
-                  {settings.textShadowStyle || 'strong'}
+                <span className="text-xs font-semibold text-slate-200">Entry Animation</span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {settings.animationStyle || 'slide-left'}
                 </span>
               </div>
 
-              {/* Shadow Style Options: None, Soft, Strong, Glow */}
-              <div className="grid grid-cols-4 gap-1.5">
-                {[
-                  { id: 'none', label: 'None' },
-                  { id: 'soft', label: 'Soft' },
-                  { id: 'strong', label: 'Strong' },
-                  { id: 'glow', label: 'Neon' }
-                ].map((s) => {
-                  const isSelected = (settings.textShadowStyle || 'strong') === s.id;
+              <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
+                {ANIMATION_STYLES.map((anim) => {
+                  const isSelected = (settings.animationStyle || 'slide-left') === anim.id;
                   return (
                     <button
-                      key={s.id}
+                      key={anim.id}
                       type="button"
-                      onClick={() => setSettings({ ...settings, textShadowStyle: s.id as any })}
-                      className={`py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer text-center ${
+                      onClick={() => setSettings({ ...settings, animationStyle: anim.id })}
+                      className={`p-2 rounded-lg border text-left transition-colors cursor-pointer ${
                         isSelected
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(0,240,255,0.3)]'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                          ? 'border-slate-500 bg-slate-800 text-white'
+                          : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:text-white'
                       }`}
                     >
-                      {s.label}
+                      <div className="text-[11px] font-semibold truncate">{anim.name}</div>
+                      <div className="text-[10px] text-slate-400 truncate">{anim.desc}</div>
                     </button>
                   );
                 })}
               </div>
-
-              {/* Shadow Blur & Color if not 'none' */}
-              {(settings.textShadowStyle || 'strong') !== 'none' && (
-                <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[10px] text-slate-400 font-medium">Shadow Blur</span>
-                    <span className="text-cyan-400 font-mono font-bold text-[10px]">{settings.textShadowBlur ?? 4}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="16"
-                    step="1"
-                    value={settings.textShadowBlur ?? 4}
-                    onChange={(e) => setSettings({ ...settings, textShadowBlur: Number(e.target.value) })}
-                    className="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* SECTION 2: OVERLAY DIMENSIONS (WIDTH & HEIGHT) */}
-          <div className="space-y-3 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white font-bold text-xs">
-                <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Overlay Dimensions</span>
-              </div>
-              <span className="text-[10px] text-cyan-400 font-mono font-bold">
-                {settings.overlayWidth ? `${settings.overlayWidth}px` : 'Auto'} × {settings.overlayHeight ? `${settings.overlayHeight}px` : 'Auto'}
-              </span>
             </div>
 
-            {/* Presets */}
-            <div className="grid grid-cols-5 gap-1">
-              {[
-                { label: 'Auto (0)', w: 0, h: 0 },
-                { label: 'Compact', w: 360, h: 480 },
-                { label: 'Square 600', w: 600, h: 600 },
-                { label: 'Standard', w: 420, h: 600 },
-                { label: 'HD Box', w: 640, h: 800 }
-              ].map((p) => {
-                const active = settings.overlayWidth === p.w && settings.overlayHeight === p.h;
-                return (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => setSettings({ ...settings, overlayWidth: p.w, overlayHeight: p.h })}
-                    className={`py-1.5 px-0.5 rounded-lg border text-[10px] font-mono font-semibold transition-all truncate text-center ${
-                      active
-                        ? 'border-cyan-400 bg-cyan-500/20 text-cyan-300 shadow-[0_0_8px_rgba(0,240,255,0.2)]'
-                        : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white hover:border-slate-700'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Width & Height Number Inputs & Sliders from 0 */}
-            <div className="space-y-2.5">
-              <div>
-                <div className="flex justify-between items-center text-xs mb-1">
-                  <span className="text-[11px] text-slate-400 font-medium">Width (W) — 0 for Auto</span>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="1920"
-                      step="1"
-                      value={settings.overlayWidth ?? 420}
-                      onChange={(e) => setSettings({ ...settings, overlayWidth: Math.max(0, Number(e.target.value) || 0) })}
-                      className="w-16 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-right font-mono text-cyan-400 text-xs focus:outline-none focus:border-cyan-400"
-                    />
-                    <span className="text-[10px] text-slate-500 font-mono">px</span>
-                  </div>
-                </div>
+            {/* SECTION 6: NOTIFICATION SOUND */}
+            <div className="space-y-2.5 pb-4 border-b border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-200">Notification Sound</span>
                 <input
-                  type="range"
-                  min="0"
-                  max="1920"
-                  step="5"
-                  value={settings.overlayWidth ?? 420}
-                  onChange={(e) => setSettings({ ...settings, overlayWidth: Number(e.target.value) })}
-                  className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  type="checkbox"
+                  checked={settings.soundEnabled}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, soundEnabled: e.target.checked }))}
+                  className="rounded border-slate-700 bg-slate-950 text-slate-200 focus:ring-0"
                 />
               </div>
 
-              <div>
-                <div className="flex justify-between items-center text-xs mb-1">
-                  <span className="text-[11px] text-slate-400 font-medium">Height (H) — 0 for Auto</span>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="1440"
-                      step="1"
-                      value={settings.overlayHeight ?? 600}
-                      onChange={(e) => setSettings({ ...settings, overlayHeight: Math.max(0, Number(e.target.value) || 0) })}
-                      className="w-16 bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-right font-mono text-cyan-400 text-xs focus:outline-none focus:border-cyan-400"
-                    />
-                    <span className="text-[10px] text-slate-500 font-mono">px</span>
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1440"
-                  step="5"
-                  value={settings.overlayHeight ?? 600}
-                  onChange={(e) => setSettings({ ...settings, overlayHeight: Number(e.target.value) })}
-                  className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                />
-              </div>
-            </div>
-
-            {/* OBS Recommendation Hint */}
-            <div className="p-2.5 rounded-xl bg-cyan-950/20 border border-cyan-500/20 flex items-start gap-2">
-              <span className="text-[10px] text-cyan-300/90 leading-tight">
-                💡 Set Width or Height to <strong className="text-white font-mono">0</strong> for Auto / Full width. In OBS Studio Browser Source properties, set Width: <strong className="text-white font-mono">{settings.overlayWidth || 1920}</strong> and Height: <strong className="text-white font-mono">{settings.overlayHeight || 1080}</strong>.
-              </span>
-            </div>
-          </div>
-
-          {/* SECTION 3: ANIMATION STYLES (20 UNIQUE ANIMATIONS) */}
-          <div className="space-y-3 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white font-bold text-xs">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Animation Style</span>
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                  {ANIMATION_STYLES.length}
-                </span>
-              </div>
-              <span className="text-[10px] text-cyan-400 font-mono capitalize">
-                {settings.animationStyle || 'slide-left'}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1 no-scrollbar">
-              {ANIMATION_STYLES.map((anim) => {
-                const isSelected = (settings.animationStyle || 'slide-left') === anim.id;
-                return (
-                  <button
-                    key={anim.id}
-                    type="button"
-                    onClick={() => setSettings({ ...settings, animationStyle: anim.id })}
-                    className={`p-2.5 rounded-xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
-                      isSelected
-                        ? 'border-cyan-400 bg-cyan-500/15 text-white shadow-[0_0_12px_rgba(0,240,255,0.25)]'
-                        : 'border-slate-800/90 bg-slate-950/80 text-slate-300 hover:border-slate-700 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-bold truncate">
-                        {anim.name}
-                      </span>
-                      {isSelected && (
-                        <Check className="w-3 h-3 text-cyan-400 flex-shrink-0" />
-                      )}
-                    </div>
-                    <div className="text-[9px] text-slate-400 truncate font-mono">
-                      {anim.desc}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* SECTION 4: COLORS */}
-          <div className="space-y-3 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center gap-2 text-white font-bold text-xs">
-              <Palette className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Colors</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] text-slate-400 truncate">Author Color</label>
-                  <span className="text-[9px] text-cyan-400 font-mono">{settings.authorColor || '#00F0FF'}</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl p-1.5">
-                  <input
-                    type="color"
-                    value={settings.authorColor?.startsWith('#') && settings.authorColor.length === 7 ? settings.authorColor : '#00F0FF'}
-                    onChange={(e) => setSettings({ ...settings, authorColor: e.target.value })}
-                    className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={settings.authorColor || '#00F0FF'}
-                    onChange={(e) => setSettings({ ...settings, authorColor: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] font-mono text-white uppercase focus:outline-none focus:border-cyan-400"
-                    maxLength={7}
-                  />
-                </div>
-                {/* Author Color Swatches */}
-                <div className="flex items-center gap-1 mt-1.5">
-                  {[
-                    { color: '#00F0FF', name: 'Cyber Cyan' },
-                    { color: '#F59E0B', name: 'Amber Gold' },
-                    { color: '#10B981', name: 'Emerald' },
-                    { color: '#A855F7', name: 'Purple' },
-                    { color: '#EC4899', name: 'Neon Pink' },
-                    { color: '#FFFFFF', name: 'Pure White' }
-                  ].map((swatch) => (
-                    <button
-                      key={swatch.color}
-                      type="button"
-                      onClick={() => setSettings({ ...settings, authorColor: swatch.color })}
-                      className={`w-4 h-4 rounded-md border transition-all cursor-pointer ${
-                        settings.authorColor?.toLowerCase() === swatch.color.toLowerCase()
-                          ? 'ring-2 ring-cyan-400 scale-110'
-                          : 'border-slate-800 hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: swatch.color }}
-                      title={swatch.name}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] text-slate-400 truncate">Message Color</label>
-                  <span className="text-[9px] text-cyan-400 font-mono">{settings.messageColor || '#FFFFFF'}</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl p-1.5">
-                  <input
-                    type="color"
-                    value={settings.messageColor?.startsWith('#') && settings.messageColor.length === 7 && settings.messageColor !== '#000000' ? settings.messageColor : '#FFFFFF'}
-                    onChange={(e) => setSettings({ ...settings, messageColor: e.target.value })}
-                    className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={settings.messageColor || '#FFFFFF'}
-                    onChange={(e) => setSettings({ ...settings, messageColor: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] font-mono text-white uppercase focus:outline-none focus:border-cyan-400"
-                    maxLength={7}
-                  />
-                </div>
-                {/* Message Color Swatches */}
-                <div className="flex items-center gap-1 mt-1.5">
-                  {[
-                    { color: '#FFFFFF', name: 'Pure White' },
-                    { color: '#F1F5F9', name: 'Slate White' },
-                    { color: '#E2E8F0', name: 'Soft Light Gray' },
-                    { color: '#E0F2FE', name: 'Sky Frost' },
-                    { color: '#FEF08A', name: 'Light Cream' },
-                    { color: '#DCFCE7', name: 'Soft Mint' }
-                  ].map((swatch) => (
-                    <button
-                      key={swatch.color}
-                      type="button"
-                      onClick={() => setSettings({ ...settings, messageColor: swatch.color })}
-                      className={`w-4 h-4 rounded-md border transition-all cursor-pointer ${
-                        settings.messageColor?.toLowerCase() === swatch.color.toLowerCase()
-                          ? 'ring-2 ring-cyan-400 scale-110'
-                          : 'border-slate-800 hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: swatch.color }}
-                      title={swatch.name}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 5: LIVE CHAT NOTIFICATION SOUND */}
-          <div className="space-y-3 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white font-bold text-xs">
-                <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Notification Sound</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                  settings.soundEnabled
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700'
-                }`}>
-                  {settings.soundEnabled ? 'ON' : 'MUTED'}
-                </span>
-                {/* Sound Toggle Switch */}
-                <button
-                  type="button"
-                  onClick={() => setSettings((prev) => ({ ...prev, soundEnabled: !prev.soundEnabled }))}
-                  className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors cursor-pointer ${
-                    settings.soundEnabled ? 'bg-cyan-500' : 'bg-slate-700'
-                  }`}
-                  title={settings.soundEnabled ? 'Mute chat sound' : 'Enable chat sound'}
-                >
-                  <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                      settings.soundEnabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            <p className="text-[10px] text-slate-400 leading-normal">
-              Plays an audio chime on your stream overlay and dashboard whenever someone sends a live chat message.
-            </p>
-
-            {settings.soundEnabled && (
-              <div className="space-y-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                {/* Sound Presets */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
-                    <span>Sound Preset</span>
-                    <span className="text-[10px] text-cyan-400 font-mono truncate max-w-[150px]">
-                      {CHAT_SOUND_PRESETS.find((p) => p.url === settings.soundUrl)?.name || 'Custom Audio'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-0.5 no-scrollbar">
+              {settings.soundEnabled && (
+                <div className="space-y-2.5 p-2.5 rounded-lg bg-slate-950 border border-slate-800">
+                  <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">
                     {CHAT_SOUND_PRESETS.map((preset) => {
                       const isSelected = settings.soundUrl === preset.url;
                       return (
@@ -2166,39 +1993,20 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                             setSettings((prev) => ({ ...prev, soundUrl: preset.url }));
                             playPreviewSound(preset.url, settings.soundVolume);
                           }}
-                          className={`p-2 rounded-lg border text-left transition-all cursor-pointer flex items-center gap-2 ${
+                          className={`p-2 rounded-md border text-left transition-colors ${
                             isSelected
-                              ? 'border-cyan-400 bg-cyan-500/15 text-white shadow-[0_0_8px_rgba(0,240,255,0.2)]'
-                              : 'border-slate-800 bg-slate-900/90 text-slate-300 hover:border-slate-700 hover:text-white'
+                              ? 'border-slate-500 bg-slate-800 text-white'
+                              : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
                           }`}
                         >
-                          <span className="text-base flex-shrink-0">{preset.icon}</span>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[11px] font-bold truncate flex items-center justify-between gap-1">
-                              <span className="truncate">{preset.name}</span>
-                              {preset.badge && (
-                                <span className={`text-[8px] font-mono px-1 py-0.2 rounded ${
-                                  isSelected
-                                    ? 'bg-cyan-400 text-slate-950 font-black'
-                                    : 'bg-slate-800 text-slate-400'
-                                }`}>
-                                  {preset.badge}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[9px] text-slate-400 truncate font-mono">
-                              {preset.desc}
-                            </div>
-                          </div>
+                          <div className="text-[11px] font-medium truncate">{preset.name}</div>
+                          <div className="text-[9px] text-slate-400 truncate">{preset.desc}</div>
                         </button>
                       );
                     })}
                   </div>
-                </div>
 
-                {/* Preview and Media Library Bar */}
-                <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -2208,52 +2016,26 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                           playPreviewSound(settings.soundUrl, settings.soundVolume);
                         }
                       }}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        isPlayingAudio
-                          ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.3)] animate-pulse'
-                          : 'bg-cyan-500/20 border-cyan-400/80 text-cyan-300 hover:bg-cyan-500/30'
-                      }`}
-                      title={isPlayingAudio ? 'Stop Preview' : 'Play Sound Preview'}
+                      className="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium flex items-center gap-1.5"
                     >
-                      {isPlayingAudio ? (
-                        <>
-                          <Square className="w-3.5 h-3.5 fill-amber-300" />
-                          <span>Stop</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-3.5 h-3.5 fill-cyan-300" />
-                          <span>Preview</span>
-                        </>
-                      )}
+                      {isPlayingAudio ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                      <span>{isPlayingAudio ? 'Stop' : 'Preview'}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setIsMediaPickerOpen(true)}
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="flex-1 px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-medium flex items-center justify-center gap-1.5"
                     >
-                      <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
+                      <FolderOpen className="w-3.5 h-3.5" />
                       <span>Media Library</span>
                     </button>
                   </div>
 
-                  {/* Volume Slider */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5">
-                        {settings.soundVolume === 0 ? (
-                          <VolumeX className="w-3.5 h-3.5 text-slate-500" />
-                        ) : settings.soundVolume < 0.5 ? (
-                          <Volume1 className="w-3.5 h-3.5 text-cyan-400" />
-                        ) : (
-                          <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
-                        )}
-                        <span>Sound Volume</span>
-                      </span>
-                      <span className="text-cyan-400 font-mono font-bold text-xs">
-                        {Math.round((settings.soundVolume ?? 0.85) * 100)}%
-                      </span>
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-[11px] text-slate-400">
+                      <span>Volume</span>
+                      <span className="font-mono text-slate-200">{Math.round((settings.soundVolume ?? 0.85) * 100)}%</span>
                     </div>
                     <input
                       type="range"
@@ -2262,39 +2044,22 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                       step="0.05"
                       value={settings.soundVolume ?? 0.85}
                       onChange={(e) => setSettings({ ...settings, soundVolume: parseFloat(e.target.value) })}
-                      className="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                    />
-                  </div>
-
-                  {/* Direct Audio URL */}
-                  <div>
-                    <label className="text-[10px] text-slate-400 block mb-1 font-mono">Audio URL or File Path</label>
-                    <input
-                      type="text"
-                      value={settings.soundUrl || ''}
-                      onChange={(e) => setSettings({ ...settings, soundUrl: e.target.value })}
-                      placeholder="/sounds/cash-register-kaching.mp3"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] font-mono text-slate-200 focus:outline-none focus:border-cyan-400 truncate"
+                      className="w-full accent-slate-300 cursor-pointer"
                     />
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* SECTION 6: TIMING & VISIBILITY TOGGLES */}
-          <div className="space-y-3 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center gap-2 text-white font-bold text-xs">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Timing &amp; Toggles</span>
+              )}
             </div>
 
+            {/* SECTION 7: TIMING & DISPLAY TOGGLES */}
             <div className="space-y-3">
+              <span className="text-xs font-semibold text-slate-200 block">Timing &amp; Display</span>
+
               <div>
-                <div className="flex justify-between items-center text-xs mb-1">
-                  <span className="text-[11px] text-slate-400 font-medium">Message Delay (Stream Sync)</span>
-                  <span className="text-cyan-400 font-mono font-bold text-xs">
-                    {(settings.messageDelay ?? 0) === 0 ? 'Instant (0s)' : `${settings.messageDelay}s delay`}
+                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                  <span>Message Delay</span>
+                  <span className="font-mono text-slate-200">
+                    {(settings.messageDelay ?? 0) === 0 ? 'Instant (0s)' : `${settings.messageDelay}s`}
                   </span>
                 </div>
                 <input
@@ -2304,38 +2069,15 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                   step="1"
                   value={settings.messageDelay ?? 0}
                   onChange={(e) => setSettings({ ...settings, messageDelay: Number(e.target.value) })}
-                  className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  className="w-full accent-slate-300 cursor-pointer"
                 />
-                <div className="flex justify-between text-[9px] text-slate-500 mt-1 font-mono">
-                  <span>0s (Instant)</span>
-                  <span>5s</span>
-                  <span>15s</span>
-                  <span>30s</span>
-                </div>
-                {/* Quick Presets for Delay */}
-                <div className="flex items-center gap-1.5 mt-2">
-                  {[0, 3, 5, 10, 15, 30].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setSettings({ ...settings, messageDelay: d })}
-                      className={`flex-1 py-1 rounded text-[10px] font-mono font-medium transition-all ${
-                        (settings.messageDelay ?? 0) === d
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                      }`}
-                    >
-                      {d === 0 ? 'Instant' : `${d}s`}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div>
-                <div className="flex justify-between items-center text-xs mb-1">
-                  <span className="text-[11px] text-slate-400 font-medium">Message Auto-Fade</span>
-                  <span className="text-cyan-400 font-mono font-bold text-xs">
-                    {settings.fadeDuration === 0 ? 'Never Fade' : `${settings.fadeDuration}s`}
+                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                  <span>Auto-Fade</span>
+                  <span className="font-mono text-slate-200">
+                    {settings.fadeDuration === 0 ? 'Never' : `${settings.fadeDuration}s`}
                   </span>
                 </div>
                 <input
@@ -2345,14 +2087,14 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                   step="5"
                   value={settings.fadeDuration}
                   onChange={(e) => setSettings({ ...settings, fadeDuration: Number(e.target.value) })}
-                  className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  className="w-full accent-slate-300 cursor-pointer"
                 />
               </div>
 
               <div>
-                <div className="flex justify-between items-center text-xs mb-1">
-                  <span className="text-[11px] text-slate-400 font-medium">Max Messages</span>
-                  <span className="text-cyan-400 font-mono font-bold text-xs">{settings.maxMessages} items</span>
+                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                  <span>Max Messages</span>
+                  <span className="font-mono text-slate-200">{settings.maxMessages}</span>
                 </div>
                 <input
                   type="range"
@@ -2360,77 +2102,39 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
                   max="20"
                   value={settings.maxMessages}
                   onChange={(e) => setSettings({ ...settings, maxMessages: Number(e.target.value) })}
-                  className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  className="w-full accent-slate-300 cursor-pointer"
                 />
               </div>
 
-              {/* Toggles */}
               <div className="grid grid-cols-2 gap-2 pt-1">
-                <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                <label className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.showBadges}
                     onChange={(e) => setSettings({ ...settings, showBadges: e.target.checked })}
-                    className="rounded border-slate-700 text-cyan-500 focus:ring-0 w-3.5 h-3.5"
+                    className="rounded border-slate-700 bg-slate-900 text-slate-200 focus:ring-0"
                   />
-                  <span className="text-xs text-slate-300 font-medium">Role Badges</span>
+                  <span className="text-xs text-slate-300">Role Badges</span>
                 </label>
 
-                <label className="flex items-center gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                <label className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.showTimestamp}
                     onChange={(e) => setSettings({ ...settings, showTimestamp: e.target.checked })}
-                    className="rounded border-slate-700 text-cyan-500 focus:ring-0 w-3.5 h-3.5"
+                    className="rounded border-slate-700 bg-slate-900 text-slate-200 focus:ring-0"
                   />
-                  <span className="text-xs text-slate-300 font-medium">Timestamps</span>
+                  <span className="text-xs text-slate-300">Timestamps</span>
                 </label>
               </div>
             </div>
           </div>
+          </aside>
         </div>
-
-        {/* Sticky Footer Action Bar (Desktop and Mobile) */}
-        <div className="p-3.5 bg-[#060911] border-t border-slate-800 flex items-center justify-between gap-2.5 flex-shrink-0">
-          <button
-            type="button"
-            onClick={handleResetChanges}
-            disabled={saving || !hasUnsavedChanges}
-            className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-400 hover:text-white hover:bg-slate-800/80 disabled:opacity-30 transition-colors cursor-pointer"
-          >
-            Reset
-          </button>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={closeRightbar}
-              className="lg:hidden px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 transition-colors cursor-pointer"
-            >
-              Close
-            </button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={handleSaveSettings}
-              loading={saving}
-              disabled={!hasUnsavedChanges && !saveSuccess}
-              className={`font-bold font-mono text-xs px-4 shadow-[0_0_15px_rgba(0,240,255,0.3)] ${
-                hasUnsavedChanges
-                  ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700/80 cursor-default opacity-80'
-              }`}
-            >
-              <Save size={13} className={hasUnsavedChanges ? 'text-slate-950' : 'text-slate-400'} />
-              <span>Save</span>
-            </Button>
-          </div>
-        </div>
-      </aside>
-    </div>
+      </div>
 
       {/* ============================================================== */}
-      {/* 4. BOTTOM FLOATING UNSAVED CHANGES TOAST BAR                   */}
+      {/* FLOATING UNSAVED CHANGES TOAST BAR                             */}
       {/* ============================================================== */}
       <div
         className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1.5rem)] max-w-xl transition-all duration-300 ease-in-out ${
@@ -2440,35 +2144,19 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
         } ${isEarthquake ? 'animate-toast-earthquake' : ''}`}
       >
         <div
-          className={`rounded-2xl px-4 py-3 backdrop-blur-xl transition-all duration-300 flex items-center justify-between gap-3 ${
+          className={`rounded-xl px-4 py-3 transition-all duration-300 flex items-center justify-between gap-3 ${
             isEarthquake
-              ? 'bg-gradient-to-r from-red-950/95 via-rose-950/95 to-red-950/95 border-2 border-red-500 shadow-[0_0_35px_rgba(239,68,68,0.7),0_14px_45px_rgba(0,0,0,0.95)] animate-toast-red-pulse'
-              : 'bg-[#0B101E]/95 border border-cyan-500/40 shadow-[0_14px_45px_rgba(0,0,0,0.85),0_0_25px_rgba(0,240,255,0.18)]'
+              ? 'bg-red-950 border border-red-500 shadow-2xl'
+              : 'bg-[#090D16] border border-slate-700 shadow-2xl'
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            {isEarthquake ? (
-              <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 flex-shrink-0 shadow-[0_0_12px_rgba(239,68,68,0.5)]">
-                <AlertTriangle size={16} className="animate-bounce" />
-              </div>
-            ) : (
-              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse flex-shrink-0 shadow-[0_0_8px_rgba(0,240,255,0.8)]" />
-            )}
             <div className="min-w-0">
-              <div className={`text-xs font-bold truncate flex items-center gap-1.5 ${isEarthquake ? 'text-red-200' : 'text-slate-100'}`}>
-                {isEarthquake ? (
-                  <>
-                    <span className="font-black text-red-400 uppercase tracking-wider">Unsaved Changes!</span>
-                    <span className="hidden sm:inline text-red-200 font-medium">— Navigation blocked</span>
-                  </>
-                ) : (
-                  <span>Careful — you have unsaved changes!</span>
-                )}
+              <div className={`text-xs font-semibold truncate ${isEarthquake ? 'text-red-200' : 'text-white'}`}>
+                {isEarthquake ? 'Unsaved changes — please save or reset first' : 'You have unsaved changes'}
               </div>
-              <p className={`text-[10px] truncate hidden xs:block ${isEarthquake ? 'text-red-300 font-semibold' : 'text-slate-400'}`}>
-                {isEarthquake
-                  ? 'Please Save or Reset changes before switching to another feature!'
-                  : 'Save your configuration to sync with OBS live chat'}
+              <p className={`text-[11px] truncate hidden xs:block ${isEarthquake ? 'text-red-300' : 'text-slate-400'}`}>
+                Save your configuration to update your OBS live chat overlay
               </p>
             </div>
           </div>
@@ -2478,44 +2166,21 @@ export const LiveChatWidgetManager: React.FC<LiveChatWidgetManagerProps> = ({
               type="button"
               disabled={saving}
               onClick={handleResetChanges}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
-                isEarthquake
-                  ? 'bg-red-950/80 border border-red-500/40 text-red-300 hover:bg-red-900/60 hover:text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-              }`}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors cursor-pointer"
             >
               Reset
             </button>
-            <Button
+            <button
               type="button"
-              variant="primary"
-              size="sm"
               onClick={handleSaveSettings}
-              loading={saving}
-              className={`font-bold font-mono text-xs px-4 transition-all shadow-md active:scale-95 ${
-                isEarthquake
-                  ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.6)] animate-pulse border-0'
-                  : 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.3)]'
-              }`}
+              disabled={saving}
+              className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-200 text-slate-950 transition-colors cursor-pointer disabled:opacity-50"
             >
-              <Save size={13} className={isEarthquake ? 'text-white' : 'text-slate-950'} />
-              <span>Save Changes</span>
-            </Button>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
           </div>
         </div>
       </div>
-
-      {/* ============================================================== */}
-      {/* 5. TOP RIGHT CHANGES SAVED SUCCESS TOAST                       */}
-      {/* ============================================================== */}
-      {saveSuccess && (
-        <div className="fixed top-6 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
-          <div className="rounded-xl px-4 py-2.5 bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold flex items-center gap-2 shadow-2xl shadow-emerald-950/50">
-            <Check className="w-4 h-4 text-emerald-400" />
-            <span>Changes saved successfully!</span>
-          </div>
-        </div>
-      )}
 
       {/* ============================================================== */}
       {/* 6. MEDIA PICKER MODAL (GLOBAL AUDIO & UPLOAD ASSETS)           */}

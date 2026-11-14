@@ -28,6 +28,7 @@ import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { SubscriberTier, SubscriberAlertSettings, SubscriberMember } from '../../types/subscriber';
 import { SubscriberAlertStudio } from './SubscriberAlertStudio';
+import { SubscribersSkeleton } from './DashboardSkeleton';
 import { MediaPickerModal } from './MediaPickerModal';
 import {
   BADGE_ICON_LIST,
@@ -544,6 +545,10 @@ export const SubscribersManager: React.FC<SubscribersManagerProps> = ({
     const matchesTier = memberTierFilter === 'all' || s.tierId === memberTierFilter;
     return matchesSearch && matchesTier;
   });
+
+  if (loading) {
+    return <SubscribersSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

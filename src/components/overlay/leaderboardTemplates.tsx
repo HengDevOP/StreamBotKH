@@ -38,6 +38,7 @@ import {
   EXTENDED_LEADERBOARD_TEMPLATES,
   renderExtendedLeaderboardTemplate
 } from './leaderboardExtendedTemplates';
+import { LEADERBOARD_GOOGLE_FONTS_CSS } from '../../data/leaderboardFonts';
 
 export interface LeaderboardTemplateMeta {
   id: string;
@@ -67,11 +68,39 @@ export interface LeaderboardTemplateRendererProps {
   showRankBadges?: boolean;
   maxRows?: number; // 1 to 10, default 3
   fontFamily?: string;
+  rankFonts?: Record<string, string>; // Per-donor rank font overrides, e.g. { '1': 'Orbitron', '2': 'Kantumruy Pro', '3': 'Teko' }
+  nameAmountGap?: number; // Pixel gap between donor name and amount (default 10)
   className?: string;
   overtakingDonorName?: string | null;
+  singleRank?: number | null; // When set (1, 2, 3...), renders ONLY that rank's donor name card
 }
 
 export const LEADERBOARD_TEMPLATES: LeaderboardTemplateMeta[] = [
+  // ==========================================
+  // FEATURED #1 CHAMPION SPOTLIGHT & PODIUM
+  // ==========================================
+  {
+    id: 'champion-spotlight',
+    name: 'Champion #1 Podium Spotlight',
+    category: 'Special',
+    previewColor: '#F59E0B',
+    description: 'Hero #1 Champion spotlight card with oversized 1st place donor name and compact 2nd & 3rd podium cards.'
+  },
+  {
+    id: 'cyber-mvp-showcase',
+    name: 'Cyber MVP #1 Hero Showcase',
+    category: 'Cyber',
+    previewColor: '#00F0FF',
+    description: 'Esports broadcast #1 MVP banner with giant neon 1st place name and tactical runner-up rows.'
+  },
+  {
+    id: 'royal-podium-crown',
+    name: 'Imperial #1 Throne Podium',
+    category: 'Special',
+    previewColor: '#EAB308',
+    description: '24K gold #1 Sovereign throne spotlight above a split 2nd & 3rd podium layout.'
+  },
+
   // ==========================================
   // 1-8: CYBER & SCI-FI (8 STYLES)
   // ==========================================
@@ -379,7 +408,7 @@ export const LEADERBOARD_TEMPLATES: LeaderboardTemplateMeta[] = [
 ];
 
 export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererProps> = ({
-  templateStyle = 'cyber-neon',
+  templateStyle = 'champion-spotlight',
   title = 'TOP SUPPORTERS',
   period = 'all',
   topDonors = [],
@@ -389,15 +418,19 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
   showRankBadges = true,
   maxRows = 3,
   fontFamily = 'Chakra Petch',
+  rankFonts = {},
+  nameAmountGap = 10,
   className = '',
-  overtakingDonorName = null
+  overtakingDonorName = null,
+  singleRank = null
 }) => {
+  const activeSingleRank = singleRank && Number(singleRank) >= 1 ? Math.min(10, Math.floor(Number(singleRank))) : null;
   // Ensure we display between 1 to 10 rows (default 3)
-  const displayLimit = Math.min(10, Math.max(1, maxRows || 3));
+  const displayLimit = Math.min(10, Math.max(1, maxRows || 3, activeSingleRank || 1));
   const effectiveDonors = topDonors.slice(0, displayLimit);
 
   // If no donors provided, generate placeholder slots matching displayLimit
-  const donorsToRender: LeaderboardDonor[] = effectiveDonors.length > 0
+  const fullDonorsList: LeaderboardDonor[] = effectiveDonors.length > 0
     ? effectiveDonors
     : Array.from({ length: displayLimit }, (_, i) => ({
         rank: i + 1,
@@ -407,13 +440,49 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
         bank: i % 2 === 0 ? 'ABA Bank' : 'Bakong KHQR'
       }));
 
+  const donorsToRender: LeaderboardDonor[] = activeSingleRank
+    ? [
+        {
+          ...(fullDonorsList.find((d) => d.rank === activeSingleRank) ||
+            fullDonorsList[activeSingleRank - 1] || {
+              rank: activeSingleRank,
+              name:
+                effectiveDonors.length > 0
+                  ? `Rank #${activeSingleRank} Open`
+                  : activeSingleRank === 1
+                  ? 'Sokha Gaming Pro'
+                  : activeSingleRank === 2
+                  ? 'Vannak KH'
+                  : activeSingleRank === 3
+                  ? 'Dara Cyber'
+                  : `Supporter #${activeSingleRank}`,
+              amount: effectiveDonors.length > 0 ? 0 : Math.max(5, Math.round((100 / activeSingleRank) * 10) / 10)
+            }),
+          count: undefined,
+          bank: undefined
+        }
+      ]
+    : fullDonorsList;
+
   const periodLabel = period === 'today' ? "Today's Top" : period === 'week' ? 'Weekly Top' : period === 'month' ? 'Monthly Top' : 'All-Time Top';
 
-  // Custom Font styling applied uniformly
-  const resolvedFontFamily = fontFamily ? `"${fontFamily}", sans-serif` : undefined;
+  // Resolve per-donor fonts (Rank 1, Rank 2, Rank 3) or fallback to global fontFamily
+  const defaultFontName = fontFamily || 'Chakra Petch';
+  const fontForRank1 = rankFonts?.['1'] || defaultFontName;
+  const fontForRank2 = rankFonts?.['2'] || defaultFontName;
+  const fontForRank3 = rankFonts?.['3'] || defaultFontName;
+  const activeSingleRankFontName =
+    (activeSingleRank && rankFonts?.[String(activeSingleRank)]) || defaultFontName;
+
+  const resolvedFontFamily = `"${activeSingleRank ? activeSingleRankFontName : defaultFontName}", sans-serif`;
+  const effectiveGap = typeof nameAmountGap === 'number' && !Number.isNaN(nameAmountGap) ? Math.max(2, Math.min(64, nameAmountGap)) : 10;
+  const fullBoardMaxWidth = Math.max(260, Math.min(380, 290 + (effectiveGap - 10) * 3));
 
   // Helper for rank icon/badge
   const renderRankBadge = (rank: number, styleColor: string, isOvertaker = false) => {
+    if (activeSingleRank) {
+      return null;
+    }
     if (isOvertaker) {
       return (
         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950 font-black text-[9px] animate-bounce shadow-md shadow-amber-400/50">
@@ -422,44 +491,116 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
       );
     }
     if (!showRankBadges) {
-      return <span className="font-mono font-bold text-xs opacity-75">#{rank}</span>;
+      return (
+        <span className={`font-mono font-bold ${rank === 1 ? 'text-sm' : 'text-[11px] opacity-75'}`}>
+          #{rank}
+        </span>
+      );
     }
     if (rank === 1) {
-      return <Crown size={15} className={showAnimation ? 'animate-pulse' : ''} style={{ color: styleColor }} />;
+      return <Crown size={18} className={showAnimation ? 'animate-pulse fill-current' : 'fill-current'} style={{ color: styleColor }} />;
     }
     if (rank === 2) {
-      return <Medal size={15} className="text-slate-300" />;
+      return <Medal size={13} className="text-slate-300" />;
     }
     if (rank === 3) {
-      return <Medal size={15} className="text-amber-600" />;
+      return <Medal size={13} className="text-amber-600" />;
     }
-    return <span className="font-mono font-bold text-xs opacity-70">#{rank}</span>;
+    return <span className="font-mono font-bold text-[11px] opacity-70">#{rank}</span>;
   };
 
-  // Check if requested template belongs to the 40 new extended styles
-  if (EXTENDED_LEADERBOARD_TEMPLATES.some((t) => t.id === templateStyle)) {
-    const extendedNode = renderExtendedLeaderboardTemplate({
-      templateStyle,
-      title,
-      periodLabel,
-      displayLimit,
-      donorsToRender,
-      accentColor,
-      showBackground,
-      showAnimation,
-      showRankBadges,
-      resolvedFontFamily,
-      className,
-      overtakingDonorName,
-      renderRankBadge
-    });
-    if (extendedNode) return extendedNode;
-  }
-
-  // Helper style block for animations
+  // Helper style block for fonts, animations & single-rank card extraction
   const animationStyles = (
     <style dangerouslySetInnerHTML={{
       __html: `
+        ${LEADERBOARD_GOOGLE_FONTS_CSS}
+        .lb-all-ranks-view > div {
+          max-width: ${fullBoardMaxWidth}px !important;
+        }
+        .lb-all-ranks-view [data-lb-donor-rank="1"] *,
+        .lb-all-ranks-view [data-lb-donor-list="true"] > div:nth-child(1):not(:has([data-lb-donor-rank])) * {
+          font-family: "${fontForRank1}", sans-serif !important;
+        }
+        .lb-all-ranks-view [data-lb-donor-rank="2"] *,
+        .lb-all-ranks-view [data-lb-donor-list="true"] > div:nth-child(2):not(:has([data-lb-donor-rank])) * {
+          font-family: "${fontForRank2}", sans-serif !important;
+        }
+        .lb-all-ranks-view [data-lb-donor-rank="3"] *,
+        .lb-all-ranks-view [data-lb-donor-list="true"] > div:nth-child(3):not(:has([data-lb-donor-rank])) * {
+          font-family: "${fontForRank3}", sans-serif !important;
+        }
+        .lb-single-rank-only,
+        .lb-single-rank-only > div,
+        .lb-single-rank-only > div > div:has([data-lb-donor-list="true"]) {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+          clip-path: none !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          width: fit-content !important;
+          max-width: 100% !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+        .lb-single-rank-only > div > *:not([data-lb-donor-list="true"]):not(:has([data-lb-donor-list="true"])):not(style),
+        .lb-single-rank-only > div > div:has([data-lb-donor-list="true"]) > *:not([data-lb-donor-list="true"]):not(style) {
+          display: none !important;
+        }
+        .lb-single-rank-only [data-lb-donor-list="true"] {
+          margin: 0 auto !important;
+          padding: 0 !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          display: block !important;
+          width: fit-content !important;
+          max-width: 100% !important;
+        }
+        .lb-single-rank-only [data-lb-donor-list="true"] > * {
+          margin-bottom: 0 !important;
+          width: fit-content !important;
+          max-width: 100% !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+        .lb-single-rank-only [data-lb-donor-list="true"],
+        .lb-single-rank-only [data-lb-donor-list="true"] * {
+          font-family: "${activeSingleRankFontName}", sans-serif !important;
+        }
+        /* Tight spacing between donor name and amount in dedicated rank mode */
+        .lb-single-rank-only [data-lb-donor-list="true"] .justify-between {
+          justify-content: flex-start !important;
+          align-items: center !important;
+          gap: ${effectiveGap}px !important;
+          width: fit-content !important;
+        }
+        .lb-single-rank-only [data-lb-donor-list="true"] .flex-1 {
+          flex: 0 1 auto !important;
+        }
+        .lb-single-rank-only.lb-single-rank-no-bg [data-lb-donor-list="true"],
+        .lb-single-rank-only.lb-single-rank-no-bg [data-lb-donor-list="true"] > div,
+        .lb-single-rank-only.lb-single-rank-no-bg [data-lb-donor-list="true"] > div > div {
+          background: transparent !important;
+          background-image: none !important;
+          background-color: transparent !important;
+          border: none !important;
+          border-color: transparent !important;
+          box-shadow: none !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          clip-path: none !important;
+          padding-top: 2px !important;
+          padding-bottom: 2px !important;
+          padding-left: 4px !important;
+          padding-right: 4px !important;
+        }
+        /* In dedicated single-rank mode, hide inline rank prefix badges/numbers so ONLY donor name & amount are shown */
+        .lb-single-rank-only [data-lb-donor-list="true"] .justify-between > div:first-child > *:first-child:not(:only-child),
+        .lb-single-rank-only [data-lb-donor-list="true"] .justify-between > *:first-child:nth-last-child(3) {
+          display: none !important;
+        }
         @keyframes lb-rgb-flow {
           0% { filter: hue-rotate(0deg); }
           50% { filter: hue-rotate(180deg); }
@@ -523,6 +664,426 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
     }} />
   );
 
+  const firstDonor = activeSingleRank && activeSingleRank > 1 ? null : donorsToRender[0];
+  const runnerUpDonors = activeSingleRank && activeSingleRank > 1 ? donorsToRender : donorsToRender.slice(1);
+
+  const renderContent = (): React.ReactNode => {
+    // Check if requested template belongs to the 40 extended styles
+    if (EXTENDED_LEADERBOARD_TEMPLATES.some((t) => t.id === templateStyle)) {
+      const extendedNode = renderExtendedLeaderboardTemplate({
+        templateStyle,
+        title,
+        periodLabel,
+        displayLimit,
+        donorsToRender,
+        accentColor,
+        showBackground,
+        showAnimation,
+        showRankBadges,
+        resolvedFontFamily,
+        className,
+        overtakingDonorName,
+        singleRank: activeSingleRank,
+        renderRankBadge
+      });
+      if (extendedNode) return extendedNode;
+    }
+
+  // ==============================================================
+  // 0A. CHAMPION #1 PODIUM SPOTLIGHT (FEATURED BEST DESIGN)
+  // ==============================================================
+  if (templateStyle === 'champion-spotlight') {
+    const col = accentColor || '#F59E0B';
+    return (
+      <div
+        className={`w-full max-w-sm p-4 sm:p-5 rounded-3xl relative overflow-hidden border-2 ${className}`}
+        style={{
+          fontFamily: resolvedFontFamily || "'Chakra Petch', sans-serif",
+          background: showBackground
+            ? 'radial-gradient(120% 100% at 50% 0%, rgba(245, 158, 11, 0.16) 0%, rgba(8, 12, 24, 0.96) 55%, rgba(4, 7, 15, 0.98) 100%)'
+            : 'transparent',
+          borderColor: `${col}99`,
+          boxShadow: showBackground ? `0 18px 40px -10px rgba(0,0,0,0.85), 0 0 28px ${col}33` : 'none'
+        }}
+      >
+        {animationStyles}
+        {/* Header */}
+        <div className="flex items-center justify-between pb-3 mb-3.5 border-b border-white/10">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center border flex-shrink-0"
+              style={{
+                backgroundColor: `${col}20`,
+                borderColor: `${col}60`,
+                color: col
+              }}
+            >
+              <Trophy size={16} className={showAnimation ? 'animate-pulse' : ''} />
+            </div>
+            <div className="truncate">
+              <h4 className="text-sm font-black tracking-wider uppercase text-white truncate leading-tight">
+                {title}
+              </h4>
+              <span className="text-[10px] font-mono tracking-widest uppercase block" style={{ color: col }}>
+                {periodLabel}
+              </span>
+            </div>
+          </div>
+          <span
+            className="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full border flex-shrink-0"
+            style={{
+              backgroundColor: `${col}18`,
+              borderColor: `${col}55`,
+              color: col
+            }}
+          >
+            TOP {displayLimit}
+          </span>
+        </div>
+
+        <div data-lb-donor-list="true">
+          {/* #1 GRAND CHAMPION HERO CARD (BIGGER NAME & SPOTLIGHT) */}
+          {firstDonor && (
+            <div
+              data-lb-donor-rank={firstDonor.rank || 1}
+              className={`p-3.5 sm:p-4 rounded-2xl border-2 mb-2.5 relative overflow-hidden transition-all ${
+                overtakingDonorName && firstDonor.name.toLowerCase() === overtakingDonorName.toLowerCase()
+                  ? 'lb-anim-overtake ring-2 ring-amber-400'
+                  : ''
+              }`}
+              style={{
+                background: `linear-gradient(135deg, ${col}28 0%, rgba(15, 23, 42, 0.92) 65%, ${col}18 100%)`,
+                borderColor: col,
+                boxShadow: `0 0 24px ${col}38, inset 0 1px 0 rgba(255,255,255,0.2)`
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {!activeSingleRank && (
+                    <div
+                      className="w-11 h-11 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border shadow-lg"
+                      style={{
+                        background: `linear-gradient(145deg, ${col}, #B45309)`,
+                        borderColor: 'rgba(255,255,255,0.45)',
+                        color: '#090D16'
+                      }}
+                    >
+                      <Crown size={18} className="fill-slate-950 stroke-[2.5]" />
+                      <span className="text-[9px] font-mono font-black leading-none mt-0.5">#1</span>
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    {!activeSingleRank && (
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span
+                          className="text-[9px] font-mono font-black uppercase tracking-widest px-1.5 py-0.5 rounded leading-none"
+                          style={{
+                            backgroundColor: `${col}30`,
+                            color: '#FEF3C7',
+                            border: `1px solid ${col}80`
+                          }}
+                        >
+                          ★ #1 TOP DONOR
+                        </span>
+                        {firstDonor.bank && (
+                          <span className="text-[9px] font-mono text-amber-200/80 truncate">
+                            • {firstDonor.bank}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <div className="text-base sm:text-lg font-black tracking-wide text-white truncate drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] leading-snug">
+                      {firstDonor.name}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right flex-shrink-0">
+                  <span
+                    className="text-base sm:text-lg font-black font-mono block leading-tight drop-shadow"
+                    style={{ color: col }}
+                  >
+                    ${Number(firstDonor.amount).toFixed(2)}
+                  </span>
+                  {firstDonor.count && (
+                    <span className="text-[10px] font-mono text-amber-200/75 block">
+                      {firstDonor.count} tips
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 2ND & 3RD PLACE (+ ADDITIONAL RANKS) COMPACT RUNNER-UP CARDS */}
+          {runnerUpDonors.length > 0 && (
+            <div className="space-y-1.5">
+              {runnerUpDonors.map((d, idx) => {
+                const isSecond = d.rank === 2;
+                const isThird = d.rank === 3;
+                const badgeColor = isSecond ? '#E2E8F0' : isThird ? '#D97706' : '#64748B';
+                return (
+                  <div
+                    key={idx}
+                    data-lb-donor-rank={d.rank}
+                    className="px-3 py-2 rounded-xl bg-slate-900/75 border border-slate-800/90 flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {!activeSingleRank && (
+                        <div
+                          className="w-6 h-6 rounded-lg flex items-center justify-center font-mono text-[10px] font-black flex-shrink-0 border"
+                          style={{
+                            backgroundColor: `${badgeColor}18`,
+                            borderColor: `${badgeColor}55`,
+                            color: badgeColor
+                          }}
+                        >
+                          #{d.rank}
+                        </div>
+                      )}
+                      <div className="truncate">
+                        <span className="text-xs font-semibold text-slate-200 block truncate leading-tight">
+                          {d.name}
+                        </span>
+                        {d.bank && (
+                          <span className="text-[8px] font-mono text-slate-400 block leading-none mt-0.5">
+                            {d.bank}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <span className="text-xs font-bold font-mono text-slate-200 block">
+                        ${Number(d.amount).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ==============================================================
+  // 0B. CYBER MVP #1 HERO SHOWCASE
+  // ==============================================================
+  if (templateStyle === 'cyber-mvp-showcase') {
+    const col = accentColor || '#00F0FF';
+    return (
+      <div
+        className={`w-full max-w-sm p-4 relative overflow-hidden ${className}`}
+        style={{
+          fontFamily: resolvedFontFamily || "'Chakra Petch', sans-serif",
+          background: showBackground ? 'rgba(5, 10, 22, 0.96)' : 'transparent',
+          border: `2px solid ${col}`,
+          boxShadow: showBackground ? `0 0 30px ${col}38, inset 0 0 18px ${col}18` : 'none',
+          clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))'
+        }}
+      >
+        {animationStyles}
+        <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-cyan-500/30">
+          <div className="flex items-center gap-2">
+            <Zap size={16} style={{ color: col }} className={showAnimation ? 'animate-pulse' : ''} />
+            <div>
+              <h4 className="text-sm font-black tracking-wider uppercase text-white leading-tight">{title}</h4>
+              <span className="text-[9px] font-mono tracking-widest uppercase" style={{ color: col }}>
+                MVP TELEMETRY • {periodLabel}
+              </span>
+            </div>
+          </div>
+          <span
+            className="text-[10px] font-mono font-bold px-2 py-0.5 bg-cyan-950/90 border text-cyan-300"
+            style={{ borderColor: `${col}66` }}
+          >
+            MVP {displayLimit}
+          </span>
+        </div>
+
+        <div data-lb-donor-list="true">
+          {/* #1 CYBER MVP HERO BANNER */}
+          {firstDonor && (
+            <div
+              data-lb-donor-rank={firstDonor.rank || 1}
+              className="p-3.5 mb-2.5 border-2 relative"
+              style={{
+                background: `linear-gradient(90deg, ${col}26 0%, rgba(8, 18, 38, 0.95) 100%)`,
+                borderColor: col,
+                boxShadow: `0 0 20px ${col}35`,
+                clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))'
+              }}
+            >
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  {!activeSingleRank && (
+                    <div
+                      className="w-10 h-10 flex flex-col items-center justify-center font-black flex-shrink-0"
+                      style={{ backgroundColor: col, color: '#020617' }}
+                    >
+                      <Crown size={16} className="fill-slate-950" />
+                      <span className="text-[9px] font-mono leading-none">MVP</span>
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    {!activeSingleRank && (
+                      <span
+                        className="text-[9px] font-mono font-black uppercase tracking-widest block"
+                        style={{ color: col }}
+                      >
+                        ⚡ #1 STREAM MVP
+                      </span>
+                    )}
+                    <span className="text-base sm:text-lg font-black text-white uppercase tracking-wide block truncate drop-shadow">
+                      {firstDonor.name}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-base sm:text-lg font-black font-mono block" style={{ color: col }}>
+                    ${Number(firstDonor.amount).toFixed(2)}
+                  </span>
+                  {firstDonor.bank && (
+                    <span className="text-[9px] font-mono text-cyan-300/75 block">{firstDonor.bank}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* COMPACT #2 & #3 ROWS */}
+          <div className="space-y-1.5">
+            {runnerUpDonors.map((d, i) => (
+              <div
+                key={i}
+                data-lb-donor-rank={d.rank}
+                className="px-2.5 py-1.5 bg-slate-900/65 border border-slate-800 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {!activeSingleRank && (
+                    <span className="text-[11px] font-mono font-bold text-slate-400 w-5">0{d.rank}</span>
+                  )}
+                  <span className="text-xs font-semibold text-slate-200 truncate">{d.name}</span>
+                </div>
+                <span className="text-xs font-mono font-bold text-cyan-300/90 ml-2 flex-shrink-0">
+                  ${Number(d.amount).toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==============================================================
+  // 0C. IMPERIAL #1 THRONE PODIUM (SPLIT 2ND & 3RD PODIUM)
+  // ==============================================================
+  if (templateStyle === 'royal-podium-crown') {
+    const gold = accentColor || '#EAB308';
+    const secondThird = runnerUpDonors.slice(0, 2);
+    const remainingDonors = runnerUpDonors.slice(2);
+    return (
+      <div
+        className={`w-full max-w-sm p-4 sm:p-5 rounded-3xl relative overflow-hidden border-2 ${className}`}
+        style={{
+          fontFamily: resolvedFontFamily || "'Chakra Petch', sans-serif",
+          background: showBackground
+            ? 'radial-gradient(circle at 50% 0%, #241904 0%, #090702 100%)'
+            : 'transparent',
+          borderColor: gold,
+          boxShadow: showBackground ? `0 0 35px ${gold}38` : 'none'
+        }}
+      >
+        {animationStyles}
+        <div className="text-center pb-3 mb-3 border-b border-amber-500/25">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-[9px] font-mono font-bold uppercase tracking-widest mb-1">
+            <Crown size={11} className="fill-amber-400 text-amber-400" />
+            <span>{periodLabel}</span>
+          </div>
+          <h4 className="text-sm font-black tracking-widest uppercase text-amber-100">{title}</h4>
+        </div>
+
+        <div data-lb-donor-list="true">
+          {/* #1 THRONE SPOTLIGHT */}
+          {firstDonor && (
+            <div
+              data-lb-donor-rank={firstDonor.rank || 1}
+              className={`p-3.5 rounded-2xl bg-gradient-to-b from-amber-500/25 to-amber-950/50 border-2 border-amber-400 shadow-[0_0_25px_rgba(234,179,8,0.3)] mb-2.5 relative ${
+                activeSingleRank ? 'flex items-center justify-between gap-3' : 'text-center'
+              }`}
+            >
+              {!activeSingleRank && (
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-mono font-black uppercase tracking-wider mb-1">
+                  <Crown size={11} className="fill-slate-950" />
+                  <span>#1 SOVEREIGN DONOR</span>
+                </div>
+              )}
+              <div className="text-base sm:text-lg font-black text-white tracking-wide truncate px-2 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+                {firstDonor.name}
+              </div>
+              <div className={`text-sm sm:text-base font-black font-mono text-amber-300 ${activeSingleRank ? 'flex-shrink-0' : 'mt-0.5'}`}>
+                ${Number(firstDonor.amount).toFixed(2)}
+              </div>
+            </div>
+          )}
+
+          {/* 2ND & 3RD SIDE-BY-SIDE COMPACT PODIUM */}
+          {secondThird.length > 0 && (
+            <div className={`grid ${secondThird.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-2 mb-2`}>
+              {secondThird.map((d, idx) => (
+                <div
+                  key={idx}
+                  data-lb-donor-rank={d.rank}
+                  className={`p-2.5 rounded-xl bg-black/55 border border-amber-500/25 ${
+                    activeSingleRank ? 'flex items-center justify-between gap-2' : 'text-center'
+                  }`}
+                >
+                  {!activeSingleRank && (
+                    <span
+                      className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded inline-block mb-1 ${
+                        d.rank === 2
+                          ? 'bg-slate-300/15 text-slate-200 border border-slate-400/30'
+                          : 'bg-amber-700/20 text-amber-400 border border-amber-600/30'
+                      }`}
+                    >
+                      #{d.rank} Runner-Up
+                    </span>
+                  )}
+                  <div className="text-xs font-semibold text-slate-200 truncate">{d.name}</div>
+                  <div className={`text-xs font-bold font-mono text-amber-300/90 ${activeSingleRank ? 'flex-shrink-0' : 'mt-0.5'}`}>
+                    ${Number(d.amount).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* RANKS 4+ */}
+          {remainingDonors.length > 0 && (
+            <div className="space-y-1">
+              {remainingDonors.map((d, idx) => (
+                <div
+                  key={idx}
+                  data-lb-donor-rank={d.rank}
+                  className="px-2.5 py-1.5 rounded-lg bg-black/40 border border-amber-500/15 flex items-center justify-between text-xs"
+                >
+                  <span className="text-slate-300 truncate">
+                    {!activeSingleRank && <strong className="font-mono text-amber-400/80 mr-1.5">#{d.rank}</strong>}
+                    {d.name}
+                  </span>
+                  <span className="font-mono font-bold text-amber-300 ml-2">${Number(d.amount).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // ==============================================================
   // 1. CYBERPUNK ELECTRIC NEON
   // ==============================================================
@@ -553,30 +1114,54 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2.5 flex items-center justify-between border transition-all ${
+              className={`${
+                d.rank === 1 ? 'p-3.5 mb-2.5' : 'p-2'
+              } flex items-center justify-between border transition-all ${
                 d.rank === 1
-                  ? 'bg-cyan-950/40 border-cyan-400/80 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                  ? 'bg-cyan-950/60 border-cyan-400 shadow-[0_0_16px_rgba(0,240,255,0.28)]'
                   : 'bg-slate-900/40 border-slate-800'
               }`}
               style={{
                 clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))'
               }}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 flex items-center justify-center font-bold">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`${
+                    d.rank === 1 ? 'w-8 h-8 rounded-lg bg-cyan-400/15 border border-cyan-400/40' : 'w-5 h-5'
+                  } flex items-center justify-center font-bold flex-shrink-0`}
+                >
                   {renderRankBadge(d.rank, col)}
                 </div>
                 <div className="truncate">
-                  <span className="text-xs font-bold text-white block truncate">{d.name}</span>
+                  {!activeSingleRank && d.rank === 1 && (
+                    <span className="text-[9px] font-mono font-black uppercase tracking-widest text-cyan-300 block leading-none mb-0.5">
+                      #1 CHAMPION
+                    </span>
+                  )}
+                  <span
+                    className={`${
+                      d.rank === 1
+                        ? 'text-sm sm:text-base font-black tracking-wide text-white'
+                        : 'text-[11px] sm:text-xs font-semibold text-slate-200'
+                    } block truncate`}
+                  >
+                    {d.name}
+                  </span>
                   {d.bank && <span className="text-[9px] font-mono text-cyan-400/80 block">{d.bank}</span>}
                 </div>
               </div>
-              <div className="text-right flex-shrink-0">
-                <span className="text-xs font-black font-mono block" style={{ color: col }}>
+              <div className="text-right flex-shrink-0 ml-2">
+                <span
+                  className={`${
+                    d.rank === 1 ? 'text-sm sm:text-base font-black' : 'text-xs font-bold'
+                  } font-mono block`}
+                  style={{ color: col }}
+                >
                   ${Number(d.amount).toFixed(2)}
                 </span>
                 {d.count && <span className="text-[9px] font-mono text-slate-400">{d.count} tips</span>}
@@ -617,27 +1202,50 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2.5 rounded-xl flex items-center justify-between border ${
+              className={`${
+                d.rank === 1 ? 'p-3.5 mb-2.5' : 'p-2'
+              } rounded-xl flex items-center justify-between border ${
                 d.rank === 1
-                  ? 'bg-amber-500/15 border-amber-400/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                  ? 'bg-amber-500/20 border-amber-400 shadow-[0_0_18px_rgba(245,158,11,0.28)]'
                   : 'bg-black/40 border-amber-500/10'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-6 h-6 flex items-center justify-center font-bold">
+                <div
+                  className={`${
+                    d.rank === 1 ? 'w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/50' : 'w-5 h-5'
+                  } flex items-center justify-center font-bold flex-shrink-0`}
+                >
                   {renderRankBadge(d.rank, gold)}
                 </div>
                 <div className="truncate">
-                  <span className="text-xs font-bold text-white block truncate">{d.name}</span>
+                  {!activeSingleRank && d.rank === 1 && (
+                    <span className="text-[9px] font-mono font-black uppercase tracking-widest text-amber-300 block leading-none mb-0.5">
+                      ★ #1 VIP LEADER
+                    </span>
+                  )}
+                  <span
+                    className={`${
+                      d.rank === 1
+                        ? 'text-sm sm:text-base font-black tracking-wide text-white'
+                        : 'text-[11px] sm:text-xs font-semibold text-slate-200'
+                    } block truncate`}
+                  >
+                    {d.name}
+                  </span>
                   {d.bank && <span className="text-[9px] font-mono text-amber-300/70 block">{d.bank}</span>}
                 </div>
               </div>
-              <div className="text-right flex-shrink-0">
-                <span className="text-xs font-black font-mono block text-amber-300">
+              <div className="text-right flex-shrink-0 ml-2">
+                <span
+                  className={`${
+                    d.rank === 1 ? 'text-sm sm:text-base font-black' : 'text-xs font-bold'
+                  } font-mono block text-amber-300`}
+                >
                   ${Number(d.amount).toFixed(2)}
                 </span>
                 {d.count && <span className="text-[9px] font-mono text-amber-500/80">{d.count} tips</span>}
@@ -670,12 +1278,14 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[8px] text-red-400 uppercase tracking-widest">{periodLabel} - TOP {displayLimit}</span>
         </div>
 
-        <div className="space-y-2 text-[9px]">
+        <div data-lb-donor-list="true" className="space-y-2 text-[9px]">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 flex items-center justify-between border-2 ${
-                d.rank === 1 ? 'border-yellow-400 bg-yellow-950/40 text-yellow-200' : 'border-slate-800 bg-slate-950 text-slate-200'
+              className={`${
+                d.rank === 1 ? 'p-3 mb-2.5 text-xs sm:text-sm font-black' : 'p-2 text-[9px]'
+              } flex items-center justify-between border-2 ${
+                d.rank === 1 ? 'border-yellow-400 bg-yellow-950/50 text-yellow-200' : 'border-slate-800 bg-slate-950 text-slate-200'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0 truncate">
@@ -720,12 +1330,14 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-orange-500/20 border-orange-500 text-orange-200 font-bold' : 'bg-black/60 border-orange-500/20 text-slate-300'
+              className={`${
+                d.rank === 1 ? 'p-3 mb-2.5 text-sm sm:text-base font-black' : 'p-2 text-[11px]'
+              } rounded flex items-center justify-between border ${
+                d.rank === 1 ? 'bg-orange-500/25 border-orange-500 text-white' : 'bg-black/60 border-orange-500/20 text-slate-300'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -774,23 +1386,48 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
             </span>
           </div>
 
-          <div className="space-y-2">
+          <div data-lb-donor-list="true" className="space-y-2">
             {donorsToRender.map((d, i) => (
               <div
                 key={i}
-                className={`p-2.5 rounded-xl flex items-center justify-between border ${
+                className={`${
+                  d.rank === 1 ? 'p-3.5 mb-2.5' : 'p-2'
+                } rounded-xl flex items-center justify-between border ${
                   d.rank === 1
-                    ? 'bg-slate-900 border-cyan-400/60 shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                    ? 'bg-slate-900 border-cyan-400 shadow-[0_0_16px_rgba(0,240,255,0.28)]'
                     : 'bg-slate-950/80 border-slate-800'
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-5 h-5 flex items-center justify-center font-bold">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`${
+                      d.rank === 1 ? 'w-7 h-7 rounded-lg bg-cyan-400/15 border border-cyan-400/40' : 'w-5 h-5'
+                    } flex items-center justify-center font-bold flex-shrink-0`}
+                  >
                     {renderRankBadge(d.rank, '#00F0FF')}
                   </div>
-                  <span className="text-xs font-bold text-white truncate">{d.name}</span>
+                  <div className="truncate">
+                    {!activeSingleRank && d.rank === 1 && (
+                      <span className="text-[9px] font-mono font-black uppercase tracking-widest text-cyan-300 block leading-none mb-0.5">
+                        #1 MVP
+                      </span>
+                    )}
+                    <span
+                      className={`${
+                        d.rank === 1
+                          ? 'text-sm sm:text-base font-black tracking-wide text-white'
+                          : 'text-[11px] sm:text-xs font-semibold text-slate-200'
+                      } block truncate`}
+                    >
+                      {d.name}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-xs font-black font-mono text-cyan-300 ml-2 flex-shrink-0">
+                <span
+                  className={`${
+                    d.rank === 1 ? 'text-sm sm:text-base font-black' : 'text-xs font-bold'
+                  } font-mono text-cyan-300 ml-2 flex-shrink-0`}
+                >
                   ${Number(d.amount).toFixed(2)}
                 </span>
               </div>
@@ -829,21 +1466,21 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2.5 rounded-xl flex items-center justify-between border ${
+              className={`${
                 d.rank === 1
-                  ? 'bg-pink-950/40 border-pink-400 text-pink-200'
-                  : 'bg-purple-950/20 border-purple-900/50 text-slate-200'
-              }`}
+                  ? 'p-3 mb-2.5 bg-pink-950/60 border-pink-400 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]'
+                  : 'p-2 bg-purple-950/20 border-purple-900/50 text-slate-200'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="font-bold text-xs text-pink-400">#{d.rank}</span>
-                <span className="text-xs font-bold truncate">{d.name}</span>
+                <span className={`${d.rank === 1 ? 'text-sm sm:text-base font-black tracking-wide' : 'text-xs font-semibold'} truncate`}>{d.name}</span>
               </div>
-              <span className="text-xs font-mono font-black text-amber-300 ml-2 flex-shrink-0">
+              <span className={`${d.rank === 1 ? 'text-sm sm:text-base font-black' : 'text-xs font-bold'} font-mono text-amber-300 ml-2 flex-shrink-0`}>
                 ${Number(d.amount).toFixed(2)}
               </span>
             </div>
@@ -880,13 +1517,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between backdrop-blur-md border ${
-                d.rank === 1 ? 'bg-white/15 border-white/40 font-bold' : 'bg-white/5 border-white/10'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-white/20 border-white/50 text-sm sm:text-base font-black'
+                  : 'p-2 bg-white/5 border-white/10 text-xs font-semibold'
+              } rounded-xl flex items-center justify-between backdrop-blur-md border`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-[11px] opacity-70">#{d.rank}</span>
@@ -927,13 +1566,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-2xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-pink-500/30 border-pink-400 text-white font-bold' : 'bg-black/30 border-pink-900/40 text-pink-100'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-pink-500/35 border-pink-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/30 border-pink-900/40 text-pink-100 text-xs font-semibold'
+              } rounded-2xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-pink-400 font-bold">♥ {d.rank}</span>
@@ -969,13 +1610,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[10px] text-emerald-500 font-bold">[SYS_TOP_{displayLimit}]</span>
         </div>
 
-        <div className="space-y-1 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-1.5 border border-emerald-900 flex items-center justify-between ${
-                d.rank === 1 ? 'bg-emerald-950/60 border-emerald-400 text-emerald-200' : 'bg-black text-emerald-500'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-2.5 mb-2 bg-emerald-950/75 border-emerald-400 text-emerald-200 text-sm sm:text-base font-black'
+                  : 'p-1.5 bg-black border-emerald-900 text-emerald-500 text-xs'
+              } border flex items-center justify-between`}
             >
               <div className="flex items-center gap-1.5 truncate">
                 <span className="text-emerald-400 font-bold">&gt; {d.rank}.</span>
@@ -1011,13 +1654,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 border flex items-center justify-between ${
-                d.rank === 1 ? 'bg-lime-950/80 border-lime-400 text-lime-200 font-bold' : 'bg-black border-lime-900/60 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-lime-950/80 border-lime-400 text-lime-200 text-sm sm:text-base font-black'
+                  : 'p-2 bg-black border-lime-900/60 text-slate-300 text-xs'
+              } border flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-lime-400 font-bold">☣ #{d.rank}</span>
@@ -1053,13 +1698,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-lg flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-red-950/60 border-red-500 text-white font-bold' : 'bg-black/50 border-red-950 text-slate-400'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-red-950/60 border-red-500 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-red-950 text-slate-400 text-xs'
+              } rounded-lg flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-red-500 font-bold">⚔ #{d.rank}</span>
@@ -1095,13 +1742,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-amber-600/30 border-amber-400 text-white font-bold' : 'bg-black/50 border-amber-950 text-amber-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-amber-600/30 border-amber-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-amber-950 text-amber-200/80 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-amber-400 font-bold">🔥 #{d.rank}</span>
@@ -1135,17 +1784,19 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[10px] font-mono text-teal-300 font-bold">ABYSS {displayLimit}</span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-teal-950/60 border-teal-400 text-teal-200 font-bold' : 'bg-black/50 border-teal-950 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-teal-950/60 border-teal-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-teal-950 text-slate-300 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-teal-400 font-bold">≈ #{d.rank}</span>
-                <span className="truncate text-xs">{d.name}</span>
+                <span className="truncate">{d.name}</span>
               </div>
               <span className="font-bold text-teal-300 ml-2 flex-shrink-0">
                 ${Number(d.amount).toFixed(2)}
@@ -1177,13 +1828,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[10px] font-mono bg-pink-500 text-black px-1.5 font-bold">VHS-REC</span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 border border-cyan-900 flex items-center justify-between ${
-                d.rank === 1 ? 'bg-cyan-950/60 border-cyan-400 text-white font-bold' : 'bg-slate-900/50 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-cyan-950/60 border-cyan-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-slate-900/50 border-cyan-900 text-slate-300 text-xs'
+              } border flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-pink-400 font-bold">#{d.rank}</span>
@@ -1217,17 +1870,19 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[10px] font-mono text-amber-400 font-bold">HONOR {displayLimit}</span>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded border ${
-                d.rank === 1 ? 'bg-amber-900/40 border-amber-600 text-amber-100 font-bold' : 'bg-black/30 border-amber-950 text-amber-300/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-amber-900/40 border-amber-600 text-amber-100 text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/30 border-amber-950 text-amber-300/80 text-xs'
+              } rounded border`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 truncate">
-                  <span className="text-amber-500 font-bold">№ {d.rank}</span>
+                  {!activeSingleRank && <span className="text-amber-500 font-bold">№ {d.rank}</span>}
                   <span className="truncate">{d.name}</span>
                 </div>
                 <span className="font-mono font-bold text-amber-300 ml-2 flex-shrink-0">${Number(d.amount).toFixed(2)}</span>
@@ -1261,13 +1916,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-indigo-950/80 border-indigo-400 text-white font-bold' : 'bg-black/40 border-indigo-950 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-indigo-950/80 border-indigo-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/40 border-indigo-950 text-slate-300 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-indigo-400 font-bold">✦ {d.rank}</span>
@@ -1298,13 +1955,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[10px] font-mono text-slate-700 uppercase font-bold tracking-widest">{periodLabel} - TOP {displayLimit}</span>
         </div>
 
-        <div className="space-y-1.5 font-sans font-bold text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-sans font-bold text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 border-2 border-black flex items-center justify-between ${
-                d.rank === 1 ? 'bg-yellow-300 text-black shadow-[3px_3px_0px_#000]' : 'bg-slate-100 text-black'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-yellow-300 text-black shadow-[3px_3px_0px_#000] text-sm sm:text-base font-black'
+                  : 'p-2 bg-slate-100 text-black text-xs'
+              } border-2 border-black flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="font-black text-xs font-mono">#{d.rank}</span>
@@ -1335,13 +1994,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[10px] font-mono text-slate-400">1 - {displayLimit}</span>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-lg flex items-center justify-between border ${
-                d.rank === 1 ? 'border-slate-500 bg-slate-900 font-bold' : 'border-slate-800/80 bg-slate-950/40 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 border-slate-500 bg-slate-900 text-sm sm:text-base font-black text-white'
+                  : 'p-2 border-slate-800/80 bg-slate-950/40 text-slate-300 text-xs'
+              } rounded-lg flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="font-mono text-slate-400">0{d.rank}</span>
@@ -1377,13 +2038,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-purple-900/50 border-purple-400 text-white font-bold' : 'bg-black/40 border-purple-950 text-purple-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-purple-900/50 border-purple-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/40 border-purple-950 text-purple-200/80 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-purple-400 font-bold">♔ #{d.rank}</span>
@@ -1419,13 +2082,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-emerald-900/60 border-emerald-400 text-white font-bold' : 'bg-black/50 border-emerald-950 text-emerald-300/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-emerald-900/60 border-emerald-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-emerald-950 text-emerald-300/80 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-emerald-400 font-bold">♦ #{d.rank}</span>
@@ -1468,13 +2133,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded border flex items-center justify-between ${
-                d.rank === 1 ? 'bg-amber-900/50 border-amber-500 text-amber-100 font-bold' : 'bg-black/50 border-amber-900/40 text-amber-300/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-amber-900/50 border-amber-500 text-amber-100 text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-amber-900/40 text-amber-300/80 text-xs'
+              } rounded border flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-amber-400 font-bold">⚙ #{d.rank}</span>
@@ -1511,13 +2178,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 border flex items-center justify-between ${
-                d.rank === 1 ? 'bg-rose-950 border-rose-400 text-white font-bold' : 'bg-neutral-950 border-rose-950 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-rose-950 border-rose-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-neutral-950 border-rose-950 text-slate-300 text-xs'
+              } border flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-yellow-400 font-bold">! {d.rank}</span>
@@ -1557,13 +2226,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border backdrop-blur-sm ${
-                d.rank === 1 ? 'bg-teal-950/70 border-teal-300 text-white font-bold' : 'bg-slate-950/40 border-teal-900/40 text-teal-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-teal-950/70 border-teal-300 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-slate-950/40 border-teal-900/40 text-teal-200/80 text-xs'
+              } rounded-xl flex items-center justify-between border backdrop-blur-sm`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-teal-400 font-bold">✦ {d.rank}</span>
@@ -1594,13 +2265,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[8px] text-amber-400/80 uppercase">{title} - TOP {displayLimit}</span>
         </div>
 
-        <div className="space-y-1.5 text-[9px]">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-[9px]">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 border-2 flex items-center justify-between ${
-                d.rank === 1 ? 'border-amber-400 bg-amber-950 text-yellow-300' : 'border-amber-900 bg-black/60 text-amber-200'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 border-amber-400 bg-amber-950 text-yellow-300 text-xs sm:text-sm font-black'
+                  : 'p-2 border-amber-900 bg-black/60 text-amber-200 text-[9px]'
+              } border-2 flex items-center justify-between`}
             >
               <div className="flex items-center gap-1.5 truncate">
                 <span className="text-yellow-400 font-bold">LV{d.rank}</span>
@@ -1637,13 +2310,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 border flex items-center justify-between ${
-                d.rank === 1 ? 'bg-red-950/80 border-red-500 text-white font-bold' : 'bg-black/50 border-red-950 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-red-950/80 border-red-500 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-red-950 text-slate-300 text-xs'
+              } border flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-red-500 font-bold">壱 #{d.rank}</span>
@@ -1679,13 +2354,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-lg flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-cyan-950/60 border-cyan-400 text-white font-bold' : 'bg-black/50 border-slate-800 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-cyan-950/60 border-cyan-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-slate-800 text-slate-300 text-xs'
+              } rounded-lg flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-cyan-400 font-bold font-mono">#{d.rank}</span>
@@ -1721,13 +2398,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-lg flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-slate-900 border-lime-500 text-white font-bold' : 'bg-black/40 border-slate-800 text-slate-400'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-slate-900 border-lime-500 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/40 border-slate-800 text-slate-400 text-xs'
+              } rounded-lg flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-lime-400 font-bold">[{d.rank}]</span>
@@ -1763,13 +2442,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-purple-950/80 border-purple-400 text-white font-bold' : 'bg-black/40 border-purple-950 text-purple-300/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-purple-950/80 border-purple-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/40 border-purple-950 text-purple-300/80 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-purple-400 font-bold">✨ #{d.rank}</span>
@@ -1805,13 +2486,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-lg flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-rose-950/60 border-rose-400 text-white font-bold' : 'bg-black/40 border-rose-950 text-slate-300'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-rose-950/60 border-rose-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/40 border-rose-950 text-slate-300 text-xs'
+              } rounded-lg flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-rose-400 font-bold">⚜ #{d.rank}</span>
@@ -1847,13 +2530,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-orange-950/60 border-orange-400 text-white font-bold' : 'bg-black/30 border-orange-950 text-orange-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-orange-950/60 border-orange-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/30 border-orange-950 text-orange-200/80 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-orange-400 font-bold">☕ #{d.rank}</span>
@@ -1889,13 +2574,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-cyan-950/70 border-cyan-300 text-white font-bold' : 'bg-black/40 border-cyan-950 text-cyan-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-cyan-950/70 border-cyan-300 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/40 border-cyan-950 text-cyan-200/80 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-cyan-300 font-bold">❄ #{d.rank}</span>
@@ -1931,13 +2618,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 border flex items-center justify-between ${
-                d.rank === 1 ? 'bg-sky-950/70 border-sky-300 text-white font-bold' : 'bg-black/50 border-sky-950 text-sky-300/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-sky-950/70 border-sky-300 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-sky-950 text-sky-300/80 text-xs'
+              } border flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-sky-400 font-bold">&lt;{d.rank}&gt;</span>
@@ -1973,13 +2662,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-yellow-500/25 border-yellow-400 text-white font-bold' : 'bg-black/50 border-yellow-950 text-yellow-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-yellow-500/25 border-yellow-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-yellow-950 text-yellow-200/80 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-yellow-400 font-bold">🏆 #{d.rank}</span>
@@ -2010,13 +2701,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           <span className="text-[10px] font-mono bg-rose-600 text-black px-1.5 font-bold uppercase">STREET</span>
         </div>
 
-        <div className="space-y-1.5 text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 border border-rose-900 flex items-center justify-between ${
-                d.rank === 1 ? 'bg-rose-950 border-rose-400 text-yellow-300 font-bold' : 'bg-black/70 text-slate-200'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-rose-950 border-rose-400 text-yellow-300 text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/70 border-rose-900 text-slate-200 text-xs'
+              } border flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 truncate font-bold">
                 <span className="text-rose-400 font-mono">#{d.rank}</span>
@@ -2052,13 +2745,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-lg flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-violet-950/70 border-violet-400 text-white font-bold' : 'bg-black/40 border-violet-950 text-violet-300/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-violet-950/70 border-violet-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/40 border-violet-950 text-violet-300/80 text-xs'
+              } rounded-lg flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-violet-400 font-bold">🔮 #{d.rank}</span>
@@ -2094,13 +2789,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </div>
         </div>
 
-        <div className="p-2 bg-white border-2 border-t-black border-l-black border-b-white border-r-white space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="p-2 bg-white border-2 border-t-black border-l-black border-b-white border-r-white space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-1 flex items-center justify-between ${
-                d.rank === 1 ? 'bg-[#000080] text-white font-bold' : 'text-black hover:bg-slate-100'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-2 mb-1.5 bg-[#000080] text-white text-sm sm:text-base font-black'
+                  : 'p-1 text-black hover:bg-slate-100 text-xs'
+              } flex items-center justify-between`}
             >
               <div className="flex items-center gap-1.5 truncate">
                 <span className="font-bold">[{d.rank}]</span>
@@ -2136,13 +2833,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-lg flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-orange-950/80 border-orange-500 text-white font-bold' : 'bg-black/60 border-orange-950 text-orange-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-orange-950/80 border-orange-500 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/60 border-orange-950 text-orange-200/80 text-xs'
+              } rounded-lg flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-orange-500 font-bold">☠ #{d.rank}</span>
@@ -2178,13 +2877,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-2xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-rose-500/30 border-rose-400 text-white font-bold' : 'bg-black/40 border-rose-950 text-rose-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-rose-500/30 border-rose-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/40 border-rose-950 text-rose-200/80 text-xs'
+              } rounded-2xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-rose-400 font-bold">🍬 #{d.rank}</span>
@@ -2220,13 +2921,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 font-mono text-xs">
+        <div data-lb-donor-list="true" className="space-y-1.5 font-mono text-xs">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded border flex items-center justify-between ${
-                d.rank === 1 ? 'bg-emerald-950/80 border-emerald-400 text-white font-bold' : 'bg-black/50 border-emerald-950 text-emerald-300/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-emerald-950/80 border-emerald-400 text-white text-sm sm:text-base font-black'
+                  : 'p-2 bg-black/50 border-emerald-950 text-emerald-300/80 text-xs'
+              } rounded border flex items-center justify-between`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-emerald-400 font-bold">📡 [{d.rank}]</span>
@@ -2262,13 +2965,15 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
           </span>
         </div>
 
-        <div className="space-y-1.5 text-xs font-mono">
+        <div data-lb-donor-list="true" className="space-y-1.5 text-xs font-mono">
           {donorsToRender.map((d, i) => (
             <div
               key={i}
-              className={`p-2 rounded-xl flex items-center justify-between border ${
-                d.rank === 1 ? 'bg-indigo-950/80 border-indigo-200 text-white font-bold shadow-[0_0_15px_rgba(224,231,255,0.25)]' : 'bg-black/40 border-indigo-950 text-indigo-200/80'
-              }`}
+              className={`${
+                d.rank === 1
+                  ? 'p-3 mb-2 bg-indigo-950/80 border-indigo-200 text-white text-sm sm:text-base font-black shadow-[0_0_15px_rgba(224,231,255,0.25)]'
+                  : 'p-2 bg-black/40 border-indigo-950 text-indigo-200/80 text-xs'
+              } rounded-xl flex items-center justify-between border`}
             >
               <div className="flex items-center gap-2 truncate">
                 <span className="text-indigo-300 font-bold">💎 #{d.rank}</span>
@@ -2289,14 +2994,40 @@ export const LeaderboardTemplateRenderer: React.FC<LeaderboardTemplateRendererPr
       style={{ fontFamily: resolvedFontFamily }}
     >
       <h4 className="font-bold text-sm mb-2">{title}</h4>
-      <div className="space-y-1 text-xs">
+      <div data-lb-donor-list="true" className="space-y-1 text-xs">
         {donorsToRender.map((d, i) => (
-          <div key={i} className="flex justify-between py-1 border-b border-slate-800">
-            <span>#{d.rank} {d.name}</span>
+          <div
+            key={i}
+            className={`flex justify-between py-1.5 border-b border-slate-800 ${
+              d.rank === 1 ? 'text-sm sm:text-base font-black text-amber-300' : 'text-xs text-slate-300'
+            }`}
+          >
+            <span>{activeSingleRank ? d.name : `#${d.rank} ${d.name}`}</span>
             <span className="font-bold font-mono">${Number(d.amount).toFixed(2)}</span>
           </div>
         ))}
       </div>
+    </div>
+  );
+  };
+
+  const renderedNode = renderContent();
+  if (activeSingleRank) {
+    return (
+      <div
+        className={`lb-single-rank-only ${!showBackground ? 'lb-single-rank-no-bg' : ''} w-fit mx-auto ${className}`}
+        style={{ fontFamily: resolvedFontFamily }}
+      >
+        {animationStyles}
+        {renderedNode}
+      </div>
+    );
+  }
+
+  return (
+    <div className="lb-all-ranks-view w-full flex justify-center">
+      {animationStyles}
+      {renderedNode}
     </div>
   );
 };

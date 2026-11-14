@@ -23,6 +23,7 @@ import {
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useAudio } from '../../hooks/useAudio';
+import { WheelSkeleton } from './DashboardSkeleton';
 
 export interface WheelSlice {
   id: string;
@@ -125,9 +126,27 @@ export const SpinningWheelManager: React.FC<SpinningWheelManagerProps> = ({
               slices: Array.isArray(s.slices) && s.slices.length > 0 ? s.slices : DEFAULT_SLICES
             })
           );
+        } else {
+          setInitialSettings(
+            JSON.stringify({
+              isEnabled: false,
+              minTipAmount: 2.0,
+              spinSoundUrl: '/sounds/neon-chime.mp3',
+              slices: DEFAULT_SLICES
+            })
+          );
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setInitialSettings(
+          JSON.stringify({
+            isEnabled: false,
+            minTipAmount: 2.0,
+            spinSoundUrl: '/sounds/neon-chime.mp3',
+            slices: DEFAULT_SLICES
+          })
+        );
+      });
   }, [effectiveToken]);
 
   // Determine if settings have unsaved modifications
@@ -384,6 +403,10 @@ export const SpinningWheelManager: React.FC<SpinningWheelManagerProps> = ({
       };
     });
   }, [slices]);
+
+  if (!initialSettings) {
+    return <WheelSkeleton />;
+  }
 
   return (
     <div className="space-y-5">

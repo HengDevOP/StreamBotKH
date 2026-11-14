@@ -6,23 +6,62 @@ import { LeaderboardTemplateRenderer, LeaderboardDonor } from './leaderboardTemp
 
 interface StreamLeaderboardOverlayProps {
   token: string;
+  singleRank?: number | null;
 }
 
-export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> = ({ token }) => {
+export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> = ({ token, singleRank = null }) => {
   const { socket, joinOverlayRoom } = useSocket();
 
   const [title, setTitle] = useState('TOP SUPPORTERS');
   const [period, setPeriod] = useState<'all' | 'month' | 'week' | 'today'>('all');
   const [maxRows, setMaxRows] = useState(3); // Default 3
   const [accentColor, setAccentColor] = useState('#F59E0B');
-  const [templateStyle, setTemplateStyle] = useState('cyber-neon');
+  const [templateStyle, setTemplateStyle] = useState('champion-spotlight');
   const [showBackground, setShowBackground] = useState(true);
   const [showAnimation, setShowAnimation] = useState(true);
   const [showRankBadges, setShowRankBadges] = useState(true);
   const [fontFamily, setFontFamily] = useState('Chakra Petch');
+  const [rankFonts, setRankFonts] = useState<Record<string, string>>({});
+  const [nameAmountGap, setNameAmountGap] = useState<number>(10);
   const [topDonors, setTopDonors] = useState<LeaderboardDonor[]>([]);
   const [isLocked, setIsLocked] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [overtakingDonorName, setOvertakingDonorName] = useState<string | null>(null);
+
+  const resolvedSingleRank = React.useMemo(() => {
+    if (singleRank && Number(singleRank) >= 1) return Math.min(10, Math.floor(Number(singleRank)));
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const r = Number(params.get('rank'));
+      if (r >= 1 && r <= 10) return Math.floor(r);
+    }
+    return null;
+  }, [singleRank]);
+
+  const urlForceNoBg = React.useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('bg') === '0' || params.get('nobg') === '1' || params.get('bg') === 'false';
+    }
+    return false;
+  }, []);
+
+  const urlFontParam = React.useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('font') || '';
+    }
+    return '';
+  }, []);
+
+  const urlGapParam = React.useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const g = Number(params.get('gap'));
+      if (!Number.isNaN(g) && g >= 2 && g <= 64) return g;
+    }
+    return null;
+  }, []);
 
   const prevDonorsRef = useRef<LeaderboardDonor[]>([]);
   const overtakeTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -50,11 +89,17 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
           setPeriod(lb.period || 'all');
           setMaxRows(lb.maxRows || 3);
           setAccentColor(lb.accentColor || '#F59E0B');
-          setTemplateStyle(lb.templateStyle || 'cyber-neon');
+          setTemplateStyle(lb.templateStyle || 'champion-spotlight');
           setShowBackground(lb.showBackground !== false);
           setShowAnimation(lb.showAnimation !== false);
           setShowRankBadges(lb.showRankBadges !== false);
           setFontFamily(lb.fontFamily || 'Chakra Petch');
+          if (lb.rankFonts && typeof lb.rankFonts === 'object') {
+            setRankFonts(lb.rankFonts);
+          }
+          if (typeof lb.nameAmountGap === 'number') {
+            setNameAmountGap(lb.nameAmountGap);
+          }
         }
         if (data.success && data.topDonors) {
           const nextDonors: LeaderboardDonor[] = data.topDonors;
@@ -76,7 +121,8 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
           setTopDonors(nextDonors);
         }
       })
-      .catch((e) => console.error('[Leaderboard Overlay] Fetch error:', e));
+      .catch((e) => console.error('[Leaderboard Overlay] Fetch error:', e))
+      .finally(() => setIsReady(true));
   };
 
   useEffect(() => {
@@ -105,6 +151,12 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
       if (payload.showAnimation !== undefined) setShowAnimation(payload.showAnimation);
       if (payload.showRankBadges !== undefined) setShowRankBadges(payload.showRankBadges);
       if (payload.fontFamily) setFontFamily(payload.fontFamily);
+      if (payload.rankFonts && typeof payload.rankFonts === 'object') {
+        setRankFonts(payload.rankFonts);
+      }
+      if (typeof payload.nameAmountGap === 'number') {
+        setNameAmountGap(payload.nameAmountGap);
+      }
 
       // Re-fetch donors in case period or maxRows changed
       fetchLeaderboardData();
@@ -136,7 +188,15 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
     };
   }, [socket, token]);
 
-  if (isLocked) {
+  const effectiveRankFonts = React.useMemo(() => {
+    const merged = { ...rankFonts };
+    if (resolvedSingleRank && urlFontParam && !merged[String(resolvedSingleRank)]) {
+      merged[String(resolvedSingleRank)] = urlFontParam;
+    }
+    return merged;
+  }, [rankFonts, resolvedSingleRank, urlFontParam]);
+
+  if (isLocked || !isReady) {
     return <div className="w-full h-full bg-transparent" />;
   }
 
@@ -148,12 +208,15 @@ export const StreamLeaderboardOverlay: React.FC<StreamLeaderboardOverlayProps> =
         period={period}
         topDonors={topDonors}
         accentColor={accentColor}
-        showBackground={showBackground}
+        showBackground={urlForceNoBg ? false : showBackground}
         showAnimation={showAnimation}
         showRankBadges={showRankBadges}
         maxRows={maxRows}
-        fontFamily={fontFamily}
+        fontFamily={urlFontParam && !resolvedSingleRank ? urlFontParam : fontFamily}
+        rankFonts={effectiveRankFonts}
+        nameAmountGap={urlGapParam ?? nameAmountGap}
         overtakingDonorName={overtakingDonorName}
+        singleRank={resolvedSingleRank}
       />
     </div>
   );

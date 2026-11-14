@@ -344,6 +344,7 @@ export interface ExtendedRenderParams {
   resolvedFontFamily?: string;
   className?: string;
   overtakingDonorName?: string | null;
+  singleRank?: number | null;
   renderRankBadge: (rank: number, styleColor: string, isOvertaker?: boolean) => React.ReactNode;
 }
 
@@ -359,6 +360,7 @@ export function renderExtendedLeaderboardTemplate({
   resolvedFontFamily,
   className = '',
   overtakingDonorName,
+  singleRank = null,
   renderRankBadge
 }: ExtendedRenderParams): React.ReactNode | null {
   const match = EXTENDED_LEADERBOARD_TEMPLATES.find((t) => t.id === templateStyle);
@@ -366,7 +368,7 @@ export function renderExtendedLeaderboardTemplate({
 
   const col = accentColor || match.previewColor;
 
-  // Render donor row helper with built-in overtake animation and style variations
+  // Render donor row helper with built-in overtake animation and #1 spotlight hierarchy
   const renderDonorRow = (
     d: LeaderboardDonor,
     i: number,
@@ -377,30 +379,94 @@ export function renderExtendedLeaderboardTemplate({
     const isOvertaker = Boolean(
       overtakingDonorName && d.name.toLowerCase() === overtakingDonorName.toLowerCase()
     );
+    const isFirst = d.rank === 1;
+
+    if (singleRank) {
+      return (
+        <div
+          key={i}
+          className={`${
+            isFirst ? 'p-3 sm:p-3.5' : 'p-2.5'
+          } flex items-center justify-between gap-3 transition-all relative ${cardClasses} ${
+            isOvertaker ? 'lb-anim-overtake ring-2 ring-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.6)]' : ''
+          }`}
+          style={cardStyles}
+        >
+          <span
+            className={`${
+              isFirst
+                ? 'text-sm sm:text-base font-black tracking-wide text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]'
+                : 'text-xs sm:text-sm font-bold text-slate-100'
+            } block truncate`}
+          >
+            {d.name}
+          </span>
+          <span
+            className={`${
+              isFirst ? 'text-sm sm:text-base font-black' : 'text-xs sm:text-sm font-bold'
+            } font-mono block flex-shrink-0 ml-2`}
+            style={{ color: customAmountColor || col }}
+          >
+            ${Number(d.amount).toFixed(2)}
+          </span>
+        </div>
+      );
+    }
 
     return (
       <div
         key={i}
-        className={`p-2.5 flex items-center justify-between transition-all relative ${cardClasses} ${
+        className={`${
+          isFirst ? 'p-3 sm:p-3.5 mb-2.5' : 'p-2'
+        } flex items-center justify-between transition-all relative ${cardClasses} ${
           isOvertaker ? 'lb-anim-overtake ring-2 ring-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.6)]' : ''
         }`}
         style={cardStyles}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-6 h-6 flex items-center justify-center font-bold flex-shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className={`${
+              isFirst
+                ? 'w-8 h-8 rounded-xl bg-white/10 border border-white/20 shadow-inner'
+                : 'w-5 h-5'
+            } flex items-center justify-center font-bold flex-shrink-0`}
+          >
             {renderRankBadge(d.rank, col, isOvertaker)}
           </div>
           <div className="truncate">
+            {isFirst && (
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span
+                  className="text-[9px] font-mono font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-white/10 border border-white/15 leading-none"
+                  style={{ color: customAmountColor || col }}
+                >
+                  #1 CHAMPION
+                </span>
+                {d.bank && (
+                  <span className="text-[9px] font-mono opacity-80 truncate" style={{ color: col }}>
+                    • {d.bank}
+                  </span>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-1.5 truncate">
-              <span className="text-xs font-bold text-white block truncate">{d.name}</span>
+              <span
+                className={`${
+                  isFirst
+                    ? 'text-sm sm:text-base font-black tracking-wide text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]'
+                    : 'text-[11px] sm:text-xs font-semibold text-slate-200/90'
+                } block truncate`}
+              >
+                {d.name}
+              </span>
               {isOvertaker && (
                 <span className="px-1.5 py-0.2 rounded-full text-[8px] font-black font-mono tracking-wider uppercase bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950 shadow-md animate-pulse flex-shrink-0">
                   ▲ RANK UP!
                 </span>
               )}
             </div>
-            {d.bank && (
-              <span className="text-[9px] font-mono block opacity-75" style={{ color: col }}>
+            {!isFirst && d.bank && (
+              <span className="text-[8px] font-mono block opacity-65" style={{ color: col }}>
                 {d.bank}
               </span>
             )}
@@ -408,10 +474,19 @@ export function renderExtendedLeaderboardTemplate({
         </div>
 
         <div className="text-right flex-shrink-0 ml-2">
-          <span className="text-xs font-black font-mono block" style={{ color: customAmountColor || col }}>
+          <span
+            className={`${
+              isFirst ? 'text-sm sm:text-base font-black' : 'text-xs font-bold opacity-90'
+            } font-mono block`}
+            style={{ color: customAmountColor || col }}
+          >
             ${Number(d.amount).toFixed(2)}
           </span>
-          {d.count && <span className="text-[9px] font-mono text-slate-400">{d.count} tips</span>}
+          {d.count && (
+            <span className={`${isFirst ? 'text-[10px]' : 'text-[8px]'} font-mono text-slate-400`}>
+              {d.count} tips
+            </span>
+          )}
         </div>
       </div>
     );
@@ -446,7 +521,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -492,7 +567,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -534,7 +609,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -576,7 +651,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -618,7 +693,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -660,7 +735,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -702,7 +777,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -744,7 +819,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -786,7 +861,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -828,7 +903,7 @@ export function renderExtendedLeaderboardTemplate({
           </span>
         </div>
 
-        <div className="space-y-2">
+        <div data-lb-donor-list="true" className="space-y-2">
           {donorsToRender.map((d, i) =>
             renderDonorRow(
               d,
@@ -877,7 +952,7 @@ export function renderExtendedLeaderboardTemplate({
         </span>
       </div>
 
-      <div className="space-y-2">
+      <div data-lb-donor-list="true" className="space-y-2">
         {donorsToRender.map((d, i) =>
           renderDonorRow(
             d,

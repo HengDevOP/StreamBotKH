@@ -23,6 +23,7 @@ import {
   Zap
 } from 'lucide-react';
 import { Button } from '../common/Button';
+import { CloneTtsSkeleton } from './DashboardSkeleton';
 
 export interface VoiceCloneItem {
   _id?: string;
@@ -786,6 +787,10 @@ export const CloneTtsManager: React.FC<CloneTtsManagerProps> = ({
   const progressPercent = Math.min(100, (recordingTime / RECOMMENDED_SECONDS) * 100);
   const isMinMet = recordingTime >= 4.8;
   const isRecommendedMet = recordingTime >= RECOMMENDED_SECONDS;
+
+  if (loadingClones) {
+    return <CloneTtsSkeleton />;
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-16 px-1 sm:px-2 md:px-0">

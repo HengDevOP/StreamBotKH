@@ -1627,6 +1627,12 @@ html.light-mode .bg-\[\#090D18\] {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02) !important;
 }
 
+html.light-mode .bg-\[\#090D16\],
+html.light-mode .bg-\[\#090D16\]\/60 {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+}
+
 html.light-mode aside.lg\:bg-\[\#090D18\] {
   background-color: #FFFFFF !important;
   border-color: #E2E8F0 !important;
@@ -1700,12 +1706,21 @@ html.light-mode h6 {
   color: #0F172A !important;
 }
 
-/* Primary Card Text and Numbers (preserving colored button text!) */
-html.light-mode .font-black.text-white,
-html.light-mode .font-extrabold.text-white,
-html.light-mode .font-bold.text-white:not(button):not(.bg-cyan-500):not(.bg-pink-600),
-html.light-mode .font-semibold.text-white:not(button) {
+/* Primary Card Text and Numbers (preserving colored button & OBS stage text!) */
+html.light-mode .font-black.text-white:not(.obs-preview-stage *),
+html.light-mode .font-extrabold.text-white:not(.obs-preview-stage *),
+html.light-mode .font-bold.text-white:not(button):not(.bg-cyan-500):not(.bg-pink-600):not(.obs-preview-stage *),
+html.light-mode .font-semibold.text-white:not(button):not(.obs-preview-stage *),
+html.light-mode .font-medium.text-white:not(button):not(.obs-preview-stage *) {
   color: #0F172A !important;
+}
+
+html.light-mode span.text-slate-200:not(.obs-preview-stage *),
+html.light-mode div.text-slate-200:not(.obs-preview-stage *),
+html.light-mode label.text-slate-200:not(.obs-preview-stage *),
+html.light-mode span.text-slate-100:not(.obs-preview-stage *),
+html.light-mode div.text-slate-100:not(.obs-preview-stage *) {
+  color: #1E293B !important;
 }
 
 /* Hero Shimmer Gradient Headline (High-Contrast Rich Gradient in Day Mode) */
@@ -1828,17 +1843,56 @@ html.light-mode .divide-slate-800 {
 /* ============================================================== */
 /* BUTTONS & BADGES                                               */
 /* ============================================================== */
+/* Primary Solid Action Buttons (Invert White Button to Dark Slate in Day Mode) */
+html.light-mode button.bg-white,
+html.light-mode button.bg-slate-100,
+html.light-mode header button.bg-slate-200 {
+  background-color: #0F172A !important;
+  color: #FFFFFF !important;
+  border-color: #0F172A !important;
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.12) !important;
+}
+html.light-mode button.bg-white:hover,
+html.light-mode button.bg-slate-100:hover,
+html.light-mode header button.bg-slate-200:hover {
+  background-color: #1E293B !important;
+  color: #FFFFFF !important;
+}
+html.light-mode button.bg-white span,
+html.light-mode button.bg-white svg,
+html.light-mode button.bg-slate-100 span,
+html.light-mode button.bg-slate-100 svg,
+html.light-mode header button.bg-slate-200 svg {
+  color: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}
+
 /* Secondary Action Buttons */
-html.light-mode button.bg-slate-800:not(aside button) {
+html.light-mode button.bg-slate-800:not(aside button),
+html.light-mode button.bg-slate-900:not(aside button),
+html.light-mode button.bg-slate-950:not(aside button),
+html.light-mode a.bg-slate-900 {
   background-color: #FFFFFF !important;
   border: 1px solid #CBD5E1 !important;
   color: #334155 !important;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04) !important;
 }
-html.light-mode button.bg-slate-800:not(aside button):hover {
+html.light-mode button.bg-slate-800:not(aside button):hover,
+html.light-mode button.bg-slate-900:not(aside button):hover,
+html.light-mode button.bg-slate-950:not(aside button):hover,
+html.light-mode a.bg-slate-900:hover {
   background-color: #F8FAFC !important;
   border-color: #94A3B8 !important;
   color: #0F172A !important;
+}
+
+/* Active Segment / Scale Buttons inside Toolbars */
+html.light-mode button.bg-slate-700 {
+  background-color: #0F172A !important;
+  color: #FFFFFF !important;
+}
+html.light-mode button.bg-slate-700 span {
+  color: #FFFFFF !important;
 }
 
 /* Primary Cyan Action Buttons (Preserve Crisp White Text) */
@@ -2144,6 +2198,32 @@ html.light-mode .bg-\[\#0F1422\] button:hover {
 /* ============================================================== */
 /* PRESERVE OBS STREAM PREVIEW CANVAS (KEEP DARK MONITOR FRAME!)  */
 /* ============================================================== */
+html.light-mode .obs-preview-stage {
+  background-color: #0B0F19 !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.light-mode .obs-preview-stage .text-white {
+  color: #FFFFFF !important;
+}
+
+html.light-mode .obs-preview-stage .text-slate-100 {
+  color: #F1F5F9 !important;
+}
+
+html.light-mode .obs-preview-stage .text-slate-200 {
+  color: #E2E8F0 !important;
+}
+
+html.light-mode .obs-preview-stage .text-slate-300 {
+  color: #CBD5E1 !important;
+}
+
+html.light-mode .obs-preview-stage .text-slate-400 {
+  color: #94A3B8 !important;
+}
+
 html.light-mode .from-slate-950.via-\[\#060911\].to-slate-950,
 html.light-mode [class*="bg-gradient-to-b from-slate-950 via-[#060911] to-slate-950"] {
   background: #0B0F19 !important;

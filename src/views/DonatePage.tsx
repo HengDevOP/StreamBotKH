@@ -317,9 +317,48 @@ export const DonatePage: React.FC<DonatePageProps> = ({ username = 'neonstreamer
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#070A12] flex flex-col items-center justify-center text-cyan-400 gap-3">
-        <Loader2 className="animate-spin" size={36} />
-        <span className="text-xs font-mono tracking-wider text-slate-400">LOADING DONATION PAGE...</span>
+      <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col items-center justify-center py-6 sm:py-12 px-3 sm:px-6 select-none">
+        <div className="w-full max-w-4xl space-y-5 animate-pulse">
+          {/* Streamer Header Card Skeleton */}
+          <div className="rounded-xl bg-[#0B0F19] border border-slate-800/80 p-5 flex items-center gap-4">
+            <div className="w-16 h-16 rounded-xl bg-slate-800 flex-shrink-0" />
+            <div className="space-y-2 flex-1">
+              <div className="h-5 w-44 bg-slate-800 rounded" />
+              <div className="h-3 w-72 bg-slate-800/60 rounded" />
+            </div>
+          </div>
+
+          {/* Main Form + Sidebar Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-7 rounded-xl bg-[#0B0F19] border border-slate-800/80 p-5 space-y-4">
+              <div className="flex gap-2">
+                <div className="h-9 flex-1 rounded-lg bg-slate-900 border border-slate-800" />
+                <div className="h-9 flex-1 rounded-lg bg-slate-900 border border-slate-800" />
+              </div>
+              <div className="h-10 w-full rounded-lg bg-slate-950 border border-slate-800" />
+              <div className="grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-10 rounded-lg bg-slate-900 border border-slate-800" />
+                ))}
+              </div>
+              <div className="h-24 w-full rounded-lg bg-slate-950 border border-slate-800" />
+              <div className="h-11 w-full rounded-lg bg-slate-800" />
+            </div>
+
+            <div className="lg:col-span-5 space-y-4">
+              <div className="rounded-xl bg-[#0B0F19] border border-slate-800/80 p-4 space-y-3">
+                <div className="h-4 w-36 bg-slate-800 rounded" />
+                {[1, 2, 3].map((r) => (
+                  <div key={r} className="h-11 rounded-lg bg-slate-900 border border-slate-800" />
+                ))}
+              </div>
+              <div className="rounded-xl bg-[#0B0F19] border border-slate-800/80 p-4 space-y-3">
+                <div className="h-4 w-32 bg-slate-800 rounded" />
+                <div className="h-8 rounded-lg bg-slate-900 border border-slate-800" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

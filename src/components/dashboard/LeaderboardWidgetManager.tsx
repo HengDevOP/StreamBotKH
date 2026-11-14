@@ -1,979 +1,1301 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
+  Trophy,
   Copy,
   Check,
-  ExternalLink,
-  Palette,
-  CheckCircle2,
-  Search,
   Save,
-  Type,
-  X,
-  Sliders,
-  Hash,
-  Crown,
-  Eye,
   RotateCcw,
-  AlertTriangle,
-  Flame
+  ExternalLink,
+  Crown,
+  Search,
+  Type,
+  Sliders,
+  Palette,
+  LayoutGrid,
+  Flame,
+  X,
+  PanelRight,
+  ZoomIn
 } from 'lucide-react';
-import { Button } from '../common/Button';
 import {
   LEADERBOARD_TEMPLATES,
-  LeaderboardTemplateMeta,
   LeaderboardTemplateRenderer,
   LeaderboardDonor
 } from '../overlay/leaderboardTemplates';
-
-const LEADERBOARD_FONTS = [
-  { id: 'Chakra Petch', name: 'Chakra Petch', category: 'Cyber / Futuristic' },
-  { id: 'Orbitron', name: 'Orbitron', category: 'Sci-Fi Military HUD' },
-  { id: 'Press Start 2P', name: 'Press Start 2P', category: 'Retro 8-Bit Pixel' },
-  { id: 'VT323', name: 'VT323', category: 'Monospace Terminal' },
-  { id: 'Bebas Neue', name: 'Bebas Neue', category: 'Bold Impact Esports' },
-  { id: 'Kanit', name: 'Kanit', category: 'High-Energy Modern' },
-  { id: 'Montserrat', name: 'Montserrat', category: 'Clean Geometric' },
-  { id: 'Inter', name: 'Inter', category: 'Neutral Swiss Minimal' },
-  { id: 'Permanent Marker', name: 'Permanent Marker', category: 'Urban Streetwear' },
-  { id: 'Koulen', name: 'Koulen', category: 'Khmer Bold Display' },
-  { id: 'Battambang', name: 'Battambang', category: 'Khmer Clean Modern' },
-  { id: 'Moul', name: 'Moul', category: 'Khmer Royal Traditional' },
-  { id: 'Bayon', name: 'Bayon', category: 'Khmer Stylized' }
-];
-
-const MODAL_CATEGORIES = ['All', 'Cyber', 'Gaming', 'Retro', 'Aesthetic', 'Minimal', 'Special'] as const;
+import { ALL_CLIENT_FONTS, ClientFontOption } from '../../data/leaderboardFonts';
+import { LeaderboardSkeleton } from './DashboardSkeleton';
+import { useSocket } from '../../context/SocketContext';
 
 interface LeaderboardWidgetManagerProps {
   streamerToken?: string;
+  overlayToken?: string;
+  streamerId?: string;
   recentDonations?: any[];
+  isRightbarOpen?: boolean;
+  onToggleRightbar?: () => void;
+  onCloseRightbar?: () => void;
 }
+
+type RightbarSection = 'templates' | 'fonts' | 'settings';
+type RankSourceOption = 'all' | '1' | '2' | '3';
 
 export const LeaderboardWidgetManager: React.FC<LeaderboardWidgetManagerProps> = ({
   streamerToken,
-  recentDonations = []
+  overlayToken: overlayTokenProp,
+  isRightbarOpen = true,
+  onToggleRightbar,
+  onCloseRightbar
 }) => {
-  const effectiveToken = streamerToken || 'demo-token';
+  const overlayToken = streamerToken || overlayTokenProp || 'demo-token';
+  const { socket } = useSocket();
 
-  // Saved active settings baseline
-  const [copiedUrl, setCopiedUrl] = useState(false);
+  // Strictly await backend data before displaying
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [title, setTitle] = useState('TOP SUPPORTERS');
+  const [period, setPeriod] = useState<'all' | 'month' | 'week' | 'today'>('all');
+  const [maxRows, setMaxRows] = useState<number>(3);
+  const [accentColor, setAccentColor] = useState('#F59E0B');
+  const [templateStyle, setTemplateStyle] = useState('champion-spotlight');
+  const [showBackground, setShowBackground] = useState(true);
+  const [showAnimation, setShowAnimation] = useState(true);
+  const [showRankBadges, setShowRankBadges] = useState(true);
+  const [fontFamily, setFontFamily] = useState('Chakra Petch');
+  const [rankFonts, setRankFonts] = useState<Record<string, string>>({});
+  const [fontTarget, setFontTarget] = useState<RankSourceOption>('all');
+  const [nameAmountGap, setNameAmountGap] = useState<number>(10);
+
+  // UI state
+  const [activeSection, setActiveSection] = useState<RightbarSection>('templates');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [fontCategory, setFontCategory] = useState<'All' | ClientFontOption['category']>('All');
+  const [fontSearch, setFontSearch] = useState('');
+
+  // Preview & Dedicated Rank Source URL state
+  const [selectedSourceRank, setSelectedSourceRank] = useState<RankSourceOption>('all');
+  const [removeRankCardBg, setRemoveRankCardBg] = useState<boolean>(false);
+  const [previewScale, setPreviewScale] = useState<number>(1.25);
+
+  const [topDonors, setTopDonors] = useState<LeaderboardDonor[]>([]);
+  const [copiedTarget, setCopiedTarget] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [overtakingDonorName, setOvertakingDonorName] = useState<string | null>(null);
   const [savedConfig, setSavedConfig] = useState({
     title: 'TOP SUPPORTERS',
-    period: 'all' as 'all' | 'month' | 'week' | 'today',
+    period: 'all' as 'all' | 'month' | 'today',
     maxRows: 3,
-    templateStyle: 'cyber-neon',
     accentColor: '#F59E0B',
+    templateStyle: 'champion-spotlight',
     showBackground: true,
     showAnimation: true,
     showRankBadges: true,
-    fontFamily: 'Chakra Petch'
+    fontFamily: 'Chakra Petch',
+    rankFonts: '{}',
+    nameAmountGap: 10,
+    removeRankCardBg: false
   });
-
-  const [title, setTitle] = useState<string>('TOP SUPPORTERS');
-  const [period, setPeriod] = useState<'all' | 'month' | 'week' | 'today'>('all');
-  const [maxRows, setMaxRows] = useState<number>(3); // 1 to 10, default 3
-  const [templateStyle, setTemplateStyle] = useState<string>('cyber-neon');
-  const [accentColor, setAccentColor] = useState<string>('#F59E0B');
-  const [showBackground, setShowBackground] = useState<boolean>(true);
-  const [showAnimation, setShowAnimation] = useState<boolean>(true);
-  const [showRankBadges, setShowRankBadges] = useState<boolean>(true);
-  const [fontFamily, setFontFamily] = useState<string>('Chakra Petch');
-
-  // Modal State for 40 Styles Browser
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [templateSearchQuery, setTemplateSearchQuery] = useState<string>('');
-  const [modalCategoryFilter, setModalCategoryFilter] = useState<string>('All');
-
-  // UI state
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
-
-  // Unsaved changes tracking
-  const hasUnsavedChanges =
-    title !== savedConfig.title ||
-    period !== savedConfig.period ||
-    maxRows !== savedConfig.maxRows ||
-    templateStyle !== savedConfig.templateStyle ||
-    accentColor !== savedConfig.accentColor ||
-    showBackground !== savedConfig.showBackground ||
-    showAnimation !== savedConfig.showAnimation ||
-    showRankBadges !== savedConfig.showRankBadges ||
-    fontFamily !== savedConfig.fontFamily;
-
   const [isEarthquake, setIsEarthquake] = useState(false);
-  const earthquakeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Broadcast unsaved changes status to global dashboard
-  useEffect(() => {
-    window.dispatchEvent(
-      new CustomEvent('dashboard-unsaved-changes', { detail: { tab: 'leaderboard', hasUnsaved: hasUnsavedChanges } })
-    );
-    if (!hasUnsavedChanges) {
-      setIsEarthquake(false);
-    }
-  }, [hasUnsavedChanges]);
+  const overtakeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Listen for earthquake trigger when user attempts to navigate away without saving
-  useEffect(() => {
-    const handleEarthquake = (e: any) => {
-      if (e.detail?.tab && e.detail.tab !== 'leaderboard') return;
-      if (!hasUnsavedChanges) return;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const baseObsUrl = `${origin}/overlay/leaderboard/${overlayToken}`;
 
-      setIsEarthquake(false);
-      requestAnimationFrame(() => {
-        setIsEarthquake(true);
-      });
-
-      if (earthquakeTimerRef.current) clearTimeout(earthquakeTimerRef.current);
-      earthquakeTimerRef.current = setTimeout(() => {
-        setIsEarthquake(false);
-      }, 2800);
-    };
-
-    window.addEventListener('dashboard-unsaved-earthquake', handleEarthquake);
-    return () => {
-      window.removeEventListener('dashboard-unsaved-earthquake', handleEarthquake);
-      if (earthquakeTimerRef.current) clearTimeout(earthquakeTimerRef.current);
-    };
-  }, [hasUnsavedChanges]);
-
-  const obsUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/overlay/leaderboard/${effectiveToken}`;
-
-  const copyObsUrl = () => {
-    navigator.clipboard.writeText(obsUrl);
-    setCopiedUrl(true);
-    setTimeout(() => setCopiedUrl(false), 2000);
+  const getEffectiveRankFont = (rankOpt: RankSourceOption): string => {
+    if (rankOpt === 'all') return fontFamily;
+    return rankFonts[rankOpt] || fontFamily;
   };
 
-  // 1. Fetch saved leaderboard settings from API
+  const getRankObsUrl = (rankOpt: RankSourceOption): string => {
+    if (rankOpt === 'all') return baseObsUrl;
+    const params = new URLSearchParams();
+    params.set('rank', rankOpt);
+    if (removeRankCardBg) params.set('bg', '0');
+    const customRankFont = rankFonts[rankOpt];
+    if (customRankFont) params.set('font', customRankFont);
+    if (nameAmountGap !== 10) params.set('gap', String(nameAmountGap));
+    return `${baseObsUrl}?${params.toString()}`;
+  };
+
+  const activeObsUrl = getRankObsUrl(selectedSourceRank);
+
+  const handleSelectRankView = (rankOpt: RankSourceOption) => {
+    setSelectedSourceRank(rankOpt);
+    setFontTarget(rankOpt);
+  };
+
+  const handleSelectFontForTarget = (selectedFontName: string, target: RankSourceOption = fontTarget) => {
+    if (target === 'all') {
+      setFontFamily(selectedFontName);
+    } else {
+      setRankFonts((prev) => ({
+        ...prev,
+        [target]: selectedFontName
+      }));
+    }
+  };
+
+  // Fetch initial saved leaderboard config & live top donors
   useEffect(() => {
-    fetch(`/api/widgets/leaderboard?token=${effectiveToken}`)
+    let isMounted = true;
+    setIsLoading(true);
+
+    fetch(`/api/widgets/leaderboard?token=${overlayToken}`)
       .then((res) => res.json())
       .then((data) => {
+        if (!isMounted) return;
         if (data.success && data.leaderboard) {
           const lb = data.leaderboard;
-          const cfg = {
-            title: lb.title || 'TOP SUPPORTERS',
-            period: (lb.period as any) || 'all',
-            maxRows: Number(lb.maxRows) || 3,
-            templateStyle: lb.templateStyle || 'cyber-neon',
-            accentColor: lb.accentColor || '#F59E0B',
-            showBackground: lb.showBackground !== false,
-            showAnimation: lb.showAnimation !== false,
-            showRankBadges: lb.showRankBadges !== false,
-            fontFamily: lb.fontFamily || 'Chakra Petch'
-          };
-          setSavedConfig(cfg);
-          setTitle(cfg.title);
-          setPeriod(cfg.period);
-          setMaxRows(cfg.maxRows);
-          setTemplateStyle(cfg.templateStyle);
-          setAccentColor(cfg.accentColor);
-          setShowBackground(cfg.showBackground);
-          setShowAnimation(cfg.showAnimation);
-          setShowRankBadges(cfg.showRankBadges);
-          setFontFamily(cfg.fontFamily);
+          const loadedTitle = lb.title || 'TOP SUPPORTERS';
+          const loadedPeriod = lb.period || 'all';
+          const loadedMaxRows = lb.maxRows || 3;
+          const loadedAccentColor = lb.accentColor || '#F59E0B';
+          const loadedTemplateStyle = lb.templateStyle || 'champion-spotlight';
+          const loadedShowBackground = lb.showBackground !== false;
+          const loadedShowAnimation = lb.showAnimation !== false;
+          const loadedShowRankBadges = lb.showRankBadges !== false;
+          const loadedFontFamily = lb.fontFamily || 'Chakra Petch';
+          const loadedRankFonts = lb.rankFonts && typeof lb.rankFonts === 'object' ? lb.rankFonts : {};
+          const loadedNameAmountGap = typeof lb.nameAmountGap === 'number' ? lb.nameAmountGap : 10;
+          const loadedRemoveRankCardBg = typeof lb.removeRankCardBg === 'boolean' ? lb.removeRankCardBg : false;
+
+          setTitle(loadedTitle);
+          setPeriod(loadedPeriod);
+          setMaxRows(loadedMaxRows);
+          setAccentColor(loadedAccentColor);
+          setTemplateStyle(loadedTemplateStyle);
+          setShowBackground(loadedShowBackground);
+          setShowAnimation(loadedShowAnimation);
+          setShowRankBadges(loadedShowRankBadges);
+          setFontFamily(loadedFontFamily);
+          setRankFonts(loadedRankFonts);
+          setNameAmountGap(loadedNameAmountGap);
+          setRemoveRankCardBg(loadedRemoveRankCardBg);
+
+          setSavedConfig({
+            title: loadedTitle,
+            period: loadedPeriod,
+            maxRows: loadedMaxRows,
+            accentColor: loadedAccentColor,
+            templateStyle: loadedTemplateStyle,
+            showBackground: loadedShowBackground,
+            showAnimation: loadedShowAnimation,
+            showRankBadges: loadedShowRankBadges,
+            fontFamily: loadedFontFamily,
+            rankFonts: JSON.stringify(loadedRankFonts),
+            nameAmountGap: loadedNameAmountGap,
+            removeRankCardBg: loadedRemoveRankCardBg
+          });
+        }
+        if (data.success && data.topDonors) {
+          setTopDonors(data.topDonors);
         }
       })
-      .catch((e) => console.error('Error fetching leaderboard settings:', e));
-  }, [effectiveToken]);
-
-  // 2. Build aggregated top donors from actual donations or demo data
-  const topDonors: LeaderboardDonor[] = React.useMemo(() => {
-    if (recentDonations && recentDonations.length > 0) {
-      const map: Record<string, { name: string; amount: number; count: number; bank: string }> = {};
-      recentDonations.forEach((d) => {
-        const name = d.donor_name || 'Anonymous';
-        if (!map[name]) {
-          map[name] = { name, amount: 0, count: 0, bank: d.banking_name || 'Bakong KHQR' };
-        }
-        const amt = Number(d.amount) || 0;
-        const inUsd = d.currency === 'KHR' ? amt / 4000 : amt;
-        map[name].amount += inUsd;
-        map[name].count += 1;
+      .catch((err) => console.error('Failed to load leaderboard config:', err))
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
       });
-      return Object.values(map)
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 10)
-        .map((item, idx) => ({
-          rank: idx + 1,
-          name: item.name,
-          amount: Math.round(item.amount * 100) / 100,
-          count: item.count,
-          bank: item.bank
-        }));
-    }
 
-    // Default demo leaderboard with full 10 donors available
-    const defaultList = [
-      { name: 'Sokha Gaming Pro', amount: 85.0, count: 4, bank: 'ABA Bank' },
-      { name: 'Vannak KH', amount: 50.0, count: 2, bank: 'Bakong App' },
-      { name: 'Dara Cyber', amount: 32.5, count: 3, bank: 'Acleda' },
-      { name: 'PhnomPenh_Ace', amount: 20.0, count: 1, bank: 'ABA Bank' },
-      { name: 'NeonSamurai', amount: 15.0, count: 1, bank: 'Bakong App' },
-      { name: 'KompongGamer', amount: 12.0, count: 2, bank: 'Wing Bank' },
-      { name: 'PixelQueen', amount: 10.0, count: 1, bank: 'ABA Bank' },
-      { name: 'KhmerWarrior', amount: 8.5, count: 1, bank: 'Bakong App' },
-      { name: 'CyberSamurai', amount: 5.0, count: 1, bank: 'ABA Bank' },
-      { name: 'SiemReapFan', amount: 3.0, count: 1, bank: 'Acleda' }
-    ];
+    return () => {
+      isMounted = false;
+    };
+  }, [overlayToken]);
 
-    return defaultList.map((d, i) => ({
-      rank: i + 1,
-      ...d
-    }));
-  }, [recentDonations]);
-
-  // Sample Donors used for rendering the 40 miniature visual templates
-  const previewDonors: LeaderboardDonor[] = React.useMemo(
-    () => [
-      { rank: 1, name: 'Sokha Pro', amount: 50.0, bank: 'ABA Bank' },
-      { rank: 2, name: 'Vannak KH', amount: 30.0, bank: 'Bakong' },
-      { rank: 3, name: 'Dara Cyber', amount: 15.0, bank: 'Acleda' }
-    ],
-    []
-  );
-
-  // Live Ranking Overtake / Rank Up Simulation State
-  const [simulatedOvertaker, setSimulatedOvertaker] = useState<string | null>(null);
-  const [simulatedDonors, setSimulatedDonors] = useState<LeaderboardDonor[] | null>(null);
-  const overtakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleSimulateOvertake = async () => {
-    if (overtakeTimeoutRef.current) {
-      clearTimeout(overtakeTimeoutRef.current);
-    }
-
-    const currentList = topDonors && topDonors.length > 0 ? [...topDonors] : [];
-    if (currentList.length < 2) return;
-
-    // Rank 2 overtakes Rank 1
-    const secondDonor = currentList[1];
-    const firstDonor = currentList[0];
-    const newLeadAmount = Math.round(((firstDonor.amount || 50) + 25) * 100) / 100;
-
-    const modifiedList: LeaderboardDonor[] = [
-      { ...secondDonor, rank: 1, amount: newLeadAmount, count: (secondDonor.count || 1) + 1 },
-      { ...firstDonor, rank: 2 },
-      ...currentList.slice(2).map((d, idx) => ({ ...d, rank: idx + 3 }))
-    ];
-
-    setSimulatedDonors(modifiedList);
-    setSimulatedOvertaker(secondDonor.name);
-
-    // Broadcast live test overtake event to OBS Browser Source Overlay
-    try {
-      fetch('/api/widgets/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: effectiveToken,
-          testOvertake: true,
-          donorName: secondDonor.name,
-          oldRank: 2,
-          newRank: 1,
-          amount: newLeadAmount
-        })
-      }).catch(() => {});
-    } catch (_) {}
-
-    // Reset simulation back to normal after 5 seconds
-    overtakeTimeoutRef.current = setTimeout(() => {
-      setSimulatedOvertaker(null);
-      setSimulatedDonors(null);
-    }, 5000);
+  const handleCopyUrl = (rankOpt: RankSourceOption = selectedSourceRank) => {
+    const urlToCopy = getRankObsUrl(rankOpt);
+    navigator.clipboard.writeText(urlToCopy);
+    setCopiedTarget(rankOpt);
+    setTimeout(() => setCopiedTarget(null), 2000);
   };
 
-  // 3. Save Settings to Database & Broadcast over Socket
-  const handleSaveSettings = async () => {
-    setIsSaving(true);
+  const handleSave = async () => {
+    setSaving(true);
     setSaveSuccess(false);
-
     try {
+      const payload = {
+        token: overlayToken,
+        title,
+        period,
+        maxRows,
+        accentColor,
+        templateStyle,
+        showBackground,
+        showAnimation,
+        showRankBadges,
+        fontFamily,
+        rankFonts,
+        nameAmountGap,
+        removeRankCardBg
+      };
+
       const res = await fetch('/api/widgets/leaderboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: effectiveToken,
-          title,
-          period,
-          maxRows,
-          templateStyle,
-          accentColor,
-          showBackground,
-          showAnimation,
-          showRankBadges,
-          fontFamily
-        })
+        body: JSON.stringify(payload)
       });
-
       const data = await res.json();
-      if (res.ok && data.success) {
-        setIsEarthquake(false);
+      if (data.success) {
+        if (data.topDonors) setTopDonors(data.topDonors);
+        if (socket) {
+          socket.emit('leaderboard:update', { token: overlayToken, ...payload });
+        }
         setSavedConfig({
           title,
           period,
           maxRows,
-          templateStyle,
           accentColor,
+          templateStyle,
           showBackground,
           showAnimation,
           showRankBadges,
-          fontFamily
+          fontFamily,
+          rankFonts: JSON.stringify(rankFonts),
+          nameAmountGap,
+          removeRankCardBg
         });
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2500);
       }
     } catch (e) {
-      console.error('Error saving leaderboard settings:', e);
+      console.error('Failed to save leaderboard widget:', e);
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  // 4. Reset Changes back to saved baseline
-  const handleResetChanges = () => {
-    setIsEarthquake(false);
+  const handleReset = () => {
     setTitle(savedConfig.title);
     setPeriod(savedConfig.period);
     setMaxRows(savedConfig.maxRows);
-    setTemplateStyle(savedConfig.templateStyle);
     setAccentColor(savedConfig.accentColor);
+    setTemplateStyle(savedConfig.templateStyle);
     setShowBackground(savedConfig.showBackground);
     setShowAnimation(savedConfig.showAnimation);
     setShowRankBadges(savedConfig.showRankBadges);
     setFontFamily(savedConfig.fontFamily);
+    try {
+      setRankFonts(JSON.parse(savedConfig.rankFonts || '{}'));
+    } catch {
+      setRankFonts({});
+    }
+    setNameAmountGap(savedConfig.nameAmountGap);
+    setRemoveRankCardBg(savedConfig.removeRankCardBg);
   };
 
-  // Filter templates for Modal Search & Category Filter
-  const modalTemplates = LEADERBOARD_TEMPLATES.filter((t) => {
-    const matchesCategory =
-      modalCategoryFilter === 'All' || t.category === modalCategoryFilter;
-    if (!matchesCategory) return false;
-    if (!templateSearchQuery.trim()) return true;
-    const q = templateSearchQuery.toLowerCase();
-    return (
-      t.name.toLowerCase().includes(q) ||
-      t.category.toLowerCase().includes(q) ||
-      t.description.toLowerCase().includes(q)
-    );
-  });
+  const hasUnsavedChanges =
+    !isLoading &&
+    (title !== savedConfig.title ||
+      period !== savedConfig.period ||
+      maxRows !== savedConfig.maxRows ||
+      accentColor !== savedConfig.accentColor ||
+      templateStyle !== savedConfig.templateStyle ||
+      showBackground !== savedConfig.showBackground ||
+      showAnimation !== savedConfig.showAnimation ||
+      showRankBadges !== savedConfig.showRankBadges ||
+      fontFamily !== savedConfig.fontFamily ||
+      JSON.stringify(rankFonts) !== savedConfig.rankFonts ||
+      nameAmountGap !== savedConfig.nameAmountGap ||
+      removeRankCardBg !== savedConfig.removeRankCardBg);
 
-  const currentTemplate =
-    LEADERBOARD_TEMPLATES.find((t) => t.id === templateStyle) || LEADERBOARD_TEMPLATES[0];
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('dashboard-unsaved-changes', {
+        detail: { tab: 'leaderboard', hasUnsaved: hasUnsavedChanges }
+      })
+    );
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    const handleEarthquake = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.tab === 'leaderboard') {
+        setIsEarthquake(true);
+        setTimeout(() => setIsEarthquake(false), 700);
+      }
+    };
+    window.addEventListener('dashboard-unsaved-earthquake', handleEarthquake);
+    return () => window.removeEventListener('dashboard-unsaved-earthquake', handleEarthquake);
+  }, []);
+
+  const handleTestOvertake = () => {
+    if (overtakeTimerRef.current) {
+      clearTimeout(overtakeTimerRef.current);
+    }
+
+    const baseList: LeaderboardDonor[] =
+      topDonors.length >= 2
+        ? [...topDonors]
+        : [
+            { rank: 1, name: 'Sokha Gaming Pro', amount: 120, count: 5, bank: 'ABA Bank' },
+            { rank: 2, name: 'Vannak KH', amount: 95, count: 3, bank: 'Bakong KHQR' },
+            { rank: 3, name: 'Dara Cyber', amount: 60, count: 2, bank: 'ACLEDA Bank' }
+          ];
+
+    const challenger = baseList[1] || { rank: 2, name: 'Vannak KH', amount: 95, count: 3, bank: 'Bakong KHQR' };
+    const leader = baseList[0];
+    const newTopAmount = Number((leader.amount + 25).toFixed(2));
+
+    const updatedDonors: LeaderboardDonor[] = [
+      { ...challenger, rank: 1, amount: newTopAmount, count: (challenger.count || 1) + 1 },
+      { ...leader, rank: 2 },
+      ...baseList.slice(2).map((d, i) => ({ ...d, rank: i + 3 }))
+    ];
+
+    setTopDonors(updatedDonors);
+    setOvertakingDonorName(challenger.name);
+
+    if (socket) {
+      socket.emit('leaderboard:overtake', {
+        token: overlayToken,
+        donorName: challenger.name,
+        newRank: 1,
+        amount: newTopAmount
+      });
+    }
+
+    overtakeTimerRef.current = setTimeout(() => {
+      setOvertakingDonorName(null);
+    }, 4500);
+  };
+
+  const categories = ['All', 'Cyber', 'Gaming', 'Retro', 'Aesthetic', 'Minimal', 'Special'];
+
+  const filteredTemplates = useMemo(() => {
+    return LEADERBOARD_TEMPLATES.filter((t) => {
+      const matchesCategory = selectedCategory === 'All' || t.category === selectedCategory;
+      const matchesSearch =
+        !templateSearch.trim() ||
+        t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+        t.id.toLowerCase().includes(templateSearch.toLowerCase()) ||
+        t.category.toLowerCase().includes(templateSearch.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [selectedCategory, templateSearch]);
+
+  const filteredFonts = useMemo(() => {
+    return ALL_CLIENT_FONTS.filter((f) => {
+      const matchesCat = fontCategory === 'All' || f.category === fontCategory;
+      const matchesSearch =
+        !fontSearch.trim() ||
+        f.label.toLowerCase().includes(fontSearch.toLowerCase()) ||
+        f.value.toLowerCase().includes(fontSearch.toLowerCase()) ||
+        f.category.toLowerCase().includes(fontSearch.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [fontCategory, fontSearch]);
+
+  const activeTemplateMeta = useMemo(
+    () => LEADERBOARD_TEMPLATES.find((t) => t.id === templateStyle) || LEADERBOARD_TEMPLATES[0],
+    [templateStyle]
+  );
+
+  // Strictly wait until backend data is ready
+  if (isLoading) {
+    return <LeaderboardSkeleton />;
+  }
+
+  const activeSingleRankNumber = selectedSourceRank === 'all' ? null : Number(selectedSourceRank);
 
   return (
-    <div className="space-y-6">
-      {/* ============================================================== */}
-      {/* 1. TOP LIVE PREVIEW SCREEN WITH OBS CONTROLS                   */}
-      {/* ============================================================== */}
-      <div className="w-full rounded-2xl bg-[#040711] border border-slate-800 p-6 sm:p-8 flex items-center justify-center min-h-[380px] relative overflow-hidden shadow-2xl">
-        {/* Transparent Checkerboard Grid */}
-        <div
-          className="absolute inset-0 opacity-15 pointer-events-none"
-          style={{
-            backgroundImage:
-              'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
-            backgroundSize: '20px 20px',
-            backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-          }}
-        />
-
-        {/* Top-Left OBS Action Controls (Positioned at top-left to avoid conflict with top-right navbar mailbox popover) */}
-        <div className="absolute top-3.5 left-3.5 sm:top-4 sm:left-4 z-20 flex items-center gap-2 flex-wrap">
-          {/* Copy OBS Overlay URL */}
-          <button
-            type="button"
-            onClick={copyObsUrl}
-            className="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-200 hover:text-white font-mono text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
-            title="Copy OBS Studio Browser Source URL"
-          >
-            {copiedUrl ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-            <span>{copiedUrl ? 'Copied' : 'Copy OBS URL'}</span>
-          </button>
-
-          {/* Test Ranking Overtake Simulation Button */}
-          <button
-            type="button"
-            onClick={handleSimulateOvertake}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 hover:text-white font-mono text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
-            title="Test rank overtake / pass ranking animation on live preview & OBS"
-          >
-            <Flame size={13} className="text-amber-400 animate-pulse fill-amber-400" />
-            <span>Test Rank Overtake</span>
-          </button>
-
-          {/* Open Standalone Overlay in New Tab */}
-          <a
-            href={obsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white transition-colors flex items-center justify-center shadow-md"
-            title="Open OBS Overlay in New Tab"
-          >
-            <ExternalLink size={14} />
-          </a>
-        </div>
-
-        {/* Real-time Rendered Leaderboard Template */}
-        <div className="relative z-10 w-full flex justify-center">
-          <LeaderboardTemplateRenderer
-            templateStyle={templateStyle}
-            title={title}
-            period={period}
-            topDonors={simulatedDonors || topDonors}
-            accentColor={accentColor}
-            showBackground={showBackground}
-            showAnimation={showAnimation}
-            showRankBadges={showRankBadges}
-            maxRows={maxRows}
-            fontFamily={fontFamily}
-            overtakingDonorName={simulatedOvertaker}
-          />
-        </div>
-      </div>
-
-      {/* ============================================================== */}
-      {/* 2. LEADERBOARD EDIT & CONFIGURATION SECTION (WEB DESKTOP VIEW)  */}
-      {/* ============================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column (lg:col-span-6): Style, Typography & Aesthetics */}
-        <div className="lg:col-span-6 space-y-5">
-          <div className="p-5 sm:p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] flex items-center gap-2 uppercase tracking-wider">
-                <Palette size={16} className="text-amber-400" />
-                Display Style & Appearance
-              </h4>
-            </div>
-
-            {/* Active Style Card & Browse All 40 Styles Trigger */}
-            <div
-              onClick={() => setIsTemplateModalOpen(true)}
-              className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/40 transition-colors cursor-pointer space-y-3 group"
+    <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 w-full h-full overflow-hidden">
+      {/* ============================================================ */}
+      {/* LEFT MAIN AREA: SCALED BIG PREVIEW SCREEN + BOTTOM DOCK BAR  */}
+      {/* ============================================================ */}
+      <div className="flex-1 min-w-0 bg-[#0B0F19] border border-slate-800/80 rounded-xl flex flex-col overflow-hidden min-h-[480px]">
+        {/* Top Bar: Active Template Info, Rank View Tabs & Scale Controls */}
+        <div className="px-4 py-2.5 border-b border-slate-800/80 bg-[#090D16] flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Trophy size={15} className="text-amber-400 shrink-0" />
+            <span className="text-xs font-semibold text-white truncate">
+              {activeTemplateMeta?.name || 'Leaderboard Preview'}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSection('fonts');
+                setFontTarget(selectedSourceRank);
+              }}
+              className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono text-slate-300 hover:text-white px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-colors"
+              title="Click to change font for this view"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-bold text-slate-300">Active Theme Style</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-400 font-bold uppercase">
-                  {currentTemplate.category}
-                </span>
-              </div>
+              <Type size={11} className="text-amber-400" />
+              <span>
+                {selectedSourceRank === 'all'
+                  ? `Font: ${fontFamily}`
+                  : `#${selectedSourceRank} Font: ${getEffectiveRankFont(selectedSourceRank)}`}
+              </span>
+            </button>
+          </div>
 
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg border border-white/10"
-                    style={{ backgroundColor: `${currentTemplate.previewColor}25`, color: currentTemplate.previewColor }}
-                  >
-                    <Palette size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <h5 className="text-xs sm:text-sm font-bold text-white font-['Chakra_Petch'] truncate">
-                      {currentTemplate.name}
-                    </h5>
-                    <p className="text-[11px] text-slate-400 line-clamp-1">{currentTemplate.description}</p>
-                  </div>
-                </div>
-
-                <Button
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Preview Mode Selector (Full vs 1st / 2nd / 3rd Name Card) */}
+            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+              {(
+                [
+                  { id: 'all', label: 'All Ranks' },
+                  { id: '1', label: '1st Card' },
+                  { id: '2', label: '2nd Card' },
+                  { id: '3', label: '3rd Card' }
+                ] as { id: RankSourceOption; label: string }[]
+              ).map((tab) => (
+                <button
+                  key={tab.id}
                   type="button"
-                  variant="primary"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsTemplateModalOpen(true);
-                  }}
-                  className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold font-mono text-xs flex-shrink-0 border-0 shadow-md"
+                  onClick={() => handleSelectRankView(tab.id)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                    selectedSourceRank === tab.id
+                      ? 'bg-slate-800 text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  <Eye size={13} className="mr-1.5" />
-                  Browse 80 Styles
-                </Button>
-              </div>
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            {/* Custom Typography / Font Family */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1.5">
-                  <Type size={14} className="text-amber-400" />
-                  <span>Typography / Font Family</span>
-                </label>
-                <span className="text-xs font-bold text-amber-300 font-mono" style={{ fontFamily }}>
-                  {fontFamily}
-                </span>
-              </div>
+            {/* Scale Selector */}
+            <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+              <ZoomIn size={12} className="text-slate-400 ml-1.5 mr-0.5" />
+              {[
+                { label: '100%', value: 1 },
+                { label: '125%', value: 1.25 },
+                { label: '140%', value: 1.4 }
+              ].map((s) => (
+                <button
+                  key={s.label}
+                  type="button"
+                  onClick={() => setPreviewScale(s.value)}
+                  className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
+                    previewScale === s.value
+                      ? 'bg-slate-800 text-white font-semibold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {LEADERBOARD_FONTS.slice(0, 8).map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setFontFamily(f.id)}
-                    className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
-                      fontFamily === f.id
-                        ? 'bg-amber-400/10 border-amber-400 text-white ring-1 ring-amber-400/30'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-900'
-                    }`}
-                  >
-                    <div className="text-xs font-bold truncate" style={{ fontFamily: f.id }}>
-                      {f.name}
-                    </div>
-                    <div className="text-[9px] text-slate-500 font-mono truncate">{f.category}</div>
-                  </button>
-                ))}
-              </div>
-
-              <select
-                value={fontFamily}
-                onChange={(e) => setFontFamily(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:border-amber-400"
+            {onToggleRightbar && !isRightbarOpen && (
+              <button
+                type="button"
+                onClick={onToggleRightbar}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-medium flex items-center gap-1.5"
               >
-                {LEADERBOARD_FONTS.map((f) => (
-                  <option key={f.id} value={f.id} className="bg-slate-950 text-white">
-                    {f.name} ({f.category})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Theme Accent & Glow Color */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-bold text-slate-300 block">
-                Theme Accent & Glow Color
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                {[
-                  '#F59E0B',
-                  '#00F0FF',
-                  '#EC4899',
-                  '#10B981',
-                  '#A855F7',
-                  '#EF4444',
-                  '#38BDF8',
-                  '#FBBF24',
-                  '#84CC16',
-                  '#E0E7FF'
-                ].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setAccentColor(c)}
-                    className={`w-7 h-7 rounded-lg border-2 transition-transform cursor-pointer ${
-                      accentColor.toUpperCase() === c.toUpperCase()
-                        ? 'scale-110 border-white ring-2 ring-white/30'
-                        : 'border-transparent hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-                <input
-                  type="text"
-                  value={accentColor}
-                  onChange={(e) => setAccentColor(e.target.value)}
-                  className="w-24 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white text-xs font-mono text-center ml-auto focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            </div>
-
-            {/* Display Toggles */}
-            <div className="space-y-2 pt-2 border-t border-slate-800 text-xs font-mono">
-              <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:bg-slate-900 cursor-pointer">
-                <span className="text-slate-300">Show Background Container</span>
-                <input
-                  type="checkbox"
-                  checked={showBackground}
-                  onChange={(e) => setShowBackground(e.target.checked)}
-                  className="rounded text-amber-500 focus:ring-0 w-4 h-4 cursor-pointer"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:bg-slate-900 cursor-pointer">
-                <span className="text-slate-300">Show Rank Badges & Medals</span>
-                <input
-                  type="checkbox"
-                  checked={showRankBadges}
-                  onChange={(e) => setShowRankBadges(e.target.checked)}
-                  className="rounded text-amber-500 focus:ring-0 w-4 h-4 cursor-pointer"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:bg-slate-900 cursor-pointer">
-                <span className="text-slate-300">Enable Live Animations (Pulsing Glow, Shimmer)</span>
-                <input
-                  type="checkbox"
-                  checked={showAnimation}
-                  onChange={(e) => setShowAnimation(e.target.checked)}
-                  className="rounded text-amber-500 focus:ring-0 w-4 h-4 cursor-pointer"
-                />
-              </label>
-            </div>
+                <PanelRight size={14} />
+                <span>Settings</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Right Column (lg:col-span-6): Content, Rules & Actions */}
-        <div className="lg:col-span-6 space-y-5">
-          <div className="p-5 sm:p-6 rounded-2xl bg-[#090D18] border border-slate-800 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] flex items-center gap-2 uppercase tracking-wider">
-                <Sliders size={16} className="text-amber-400" />
-                Content & Ranking Rules
-              </h4>
-            </div>
+        {/* Center Big Preview Stage */}
+        <div
+          className="obs-preview-stage flex-1 relative overflow-auto flex items-center justify-center p-6 sm:p-10 min-h-[340px]"
+          style={{
+            backgroundColor: '#060911',
+            backgroundImage:
+              'linear-gradient(45deg, #0b101d 25%, transparent 25%), linear-gradient(-45deg, #0b101d 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #0b101d 75%), linear-gradient(-45deg, transparent 75%, #0b101d 75%)',
+            backgroundSize: '24px 24px',
+            backgroundPosition: '0 0, 0 12px, 12px -12px, -12px 0px'
+          }}
+        >
+          {/* Mode Indicator Pill */}
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-2 flex-wrap">
+            <span className="px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-slate-300">
+              {selectedSourceRank === 'all'
+                ? `Full Leaderboard (Top ${maxRows})`
+                : `Dedicated #${selectedSourceRank} Donor Name & Amount Only`}
+            </span>
+            {selectedSourceRank !== 'all' && (
+              <span className="px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-amber-300">
+                #{selectedSourceRank} Font: {getEffectiveRankFont(selectedSourceRank)}
+              </span>
+            )}
+          </div>
 
-            {/* Leaderboard Title */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-bold text-slate-300 block">
-                Leaderboard Header Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="TOP SUPPORTERS"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-amber-400 transition-colors"
+          {/* Scaled Preview Wrapper */}
+          <div
+            className="w-full flex items-center justify-center transition-transform duration-200 origin-center my-auto"
+            style={{
+              transform: `scale(${previewScale})`
+            }}
+          >
+            <div className="w-full flex justify-center">
+              <LeaderboardTemplateRenderer
+                templateStyle={templateStyle}
+                title={title}
+                period={period}
+                topDonors={topDonors}
+                accentColor={accentColor}
+                showBackground={selectedSourceRank !== 'all' ? !removeRankCardBg && showBackground : showBackground}
+                showAnimation={showAnimation}
+                showRankBadges={showRankBadges}
+                maxRows={maxRows}
+                fontFamily={fontFamily}
+                rankFonts={rankFonts}
+                nameAmountGap={nameAmountGap}
+                overtakingDonorName={overtakingDonorName}
+                singleRank={activeSingleRankNumber}
               />
             </div>
+          </div>
+        </div>
 
-            {/* Ranking Period */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-bold text-slate-300 block">
-                Ranking Time Period
+        {/* ============================================================ */}
+        {/* BOTTOM BAR: DEDICATED RANK SOURCE URLS + ACTIONS             */}
+        {/* ============================================================ */}
+        <div className="p-3.5 border-t border-slate-800/80 bg-[#090D16] flex flex-col gap-2.5 shrink-0">
+          {/* Row 1: Dedicated Rank Source URL Switcher & Quick Copy */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-medium text-slate-400 mr-1">OBS Source URL:</span>
+              {(
+                [
+                  { id: 'all', label: 'All Ranks' },
+                  { id: '1', label: '1st Place Only' },
+                  { id: '2', label: '2nd Place Only' },
+                  { id: '3', label: '3rd Place Only' }
+                ] as { id: RankSourceOption; label: string }[]
+              ).map((item) => {
+                const isSelected = selectedSourceRank === item.id;
+                const isCopied = copiedTarget === item.id;
+                return (
+                  <div key={item.id} className="inline-flex items-center rounded-lg border border-slate-800 bg-slate-950 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectRankView(item.id)}
+                      className={`px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                        isSelected
+                          ? 'bg-slate-800 text-white'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyUrl(item.id)}
+                      title={`Copy ${item.label} OBS URL`}
+                      className="px-2 py-1.5 border-l border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                    >
+                      {isCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Checkbox to remove background card in dedicated source URL */}
+              <label className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-medium text-slate-300 hover:text-white cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={removeRankCardBg}
+                  onChange={(e) => setRemoveRankCardBg(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-0"
+                />
+                <span>Remove Background Card</span>
               </label>
-              <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
-                {(['all', 'month', 'week', 'today'] as const).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPeriod(p)}
-                    className={`py-2 rounded-lg text-[11px] font-mono font-bold capitalize transition-colors cursor-pointer ${
-                      period === p
-                        ? 'bg-amber-400 text-slate-950 shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
+
+              {/* Compact Name & Amount Spacing Slider */}
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
+                <span className="text-slate-400">Spacing:</span>
+                <input
+                  type="range"
+                  min={4}
+                  max={40}
+                  step={1}
+                  value={nameAmountGap}
+                  onChange={(e) => setNameAmountGap(Number(e.target.value))}
+                  className="w-16 accent-amber-400 cursor-pointer"
+                  title="Adjust spacing between donor name and amount"
+                />
+                <span className="font-mono text-[10px] text-amber-300 w-7 text-right">{nameAmountGap}px</span>
               </div>
             </div>
 
-            {/* Top Donors Display Count (1 to 10) */}
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-200 font-bold flex items-center gap-1.5">
-                  <Hash size={13} className="text-amber-400" />
-                  Top Donors Display Count (1 to 10)
-                </span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-mono">
-                  Top {maxRows}
-                </span>
-              </div>
+            {/* Active URL Readout */}
+            <div className="hidden xl:flex items-center gap-2 min-w-0 max-w-xs">
+              <code className="text-[11px] font-mono text-slate-400 bg-slate-950 border border-slate-800/80 px-2.5 py-1 rounded truncate">
+                {activeObsUrl}
+              </code>
+            </div>
+          </div>
 
-              <div className="flex items-center gap-2">
-                {[
-                  { count: 3, label: 'Top 3 (Default)' },
-                  { count: 5, label: 'Top 5' },
-                  { count: 10, label: 'Top 10' }
-                ].map((item) => (
-                  <button
-                    key={item.count}
-                    type="button"
-                    onClick={() => setMaxRows(item.count)}
-                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
-                      maxRows === item.count
-                        ? 'bg-amber-400 text-slate-950 border-amber-400 font-black shadow-md'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+          {/* Row 2: Bottom Action Controls (Copy OBS URL, Test Rank Overtake, Popup) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
+            <div className="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">
+              {selectedSourceRank === 'all' ? (
+                <span>
+                  Displays full leaderboard • Fonts: <strong className="text-slate-200">1st ({getEffectiveRankFont('1')})</strong>,{' '}
+                  <strong className="text-slate-200">2nd ({getEffectiveRankFont('2')})</strong>,{' '}
+                  <strong className="text-slate-200">3rd ({getEffectiveRankFont('3')})</strong>
+                </span>
+              ) : (
+                <span>
+                  Displays <strong className="text-white">only #{selectedSourceRank} donor name & amount</strong> • Font:{' '}
+                  <strong className="text-amber-300">{getEffectiveRankFont(selectedSourceRank)}</strong>
+                </span>
+              )}
+            </div>
 
-              <div className="grid grid-cols-10 gap-1 pt-1">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setMaxRows(num)}
-                    className={`py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                      maxRows === num
-                        ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-400 font-black'
-                        : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800/80'
-                    }`}
-                  >
-                    {num}
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleCopyUrl(selectedSourceRank)}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-white text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+              >
+                {copiedTarget === selectedSourceRank ? <Check size={14} /> : <Copy size={14} />}
+                <span>
+                  {copiedTarget === selectedSourceRank
+                    ? 'Copied URL'
+                    : selectedSourceRank === 'all'
+                    ? 'Copy OBS URL'
+                    : `Copy #${selectedSourceRank} Rank URL`}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTestOvertake}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+              >
+                <Flame size={14} className={overtakingDonorName ? 'animate-bounce text-amber-400' : ''} />
+                <span>Test Rank Overtake</span>
+              </button>
+
+              <a
+                href={activeObsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                title="Open OBS Overlay in New Tab"
+              >
+                <ExternalLink size={14} />
+                <span>Popup</span>
+              </a>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* 3. 80 UNIQUE STYLES SELECTION MODAL                            */}
-      {/* ============================================================== */}
-      {isTemplateModalOpen &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div className="fixed inset-0 z-[9995] flex items-stretch md:items-center justify-center p-0 md:p-6 bg-[#080C16] md:bg-black/85 md:backdrop-blur-md overscroll-none animate-fadeIn">
-            <div className="w-full max-w-5xl h-full md:h-auto md:max-h-[90vh] rounded-none md:rounded-3xl bg-[#0B101E] border-0 md:border md:border-amber-500/30 shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden text-slate-100">
-              {/* Pinned Modal Header */}
-              <div className="p-4 sm:p-6 border-b border-slate-800/80 flex items-center justify-between gap-4 bg-[#0B101E] flex-shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0">
-                    <Palette size={20} />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-lg font-bold text-white font-['Chakra_Petch'] truncate">
-                      Select From 80 Unique Leaderboard Displays
-                    </h3>
-                    <p className="text-xs text-slate-400 font-mono hidden sm:block truncate">
-                      Click any style to apply. Includes animated flame, frost outlines, laser beams, and live rank-up overtake animations.
-                    </p>
-                  </div>
-                </div>
+      {/* ============================================================ */}
+      {/* RIGHTBAR: ALL CONFIGURATION SETTINGS                         */}
+      {/* ============================================================ */}
+      <div
+        className={`fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity duration-300 ease-in-out ${
+          isRightbarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onCloseRightbar}
+      />
 
-                <div className="flex items-center gap-2">
-                  <div className="relative w-48 sm:w-64">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <div
+        className={`fixed lg:static top-0 right-0 bottom-0 z-50 lg:z-0 w-full max-w-[380px] lg:max-w-none shrink-0 h-full overflow-hidden transition-all duration-300 ease-in-out ${
+          isRightbarOpen
+            ? 'translate-x-0 lg:w-[360px] xl:w-[400px] lg:opacity-100 pointer-events-auto'
+            : 'translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:-ml-4 pointer-events-none'
+        }`}
+      >
+        <aside className="w-full max-w-[380px] lg:max-w-none lg:w-[360px] xl:w-[400px] bg-[#0B0F19] border-l lg:border border-slate-800/80 lg:rounded-xl flex flex-col h-full overflow-hidden">
+          {/* Rightbar Header */}
+          <div className="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <Sliders size={15} className="text-slate-300" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                Leaderboard Configuration
+              </h3>
+            </div>
+            {onCloseRightbar && (
+              <button
+                type="button"
+                onClick={onCloseRightbar}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+            {/* Rightbar Navigation Tabs */}
+            <div className="grid grid-cols-3 gap-1 p-2 bg-[#090D16] border-b border-slate-800/80 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveSection('templates')}
+                className={`py-2 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  activeSection === 'templates'
+                    ? 'bg-slate-800 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <LayoutGrid size={13} />
+                <span>Templates ({LEADERBOARD_TEMPLATES.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection('fonts')}
+                className={`py-2 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  activeSection === 'fonts'
+                    ? 'bg-slate-800 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Type size={13} />
+                <span>Fonts ({ALL_CLIENT_FONTS.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection('settings')}
+                className={`py-2 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  activeSection === 'settings'
+                    ? 'bg-slate-800 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Palette size={13} />
+                <span>Display</span>
+              </button>
+            </div>
+
+            {/* Rightbar Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* SECTION 1: TEMPLATE STYLES */}
+              {activeSection === 'templates' && (
+                <div className="space-y-3">
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
                       type="text"
-                      value={templateSearchQuery}
-                      onChange={(e) => setTemplateSearchQuery(e.target.value)}
-                      placeholder="Search 80 styles (e.g. flame, frost)..."
-                      className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-amber-400"
+                      value={templateSearch}
+                      onChange={(e) => setTemplateSearch(e.target.value)}
+                      placeholder="Search template style..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-600"
                     />
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsTemplateModalOpen(false)}
-                    aria-label="Close templates modal"
-                    className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0 cursor-pointer"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Category Filter Tabs */}
-              <div className="px-4 sm:px-6 py-2.5 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto no-scrollbar bg-[#090D18] flex-shrink-0">
-                {MODAL_CATEGORIES.map((cat) => {
-                  const count =
-                    cat === 'All'
-                      ? LEADERBOARD_TEMPLATES.length
-                      : LEADERBOARD_TEMPLATES.filter((t) => t.category === cat).length;
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setModalCategoryFilter(cat)}
-                      className={`px-3 py-1 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer ${
-                        modalCategoryFilter === cat
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
-                          : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'
-                      }`}
-                    >
-                      {cat} ({count})
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 40 Visual Miniature Live Templates Grid */}
-              <div className="p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto overscroll-contain flex-1 min-h-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-                  {modalTemplates.map((tmpl) => {
-                    const isSelected = templateStyle === tmpl.id;
-                    return (
-                      <div
-                        key={tmpl.id}
-                        onClick={() => {
-                          setTemplateStyle(tmpl.id);
-                          if (tmpl.previewColor) setAccentColor(tmpl.previewColor);
-                          setIsTemplateModalOpen(false);
-                        }}
-                        className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-3 relative group flex flex-col ${
-                          isSelected
-                            ? 'bg-amber-950/25 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)] ring-1 ring-amber-400/50'
-                            : 'bg-[#090D18] border-slate-800/90 hover:border-slate-700 hover:bg-[#0C1222]'
+                  {/* Category Filter Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors ${
+                          selectedCategory === cat
+                            ? 'bg-slate-200 text-slate-950 font-semibold'
+                            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
                         }`}
                       >
-                        {/* Top Header Row */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm"
-                              style={{ backgroundColor: tmpl.previewColor }}
-                            />
-                            <h4 className="text-sm font-bold text-white font-['Chakra_Petch'] truncate">
-                              {tmpl.name}
-                            </h4>
-                            <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 flex-shrink-0">
-                              {tmpl.category}
-                            </span>
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Templates List */}
+                  <div className="grid grid-cols-1 gap-2">
+                    {filteredTemplates.map((tmpl) => {
+                      const isSelected = templateStyle === tmpl.id;
+                      const isHeroFlagship =
+                        tmpl.id === 'champion-spotlight' ||
+                        tmpl.id === 'cyber-mvp-showcase' ||
+                        tmpl.id === 'royal-podium-crown';
+
+                      return (
+                        <button
+                          key={tmpl.id}
+                          type="button"
+                          onClick={() => {
+                            setTemplateStyle(tmpl.id);
+                            setAccentColor(tmpl.previewColor);
+                          }}
+                          className={`p-3 rounded-lg border text-left transition-colors flex items-start justify-between gap-2.5 ${
+                            isSelected
+                              ? 'bg-slate-800/90 border-slate-500 text-white'
+                              : 'bg-slate-900/50 border-slate-800/80 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: tmpl.previewColor }}
+                              />
+                              <span className="text-xs font-semibold text-white truncate">
+                                {tmpl.name}
+                              </span>
+                              {isHeroFlagship && (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono font-bold uppercase shrink-0">
+                                  #1 Hero
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-400 line-clamp-1">
+                              {tmpl.description}
+                            </p>
                           </div>
+                          <span className="text-[10px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 shrink-0">
+                            {tmpl.category}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                          {isSelected ? (
-                            <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold flex-shrink-0">
-                              <Check size={11} className="stroke-[3]" />
-                              Selected
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                              Click to apply
-                            </span>
-                          )}
-                        </div>
+              {/* SECTION 2: ALL AVAILABLE FONTS (GLOBAL & PER-DONOR RANK) */}
+              {activeSection === 'fonts' && (
+                <div className="space-y-3">
+                  {/* Per-Donor Font Target Selector */}
+                  <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-slate-200">
+                        Select Font For Donor:
+                      </span>
+                      {Object.keys(rankFonts).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setRankFonts({})}
+                          className="text-[10px] font-mono text-amber-400 hover:text-amber-300"
+                        >
+                          Use Same Font For All
+                        </button>
+                      )}
+                    </div>
 
-                        {/* Live Rendered Template Preview Box */}
-                        <div className="w-full rounded-xl bg-[#030611] border border-slate-800/80 p-3 sm:p-4 flex items-center justify-center relative overflow-hidden pointer-events-none min-h-[220px]">
-                          {/* Transparent Checkerboard */}
-                          <div
-                            className="absolute inset-0 opacity-12 pointer-events-none"
-                            style={{
-                              backgroundImage:
-                                'linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%)',
-                              backgroundSize: '16px 16px',
-                              backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px'
-                            }}
-                          />
-
-                          <div className="w-full max-w-sm relative z-10 flex justify-center transform scale-[0.88] sm:scale-95 origin-center transition-transform group-hover:scale-100 duration-200">
-                            <LeaderboardTemplateRenderer
-                              templateStyle={tmpl.id}
-                              title="TOP SUPPORTERS"
-                              period={period}
-                              topDonors={previewDonors}
-                              accentColor={tmpl.previewColor}
-                              showBackground={true}
-                              showAnimation={true}
-                              showRankBadges={true}
-                              maxRows={3}
-                              fontFamily={fontFamily}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Description & Action Button Footer */}
-                        <div className="flex items-center justify-between gap-3 pt-1 mt-auto">
-                          <p className="text-[11px] text-slate-400 line-clamp-1">{tmpl.description}</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(
+                        [
+                          { id: 'all', label: 'All Donors (Default)', font: fontFamily },
+                          { id: '1', label: '1st Place Donor', font: getEffectiveRankFont('1') },
+                          { id: '2', label: '2nd Place Donor', font: getEffectiveRankFont('2') },
+                          { id: '3', label: '3rd Place Donor', font: getEffectiveRankFont('3') }
+                        ] as { id: RankSourceOption; label: string; font: string }[]
+                      ).map((target) => {
+                        const isTargetActive = fontTarget === target.id;
+                        const hasCustomOverride = target.id !== 'all' && Boolean(rankFonts[target.id]);
+                        return (
                           <button
+                            key={target.id}
                             type="button"
-                            className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 flex-shrink-0 ${
-                              isSelected
-                                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/30'
-                                : 'bg-slate-800 hover:bg-amber-400 hover:text-slate-950 text-slate-300'
+                            onClick={() => {
+                              setFontTarget(target.id);
+                              setSelectedSourceRank(target.id);
+                            }}
+                            className={`p-2 rounded-lg border text-left transition-colors ${
+                              isTargetActive
+                                ? 'bg-slate-800 border-amber-500/70 text-white'
+                                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
                             }`}
                           >
-                            {isSelected ? (
-                              <>
-                                <Check size={12} className="stroke-[3]" />
-                                <span>Active</span>
-                              </>
-                            ) : (
-                              <span>Apply Style</span>
-                            )}
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[11px] font-semibold truncate">{target.label}</span>
+                              {hasCustomOverride && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                              )}
+                            </div>
+                            <div
+                              className="text-[10px] font-mono text-amber-300/90 truncate mt-0.5"
+                              style={{ fontFamily: `"${target.font}", sans-serif` }}
+                            >
+                              {target.font}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Search Fonts */}
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      value={fontSearch}
+                      onChange={(e) => setFontSearch(e.target.value)}
+                      placeholder="Search 89 English & Khmer fonts..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-600"
+                    />
+                  </div>
+
+                  {/* Font Category Tabs */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                    {(['All', 'English & Gaming', 'Khmer Unicode', 'KhmerAng Studio', 'System & Web'] as const).map(
+                      (cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setFontCategory(cat)}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors ${
+                            fontCategory === cat
+                              ? 'bg-slate-200 text-slate-950 font-semibold'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  {/* Font List */}
+                  <div className="space-y-1.5">
+                    {filteredFonts.map((f) => {
+                      const activeFontForTarget = getEffectiveRankFont(fontTarget);
+                      const isSelected = activeFontForTarget === f.value;
+                      const usedByRanks = (['1', '2', '3'] as const).filter(
+                        (r) => getEffectiveRankFont(r) === f.value
+                      );
+
+                      return (
+                        <button
+                          key={f.value}
+                          type="button"
+                          onClick={() => handleSelectFontForTarget(f.value, fontTarget)}
+                          className={`w-full px-3 py-2.5 rounded-lg border text-left transition-colors flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? 'bg-slate-800 border-amber-500/70 text-white'
+                              : 'bg-slate-900/50 border-slate-800/80 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-semibold text-white truncate">
+                                {f.label}
+                              </span>
+                              {usedByRanks.map((r) => (
+                                <span
+                                  key={r}
+                                  className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-mono font-bold"
+                                >
+                                  #{r}
+                                </span>
+                              ))}
+                            </div>
+                            <div
+                              className="text-xs text-slate-400 truncate mt-0.5"
+                              style={{ fontFamily: `"${f.value}", sans-serif` }}
+                            >
+                              {fontTarget === '2'
+                                ? 'Vannak KH  $50.00 • អ្នកឧបត្ថម្ភលេខ ២'
+                                : fontTarget === '3'
+                                ? 'Dara Cyber  $32.50 • អ្នកឧបត្ថម្ភលេខ ៣'
+                                : 'Sokha Gaming Pro  $85.00 • កំពូលអ្នកឧបត្ថម្ភ'}
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 shrink-0">
+                            {f.category === 'KhmerAng Studio'
+                              ? 'KhmerAng'
+                              : f.category === 'Khmer Unicode'
+                              ? 'Khmer'
+                              : f.category === 'English & Gaming'
+                              ? 'Gaming'
+                              : 'System'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION 3: DISPLAY & GENERAL SETTINGS */}
+              {activeSection === 'settings' && (
+                <div className="space-y-4">
+                  {/* Name & Amount Spacing Control */}
+                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-slate-200">
+                        Name & Amount Spacing
+                      </label>
+                      <span className="text-xs font-mono font-semibold text-amber-300">
+                        {nameAmountGap}px
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={4}
+                      max={40}
+                      step={1}
+                      value={nameAmountGap}
+                      onChange={(e) => setNameAmountGap(Number(e.target.value))}
+                      className="w-full accent-amber-400 cursor-pointer"
+                    />
+                    <div className="grid grid-cols-4 gap-1">
+                      {[
+                        { label: 'Tight (6px)', val: 6 },
+                        { label: 'Compact (10px)', val: 10 },
+                        { label: 'Medium (16px)', val: 16 },
+                        { label: 'Wide (24px)', val: 24 }
+                      ].map((preset) => (
+                        <button
+                          key={preset.val}
+                          type="button"
+                          onClick={() => setNameAmountGap(preset.val)}
+                          className={`py-1 px-1.5 rounded text-[10px] font-mono border transition-colors ${
+                            nameAmountGap === preset.val
+                              ? 'bg-slate-800 border-slate-500 text-white font-semibold'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Leaderboard Title */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Header Title
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="TOP SUPPORTERS"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-600"
+                    />
+                  </div>
+
+                  {/* Time Period */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Ranking Period
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: 'all', label: 'All-Time' },
+                        { id: 'month', label: 'This Month' },
+                        { id: 'week', label: 'This Week' },
+                        { id: 'today', label: 'Today' }
+                      ].map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setPeriod(p.id as any)}
+                          className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                            period === p.id
+                              ? 'bg-slate-800 border-slate-500 text-white'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Max Donor Rows */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Displayed Ranks
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[3, 5, 10].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => setMaxRows(num)}
+                          className={`py-2 px-2.5 rounded-lg text-xs font-mono font-semibold border transition-colors ${
+                            maxRows === num
+                              ? 'bg-slate-800 border-slate-500 text-white'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Top {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Accent Color */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Accent Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="w-9 h-9 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-white"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      {['#F59E0B', '#00F0FF', '#EAB308', '#10B981', '#EC4899', '#A855F7', '#EF4444', '#3B82F6'].map(
+                        (hex) => (
+                          <button
+                            key={hex}
+                            type="button"
+                            onClick={() => setAccentColor(hex)}
+                            className={`w-6 h-6 rounded-md border ${
+                              accentColor.toLowerCase() === hex.toLowerCase()
+                                ? 'border-white scale-110'
+                                : 'border-slate-700'
+                            }`}
+                            style={{ backgroundColor: hex }}
+                          />
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Visual Toggles */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                    <label className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 cursor-pointer">
+                      <span className="text-xs text-slate-200">Show Card Background</span>
+                      <input
+                        type="checkbox"
+                        checked={showBackground}
+                        onChange={(e) => setShowBackground(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 cursor-pointer">
+                      <span className="text-xs text-slate-200 flex items-center gap-1.5">
+                        <Crown size={13} className="text-amber-400" />
+                        <span>Show Rank Crown & Medals</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={showRankBadges}
+                        onChange={(e) => setShowRankBadges(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 cursor-pointer">
+                      <span className="text-xs text-slate-200">Enable Live Animations</span>
+                      <input
+                        type="checkbox"
+                        checked={showAnimation}
+                        onChange={(e) => setShowAnimation(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Dedicated Rank Source URLs & Per-Donor Font Picker */}
+                  <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                    <div className="text-xs font-medium text-slate-300">
+                      Dedicated Top Donor Rank URLs & Fonts
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Place 1st, 2nd, or 3rd donor name & amount individually in OBS with its own dedicated font.
+                    </p>
+                    <label className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 cursor-pointer">
+                      <span className="text-xs text-slate-200">Remove Background Card in Rank URL</span>
+                      <input
+                        type="checkbox"
+                        checked={removeRankCardBg}
+                        onChange={(e) => setRemoveRankCardBg(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0"
+                      />
+                    </label>
+                    {(
+                      [
+                        { id: '1', title: '1st Place Donor' },
+                        { id: '2', title: '2nd Place Donor' },
+                        { id: '3', title: '3rd Place Donor' }
+                      ] as { id: RankSourceOption; title: string }[]
+                    ).map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold text-white">{r.title}</div>
+                            <div className="text-[10px] font-mono text-slate-400 truncate">
+                              {getRankObsUrl(r.id)}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyUrl(r.id)}
+                            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-medium flex items-center gap-1 shrink-0"
+                          >
+                            {copiedTarget === r.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                            <span>{copiedTarget === r.id ? 'Copied' : 'Copy'}</span>
                           </button>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
 
-      {/* ============================================================== */}
-      {/* 4. BOTTOM FLOATING UNSAVED CHANGES TOAST BAR                   */}
-      {/* ============================================================== */}
-      <div
-        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1.5rem)] max-w-xl transition-all duration-300 ease-in-out ${
-          hasUnsavedChanges
-            ? 'translate-y-0 opacity-100 pointer-events-auto'
-            : 'translate-y-24 opacity-0 pointer-events-none'
-        } ${isEarthquake ? 'animate-toast-earthquake' : ''}`}
-      >
+                        {/* Per-Donor Font Dropdown */}
+                        <div className="flex items-center gap-2 pt-1.5 border-t border-slate-800/70">
+                          <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                            #{r.id} Font:
+                          </span>
+                          <select
+                            value={getEffectiveRankFont(r.id)}
+                            onChange={(e) => handleSelectFontForTarget(e.target.value, r.id)}
+                            className="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-slate-600"
+                          >
+                            {ALL_CLIENT_FONTS.map((f) => (
+                              <option key={f.value} value={f.value}>
+                                {f.label} ({f.category})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+        </aside>
+      </div>
+
+      {/* Floating Unsaved Changes Toast Bar */}
+      {hasUnsavedChanges && (
         <div
-          className={`rounded-2xl px-4 py-3 backdrop-blur-xl transition-all duration-300 flex items-center justify-between gap-3 ${
-            isEarthquake
-              ? 'bg-gradient-to-r from-red-950/95 via-rose-950/95 to-red-950/95 border-2 border-red-500 shadow-[0_0_35px_rgba(239,68,68,0.7),0_14px_45px_rgba(0,0,0,0.95)] animate-toast-red-pulse'
-              : 'bg-[#0B101E]/95 border border-amber-500/40 shadow-[0_14px_45px_rgba(0,0,0,0.85),0_0_25px_rgba(245,158,11,0.18)]'
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-200 ${
+            isEarthquake ? 'animate-shake' : ''
           }`}
         >
-          <div className="flex items-center gap-2.5 min-w-0">
-            {isEarthquake ? (
-              <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 flex-shrink-0 shadow-[0_0_12px_rgba(239,68,68,0.5)]">
-                <AlertTriangle size={16} className="animate-bounce" />
-              </div>
-            ) : (
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
-            )}
-            <div className="min-w-0">
-              <div className={`text-xs font-bold truncate flex items-center gap-1.5 ${isEarthquake ? 'text-red-200' : 'text-slate-100'}`}>
-                {isEarthquake ? (
-                  <>
-                    <span className="font-black text-red-400 uppercase tracking-wider">Unsaved Changes!</span>
-                    <span className="hidden sm:inline text-red-200 font-medium">— Navigation blocked</span>
-                  </>
+          <div className="bg-[#0B0F19] border border-slate-700 rounded-lg px-4 py-2.5 shadow-2xl flex items-center gap-4">
+            <span className="text-xs font-medium text-slate-300">
+              {isEarthquake ? 'Unsaved changes — please save or reset first' : 'Careful — you have unsaved changes'}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={saving}
+                className="px-2.5 py-1 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="px-3.5 py-1.5 rounded bg-white hover:bg-slate-200 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                {saving ? (
+                  <span>Saving...</span>
                 ) : (
-                  <span>Careful — you have unsaved changes!</span>
+                  <>
+                    <Save size={13} />
+                    <span>Save Changes</span>
+                  </>
                 )}
-              </div>
-              <p className={`text-[10px] truncate hidden xs:block ${isEarthquake ? 'text-red-300 font-semibold' : 'text-slate-400'}`}>
-                {isEarthquake
-                  ? 'Please Save or Reset changes before switching to another feature!'
-                  : 'Save your configuration to sync with OBS leaderboard'}
-              </p>
+              </button>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              type="button"
-              disabled={isSaving}
-              onClick={handleResetChanges}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
-                isEarthquake
-                  ? 'bg-red-950/80 border border-red-500/40 text-red-300 hover:bg-red-900/60 hover:text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-              } disabled:opacity-50`}
-            >
-              Reset
-            </button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={handleSaveSettings}
-              loading={isSaving}
-              className={`font-bold font-mono text-xs px-4 border-0 transition-all shadow-md active:scale-95 ${
-                isEarthquake
-                  ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.6)] animate-pulse'
-                  : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.3)]'
-              }`}
-            >
-              {saveSuccess ? (
-                <span className="flex items-center gap-1.5 font-black text-slate-950">
-                  <CheckCircle2 size={13} />
-                  <span>Saved!</span>
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <Save size={13} className={isEarthquake ? 'text-white' : 'text-slate-950'} />
-                  <span>Save Changes</span>
-                </span>
-              )}
-            </Button>
-          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

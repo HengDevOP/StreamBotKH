@@ -421,7 +421,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
     }
     return true;
   });
-  const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(false);
+  const [isVideoSettingsOpen, setIsVideoSettingsOpen] = useState(true);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [liveTokenUsage, setLiveTokenUsage] = useState<TokenUsage | null>(null);
 
@@ -495,6 +495,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
   };
   const [chatHasUnsavedChanges, setChatHasUnsavedChanges] = useState(false);
   const [videoHasUnsavedChanges, setVideoHasUnsavedChanges] = useState(false);
+  const [isLeaderboardSettingsOpen, setIsLeaderboardSettingsOpen] = useState(true);
+  const [isBroadcastSettingsOpen, setIsBroadcastSettingsOpen] = useState(true);
+  const [isSoundboardSettingsOpen, setIsSoundboardSettingsOpen] = useState(true);
   const [unsavedTabs, setUnsavedTabs] = useState<Record<string, boolean>>({});
 
   // Close dropup menu on outside clicks
@@ -2588,43 +2591,90 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               </button>
             )}
 
-            {/* Video Share Settings Toggle Menu Button (Top Navbar Right Side - Mobile Only) */}
+            {/* Video Share Rightbar Toggle Button */}
             {activeTab === 'video-alerts' && (
               <button
                 type="button"
                 onClick={() => {
                   setIsVideoSettingsOpen((prev) => !prev);
                 }}
-                className={`lg:hidden relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   isVideoSettingsOpen
-                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                    ? 'bg-slate-200 text-slate-950'
                     : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white shadow-sm'
                 }`}
-                title="Toggle Video Share Settings"
+                title={isVideoSettingsOpen ? 'Hide Video Share Settings' : 'Show Video Share Settings'}
                 aria-label="Toggle Video Alert Settings"
               >
-                {isVideoSettingsOpen ? (
-                  <X size={16} />
-                ) : (
-                  <Menu size={16} className="text-slate-300" />
-                )}
+                <PanelRight size={17} className={isVideoSettingsOpen ? 'text-slate-950' : 'text-slate-300'} />
                 {videoHasUnsavedChanges && (
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
                 )}
+              </button>
+            )}
+
+            {/* Leaderboard Rightbar Toggle Button */}
+            {activeTab === 'leaderboard' && (
+              <button
+                type="button"
+                onClick={() => setIsLeaderboardSettingsOpen((prev) => !prev)}
+                className={`relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isLeaderboardSettingsOpen
+                    ? 'bg-slate-200 text-slate-950'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white shadow-sm'
+                }`}
+                title={isLeaderboardSettingsOpen ? 'Hide Configuration' : 'Show Configuration'}
+                aria-label="Toggle Leaderboard Configuration"
+              >
+                <PanelRight size={17} className={isLeaderboardSettingsOpen ? 'text-slate-950' : 'text-slate-300'} />
+              </button>
+            )}
+
+            {/* Broadcast Channels Rightbar Toggle Button */}
+            {activeTab === 'broadcast' && (
+              <button
+                type="button"
+                onClick={() => setIsBroadcastSettingsOpen((prev) => !prev)}
+                className={`relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isBroadcastSettingsOpen
+                    ? 'bg-slate-200 text-slate-950'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white shadow-sm'
+                }`}
+                title={isBroadcastSettingsOpen ? 'Hide Broadcast Channels' : 'Show Broadcast Channels'}
+                aria-label="Toggle Broadcast Channels Rightbar"
+              >
+                <PanelRight size={17} className={isBroadcastSettingsOpen ? 'text-slate-950' : 'text-slate-300'} />
+              </button>
+            )}
+
+            {/* Soundboard Rightbar Toggle Button */}
+            {activeTab === 'soundboard' && (
+              <button
+                type="button"
+                onClick={() => setIsSoundboardSettingsOpen((prev) => !prev)}
+                className={`relative flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isSoundboardSettingsOpen
+                    ? 'bg-slate-200 text-slate-950'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white shadow-sm'
+                }`}
+                title={isSoundboardSettingsOpen ? 'Hide Soundboard Configuration' : 'Show Soundboard Configuration'}
+                aria-label="Toggle Soundboard Rightbar"
+              >
+                <PanelRight size={17} className={isSoundboardSettingsOpen ? 'text-slate-950' : 'text-slate-300'} />
               </button>
             )}
           </div>
         </header>
 
         {/* Dynamic Workbench Views (Internally Scrollable Container Only) */}
-        <div className={`flex-1 min-h-0 ${activeTab === 'chat' || activeTab === 'video-alerts' || activeTab === 'support' || activeTab === 'admin-requests' || (activeTab as any) === 'report-issue' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
-        <div className={activeTab === 'chat' || activeTab === 'video-alerts' || activeTab === 'support' || activeTab === 'admin-requests' || (activeTab as any) === 'report-issue'
+        <div className={`flex-1 min-h-0 ${activeTab === 'chat' || activeTab === 'video-alerts' || activeTab === 'leaderboard' || activeTab === 'broadcast' || activeTab === 'soundboard' || activeTab === 'support' || activeTab === 'admin-requests' || (activeTab as any) === 'report-issue' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto overscroll-contain'}`}>
+        <div className={activeTab === 'chat' || activeTab === 'video-alerts' || activeTab === 'leaderboard' || activeTab === 'broadcast' || activeTab === 'soundboard' || activeTab === 'support' || activeTab === 'admin-requests' || (activeTab as any) === 'report-issue'
           ? 'w-full h-full p-2.5 sm:p-4 lg:p-5 flex-1 flex flex-col min-h-0 overflow-hidden'
           : activeTab === 'overview'
           ? 'w-full min-h-full p-3 xs:p-4 sm:p-5 lg:p-6 flex flex-col animate-fadeIn'
           : 'p-3 xs:p-4 sm:p-6 lg:p-7 max-w-7xl 2xl:max-w-[1600px] w-full mx-auto space-y-6 animate-fadeIn pb-16'
         }>
-          {loading && activeTab !== 'account' ? (
+          {(authLoading || loading) ? (
             <FeatureTabSkeleton tab={activeTab} />
           ) : (
             <>
@@ -2800,6 +2850,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
             <LeaderboardWidgetManager
               streamerToken={user?.overlayToken}
               recentDonations={stats?.recentDonations}
+              isRightbarOpen={isLeaderboardSettingsOpen}
+              onToggleRightbar={() => setIsLeaderboardSettingsOpen((prev) => !prev)}
+              onCloseRightbar={() => setIsLeaderboardSettingsOpen(false)}
             />
           )}
 
@@ -2826,6 +2879,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
           {activeTab === 'soundboard' && (
             <SoundboardManager
               streamerToken={user?.overlayToken}
+              isRightbarOpen={isSoundboardSettingsOpen}
+              onToggleRightbar={() => setIsSoundboardSettingsOpen((prev) => !prev)}
+              onCloseRightbar={() => setIsSoundboardSettingsOpen(false)}
             />
           )}
 
@@ -2857,6 +2913,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate, initia
               user={user}
               onRefreshUser={refreshUser}
               onNavigateToTab={(tab) => handleTabNavigation(tab as DashboardTab)}
+              isRightbarOpen={isBroadcastSettingsOpen}
+              onToggleRightbar={() => setIsBroadcastSettingsOpen((prev) => !prev)}
+              onCloseRightbar={() => setIsBroadcastSettingsOpen(false)}
             />
           )}
 

@@ -1575,15 +1575,6 @@ export const SubscriberAlertStudio: React.FC<SubscriberAlertStudioProps> = ({
       )}
 
       {/* 4. TOAST NOTIFICATIONS */}
-      {saveSuccessToast && (
-        <div className="fixed top-6 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
-          <div className="rounded-xl px-4 py-2.5 bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold flex items-center gap-2 shadow-2xl shadow-emerald-950/50">
-            <Check className="w-4 h-4 text-emerald-400" />
-            <span>Alert settings for &quot;{tier.name}&quot; saved successfully!</span>
-          </div>
-        </div>
-      )}
-
       {testToast && (
         <div className="fixed top-18 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
           <div className="rounded-xl px-4 py-2.5 bg-cyan-950/90 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-bold flex items-center gap-2 shadow-2xl shadow-cyan-950/50">
